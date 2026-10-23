@@ -1,4 +1,5 @@
 import type {
+  BackupKind,
   Brand,
   ConfirmationPort,
   DeviceModel,
@@ -32,6 +33,7 @@ export type LedgerHandlerOptions = {
   confirmation: ConfirmationPort;
   slotId: string;
   entropy: Uint8Array;
+  backup?: BackupKind;
   mtu?: number;
 };
 
@@ -43,6 +45,7 @@ export class LedgerProtocolHandler implements ProtocolHandler {
   private readonly confirmation: ConfirmationPort;
   private readonly slotId: string;
   private readonly entropy: Uint8Array;
+  private readonly backup: BackupKind;
   private readonly assembler = new BleReassembler();
   private readonly ethSession: EthSession = {};
   private mtu: number;
@@ -53,6 +56,7 @@ export class LedgerProtocolHandler implements ProtocolHandler {
     this.confirmation = options.confirmation;
     this.slotId = options.slotId;
     this.entropy = options.entropy;
+    this.backup = options.backup ?? 'bip39';
     this.mtu = clampMtu(options.mtu ?? DEFAULT_MTU);
     this.models = [options.model.id];
   }
@@ -150,6 +154,7 @@ export class LedgerProtocolHandler implements ProtocolHandler {
         confirmation: this.confirmation,
         slotId: this.slotId,
         entropy: this.entropy,
+        backup: this.backup,
         session: this.ethSession,
       });
     }

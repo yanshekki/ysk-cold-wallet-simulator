@@ -1,16 +1,26 @@
+import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { SeedSlot } from '@cws/contracts';
-import { colors, fonts, radius, space } from './theme';
+import { colors, radius, space } from './theme';
 
 type Props = {
   slot: SeedSlot;
   selected?: boolean;
-  address?: string | null;
+  badge?: string;
   onPress?: () => void;
   onDelete?: () => void;
+  children?: ReactNode;
 };
 
-export function SeedCard({ slot, selected, address, onPress, onDelete }: Props) {
+export function backupBadge(slot: SeedSlot): string {
+  const kind = (slot.backup ?? 'bip39').toUpperCase();
+  if (slot.backup === 'slip39' && slot.shares) {
+    return `${kind} ${slot.shares.threshold}-of-${slot.shares.count}`;
+  }
+  return `${kind} ${slot.wordCount}`;
+}
+
+export function SeedCard({ slot, selected, badge, onPress, onDelete, children }: Props) {
   return (
     <View style={[styles.card, selected && styles.selected]}>
       <View style={styles.row}>
@@ -23,9 +33,8 @@ export function SeedCard({ slot, selected, address, onPress, onDelete }: Props) 
         >
           <Text style={styles.label}>{slot.label}</Text>
           <Text style={styles.meta}>
-            {slot.wordCount} words · {slot.brand} · {slot.modelId}
+            {badge ?? backupBadge(slot)} · {slot.brand} · {slot.modelId}
           </Text>
-          {address ? <Text style={styles.address}>{address}</Text> : null}
         </Pressable>
         {onDelete ? (
           <Pressable
@@ -38,6 +47,7 @@ export function SeedCard({ slot, selected, address, onPress, onDelete }: Props) 
           </Pressable>
         ) : null}
       </View>
+      {selected && children ? <View style={styles.inspector}>{children}</View> : null}
     </View>
   );
 }
@@ -72,14 +82,14 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontSize: 13,
   },
-  address: {
-    color: colors.ok,
-    fontFamily: fonts.mono,
-    fontSize: 12,
-    marginTop: 8,
-  },
   delete: {
     color: colors.danger,
     fontWeight: '600',
+  },
+  inspector: {
+    marginTop: space.md,
+    paddingTop: space.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
   },
 });

@@ -5,6 +5,7 @@ import { secp256k1 } from '@noble/curves/secp256k1';
 import { keccak_256 } from '@noble/hashes/sha3';
 import { ripemd160 } from '@noble/hashes/ripemd160';
 import { sha256 } from '@noble/hashes/sha2';
+import type { BackupKind } from '@cws/contracts';
 import { bytesToHex, concatBytes, encodeUtf8 } from './bytes';
 
 const BASE58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
@@ -17,9 +18,12 @@ export function derivePrivateKey(
   entropy: Uint8Array,
   path: string,
   passphrase?: string,
+  backup: BackupKind = 'bip39',
 ): Uint8Array {
-  const mnemonic = mnemonicFromEntropy(entropy);
-  const seed = mnemonicToSeedSync(mnemonic, passphrase ?? '');
+  const seed =
+    backup === 'slip39'
+      ? entropy
+      : mnemonicToSeedSync(mnemonicFromEntropy(entropy), passphrase ?? '');
   const child = HDKey.fromMasterSeed(seed).derive(path);
   if (!child.privateKey) {
     throw new Error('derived key has no private key');

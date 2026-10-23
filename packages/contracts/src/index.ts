@@ -11,12 +11,18 @@ export interface DeviceModel {
   protocol: 'ledger-apdu' | 'thp' | 'onekey-v1' | 'onekey-v2';
 }
 
+export type BackupKind = 'bip39' | 'slip39';
+
+export type WordCount = 12 | 15 | 18 | 21 | 24 | 20 | 33;
+
 export interface SeedSlot {
   id: string;
   label: string;
   brand: Brand;
   modelId: string;
-  wordCount: 12 | 24;
+  backup?: BackupKind;
+  wordCount: WordCount;
+  shares?: { threshold: number; count: number };
   createdAt: number;
   // seed itself is never in this object — only in SecureStore
 }

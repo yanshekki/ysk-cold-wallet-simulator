@@ -2,48 +2,58 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, StyleSheet, Text } from 'react-native';
 import type { SeedSlot } from '@cws/contracts';
-import { Button, Screen, SeedCard, colors } from '@cws/ui';
-import { derivedEthAddress } from '../../src/lab/ethAddress';
+import { inspectAddresses, type InspectRow } from '@cws/sdk';
+import { AddressInspector, Button, Screen, SeedCard, colors } from '@cws/ui';
+import { copyText } from '../../src/lab/copy';
 import { deleteSlot, listSlots, loadEntropy } from '../../src/seeds/vault';
 import { useAppState } from '../../src/state/AppState';
 
 export default function VaultScreen() {
   const router = useRouter();
-  const { seed, selectSeed } = useAppState();
+  const { seed, model, selectSeed } = useAppState();
   const [slots, setSlots] = useState<SeedSlot[]>([]);
-  const [address, setAddress] = useState<string | null>(null);
+  const [rows, setRows] = useState<InspectRow[]>([]);
+  const [passphrase, setPassphrase] = useState('');
   const [deriveError, setDeriveError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setSlots(await listSlots());
   }, []);
 
-  const loadAddress = useCallback(async (slot: SeedSlot | null) => {
-    if (!slot) {
-      setAddress(null);
-      setDeriveError(null);
-      return;
-    }
-    try {
-      const entropy = await loadEntropy(slot.id);
-      setAddress(derivedEthAddress(entropy));
-      setDeriveError(null);
-    } catch (err) {
-      setAddress(null);
-      setDeriveError(err instanceof Error ? err.message : 'could not derive address');
-    }
-  }, []);
+  const loadInspector = useCallback(
+    async (slot: SeedSlot | null, phrase: string) => {
+      if (!slot) {
+        setRows([]);
+        setDeriveError(null);
+        return;
+      }
+      try {
+        const secret = await loadEntropy(slot.id);
+        setRows(inspectAddresses(secret, slot.backup ?? 'bip39', phrase));
+        setDeriveError(null);
+      } catch (err) {
+        setRows([]);
+        setDeriveError(err instanceof Error ? err.message : 'could not derive addresses');
+      }
+    },
+    [],
+  );
 
   useFocusEffect(
     useCallback(() => {
       void refresh();
-      void loadAddress(seed);
-    }, [loadAddress, refresh, seed]),
+      void loadInspector(seed, passphrase);
+    }, [loadInspector, passphrase, refresh, seed]),
   );
 
   const onSelect = (slot: SeedSlot) => {
     selectSeed(slot);
-    void loadAddress(slot);
+    void loadInspector(slot, passphrase);
+  };
+
+  const onPassphrase = (value: string) => {
+    setPassphrase(value);
+    void loadInspector(seed, value);
   };
 
   const onDelete = (slot: SeedSlot) => {
@@ -57,7 +67,7 @@ export default function VaultScreen() {
             await deleteSlot(slot.id);
             if (seed?.id === slot.id) {
               selectSeed(null);
-              setAddress(null);
+              setRows([]);
             }
             await refresh();
           })();
@@ -66,17 +76,19 @@ export default function VaultScreen() {
     ]);
   };
 
+  const ledgerSlip39 = seed?.backup === 'slip39' && model?.brand === 'ledger';
+
   return (
     <Screen
       kicker="Vault"
       title="Seeds"
-      subtitle="Entropy stays in SecureStore. The mnemonic is never persisted after the first reveal."
+      subtitle="BIP39 12–24 and SLIP-39 backups. Entropy stays in SecureStore. The words are never persisted after the first reveal."
       edges={[]}
     >
-      <Button label="Generate 12/24 words" onPress={() => router.push('/seeds/new')} />
-      <Button label="Import mnemonic" variant="ghost" onPress={() => router.push('/seeds/import')} />
+      <Button label="Generate backup" onPress={() => router.push('/seeds/new')} />
+      <Button label="Import backup" variant="ghost" onPress={() => router.push('/seeds/import')} />
       {slots.length === 0 ? (
-        <Text style={styles.empty}>No seeds yet. Generate one, then start the radio from Device.</Text>
+        <Text style={styles.empty}>Generate a BIP39 or SLIP-39 backup, then start the radio from Device.</Text>
       ) : null}
       {deriveError ? <Text style={styles.error}>{deriveError}</Text> : null}
       {slots.map((slot) => (
@@ -84,10 +96,26 @@ export default function VaultScreen() {
           key={slot.id}
           slot={slot}
           selected={seed?.id === slot.id}
-          address={seed?.id === slot.id ? address : null}
           onPress={() => onSelect(slot)}
           onDelete={() => onDelete(slot)}
-        />
+        >
+          <AddressInspector
+            rows={rows}
+            passphrase={passphrase}
+            onPassphrase={onPassphrase}
+            onCopy={(value) => void copyText(value)}
+            warning={
+              ledgerSlip39
+                ? 'Ledger Live expects BIP39. A SLIP-39 secret will not match a Ledger-restored seed.'
+                : null
+            }
+            hint={
+              slot.backup === 'slip39'
+                ? 'SLIP-39 passphrase is applied when combining shares, not as a BIP39 25th word.'
+                : undefined
+            }
+          />
+        </SeedCard>
       ))}
     </Screen>
   );

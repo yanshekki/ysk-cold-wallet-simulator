@@ -51,6 +51,7 @@ type AppStateValue = {
   setApp: (app: LedgerApp) => void;
   setPassphrase: (value: string) => void;
   resolveSigning: (ok: boolean) => void;
+  clearLogs: () => void;
 };
 
 const AppStateContext = createContext<AppStateValue | null>(null);
@@ -73,20 +74,26 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const handlerRef = useRef<ProtocolHandler | null>(null);
   const pendingRef = useRef<PendingConfirm | null>(null);
   const passphraseRef = useRef('');
+  const logSeq = useRef(0);
 
   const appendLog = useCallback((direction: 'in' | 'out', hex: string, note?: string) => {
-    setLogs((current) =>
-      [
+    setLogs((current) => {
+      const next = [
+        ...current,
         {
-          id: `${Date.now()}-${current.length}`,
+          id: `log-${logSeq.current++}`,
           at: Date.now(),
           direction,
           hex,
           note,
         },
-        ...current,
-      ].slice(0, 80),
-    );
+      ];
+      return next.length > 1000 ? next.slice(next.length - 1000) : next;
+    });
+  }, []);
+
+  const clearLogs = useCallback(() => {
+    setLogs([]);
   }, []);
 
   const confirmation = useMemo<ConfirmationPort>(
@@ -176,6 +183,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         confirmation,
         slotId: seed.id,
         entropy,
+        backup: seed.backup ?? 'bip39',
       });
       handlerRef.current = handler;
       setLogs([]);
@@ -244,9 +252,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         setPassphrase(value);
       },
       resolveSigning,
+      clearLogs,
     }),
     [
       advertising,
+      clearLogs,
       connected,
       connectedLabel,
       currentApp,

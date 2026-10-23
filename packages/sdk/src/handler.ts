@@ -1,4 +1,4 @@
-import type { ConfirmationPort, DeviceModel, ProtocolHandler } from '@cws/contracts';
+import type { BackupKind, ConfirmationPort, DeviceModel, ProtocolHandler } from '@cws/contracts';
 import {
   DEFAULT_MTU,
   LedgerProtocolHandler,
@@ -17,6 +17,7 @@ export type CreateHandlerOptions = {
   confirmation: ConfirmationPort;
   slotId: string;
   entropy: Uint8Array;
+  backup?: BackupKind;
   mtu?: number;
 };
 

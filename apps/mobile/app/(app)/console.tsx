@@ -1,36 +1,39 @@
-import { StyleSheet, Text } from 'react-native';
-import { ApduLog, Screen, colors } from '@cws/ui';
-import { copyText } from '../../src/lab/copy';
+import { StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { LogEditor, colors, space } from '@cws/ui';
+import { copyText, exportText } from '../../src/lab/copy';
 import { useAppState } from '../../src/state/AppState';
 
 export default function ConsoleScreen() {
-  const { model, seed, advertising, connected, connectedLabel, logs, error } = useAppState();
-  const host = connected ? connectedLabel : advertising ? `ADV ${model?.name ?? ''}` : 'Idle';
+  const { logs, error, clearLogs } = useAppState();
 
   return (
-    <Screen
-      kicker="Console"
-      title={host}
-      subtitle={
-        seed
-          ? `${model?.name ?? 'Device'} · ${seed.label}`
-          : 'Select a seed in Vault, then advertise from Device.'
-      }
-      scroll={false}
-      edges={[]}
-    >
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      <ApduLog
-        fill
-        entries={logs}
-        emptyLabel="Waiting for host… advertise from Device."
-        onCopyLast={(hex) => void copyText(hex)}
-      />
-    </Screen>
+    <SafeAreaView style={styles.safe} edges={['bottom']}>
+      <View style={styles.body}>
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+        <LogEditor
+          entries={logs}
+          onCopy={(text) => void copyText(text)}
+          onClear={clearLogs}
+          onExport={(text) => void exportText('cws-console.txt', text)}
+        />
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safe: {
+    flex: 1,
+    backgroundColor: colors.bg,
+  },
+  body: {
+    flex: 1,
+    minHeight: 0,
+    paddingHorizontal: space.md,
+    paddingTop: space.sm,
+    gap: space.sm,
+  },
   error: {
     color: colors.danger,
   },

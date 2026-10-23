@@ -3,6 +3,7 @@ import { entropyToMnemonic, mnemonicToSeedSync } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
 import { secp256k1 } from '@noble/curves/secp256k1';
 import { keccak_256 } from '@noble/hashes/sha3';
+import type { BackupKind } from '@cws/contracts';
 import { bytesToHex, concatBytes, encodeAscii } from './bytes';
 
 export function mnemonicFromEntropy(entropy: Uint8Array): string {
@@ -13,9 +14,12 @@ export function derivePrivateKey(
   entropy: Uint8Array,
   path: string,
   passphrase?: string,
+  backup: BackupKind = 'bip39',
 ): Uint8Array {
-  const mnemonic = mnemonicFromEntropy(entropy);
-  const seed = mnemonicToSeedSync(mnemonic, passphrase ?? '');
+  const seed =
+    backup === 'slip39'
+      ? entropy
+      : mnemonicToSeedSync(mnemonicFromEntropy(entropy), passphrase ?? '');
   const child = HDKey.fromMasterSeed(seed).derive(path);
   if (!child.privateKey) {
     throw new Error('derived key has no private key');

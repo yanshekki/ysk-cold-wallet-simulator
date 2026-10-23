@@ -1,4 +1,4 @@
-import type { Brand, ConfirmationPort, DeviceModel, ProtocolHandler, SigningRequest } from '@cws/contracts';
+import type { BackupKind, Brand, ConfirmationPort, DeviceModel, ProtocolHandler, SigningRequest } from '@cws/contracts';
 import { keccak_256 } from '@noble/hashes/sha3';
 import { sha256 } from '@noble/hashes/sha2';
 import {
@@ -80,6 +80,7 @@ export type TrezorHandlerOptions = {
   confirmation: ConfirmationPort;
   slotId: string;
   entropy: Uint8Array;
+  backup?: BackupKind;
   mtu?: number;
 };
 
@@ -131,6 +132,7 @@ export class TrezorThpProtocolHandler implements ProtocolHandler {
   private readonly confirmation: ConfirmationPort;
   private readonly slotId: string;
   private readonly entropy: Uint8Array;
+  private readonly backup: BackupKind;
   private readonly assembler = new ThpReassembler();
   private readonly deviceProperties = encodeDeviceProperties();
   private readonly credAuthKey = randomBytes(32);
@@ -156,6 +158,7 @@ export class TrezorThpProtocolHandler implements ProtocolHandler {
     this.confirmation = options.confirmation;
     this.slotId = options.slotId;
     this.entropy = options.entropy;
+    this.backup = options.backup ?? 'bip39';
     this.mtu = clampMtu(options.mtu ?? DEFAULT_MTU);
     this.models = [options.model.id];
     this.noise = new ThpNoiseResponder(this.deviceProperties, this.credAuthKey);
@@ -488,7 +491,7 @@ export class TrezorThpProtocolHandler implements ProtocolHandler {
     }
     const passphrase =
       (await this.confirmation.getPassphrase(this.slotId)) ?? this.sessions.get(pending.sessionId) ?? '';
-    const privateKey = derivePrivateKey(this.entropy, pending.path, passphrase);
+    const privateKey = derivePrivateKey(this.entropy, pending.path, passphrase, this.backup);
     const address = ethereumAddressFromPrivateKey(privateKey);
     if (pending.kind === 'eth-address') {
       return encodeL4(pending.sessionId, MessageType.EthereumAddress, encodeEthereumAddress(address));

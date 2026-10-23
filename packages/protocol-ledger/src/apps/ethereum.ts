@@ -14,7 +14,7 @@ import {
   publicKeyUncompressed,
   signPersonalMessage,
 } from '../crypto';
-import type { ConfirmationPort, SigningRequest } from '@cws/contracts';
+import type { BackupKind, ConfirmationPort, SigningRequest } from '@cws/contracts';
 
 export const ETH_APP_VERSION = Uint8Array.of(0x00, 0x01, 0x11, 0x00);
 
@@ -30,6 +30,7 @@ export type EthContext = {
   confirmation: ConfirmationPort;
   slotId: string;
   entropy: Uint8Array;
+  backup?: BackupKind;
   session: EthSession;
 };
 
@@ -61,7 +62,7 @@ async function handleGetAddress(apdu: Apdu, ctx: EthContext): Promise<Uint8Array
     return encodeResponse(new Uint8Array(), SW_DENY);
   }
   const passphrase = await ctx.confirmation.getPassphrase(ctx.slotId);
-  const privateKey = derivePrivateKey(ctx.entropy, path, passphrase);
+  const privateKey = derivePrivateKey(ctx.entropy, path, passphrase, ctx.backup);
   const pub = publicKeyUncompressed(privateKey);
   const address = ethereumAddressFromPrivateKey(privateKey);
   const addressBytes = encodeAscii(address);
@@ -117,7 +118,7 @@ async function handlePersonalSign(apdu: Apdu, ctx: EthContext): Promise<Uint8Arr
     return encodeResponse(new Uint8Array(), SW_DENY);
   }
   const passphrase = await ctx.confirmation.getPassphrase(ctx.slotId);
-  const privateKey = derivePrivateKey(ctx.entropy, pending.path, passphrase);
+  const privateKey = derivePrivateKey(ctx.entropy, pending.path, passphrase, ctx.backup);
   const signature = signPersonalMessage(privateKey, message);
   return encodeResponse(signature, SW_OK);
 }

@@ -1,4 +1,4 @@
-import type { Brand, ConfirmationPort, DeviceModel, ProtocolHandler, SigningRequest } from '@cws/contracts';
+import type { BackupKind, Brand, ConfirmationPort, DeviceModel, ProtocolHandler, SigningRequest } from '@cws/contracts';
 import { keccak_256 } from '@noble/hashes/sha3';
 import { bytesToHex, encodeUtf8 } from './bytes';
 import {
@@ -39,6 +39,7 @@ export type OneKeyHandlerOptions = {
   confirmation: ConfirmationPort;
   slotId: string;
   entropy: Uint8Array;
+  backup?: BackupKind;
   mtu?: number;
 };
 
@@ -89,6 +90,7 @@ export class OneKeyV1ProtocolHandler implements ProtocolHandler {
   private readonly confirmation: ConfirmationPort;
   private readonly slotId: string;
   private readonly entropy: Uint8Array;
+  private readonly backup: BackupKind;
   private readonly assembler = new V1Reassembler();
   private readonly sessionId: Uint8Array;
   private readonly serial: string;
@@ -100,6 +102,7 @@ export class OneKeyV1ProtocolHandler implements ProtocolHandler {
     this.confirmation = options.confirmation;
     this.slotId = options.slotId;
     this.entropy = options.entropy;
+    this.backup = options.backup ?? 'bip39';
     this.mtu = clampMtu(options.mtu ?? DEFAULT_MTU);
     this.models = [options.model.id];
     this.sessionId = keccak_256(encodeUtf8(`cws:${options.slotId}:${options.model.id}`));
@@ -312,7 +315,7 @@ export class OneKeyV1ProtocolHandler implements ProtocolHandler {
 
   private async ethAddressReply(path: string, replyType: number): Promise<Uint8Array> {
     const passphrase = await this.confirmation.getPassphrase(this.slotId);
-    const privateKey = derivePrivateKey(this.entropy, path, passphrase);
+    const privateKey = derivePrivateKey(this.entropy, path, passphrase, this.backup);
     const address = ethereumAddressFromPrivateKey(privateKey);
     return this.reply(replyType, encodeEthereumAddress(address));
   }
@@ -323,7 +326,7 @@ export class OneKeyV1ProtocolHandler implements ProtocolHandler {
     replyType: number,
   ): Promise<Uint8Array> {
     const passphrase = await this.confirmation.getPassphrase(this.slotId);
-    const privateKey = derivePrivateKey(this.entropy, path, passphrase);
+    const privateKey = derivePrivateKey(this.entropy, path, passphrase, this.backup);
     const address = ethereumAddressFromPrivateKey(privateKey);
     const signature = signPersonalMessage(privateKey, message);
     return this.reply(replyType, encodeEthereumMessageSignature(signature, address));
@@ -331,7 +334,7 @@ export class OneKeyV1ProtocolHandler implements ProtocolHandler {
 
   private async bitcoinAddressReply(path: string, coinName: string): Promise<Uint8Array> {
     const passphrase = await this.confirmation.getPassphrase(this.slotId);
-    const privateKey = derivePrivateKey(this.entropy, path, passphrase);
+    const privateKey = derivePrivateKey(this.entropy, path, passphrase, this.backup);
     const testnet = /testnet|regtest/i.test(coinName);
     const address = bitcoinP2pkhAddress(privateKey, testnet);
     return this.reply(MessageType.Address, encodeBitcoinAddress(address));

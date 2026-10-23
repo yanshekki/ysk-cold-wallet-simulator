@@ -1,3 +1,4 @@
+import '../src/lab/polyfillCrypto';
 import 'react-native-reanimated';
 import { Stack, usePathname, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';

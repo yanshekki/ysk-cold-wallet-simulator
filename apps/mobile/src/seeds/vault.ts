@@ -44,7 +44,13 @@ export async function listSlots(): Promise<SeedSlot[]> {
   }
   try {
     const parsed = JSON.parse(raw) as SeedSlot[];
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed.map((slot) => ({
+      ...slot,
+      backup: slot.backup ?? 'bip39',
+    }));
   } catch {
     return [];
   }
@@ -83,12 +89,15 @@ async function readSecret(key: string): Promise<string | null> {
 }
 
 export async function saveSlot(slot: SeedSlot, entropy: Uint8Array): Promise<SeedSlot> {
-  wordCountFromEntropy(entropy);
+  if ((slot.backup ?? 'bip39') === 'bip39') {
+    wordCountFromEntropy(entropy);
+  }
+  const stored: SeedSlot = { ...slot, backup: slot.backup ?? 'bip39' };
   const slots = await listSlots();
-  const next = [...slots.filter((item) => item.id !== slot.id), slot];
+  const next = [...slots.filter((item) => item.id !== stored.id), stored];
   await writeSlots(next);
-  await writeSecret(entropyKey(slot.id), bytesToBase64(entropy));
-  return slot;
+  await writeSecret(entropyKey(stored.id), bytesToBase64(entropy));
+  return stored;
 }
 
 export async function loadEntropy(id: string): Promise<Uint8Array> {

@@ -2,9 +2,12 @@ export { colors, radius, space, fonts, motion, BRAND_LABEL, brandColor } from '.
 export { Screen } from './Screen';
 export { Button } from './Button';
 export { BrandGrid } from './BrandGrid';
-export { SeedCard } from './SeedCard';
+export { SeedCard, backupBadge } from './SeedCard';
+export { AddressInspector } from './AddressInspector';
 export { SigningModal } from './SigningModal';
 export { ApduLog } from './ApduLog';
+export { LogEditor } from './LogEditor';
+export { formatHex, formatLogText } from './logFormat';
 export { Hud, formatSessionRemaining, radioMode, type RadioMode } from './Hud';
 export { DeviceCard } from './DeviceCard';
 export { PairingTakeover } from './PairingTakeover';

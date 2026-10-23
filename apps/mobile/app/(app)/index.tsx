@@ -87,6 +87,11 @@ export default function DeviceScreen() {
                     {!seed ? (
                       <Text style={styles.hint}>Select a seed in Vault before starting the radio.</Text>
                     ) : null}
+                    {seed?.backup === 'slip39' && item.brand === 'ledger' ? (
+                      <Text style={styles.hint}>
+                        Ledger Live expects BIP39. This SLIP-39 slot will not match a Ledger-restored seed.
+                      </Text>
+                    ) : null}
                     {advertising ? (
                       <>
                         <Text style={styles.live}>
