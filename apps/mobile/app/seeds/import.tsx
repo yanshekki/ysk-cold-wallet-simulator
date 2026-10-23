@@ -41,7 +41,11 @@ export default function ImportSeedScreen() {
   };
 
   return (
-    <Screen title="Import mnemonic" subtitle="Validated with @scure/bip39. The words are not stored.">
+    <Screen
+      kicker="Vault"
+      title="Import mnemonic"
+      subtitle="Validated with @scure/bip39. The words are not stored."
+    >
       <TextInput
         value={label}
         onChangeText={setLabel}
@@ -61,6 +65,7 @@ export default function ImportSeedScreen() {
       />
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <Button label="Import" onPress={() => void onImport()} />
+      <Button label="Cancel" variant="ghost" onPress={() => router.back()} />
     </Screen>
   );
 }

@@ -1,9 +1,11 @@
+import 'react-native-reanimated';
 import { Stack, usePathname, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { AppStateProvider, useAppState } from '../src/state/AppState';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { colors } from '@cws/ui';
+import { AppStateProvider, useAppState } from '../src/state/AppState';
 
 function SessionGate() {
   const { unlockedUntil } = useAppState();
@@ -14,6 +16,10 @@ function SessionGate() {
     const unlocked = !!unlockedUntil && unlockedUntil > Date.now();
     if (!unlocked && pathname !== '/') {
       router.replace('/');
+      return;
+    }
+    if (unlocked && pathname === '/') {
+      router.replace('/(app)');
     }
   }, [pathname, router, unlockedUntil]);
 
@@ -23,25 +29,23 @@ function SessionGate() {
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <AppStateProvider>
-        <StatusBar style="light" />
-        <SessionGate />
-        <Stack
-          screenOptions={{
-            headerStyle: { backgroundColor: colors.bg },
-            headerTintColor: colors.text,
-            headerShadowVisible: false,
-            contentStyle: { backgroundColor: colors.bg },
-          }}
-        >
-          <Stack.Screen name="index" options={{ headerShown: false }} />
-          <Stack.Screen name="models" options={{ title: 'Brand & model' }} />
-          <Stack.Screen name="seeds/index" options={{ title: 'Seed vault' }} />
-          <Stack.Screen name="seeds/new" options={{ title: 'Generate seed' }} />
-          <Stack.Screen name="seeds/import" options={{ title: 'Import seed' }} />
-          <Stack.Screen name="simulate" options={{ title: 'Simulation' }} />
-        </Stack>
-      </AppStateProvider>
+      <SafeAreaProvider>
+        <AppStateProvider>
+          <StatusBar style="light" />
+          <SessionGate />
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: colors.bg },
+            }}
+          >
+            <Stack.Screen name="index" />
+            <Stack.Screen name="(app)" />
+            <Stack.Screen name="seeds/new" options={{ presentation: 'modal' }} />
+            <Stack.Screen name="seeds/import" options={{ presentation: 'modal' }} />
+          </Stack>
+        </AppStateProvider>
+      </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }

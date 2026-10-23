@@ -43,6 +43,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: space.lg,
+    overflow: 'hidden',
   },
   primary: {
     backgroundColor: colors.accent,

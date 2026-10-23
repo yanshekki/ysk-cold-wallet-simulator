@@ -169,29 +169,34 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       throw new Error('Select a seed first');
     }
     setError(null);
-    const entropy = await loadEntropy(seed.id);
-    const handler = createHandler({
-      model,
-      confirmation,
-      slotId: seed.id,
-      entropy,
-    });
-    handlerRef.current = handler;
-    setLogs([]);
-    const handle = await startAdvertising(model, handler, {
-      onConnected: (id) => {
-        setConnected(true);
-        setConnectedLabel(id);
-      },
-      onDisconnected: () => {
-        setConnected(false);
-        setConnectedLabel('');
-      },
-      onLog: appendLog,
-    });
-    peripheralRef.current = handle;
-    setAdvertising(true);
-    setCurrentApp(handler instanceof LedgerProtocolHandler ? handler.getApp() : 'dashboard');
+    try {
+      const entropy = await loadEntropy(seed.id);
+      const handler = createHandler({
+        model,
+        confirmation,
+        slotId: seed.id,
+        entropy,
+      });
+      handlerRef.current = handler;
+      setLogs([]);
+      const handle = await startAdvertising(model, handler, {
+        onConnected: (id) => {
+          setConnected(true);
+          setConnectedLabel(id);
+        },
+        onDisconnected: () => {
+          setConnected(false);
+          setConnectedLabel('');
+        },
+        onLog: appendLog,
+      });
+      peripheralRef.current = handle;
+      setAdvertising(true);
+      setCurrentApp(handler instanceof LedgerProtocolHandler ? handler.getApp() : 'dashboard');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'failed to advertise';
+      setError(message);
+    }
   }, [appendLog, confirmation, model, seed]);
 
   const setApp = useCallback((app: LedgerApp) => {

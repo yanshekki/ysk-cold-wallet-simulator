@@ -1,3 +1,6 @@
+import { Platform } from 'react-native';
+import type { Brand } from '@cws/contracts';
+
 export const colors = {
   bg: '#0B0C0F',
   bgElevated: '#14161C',
@@ -26,4 +29,28 @@ export const radius = {
   sm: 8,
   md: 14,
   lg: 20,
+};
+
+export const fonts = {
+  mono: Platform.select({
+    ios: 'Menlo',
+    android: 'monospace',
+    default: 'ui-monospace, Menlo, Courier, monospace',
+  }) as string,
+};
+
+export const BRAND_LABEL: Record<Brand, string> = {
+  ledger: 'Ledger',
+  trezor: 'Trezor',
+  onekey: 'OneKey',
+};
+
+export function brandColor(brand: Brand): string {
+  return colors[brand];
+}
+
+export const motion = {
+  sheet: 220,
+  enter: 180,
+  radioPulse: 1600,
 };

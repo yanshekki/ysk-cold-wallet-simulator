@@ -1,15 +1,16 @@
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Button, Screen, colors, space } from '@cws/ui';
+import { Screen, colors, space } from '@cws/ui';
+import { ScanButton } from '../src/lab/ScanButton';
 import { describeUnlock, type UnlockStatus } from '../src/passkeys';
 import { useAppState } from '../src/state/AppState';
 
-export default function HomeScreen() {
-  const router = useRouter();
-  const { unlockedUntil, unlock, lock, model, seed, advertising, error } = useAppState();
-  const unlocked = !!unlockedUntil && unlockedUntil > Date.now();
+export default function UnlockScreen() {
+  const { unlock, error } = useAppState();
   const [status, setStatus] = useState<UnlockStatus | null>(null);
+  const [busy, setBusy] = useState(false);
+  const unlockDisabled = status?.kind === 'not-enrolled';
 
   useFocusEffect(
     useCallback(() => {
@@ -17,64 +18,53 @@ export default function HomeScreen() {
     }, []),
   );
 
-  const lockedSubtitle = status?.message ?? 'Unlocking requires the platform authenticator.';
-  const unlockDisabled = status?.kind === 'not-enrolled';
+  const onUnlock = async () => {
+    setBusy(true);
+    try {
+      await unlock();
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <Screen
-      title={unlocked ? 'Ready to simulate' : 'Unlock'}
-      subtitle={
-        unlocked
-          ? 'Android keeps advertising with a persistent notification. iOS must stay in the foreground.'
-          : lockedSubtitle
-      }
+      kicker={null}
+      title="YSK"
+      subtitle={status?.message ?? 'Unlocking requires the platform authenticator.'}
     >
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      <View style={styles.card}>
-        <Text style={styles.meta}>Model</Text>
-        <Text style={styles.value}>{model?.name ?? 'None selected'}</Text>
-        <Text style={styles.meta}>Seed</Text>
-        <Text style={styles.value}>{seed?.label ?? 'None selected'}</Text>
-        <Text style={styles.meta}>Advertising</Text>
-        <Text style={styles.value}>{advertising ? 'On' : 'Off'}</Text>
-      </View>
-      {!unlocked ? (
-        <Button label="Unlock" disabled={unlockDisabled} onPress={() => void unlock()} />
-      ) : (
-        <>
-          <Button label="Choose model" onPress={() => router.push('/models')} />
-          <Button label="Seed vault" variant="ghost" onPress={() => router.push('/seeds')} />
-          <Button label="Start simulation" variant="ghost" onPress={() => router.push('/simulate')} />
-          <Button label="Lock" variant="danger" onPress={lock} />
-        </>
-      )}
+      <ScanButton
+        label="Unlock"
+        disabled={unlockDisabled}
+        busy={busy}
+        onPress={() => void onUnlock()}
+      />
+      {unlockDisabled ? (
+        <Text style={styles.hint}>Enroll a lock screen PIN or biometric in system settings, then return here.</Text>
+      ) : null}
+      <View style={styles.rule} />
+      <Text style={styles.meta}>Lab console · 15-minute session · never auto-sign</Text>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: colors.card,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: 14,
-    padding: space.md,
-    gap: 6,
-    marginBottom: space.sm,
+  error: {
+    color: colors.danger,
+  },
+  hint: {
+    color: colors.muted,
+    lineHeight: 20,
+  },
+  rule: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginTop: space.sm,
   },
   meta: {
     color: colors.muted,
     fontSize: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginTop: 6,
-  },
-  value: {
-    color: colors.text,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  error: {
-    color: colors.danger,
+    letterSpacing: 0.4,
   },
 });

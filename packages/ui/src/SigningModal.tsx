@@ -1,7 +1,7 @@
 import { Modal, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { SigningRequest } from '@cws/contracts';
 import { Button } from './Button';
-import { colors, radius, space } from './theme';
+import { BRAND_LABEL, brandColor, colors, fonts, radius, space } from './theme';
 
 type Props = {
   visible: boolean;
@@ -20,12 +20,15 @@ export function SigningModal({
   onConfirm,
   onReject,
 }: Props) {
+  const brand = request?.brand;
   return (
     <Modal visible={visible} transparent animationType="fade">
       <View style={styles.backdrop}>
         <View style={styles.sheet}>
           <Text style={styles.kicker}>Confirm on device</Text>
-          <Text style={styles.title}>Signing request</Text>
+          {brand ? (
+            <Text style={[styles.brand, { color: brandColor(brand) }]}>{BRAND_LABEL[brand]}</Text>
+          ) : null}
           <Text style={styles.path}>{request?.path ?? ''}</Text>
           <Text style={styles.message}>{request?.message ?? ''}</Text>
           <Text style={styles.hint}>BIP39 passphrase is never stored. Leave blank if unused.</Text>
@@ -52,7 +55,7 @@ const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.72)',
-    justifyContent: 'center',
+    justifyContent: 'flex-end',
     padding: space.lg,
   },
   sheet: {
@@ -68,15 +71,17 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 1.2,
     fontSize: 12,
-  },
-  title: {
-    color: colors.text,
-    fontSize: 22,
     fontWeight: '700',
+  },
+  brand: {
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
   },
   path: {
     color: colors.ok,
-    fontFamily: 'Courier',
+    fontFamily: fonts.mono,
     fontSize: 13,
   },
   message: {

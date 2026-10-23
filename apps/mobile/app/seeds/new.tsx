@@ -59,6 +59,7 @@ export default function NewSeedScreen() {
 
   return (
     <Screen
+      kicker="Vault"
       title="Generate seed"
       subtitle="The words appear once. Write them down, then confirm. Only encrypted entropy is stored."
     >
@@ -74,6 +75,7 @@ export default function NewSeedScreen() {
         <Button label="24 words" variant={wordCount === 24 ? 'primary' : 'ghost'} onPress={() => setWordCount(24)} />
       </View>
       <Button label={busy ? 'Generating…' : 'Generate'} disabled={busy} onPress={() => void generate()} />
+      <Button label="Cancel" variant="ghost" onPress={() => router.back()} />
       {mnemonic ? (
         <View style={styles.words}>
           <Text style={styles.warn}>Shown once. This app will not display it again.</Text>

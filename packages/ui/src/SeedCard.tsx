@@ -1,15 +1,16 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { SeedSlot } from '@cws/contracts';
-import { colors, radius, space } from './theme';
+import { colors, fonts, radius, space } from './theme';
 
 type Props = {
   slot: SeedSlot;
   selected?: boolean;
+  address?: string | null;
   onPress?: () => void;
   onDelete?: () => void;
 };
 
-export function SeedCard({ slot, selected, onPress, onDelete }: Props) {
+export function SeedCard({ slot, selected, address, onPress, onDelete }: Props) {
   return (
     <View style={[styles.card, selected && styles.selected]}>
       <View style={styles.row}>
@@ -24,6 +25,7 @@ export function SeedCard({ slot, selected, onPress, onDelete }: Props) {
           <Text style={styles.meta}>
             {slot.wordCount} words · {slot.brand} · {slot.modelId}
           </Text>
+          {address ? <Text style={styles.address}>{address}</Text> : null}
         </Pressable>
         {onDelete ? (
           <Pressable
@@ -69,6 +71,12 @@ const styles = StyleSheet.create({
     color: colors.muted,
     marginTop: 4,
     fontSize: 13,
+  },
+  address: {
+    color: colors.ok,
+    fontFamily: fonts.mono,
+    fontSize: 12,
+    marginTop: 8,
   },
   delete: {
     color: colors.danger,
