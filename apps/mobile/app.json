@@ -1,0 +1,34 @@
+{
+  "expo": {
+    "name": "Cold Wallet Simulator",
+    "slug": "cold-wallet-simulator",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "cws",
+    "plugins": [
+      [
+        "munim-bluetooth",
+        {
+          "isBackgroundEnabled": true,
+          "modes": ["peripheral", "central"],
+          "bluetoothAlwaysPermission": "Allow Cold Wallet Simulator to act as a hardware wallet over Bluetooth"
+        }
+      ]
+    ],
+    "android": {
+      "permissions": [
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN",
+        "android.permission.BLUETOOTH_ADVERTISE",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
+    },
+    "ios": {
+      "infoPlist": {
+        "NSBluetoothAlwaysUsageDescription": "This app simulates a hardware wallet over Bluetooth",
+        "UIBackgroundModes": ["bluetooth-peripheral"]
+      }
+    }
+  }
+}
