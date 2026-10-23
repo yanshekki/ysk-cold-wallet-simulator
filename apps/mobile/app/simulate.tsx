@@ -23,6 +23,8 @@ export default function SimulateScreen() {
   } = useAppState();
   const [busy, setBusy] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+  const isLedger = model?.protocol === 'ledger-apdu';
+  const modelName = model?.name ?? 'device';
 
   const onStart = async () => {
     setBusy(true);
@@ -38,7 +40,7 @@ export default function SimulateScreen() {
 
   return (
     <Screen
-      title="Nano X simulation"
+      title={`${modelName} simulation`}
       subtitle="Requires a physical Android device. Host apps may still reject this simulator if they check device certificates — transport answers are real, attestation is not faked."
     >
       <View style={styles.status}>
@@ -46,9 +48,19 @@ export default function SimulateScreen() {
           {model?.name ?? 'No model'} · {seed?.label ?? 'No seed'}
         </Text>
         <Text style={styles.value}>
-          {advertising ? (connected ? `Host connected (${connectedLabel})` : 'Advertising as Ledger Nano X') : 'Stopped'}
+          {advertising
+            ? connected
+              ? `Host connected (${connectedLabel})`
+              : `Advertising as ${modelName}`
+            : 'Stopped'}
         </Text>
-        <Text style={styles.meta}>App: {currentApp === 'ethereum' ? 'Ethereum' : 'BOLOS dashboard'}</Text>
+        {isLedger ? (
+          <Text style={styles.meta}>
+            App: {currentApp === 'ethereum' ? 'Ethereum' : 'BOLOS dashboard'}
+          </Text>
+        ) : (
+          <Text style={styles.meta}>Firmware answers Initialize, Features, and ETH signing.</Text>
+        )}
       </View>
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {localError ? <Text style={styles.error}>{localError}</Text> : null}
@@ -56,15 +68,17 @@ export default function SimulateScreen() {
         <Button label={busy ? 'Starting…' : 'Start advertising'} disabled={busy} onPress={() => void onStart()} />
       ) : (
         <>
-          <Button
-            label={currentApp === 'ethereum' ? 'Return to dashboard' : 'Open Ethereum app'}
-            variant="ghost"
-            onPress={() => setApp(currentApp === 'ethereum' ? 'dashboard' : 'ethereum')}
-          />
+          {isLedger ? (
+            <Button
+              label={currentApp === 'ethereum' ? 'Return to dashboard' : 'Open Ethereum app'}
+              variant="ghost"
+              onPress={() => setApp(currentApp === 'ethereum' ? 'dashboard' : 'ethereum')}
+            />
+          ) : null}
           <Button label="Stop" variant="danger" onPress={() => void stopSimulation()} />
         </>
       )}
-      <ApduLog entries={logs} />
+      <ApduLog entries={logs} emptyLabel="Waiting for host traffic…" />
       <SigningModal
         visible={!!pending}
         request={pending}

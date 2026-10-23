@@ -14,6 +14,7 @@
   "dependencies": {
     "@cws/contracts": "*",
     "@cws/protocol-ledger": "*",
+    "@cws/protocol-onekey": "*",
     "@cws/sdk": "*",
     "@cws/ui": "*",
     "@noble/curves": "^1.9.7",

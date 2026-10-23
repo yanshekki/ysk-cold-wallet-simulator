@@ -1,6 +1,6 @@
 import type { GATTCharacteristicPermission } from 'munim-bluetooth';
 import type { DeviceModel, ProtocolHandler } from '@cws/contracts';
-import { DEFAULT_MTU, splitFramedPackets } from '@cws/protocol-ledger';
+import { DEFAULT_MTU, splitNotify } from '@cws/sdk';
 import { bytesToHex, hexToBytes } from './hex';
 import type { PeripheralCallbacks, PeripheralHandle } from './types';
 
@@ -95,7 +95,7 @@ export async function startAdvertising(
         if (!outgoing || outgoing.length === 0) {
           return;
         }
-        const packets = splitFramedPackets(outgoing, Math.max(DEFAULT_MTU, incoming.length));
+        const packets = splitNotify(model, outgoing, Math.max(DEFAULT_MTU, incoming.length));
         for (const packet of packets) {
           const hex = bytesToHex(packet);
           callbacks.onLog('out', hex, 'GATT notify');

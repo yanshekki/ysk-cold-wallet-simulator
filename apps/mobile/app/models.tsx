@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { StyleSheet, Text } from 'react-native';
 import { ALL_MODELS } from '@cws/contracts';
+import { isSimulatable } from '@cws/sdk';
 import { BrandGrid, Screen, colors } from '@cws/ui';
 import { useAppState } from '../src/state/AppState';
 
@@ -11,10 +12,11 @@ export default function ModelsScreen() {
   return (
     <Screen
       title="Brand & model"
-      subtitle="This slice advertises Ledger Nano X only. Other models are listed so the catalog matches the architecture."
+      subtitle="This phase advertises Ledger Nano X and OneKey Classic / Touch / Pro. Remaining models stay listed so the catalog matches the architecture."
     >
       <Text style={styles.copy}>
-        Hosts scan for the exact Service UUID and local name of a real Nano X.
+        Hosts scan for the exact Service UUID and local name of the selected device. Transport
+        answers are real; attestation is not faked.
       </Text>
       <BrandGrid
         selectedId={model?.id}
@@ -24,13 +26,12 @@ export default function ModelsScreen() {
         }}
         items={ALL_MODELS.map((item) => ({
           model: item,
-          enabled: item.id === 'nano-x',
-          badge:
-            item.id === 'nano-x'
-              ? 'BLE ready'
-              : item.brand === 'ledger'
-                ? 'UUID catalogued'
-                : 'Next phase',
+          enabled: isSimulatable(item),
+          badge: isSimulatable(item)
+            ? 'BLE ready'
+            : item.brand === 'ledger'
+              ? 'UUID catalogued'
+              : 'Next phase',
         }))}
       />
     </Screen>

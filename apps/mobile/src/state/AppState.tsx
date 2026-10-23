@@ -12,10 +12,11 @@ import type {
   ConfirmationPort,
   DeviceModel,
   LedgerApp,
+  ProtocolHandler,
   SeedSlot,
   SigningRequest,
 } from '@cws/contracts';
-import { createLedgerHandler, getModel } from '@cws/sdk';
+import { createHandler, getModel, isSimulatable } from '@cws/sdk';
 import { LedgerProtocolHandler } from '@cws/protocol-ledger';
 import { startAdvertising } from '../ble/peripheral';
 import type { PeripheralHandle } from '../ble/types';
@@ -66,7 +67,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
 
   const peripheralRef = useRef<PeripheralHandle | null>(null);
-  const handlerRef = useRef<LedgerProtocolHandler | null>(null);
+  const handlerRef = useRef<ProtocolHandler | null>(null);
   const pendingRef = useRef<PendingConfirm | null>(null);
   const passphraseRef = useRef('');
 
@@ -132,15 +133,15 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   }, [stopSimulation]);
 
   const startSimulation = useCallback(async () => {
-    if (!model || model.id !== 'nano-x') {
-      throw new Error('This slice only advertises Ledger Nano X');
+    if (!model || !isSimulatable(model)) {
+      throw new Error('This phase only advertises Ledger Nano X and OneKey V1');
     }
     if (!seed) {
       throw new Error('Select a seed first');
     }
     setError(null);
     const entropy = await loadEntropy(seed.id);
-    const handler = createLedgerHandler({
+    const handler = createHandler({
       model,
       confirmation,
       slotId: seed.id,
@@ -161,12 +162,15 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     });
     peripheralRef.current = handle;
     setAdvertising(true);
-    setCurrentApp(handler.getApp());
+    setCurrentApp(handler instanceof LedgerProtocolHandler ? handler.getApp() : 'dashboard');
   }, [appendLog, confirmation, model, seed]);
 
   const setApp = useCallback((app: LedgerApp) => {
-    handlerRef.current?.setApp(app);
-    setCurrentApp(app);
+    const handler = handlerRef.current;
+    if (handler instanceof LedgerProtocolHandler) {
+      handler.setApp(app);
+      setCurrentApp(app);
+    }
   }, []);
 
   const resolveSigning = useCallback((ok: boolean) => {

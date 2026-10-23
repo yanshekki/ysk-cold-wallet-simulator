@@ -23,6 +23,9 @@ export function BrandGrid({ items, selectedId, onSelect }: Props) {
           <Pressable
             key={model.id}
             disabled={!enabled}
+            accessibilityRole="button"
+            accessibilityLabel={model.name}
+            accessibilityState={{ disabled: !enabled, selected }}
             onPress={() => onSelect(model)}
             style={[
               styles.card,

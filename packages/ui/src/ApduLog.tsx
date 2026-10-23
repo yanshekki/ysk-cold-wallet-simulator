@@ -4,13 +4,14 @@ import { colors, radius, space } from './theme';
 
 type Props = {
   entries: ApduLogEntry[];
+  emptyLabel?: string;
 };
 
-export function ApduLog({ entries }: Props) {
+export function ApduLog({ entries, emptyLabel = 'Waiting for host APDUs…' }: Props) {
   return (
     <ScrollView style={styles.box} contentContainerStyle={styles.inner}>
       {entries.length === 0 ? (
-        <Text style={styles.empty}>Waiting for host APDUs…</Text>
+        <Text style={styles.empty}>{emptyLabel}</Text>
       ) : (
         entries.map((entry) => (
           <View key={entry.id} style={styles.row}>
