@@ -1,6 +1,7 @@
-# Cold Wallet Simulator — Architecture Document
+# YSK Cold Wallet Simulator — Architecture Document
 
-**Project Name:** `cold-wallet-simulator`  
+**Project Name:** `ysk-cold-wallet-simulator`  
+**Display Name:** YSK Cold Wallet Simulator  
 **Style:** ysk-kit (Expo TypeScript monorepo)  
 **Scope:** BLE-only peripheral mode that mimics real Ledger / Trezor / OneKey hardware wallets.  
 **Platform Priority:** Android first. iOS if feasible (with known background limitations).  
@@ -76,7 +77,7 @@ Only Safe 7 has BLE. Older models are USB-only.
 ## 2. High-Level Architecture (ysk-kit Style)
 
 ```
-cold-wallet-simulator/
+ysk-cold-wallet-simulator/
 ├── apps/
 │   └── mobile/                 # Expo app (Android + iOS)
 │       ├── app/                # Expo Router screens
