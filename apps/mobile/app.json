@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Cold Wallet Simulator",
-    "slug": "cold-wallet-simulator",
+    "name": "YSK Cold Wallet Simulator",
+    "slug": "ysk-cold-wallet-simulator",
     "version": "1.0.0",
     "orientation": "portrait",
     "scheme": "cws",
@@ -11,7 +11,7 @@
         {
           "isBackgroundEnabled": true,
           "modes": ["peripheral", "central"],
-          "bluetoothAlwaysPermission": "Allow Cold Wallet Simulator to act as a hardware wallet over Bluetooth"
+          "bluetoothAlwaysPermission": "Allow YSK Cold Wallet Simulator to act as a hardware wallet over Bluetooth"
         }
       ]
     ],

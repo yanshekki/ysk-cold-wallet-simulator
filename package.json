@@ -1,5 +1,5 @@
 {
-  "name": "cold-wallet-simulator",
+  "name": "ysk-cold-wallet-simulator",
   "private": true,
   "workspaces": [
     "apps/*",

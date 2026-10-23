@@ -1,6 +1,8 @@
-# Cold Wallet Simulator
+# YSK Cold Wallet Simulator
 
 BLE-only cold wallet simulator (Ledger / Trezor / OneKey) built with ysk-kit style Expo monorepo.
+
+**Project:** `ysk-cold-wallet-simulator`
 
 See `docs/ARCHITECTURE.md` for the full design.
 
