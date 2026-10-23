@@ -6,6 +6,11 @@ import {
   type LedgerHandlerOptions,
 } from '@cws/protocol-ledger';
 import { OneKeyV1ProtocolHandler, splitOneKeyV1 } from '@cws/protocol-onekey';
+import {
+  DEFAULT_MTU as THP_MTU,
+  TrezorThpProtocolHandler,
+  splitThpPackets,
+} from '@cws/protocol-trezor';
 
 export type CreateHandlerOptions = {
   model: DeviceModel;
@@ -21,6 +26,8 @@ export function createHandler(options: CreateHandlerOptions): ProtocolHandler {
       return new LedgerProtocolHandler(options);
     case 'onekey-v1':
       return new OneKeyV1ProtocolHandler(options);
+    case 'thp':
+      return new TrezorThpProtocolHandler(options);
     default:
       throw new Error(`protocol ${options.model.protocol} is not implemented yet`);
   }
@@ -36,6 +43,8 @@ export function splitNotify(model: DeviceModel, framed: Uint8Array, mtu: number)
       return splitFramedPackets(framed, mtu);
     case 'onekey-v1':
       return splitOneKeyV1(framed, mtu);
+    case 'thp':
+      return splitThpPackets(framed, Math.max(THP_MTU, mtu));
     default:
       throw new Error(`protocol ${model.protocol} is not implemented yet`);
   }
@@ -43,7 +52,9 @@ export function splitNotify(model: DeviceModel, framed: Uint8Array, mtu: number)
 
 export function isSimulatable(model: DeviceModel): boolean {
   return (
-    (model.protocol === 'ledger-apdu' && model.id === 'nano-x') || model.protocol === 'onekey-v1'
+    (model.protocol === 'ledger-apdu' && model.id === 'nano-x') ||
+    model.protocol === 'onekey-v1' ||
+    model.protocol === 'thp'
   );
 }
 

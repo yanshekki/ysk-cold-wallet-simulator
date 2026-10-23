@@ -12,7 +12,7 @@ export default function ModelsScreen() {
   return (
     <Screen
       title="Brand & model"
-      subtitle="This phase advertises Ledger Nano X and OneKey Classic / Touch / Pro. Remaining models stay listed so the catalog matches the architecture."
+      subtitle="This phase advertises Ledger Nano X, OneKey Classic / Touch / Pro, and Trezor Safe 7. Remaining models stay listed so the catalog matches the architecture."
     >
       <Text style={styles.copy}>
         Hosts scan for the exact Service UUID and local name of the selected device. Transport

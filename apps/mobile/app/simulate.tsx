@@ -13,6 +13,7 @@ export default function SimulateScreen() {
     currentApp,
     logs,
     pending,
+    pairingCode,
     passphrase,
     error,
     startSimulation,
@@ -24,6 +25,7 @@ export default function SimulateScreen() {
   const [busy, setBusy] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const isLedger = model?.protocol === 'ledger-apdu';
+  const isTrezor = model?.protocol === 'thp';
   const modelName = model?.name ?? 'device';
 
   const onStart = async () => {
@@ -58,9 +60,20 @@ export default function SimulateScreen() {
           <Text style={styles.meta}>
             App: {currentApp === 'ethereum' ? 'Ethereum' : 'BOLOS dashboard'}
           </Text>
+        ) : isTrezor ? (
+          <Text style={styles.meta}>
+            THP: Noise XX, Code Entry pairing, then Initialize / ETH. Hosts may still reject without
+            attestation.
+          </Text>
         ) : (
           <Text style={styles.meta}>Firmware answers Initialize, Features, and ETH signing.</Text>
         )}
+        {pairingCode ? (
+          <View>
+            <Text style={styles.meta}>Pairing code — type this on the host</Text>
+            <Text style={styles.code}>{pairingCode}</Text>
+          </View>
+        ) : null}
       </View>
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {localError ? <Text style={styles.error}>{localError}</Text> : null}
@@ -103,6 +116,14 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 18,
     fontWeight: '700',
+  },
+  code: {
+    color: colors.ok,
+    fontFamily: 'Courier',
+    fontSize: 32,
+    fontWeight: '700',
+    letterSpacing: 8,
+    marginTop: 4,
   },
   error: {
     color: colors.danger,

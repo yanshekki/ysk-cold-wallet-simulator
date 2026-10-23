@@ -38,6 +38,7 @@ type AppStateValue = {
   currentApp: LedgerApp;
   logs: ApduLogEntry[];
   pending: SigningRequest | null;
+  pairingCode: string | null;
   passphrase: string;
   error: string | null;
   unlock: () => Promise<boolean>;
@@ -63,6 +64,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [currentApp, setCurrentApp] = useState<LedgerApp>('dashboard');
   const [logs, setLogs] = useState<ApduLogEntry[]>([]);
   const [pending, setPending] = useState<SigningRequest | null>(null);
+  const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [passphrase, setPassphrase] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -97,6 +99,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       async getPassphrase() {
         return passphraseRef.current || undefined;
       },
+      onPairingCode(code) {
+        setPairingCode(code);
+      },
     }),
     [],
   );
@@ -125,6 +130,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setPending(null);
     passphraseRef.current = '';
     setPassphrase('');
+    setPairingCode(null);
   }, []);
 
   const lock = useCallback(() => {
@@ -134,7 +140,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   const startSimulation = useCallback(async () => {
     if (!model || !isSimulatable(model)) {
-      throw new Error('This phase only advertises Ledger Nano X and OneKey V1');
+      throw new Error('This phase only advertises Ledger Nano X, OneKey V1, and Trezor Safe 7');
     }
     if (!seed) {
       throw new Error('Select a seed first');
@@ -195,6 +201,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       currentApp,
       logs,
       pending,
+      pairingCode,
       passphrase,
       error,
       unlock,
@@ -219,6 +226,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       lock,
       logs,
       model,
+      pairingCode,
       passphrase,
       pending,
       resolveSigning,

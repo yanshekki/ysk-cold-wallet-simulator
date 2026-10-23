@@ -12,6 +12,7 @@
     "@cws/contracts": "*",
     "@cws/protocol-ledger": "*",
     "@cws/protocol-onekey": "*",
+    "@cws/protocol-trezor": "*",
     "@scure/bip39": "^1.6.0"
   },
   "devDependencies": {

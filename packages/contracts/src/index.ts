@@ -39,6 +39,7 @@ export interface ProtocolHandler {
 export interface ConfirmationPort {
   confirm(request: SigningRequest): Promise<boolean>;
   getPassphrase(slotId: string): Promise<string | undefined>;
+  onPairingCode?(code: string | null): void;
 }
 
 export type LedgerApp = 'dashboard' | 'ethereum';
