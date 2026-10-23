@@ -2,6 +2,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -20,8 +21,8 @@ import { createHandler, getModel, isSimulatable } from '@cws/sdk';
 import { LedgerProtocolHandler } from '@cws/protocol-ledger';
 import { startAdvertising } from '../ble/peripheral';
 import type { PeripheralHandle } from '../ble/types';
+import { SESSION_MS, unlock as requestUnlock } from '../passkeys';
 import { loadEntropy } from '../seeds/vault';
-import { authenticateUnlock, SESSION_MS } from '../unlock/session';
 
 type PendingConfirm = {
   request: SigningRequest;
@@ -107,12 +108,17 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   );
 
   const unlock = useCallback(async () => {
-    const ok = await authenticateUnlock();
-    if (ok) {
-      setUnlockedUntil(Date.now() + SESSION_MS);
-      setError(null);
+    try {
+      const ok = await requestUnlock();
+      if (ok) {
+        setUnlockedUntil(Date.now() + SESSION_MS);
+        setError(null);
+      }
+      return ok;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unlock failed');
+      return false;
     }
-    return ok;
   }, []);
 
   const stopSimulation = useCallback(async () => {
@@ -137,6 +143,21 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     void stopSimulation();
     setUnlockedUntil(null);
   }, [stopSimulation]);
+
+  useEffect(() => {
+    if (unlockedUntil == null) {
+      return;
+    }
+    const remaining = unlockedUntil - Date.now();
+    if (remaining <= 0) {
+      lock();
+      return;
+    }
+    const timer = setTimeout(() => {
+      lock();
+    }, remaining);
+    return () => clearTimeout(timer);
+  }, [lock, unlockedUntil]);
 
   const startSimulation = useCallback(async () => {
     if (!model || !isSimulatable(model)) {

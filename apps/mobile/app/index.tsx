@@ -1,12 +1,24 @@
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Button, Screen, colors, space } from '@cws/ui';
+import { describeUnlock, type UnlockStatus } from '../src/passkeys';
 import { useAppState } from '../src/state/AppState';
 
 export default function HomeScreen() {
   const router = useRouter();
   const { unlockedUntil, unlock, lock, model, seed, advertising, error } = useAppState();
   const unlocked = !!unlockedUntil && unlockedUntil > Date.now();
+  const [status, setStatus] = useState<UnlockStatus | null>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      void describeUnlock().then(setStatus);
+    }, []),
+  );
+
+  const lockedSubtitle = status?.message ?? 'Unlocking requires the platform authenticator.';
+  const unlockDisabled = status?.kind === 'not-enrolled';
 
   return (
     <Screen
@@ -14,7 +26,7 @@ export default function HomeScreen() {
       subtitle={
         unlocked
           ? 'Android first. Keep the app in the foreground — iOS background BLE is limited.'
-          : 'Biometric / device PIN unlocks a 15-minute session. Seeds stay in SecureStore.'
+          : lockedSubtitle
       }
     >
       {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -27,7 +39,7 @@ export default function HomeScreen() {
         <Text style={styles.value}>{advertising ? 'On' : 'Off'}</Text>
       </View>
       {!unlocked ? (
-        <Button label="Unlock" onPress={() => void unlock()} />
+        <Button label="Unlock" disabled={unlockDisabled} onPress={() => void unlock()} />
       ) : (
         <>
           <Button label="Choose model" onPress={() => router.push('/models')} />
