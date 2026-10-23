@@ -1,0 +1,25 @@
+{
+  "name": "@cws/ui",
+  "version": "0.1.0",
+  "private": true,
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@cws/contracts": "*"
+  },
+  "peerDependencies": {
+    "react": "*",
+    "react-native": "*"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.3",
+    "react": "19.2.3",
+    "react-native": "0.86.3",
+    "typescript": "~5.9.2",
+    "vitest": "^3.2.4"
+  }
+}

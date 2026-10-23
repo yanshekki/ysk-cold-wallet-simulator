@@ -5,7 +5,12 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "scheme": "cws",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
     "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-local-authentication",
       [
         "munim-bluetooth",
         {
@@ -16,17 +21,26 @@
       ]
     ],
     "android": {
+      "package": "hk.ysk.coldwalletsimulator",
       "permissions": [
         "android.permission.BLUETOOTH",
         "android.permission.BLUETOOTH_ADMIN",
         "android.permission.BLUETOOTH_ADVERTISE",
         "android.permission.BLUETOOTH_CONNECT",
-        "android.permission.ACCESS_FINE_LOCATION"
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT"
       ]
     },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
     "ios": {
+      "bundleIdentifier": "hk.ysk.coldwalletsimulator",
       "infoPlist": {
         "NSBluetoothAlwaysUsageDescription": "This app simulates a hardware wallet over Bluetooth",
+        "NSFaceIDUsageDescription": "Unlock the seed vault",
         "UIBackgroundModes": ["bluetooth-peripheral"]
       }
     }

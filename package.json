@@ -9,7 +9,8 @@
     "mobile": "yarn workspace @cws/mobile start",
     "mobile:android": "yarn workspace @cws/mobile android",
     "mobile:ios": "yarn workspace @cws/mobile ios",
-    "typecheck": "yarn workspaces run typecheck"
+    "typecheck": "yarn workspaces run typecheck",
+    "test": "yarn workspaces run test"
   },
   "packageManager": "yarn@1.22.22"
 }

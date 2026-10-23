@@ -24,6 +24,36 @@ export interface SeedSlot {
 export interface SigningRequest {
   brand: Brand;
   path: string;
-  message: string; // human-readable summary
+  message: string;
   rawPayload: Uint8Array;
 }
+
+export interface ProtocolHandler {
+  brand: Brand;
+  models: string[];
+  handleWrite(data: Uint8Array): Promise<Uint8Array | null>;
+  getServiceUUID(): string;
+  getCharacteristics(): { write: string; notify: string; writeCmd?: string };
+}
+
+export interface ConfirmationPort {
+  confirm(request: SigningRequest): Promise<boolean>;
+  getPassphrase(slotId: string): Promise<string | undefined>;
+}
+
+export type LedgerApp = 'dashboard' | 'ethereum';
+
+export interface ApduLogEntry {
+  id: string;
+  at: number;
+  direction: 'in' | 'out';
+  hex: string;
+  note?: string;
+}
+
+export {
+  ALL_MODELS,
+  LEDGER_MODELS,
+  TREZOR_MODELS,
+  ONEKEY_MODELS,
+} from './models';

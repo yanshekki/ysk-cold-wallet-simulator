@@ -1,4 +1,4 @@
-import { DeviceModel } from '@cws/contracts';
+import type { DeviceModel } from './index';
 
 export const LEDGER_MODELS: DeviceModel[] = [
   {
