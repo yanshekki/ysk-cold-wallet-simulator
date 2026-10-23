@@ -9,16 +9,22 @@ import {
   ButtonRequestType,
   FailureType,
   MessageType,
+  V2FrameAssembler,
+  V2MessageType,
   decodeButtonRequest,
   decodeEthereumAddress,
   decodeEthereumMessageSignature,
   decodeFailure,
   decodeFeatures,
+  decodeFrame,
+  encodeProtobufFrame,
   encodeRepeatedUint32,
   encodeUint32,
+  isAckFrame,
 } from './index';
 import { decodeFields, encodeBytes, encodeString, readOptionalString } from './proto';
 import { concatBytes } from './bytes';
+import { encodeSuccess } from './messages';
 
 const FOUNDATION = 'test test test test test test test test test test test junk';
 const PATH = "m/44'/60'/0'/0/0";
@@ -119,7 +125,28 @@ describe('OneKeyV1ProtocolHandler', () => {
     });
     const reply = await exchange(handler, frameV1(MessageType.EthereumSignTx, new Uint8Array()));
     expect(reply.type).toBe(MessageType.Failure);
-    expect(decodeFailure(reply.payload).code).toBe(FailureType.UnexpectedMessage);
+    expect(decodeFailure(reply.payload).code).toBe(FailureType.DataError);
+  });
+
+  it('signs a legacy Ethereum transaction after ButtonAck', async () => {
+    const handler = new OneKeyV1ProtocolHandler({
+      model: classic,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy,
+    });
+    const payload = concatBytes(
+      encodeRepeatedUint32(1, [0x8000002c, 0x8000003c, 0x80000000, 0, 0]),
+      encodeBytes(5, Uint8Array.from({ length: 20 }, () => 0x11)),
+      encodeUint32(11, 1),
+    );
+    const button = await exchange(handler, frameV1(MessageType.EthereumSignTx, payload));
+    expect(button.type).toBe(MessageType.ButtonRequest);
+    const reply = await exchange(handler, frameV1(MessageType.ButtonAck, new Uint8Array()));
+    expect(reply.type).toBe(MessageType.EthereumTxRequest);
+    const fields = decodeFields(reply.payload);
+    expect(fields.find((field) => field.field === 3)?.bytes.length).toBe(32);
+    expect(fields.find((field) => field.field === 4)?.bytes.length).toBe(32);
   });
 
   it('exports the known Ethereum address after ButtonAck', async () => {
@@ -211,5 +238,214 @@ describe('OneKeyV1ProtocolHandler', () => {
   it('derives the foundry default address', () => {
     const key = derivePrivateKey(entropy, PATH);
     expect(ethereumAddressFromPrivateKey(key).toLowerCase()).toBe(EXPECTED_ADDRESS.toLowerCase());
+  });
+});
+
+describe('OneKey V2 BLE handshake', () => {
+  const pro = ONEKEY_MODELS.find((model) => model.id === 'pro')!;
+  const entropy = entropyFromMnemonic(FOUNDATION);
+
+  async function exchangeV2(handler: OneKeyV1ProtocolHandler, frame: Uint8Array) {
+    const outgoing = await handler.handleWrite(frame);
+    expect(outgoing).not.toBeNull();
+    const frames = new V2FrameAssembler().drain(outgoing!);
+    expect(frames.length).toBeGreaterThanOrEqual(2);
+    expect(isAckFrame(frames[0])).toBe(true);
+    return decodeFrame(frames[1]);
+  }
+
+  it('ACKs a sys Ping and echoes Success 60207 instead of V1 Invalid framing', async () => {
+    const handler = new OneKeyV1ProtocolHandler({
+      model: pro,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy,
+    });
+    await exchange(handler, frameV1(MessageType.Initialize, new Uint8Array()));
+    const ping = encodeProtobufFrame(
+      V2MessageType.Ping,
+      encodeString(1, 'protobuf-protobuf'),
+      0,
+      1,
+      6,
+    );
+    const reply = await exchangeV2(handler, ping);
+    expect(reply.messageTypeId).toBe(V2MessageType.Success);
+    expect(Array.from(reply.pbPayload)).toEqual(Array.from(encodeSuccess('protobuf-protobuf')));
+  });
+
+  it('answers ProtocolInfoRequest with an application fingerprint', async () => {
+    const handler = new OneKeyV1ProtocolHandler({
+      model: pro,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy,
+    });
+    const request = encodeProtobufFrame(
+      V2MessageType.ProtocolInfoRequest,
+      encodeUint32(1, 1),
+      0,
+      1,
+      1,
+    );
+    const reply = await exchangeV2(handler, request);
+    expect(reply.messageTypeId).toBe(V2MessageType.ProtocolInfo);
+    const fields = decodeFields(reply.pbPayload);
+    expect(fields.find((field) => field.field === 1)?.varint).toBe(1);
+    const fingerprint = readOptionalString(fields, 2) ?? '';
+    expect(fingerprint.startsWith('application__4.21.0__')).toBe(true);
+    expect(fingerprint.endsWith('__PROD__RELEASE')).toBe(true);
+  });
+
+  it('reassembles DeviceInfo from 20-byte BLE notifies', async () => {
+    const handler = new OneKeyV1ProtocolHandler({
+      model: pro,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy,
+    });
+    const request = encodeProtobufFrame(V2MessageType.DeviceInfoGet, new Uint8Array(), 0, 1, 3);
+    const outgoing = await handler.handleWrite(request);
+    expect(outgoing).not.toBeNull();
+    const chunks = splitOneKeyV1(outgoing!, 20);
+    expect(chunks.length).toBeGreaterThan(3);
+    expect(chunks.every((chunk) => chunk.length <= 20)).toBe(true);
+    const frames = new V2FrameAssembler().drain(concatBytes(...chunks));
+    expect(isAckFrame(frames[0])).toBe(true);
+    expect(decodeFrame(frames[1]).messageTypeId).toBe(V2MessageType.DeviceInfo);
+  });
+
+  it('answers DeviceInfoGet with Pro hardware and firmware version', async () => {
+    const handler = new OneKeyV1ProtocolHandler({
+      model: pro,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy,
+    });
+    const request = encodeProtobufFrame(V2MessageType.DeviceInfoGet, new Uint8Array(), 0, 1, 3);
+    const reply = await exchangeV2(handler, request);
+    expect(reply.messageTypeId).toBe(V2MessageType.DeviceInfo);
+    const fields = decodeFields(reply.pbPayload);
+    expect(fields.find((field) => field.field === 1)?.varint).toBe(1);
+    expect(fields.find((field) => field.field === 100)?.bytes.length).toBeGreaterThan(0);
+    const hw = decodeFields(fields.find((field) => field.field === 100)!.bytes);
+    expect(hw.find((field) => field.field === 10)?.varint).toBe(5);
+    const coprocessor = decodeFields(fields.find((field) => field.field === 300)!.bytes);
+    const bleImage = decodeFields(coprocessor.find((field) => field.field === 30)!.bytes);
+    expect(readOptionalString(bleImage, 10)).toBe('2.3.7');
+  });
+
+  it('answers Features with a current BLE version', async () => {
+    const handler = new OneKeyV1ProtocolHandler({
+      model: pro,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy,
+    });
+    const request = encodeProtobufFrame(MessageType.GetFeatures, new Uint8Array(), 0, 1, 2);
+    const reply = await exchangeV2(handler, request);
+    const fields = decodeFields(reply.pbPayload);
+    expect(readOptionalString(fields, 502)).toBe('2.3.7');
+    expect(readOptionalString(fields, 615)).toBe('2.3.7');
+    expect(readOptionalString(fields, 508)).toBe('4.21.0');
+  });
+
+  it('answers SESignMessage after a verify confirm, then ButtonAck', async () => {
+    const handler = new OneKeyV1ProtocolHandler({
+      model: pro,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy,
+    });
+    const challenge = encodeBytes(1, Uint8Array.of(1, 2, 3, 4));
+    const button = await exchangeV2(
+      handler,
+      encodeProtobufFrame(MessageType.SESignMessage, challenge, 0, 1, 3),
+    );
+    expect(button.messageTypeId).toBe(MessageType.ButtonRequest);
+    const signed = await exchangeV2(
+      handler,
+      encodeProtobufFrame(MessageType.ButtonAck, new Uint8Array(), 0, 1, 4),
+    );
+    expect(signed.messageTypeId).toBe(MessageType.SEMessageSignature);
+    expect(decodeFields(signed.pbPayload).find((field) => field.field === 1)?.bytes.length).toBe(32);
+    const cert = await exchangeV2(
+      handler,
+      encodeProtobufFrame(MessageType.ReadSEPublicCert, new Uint8Array(), 0, 1, 5),
+    );
+    expect(cert.messageTypeId).toBe(MessageType.SEPublicCert);
+    expect(decodeFields(cert.pbPayload).find((field) => field.field === 1)?.bytes.length).toBe(32);
+  });
+
+  it('does not sign authenticity when the user rejects', async () => {
+    const handler = new OneKeyV1ProtocolHandler({
+      model: pro,
+      confirmation: autoConfirm(false),
+      slotId: 'slot',
+      entropy,
+    });
+    const challenge = encodeBytes(1, Uint8Array.of(1, 2, 3, 4));
+    const reply = await exchangeV2(
+      handler,
+      encodeProtobufFrame(MessageType.SESignMessage, challenge, 0, 1, 3),
+    );
+    expect(reply.messageTypeId).toBe(MessageType.Failure);
+  });
+
+  it('reports Classic 1s / Pure / Pro 2 device types and firmware', async () => {
+    const classic1s = ONEKEY_MODELS.find((model) => model.id === 'classic1s')!;
+    const handler = new OneKeyV1ProtocolHandler({
+      model: classic1s,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy,
+    });
+    const reply = await exchange(handler, frameV1(MessageType.Initialize, new Uint8Array()));
+    const fields = decodeFields(reply.payload);
+    expect(fields.find((field) => field.field === 600)?.varint).toBe(1);
+    expect(readOptionalString(fields, 508)).toBe('3.21.0');
+    expect(readOptionalString(fields, 502)).toBe('1.5.6');
+
+    const pro2 = ONEKEY_MODELS.find((model) => model.id === 'pro2')!;
+    const pro2Handler = new OneKeyV1ProtocolHandler({
+      model: pro2,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy,
+    });
+    const info = await exchangeV2(
+      pro2Handler,
+      encodeProtobufFrame(V2MessageType.DeviceInfoGet, new Uint8Array(), 0, 1, 3),
+    );
+    const hw = decodeFields(decodeFields(info.pbPayload).find((field) => field.field === 100)!.bytes);
+    expect(hw.find((field) => field.field === 10)?.varint).toBe(7);
+  });
+
+  it('reports Touch firmware 4.12.0 and BLE 2.3.1', async () => {
+    const touch = ONEKEY_MODELS.find((model) => model.id === 'touch')!;
+    const handler = new OneKeyV1ProtocolHandler({
+      model: touch,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy,
+    });
+    const reply = await exchange(handler, frameV1(MessageType.GetFeatures, new Uint8Array()));
+    const fields = decodeFields(reply.payload);
+    expect(readOptionalString(fields, 508)).toBe('4.12.0');
+    expect(readOptionalString(fields, 502)).toBe('2.3.1');
+  });
+
+  it('still serves GetFeatures after switching onto V2 frames', async () => {
+    const handler = new OneKeyV1ProtocolHandler({
+      model: pro,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy,
+    });
+    const request = encodeProtobufFrame(MessageType.GetFeatures, new Uint8Array(), 0, 1, 2);
+    const reply = await exchangeV2(handler, request);
+    expect(reply.messageTypeId).toBe(MessageType.Features);
+    expect(decodeFeatures(reply.pbPayload).vendor).toBe('onekey.so');
+    expect(decodeFeatures(reply.pbPayload).model).toBe('pro');
   });
 });

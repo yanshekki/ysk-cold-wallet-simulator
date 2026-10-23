@@ -17,12 +17,16 @@ import type {
   SeedSlot,
   SigningRequest,
 } from '@cws/contracts';
-import { createHandler, getModel, isSimulatable } from '@cws/sdk';
+import { createHandler, entropyFromMnemonic, getModel, isSimulatable } from '@cws/sdk';
 import { LedgerProtocolHandler } from '@cws/protocol-ledger';
 import { startAdvertising } from '../ble/peripheral';
 import type { PeripheralHandle } from '../ble/types';
+import { isDevBuild } from '../passkeys/devFlag';
 import { SESSION_MS, unlock as requestUnlock } from '../passkeys';
-import { loadEntropy } from '../seeds/vault';
+import { listSlots, loadEntropy, saveSlot } from '../seeds/vault';
+
+const DEV_LAB_MNEMONIC =
+  'test test test test test test test test test test test junk';
 
 type PendingConfirm = {
   request: SigningRequest;
@@ -77,6 +81,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const logSeq = useRef(0);
 
   const appendLog = useCallback((direction: 'in' | 'out', hex: string, note?: string) => {
+    console.log(`[cws-ble] ${direction} ${note ?? ''} ${hex}`.trim());
     setLogs((current) => {
       const next = [
         ...current,
@@ -120,13 +125,35 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       if (ok) {
         setUnlockedUntil(Date.now() + SESSION_MS);
         setError(null);
+        if (isDevBuild()) {
+          const labId = 'dev-lab';
+          const slots = await listSlots();
+          const existing = slots.find((slot) => slot.id === labId);
+          if (existing) {
+            setSeed(existing);
+          } else {
+            setSeed(
+              await saveSlot(
+                {
+                  id: labId,
+                  label: 'DEV lab seed',
+                  brand: model?.brand ?? 'ledger',
+                  modelId: model?.id ?? 'nano-x',
+                  wordCount: 12,
+                  createdAt: Date.now(),
+                },
+                entropyFromMnemonic(DEV_LAB_MNEMONIC),
+              ),
+            );
+          }
+        }
       }
       return ok;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unlock failed');
       return false;
     }
-  }, []);
+  }, [model]);
 
   const stopSimulation = useCallback(async () => {
     await peripheralRef.current?.stop();
@@ -170,7 +197,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const startSimulation = useCallback(async () => {
     if (!model || !isSimulatable(model)) {
       throw new Error(
-        'This app advertises Ledger Nano X / Flex / Stax / Nano Gen5, OneKey V1, and Trezor Safe 7',
+        'This app advertises Ledger BLE models, OneKey Classic/Touch/Pro/Pro 2/Neo/Pure, and Trezor Safe 7',
       );
     }
     if (!seed) {
@@ -185,6 +212,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         slotId: seed.id,
         entropy,
         backup: seed.backup ?? 'bip39',
+        onAppChange: (app) => setCurrentApp(app),
       });
       handlerRef.current = handler;
       setLogs([]);
@@ -198,6 +226,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           setConnectedLabel('');
         },
         onLog: appendLog,
+        onError: (message) => {
+          setError(message);
+          setAdvertising(false);
+        },
       });
       peripheralRef.current = handle;
       setAdvertising(true);

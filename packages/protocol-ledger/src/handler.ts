@@ -6,6 +6,7 @@ import type {
   LedgerApp,
   ProtocolHandler,
 } from '@cws/contracts';
+import { ledgerAppLabel, matchLedgerApp } from '@cws/contracts';
 import {
   BleReassembler,
   clampMtu,
@@ -21,11 +22,20 @@ import {
   encodeResponse,
   parseApdu,
   SW_CLA_NOT_SUPPORTED,
+  SW_DENY,
   SW_INS_NOT_SUPPORTED,
   SW_OK,
 } from './apdu';
-import { concatBytes, encodeAscii } from './bytes';
-import { getAppAndVersion, getFirmwareVersion, openAppName } from './apps/dashboard';
+import {
+  encodeListApps,
+  getAppAndVersionFor,
+  getAppStorageInfo,
+  getDeviceName,
+  getFirmwareVersion,
+  MANAGER_INS,
+  openAppName,
+} from './apps/dashboard';
+import { handleBitcoinApdu } from './apps/bitcoin';
 import { handleEthereumApdu, type EthSession } from './apps/ethereum';
 
 export type LedgerHandlerOptions = {
@@ -35,6 +45,7 @@ export type LedgerHandlerOptions = {
   entropy: Uint8Array;
   backup?: BackupKind;
   mtu?: number;
+  onAppChange?: (app: LedgerApp) => void;
 };
 
 export class LedgerProtocolHandler implements ProtocolHandler {
@@ -46,10 +57,12 @@ export class LedgerProtocolHandler implements ProtocolHandler {
   private readonly slotId: string;
   private readonly entropy: Uint8Array;
   private readonly backup: BackupKind;
+  private readonly onAppChange?: (app: LedgerApp) => void;
   private readonly assembler = new BleReassembler();
   private readonly ethSession: EthSession = {};
   private mtu: number;
   private app: LedgerApp = 'dashboard';
+  private managerAllowed = false;
 
   constructor(options: LedgerHandlerOptions) {
     this.model = options.model;
@@ -57,6 +70,7 @@ export class LedgerProtocolHandler implements ProtocolHandler {
     this.slotId = options.slotId;
     this.entropy = options.entropy;
     this.backup = options.backup ?? 'bip39';
+    this.onAppChange = options.onAppChange;
     this.mtu = clampMtu(options.mtu ?? DEFAULT_MTU);
     this.models = [options.model.id];
   }
@@ -76,6 +90,7 @@ export class LedgerProtocolHandler implements ProtocolHandler {
   setApp(app: LedgerApp): void {
     this.app = app;
     this.ethSession.pendingPersonal = undefined;
+    this.onAppChange?.(app);
   }
 
   getApp(): LedgerApp {
@@ -83,7 +98,10 @@ export class LedgerProtocolHandler implements ProtocolHandler {
   }
 
   observeIncomingSize(size: number): void {
-    this.mtu = clampMtu(Math.max(this.mtu, size));
+    // iOS notify stays at 20 unless ATT MTU is raised, which munim does not
+    // expose. Growing this.mtu makes GET_VERSION / genuine replies larger
+    // than the central will accept, so CoreBluetooth drops them.
+    void size;
   }
 
   async handleWrite(data: Uint8Array): Promise<Uint8Array | null> {
@@ -131,22 +149,35 @@ export class LedgerProtocolHandler implements ProtocolHandler {
     }
 
     if (apdu.cla === 0xb0 && apdu.ins === 0x01) {
-      return getAppAndVersionFor(this.app);
+      return getAppAndVersionFor(this.app, this.model.id);
     }
     if (apdu.cla === 0xb0 && apdu.ins === 0xa7) {
       this.setApp('dashboard');
       return encodeResponse(new Uint8Array(), SW_OK);
     }
     if (apdu.cla === 0xe0 && apdu.ins === 0xd8) {
-      const name = openAppName(apdu.data).toLowerCase();
-      if (name.includes('ethereum')) {
-        this.setApp('ethereum');
-        return encodeResponse(new Uint8Array(), SW_OK);
-      }
-      return encodeResponse(new Uint8Array(), SW_INS_NOT_SUPPORTED);
+      return this.openApp(apdu.data);
     }
-    if (apdu.cla === 0xe0 && apdu.ins === 0x01 && this.app === 'dashboard') {
-      return getFirmwareVersion(this.model.id);
+    if (apdu.cla === 0xe0 && apdu.ins === 0x01) {
+      return getFirmwareVersion(this.model.id, this.managerAllowed);
+    }
+    if (apdu.cla === 0xe0 && apdu.ins === 0xd2) {
+      return getDeviceName(this.model.id);
+    }
+    if (this.app === 'dashboard' && apdu.cla === 0xe0 && apdu.ins === 0x50) {
+      return encodeResponse(new Uint8Array(), SW_OK);
+    }
+    if (this.app === 'dashboard' && apdu.cla === 0xe0 && apdu.ins === 0xde) {
+      return encodeListApps();
+    }
+    if (this.app === 'dashboard' && apdu.cla === 0xe0 && apdu.ins === 0xdf) {
+      return encodeResponse(new Uint8Array(), SW_OK);
+    }
+    if (this.app === 'dashboard' && apdu.cla === 0xe0 && apdu.ins === 0x6a) {
+      return getAppStorageInfo();
+    }
+    if (this.app === 'dashboard' && apdu.cla === 0xe0 && MANAGER_INS.has(apdu.ins)) {
+      return this.allowManager();
     }
 
     if (this.app === 'ethereum' && apdu.cla === 0xe0) {
@@ -159,30 +190,58 @@ export class LedgerProtocolHandler implements ProtocolHandler {
       });
     }
 
+    if (this.app === 'bitcoin' && apdu.cla === 0xe0) {
+      return handleBitcoinApdu(apdu, {
+        confirmation: this.confirmation,
+        slotId: this.slotId,
+        entropy: this.entropy,
+        backup: this.backup,
+      });
+    }
+
     if (apdu.cla !== 0xe0 && apdu.cla !== 0xb0) {
       return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
     }
     return encodeResponse(new Uint8Array(), SW_INS_NOT_SUPPORTED);
   }
-}
 
-function getAppAndVersionFor(app: LedgerApp): Uint8Array {
-  if (app === 'ethereum') {
-    const name = encodeAscii('Ethereum');
-    const version = encodeAscii('1.17.0');
-    const flags = Uint8Array.of(0x00);
-    return encodeResponse(
-      concatBytes(
-        Uint8Array.of(0x01),
-        Uint8Array.of(name.length),
-        name,
-        Uint8Array.of(version.length),
-        version,
-        Uint8Array.of(flags.length),
-        flags,
-      ),
-      SW_OK,
-    );
+  private async openApp(data: Uint8Array): Promise<Uint8Array> {
+    const app = matchLedgerApp(openAppName(data));
+    if (!app || app === 'dashboard') {
+      return encodeResponse(new Uint8Array(), SW_INS_NOT_SUPPORTED);
+    }
+    const label = ledgerAppLabel(app);
+    const ok = await this.confirmation.confirm({
+      brand: 'ledger',
+      kind: 'open-app',
+      title: `Open ${label}`,
+      path: app,
+      message: `Open ${label}`,
+      rawPayload: data,
+    });
+    if (!ok) {
+      return encodeResponse(new Uint8Array(), SW_DENY);
+    }
+    this.setApp(app);
+    return encodeResponse(new Uint8Array(), SW_OK);
   }
-  return getAppAndVersion();
+
+  private async allowManager(): Promise<Uint8Array> {
+    if (this.managerAllowed) {
+      return encodeResponse(new Uint8Array(), SW_OK);
+    }
+    const ok = await this.confirmation.confirm({
+      brand: 'ledger',
+      kind: 'allow-manager',
+      title: 'Allow Ledger Manager',
+      path: 'manager',
+      message: 'Allow Ledger Manager to talk to this device',
+      rawPayload: new Uint8Array(),
+    });
+    if (!ok) {
+      return encodeResponse(new Uint8Array(), SW_DENY);
+    }
+    this.managerAllowed = true;
+    return encodeResponse(new Uint8Array(), SW_OK);
+  }
 }

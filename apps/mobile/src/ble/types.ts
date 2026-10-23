@@ -4,6 +4,7 @@ export type PeripheralCallbacks = {
   onConnected: (centralId: string) => void;
   onDisconnected: () => void;
   onLog: (direction: 'in' | 'out', hex: string, note?: string) => void;
+  onError?: (message: string) => void;
 };
 
 export type PeripheralHandle = {

@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import type { SeedSlot } from '@cws/contracts';
 import { wordCountFromEntropy } from '@cws/sdk';
+import { isDevBuild } from '../passkeys/devFlag';
 import { entropyKey, LEGACY_SLOTS_KEY, SLOTS_KEY } from './vaultKeys';
 
 export { entropyKey, secureStoreKey, SLOTS_KEY } from './vaultKeys';
@@ -95,6 +96,10 @@ async function readSecret(key: string): Promise<string | null> {
     }
   } catch {
     // Fall through to the authenticated copy of older slots.
+  }
+  if (isDevBuild()) {
+    // Debug builds skip Face ID; authenticated SecureStore copies stay unread.
+    return null;
   }
   try {
     return await SecureStore.getItemAsync(key, authOptions());

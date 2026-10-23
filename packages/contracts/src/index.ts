@@ -1,3 +1,5 @@
+import type { SigningRequest } from './signing';
+
 export type Brand = 'ledger' | 'trezor' | 'onekey';
 
 export interface DeviceModel {
@@ -27,12 +29,17 @@ export interface SeedSlot {
   // seed itself is never in this object — only in SecureStore
 }
 
-export interface SigningRequest {
-  brand: Brand;
-  path: string;
-  message: string;
-  rawPayload: Uint8Array;
-}
+export type {
+  SigningKind,
+  SigningRequest,
+} from './signing';
+export {
+  SLIDE_COMMIT_RATIO,
+  signingNeedsPassphrase,
+  signingSlideLabel,
+  slideProgress,
+  shouldCommitSlide,
+} from './signing';
 
 export interface ProtocolHandler {
   brand: Brand;
@@ -48,7 +55,15 @@ export interface ConfirmationPort {
   onPairingCode?(code: string | null): void;
 }
 
-export type LedgerApp = 'dashboard' | 'ethereum';
+export type { LedgerApp, LedgerInstalledApp, LedgerInstalledAppId } from './ledgerApps';
+export {
+  LEDGER_APPS,
+  LEDGER_INSTALLED_APPS,
+  ledgerAppChip,
+  ledgerAppLabel,
+  ledgerInstalledApp,
+  matchLedgerApp,
+} from './ledgerApps';
 
 export interface ApduLogEntry {
   id: string;
@@ -63,4 +78,17 @@ export {
   LEDGER_MODELS,
   TREZOR_MODELS,
   ONEKEY_MODELS,
+  bleAdvertiseName,
 } from './models';
+
+export {
+  LEDGER_OS,
+  ONEKEY_FIRMWARE,
+  TREZOR_FIRMWARE,
+  formatVersion,
+  ledgerOsFor,
+  onekeyFirmwareFor,
+  type LedgerOsVersion,
+  type OneKeyFirmware,
+  type VersionTriple,
+} from './versions';

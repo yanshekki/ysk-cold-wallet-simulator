@@ -1,9 +1,10 @@
-import { concatBytes } from './bytes';
+import { concatBytes, hexToBytes } from './bytes';
 import {
   decodeFields,
   encodeBool,
   encodeBytes,
   encodePackedUint32,
+  encodeRepeatedUint32,
   encodeString,
   encodeUint32,
   readOptionalBool,
@@ -41,6 +42,10 @@ export const MessageType = {
   EthereumSignTxEIP1559OneKey: 20105,
   EthereumSignMessageOneKey: 20108,
   EthereumMessageSignatureOneKey: 20110,
+  ReadSEPublicCert: 10007,
+  SEPublicCert: 10008,
+  SESignMessage: 10012,
+  SEMessageSignature: 10013,
 } as const;
 
 export const FailureType = {
@@ -71,6 +76,9 @@ export const OneKeyDeviceType = {
   Mini: 2,
   Touch: 3,
   Pro: 5,
+  Pure: 6,
+  Pro2: 7,
+  Neo: 8,
 } as const;
 
 export type EthereumGetAddressMsg = {
@@ -89,6 +97,17 @@ export type BitcoinGetAddressMsg = {
   showDisplay: boolean;
 };
 
+export type EthereumSignTxMsg = {
+  addressN: number[];
+  nonce: Uint8Array;
+  gasPrice: Uint8Array;
+  gasLimit: Uint8Array;
+  to: Uint8Array;
+  value: Uint8Array;
+  data: Uint8Array;
+  chainId: number;
+};
+
 export type FeaturesInput = {
   vendor: string;
   major: number;
@@ -100,6 +119,10 @@ export type FeaturesInput = {
   serial: string;
   bleName: string;
   onekeyVersion: string;
+  bleVersion: string;
+  bootVersion: string;
+  boardVersion: string;
+  seVersion: string;
   sessionId: Uint8Array;
   deviceType: number;
 };
@@ -108,8 +131,82 @@ export function encodeFailure(code: number, message: string): Uint8Array {
   return concatBytes(encodeUint32(1, code), encodeString(2, message));
 }
 
+export function encodeV2Failure(code: number, message: string, subcode = 0): Uint8Array {
+  return concatBytes(encodeUint32(1, code), encodeUint32(2, subcode), encodeString(3, message));
+}
+
 export function encodeSuccess(message?: string): Uint8Array {
   return message ? encodeString(1, message) : new Uint8Array();
+}
+
+export function encodeProtocolInfo(input: {
+  version: number;
+  buildFingerprint: string;
+  supportedMessages: number[];
+}): Uint8Array {
+  return concatBytes(
+    encodeUint32(1, input.version),
+    encodeString(2, input.buildFingerprint),
+    encodeRepeatedUint32(3, input.supportedMessages),
+  );
+}
+
+const DEVICE_TYPE_PRO = 5;
+
+function encodeFirmwareImage(version: string, buildId: string): Uint8Array {
+  return concatBytes(encodeString(10, version), encodeString(20, buildId));
+}
+
+export function encodeDeviceInfo(input: {
+  serial: string;
+  bleName: string;
+  firmware: string;
+  bleVersion: string;
+  bootVersion: string;
+  boardVersion: string;
+  deviceType?: number;
+}): Uint8Array {
+  const app = encodeFirmwareImage(input.firmware, 'cws0000');
+  const boot = encodeFirmwareImage(input.bootVersion, 'cwsboot');
+  const board = encodeFirmwareImage(input.boardVersion, 'cwsboard');
+  const ble = encodeFirmwareImage(input.bleVersion, 'cwsble');
+  const hw = concatBytes(
+    encodeUint32(10, input.deviceType ?? DEVICE_TYPE_PRO),
+    encodeString(20, input.serial),
+    encodeString(100, '1.0'),
+  );
+  const mainMcu = concatBytes(encodeBytes(10, board), encodeBytes(20, boot), encodeBytes(30, app));
+  const coprocessor = concatBytes(encodeBytes(20, ble), encodeBytes(30, ble), encodeString(100, input.bleName));
+  return concatBytes(
+    encodeUint32(1, 1),
+    encodeBytes(100, hw),
+    encodeBytes(200, mainMcu),
+    encodeBytes(300, coprocessor),
+  );
+}
+
+export function encodeSEPublicCert(cert: Uint8Array): Uint8Array {
+  return encodeBytes(1, cert);
+}
+
+export function encodeSEMessageSignature(signature: Uint8Array): Uint8Array {
+  return encodeBytes(1, signature);
+}
+
+export function decodeSESignMessage(payload: Uint8Array): Uint8Array {
+  return readOptionalBytes(decodeFields(payload), 1) ?? payload;
+}
+
+export function encodeDeviceStatus(deviceId: string): Uint8Array {
+  return concatBytes(
+    encodeString(1, deviceId),
+    encodeBool(2, true),
+    encodeBool(3, true),
+    encodeBool(4, false),
+    encodeBool(10, false),
+    encodeBool(11, false),
+    encodeBool(12, false),
+  );
 }
 
 export function encodeButtonRequest(code: number): Uint8Array {
@@ -141,22 +238,35 @@ export function encodeFeatures(input: FeaturesInput): Uint8Array {
     ]),
     encodeBytes(35, input.sessionId),
     encodeString(501, input.bleName),
+    encodeString(502, input.bleVersion),
+    encodeBool(503, true),
+    encodeBool(504, true),
+    encodeString(506, input.seVersion),
     encodeString(508, input.onekeyVersion),
     encodeString(509, input.serial),
+    encodeString(510, input.bootVersion),
     encodeString(511, input.serial),
+    encodeString(519, input.boardVersion),
     encodeUint32(600, input.deviceType),
+    encodeString(602, input.boardVersion),
+    encodeString(604, input.bootVersion),
+    encodeString(606, input.seVersion),
     encodeString(609, input.onekeyVersion),
     encodeString(612, input.serial),
     encodeString(614, input.bleName),
+    encodeString(615, input.bleVersion),
   );
 }
 
 export function encodeOnekeyFeatures(input: FeaturesInput): Uint8Array {
   return concatBytes(
     encodeUint32(1, input.deviceType),
+    encodeString(2, input.boardVersion),
+    encodeString(3, input.bootVersion),
     encodeString(4, input.onekeyVersion),
     encodeString(11, input.serial),
     encodeString(12, input.bleName),
+    encodeString(13, input.bleVersion),
   );
 }
 
@@ -191,6 +301,41 @@ export function decodeEthereumSignMessage(payload: Uint8Array): EthereumSignMess
     addressN: readPackedOrRepeatedUint32(fields, 1),
     message,
   };
+}
+
+export function decodeEthereumSignTx(payload: Uint8Array): EthereumSignTxMsg {
+  const fields = decodeFields(payload);
+  const toBytes = readOptionalBytes(fields, 5);
+  const toString = readOptionalString(fields, 9);
+  let to = toBytes && toBytes.length > 0 ? toBytes : new Uint8Array();
+  if (to.length === 0 && toString) {
+    const hex = toString.startsWith('0x') || toString.startsWith('0X') ? toString.slice(2) : toString;
+    if (hex.length % 2 === 0 && hex.length > 0) {
+      to = hexToBytes(hex);
+    }
+  }
+  return {
+    addressN: readPackedOrRepeatedUint32(fields, 1),
+    nonce: readOptionalBytes(fields, 2) ?? new Uint8Array(),
+    gasPrice: readOptionalBytes(fields, 3) ?? new Uint8Array(),
+    gasLimit: readOptionalBytes(fields, 4) ?? new Uint8Array(),
+    to,
+    value: readOptionalBytes(fields, 6) ?? new Uint8Array(),
+    data: readOptionalBytes(fields, 7) ?? new Uint8Array(),
+    chainId: fields.find((field) => field.field === 11)?.varint ?? 1,
+  };
+}
+
+export function encodeEthereumTxRequest(signature: {
+  v: number;
+  r: Uint8Array;
+  s: Uint8Array;
+}): Uint8Array {
+  return concatBytes(
+    encodeUint32(2, signature.v),
+    encodeBytes(3, signature.r),
+    encodeBytes(4, signature.s),
+  );
 }
 
 export function decodeBitcoinGetAddress(payload: Uint8Array): BitcoinGetAddressMsg {

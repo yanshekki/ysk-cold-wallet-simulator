@@ -3,6 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const platform = { OS: 'ios' };
 const getEnrolledLevelAsync = vi.fn();
 const authenticateAsync = vi.fn();
+const { isDevBuild } = vi.hoisted(() => ({
+  isDevBuild: vi.fn(() => false),
+}));
+
+vi.mock('./devFlag', () => ({
+  isDevBuild: () => isDevBuild(),
+}));
 
 vi.mock('react-native', () => ({
   Platform: platform,
@@ -22,8 +29,22 @@ vi.mock('expo-local-authentication', () => ({
 describe('passkeys session', () => {
   beforeEach(() => {
     platform.OS = 'ios';
+    isDevBuild.mockReset();
+    isDevBuild.mockReturnValue(false);
     getEnrolledLevelAsync.mockReset();
     authenticateAsync.mockReset();
+  });
+
+  it('skips Face ID in a DEV build without calling the platform authenticator', async () => {
+    isDevBuild.mockReturnValue(true);
+    const { unlock, describeUnlock, DEV_SKIP_MESSAGE } = await import('./session');
+    await expect(unlock()).resolves.toBe(true);
+    expect(getEnrolledLevelAsync).not.toHaveBeenCalled();
+    expect(authenticateAsync).not.toHaveBeenCalled();
+    await expect(describeUnlock()).resolves.toEqual({
+      kind: 'dev-skip',
+      message: DEV_SKIP_MESSAGE,
+    });
   });
 
   it('unlocks on web without calling the platform authenticator', async () => {

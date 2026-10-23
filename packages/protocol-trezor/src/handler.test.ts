@@ -100,8 +100,11 @@ class ThpHost {
   initiator: ThpNoiseInitiator | undefined;
   properties: Uint8Array = new Uint8Array();
 
-  constructor(acceptSigning = true) {
-    this.confirmation = autoConfirm(acceptSigning);
+  constructor(
+    acceptSigning = true,
+    confirmation?: ConfirmationPort & { pairingCode: string | null },
+  ) {
+    this.confirmation = confirmation ?? autoConfirm(acceptSigning);
     this.handler = new TrezorThpProtocolHandler({
       model: safe7,
       confirmation: this.confirmation,
@@ -213,6 +216,9 @@ describe('TrezorThpProtocolHandler', () => {
     expect(decoded.vendor).toBe('trezor.io');
     expect(decoded.internalModel).toBe(INTERNAL_MODEL);
     expect(decoded.initialized).toBe(true);
+    expect(decoded.major).toBe(2);
+    expect(decoded.minor).toBe(13);
+    expect(decoded.patch).toBe(0);
   });
 
   it('exports the foundation Ethereum address after confirm', async () => {
@@ -260,6 +266,21 @@ describe('TrezorThpProtocolHandler', () => {
     const entropy = entropyFromMnemonic(FOUNDATION);
     const expected = signPersonalMessage(derivePrivateKey(entropy, PATH), message);
     expect(Array.from(decoded.signature)).toEqual(Array.from(expected));
+  });
+
+  it('cancels pairing when the user rejects', async () => {
+    const confirmation = autoConfirm(true);
+    confirmation.confirm = async () => false;
+    const host = new ThpHost(true, confirmation);
+    await host.allocate();
+    await host.handshake();
+    const reply = await host.app(
+      MessageType.ThpPairingRequest,
+      encodePairingRequest('laptop', 'Trezor Suite'),
+    );
+    expect(reply.type).toBe(MessageType.Failure);
+    expect(decodeFailure(reply.payload).code).toBe(FailureType.ActionCancelled);
+    expect(confirmation.pairingCode).toBeNull();
   });
 
   it('returns Failure for EthereumSignTx and unknown types', async () => {

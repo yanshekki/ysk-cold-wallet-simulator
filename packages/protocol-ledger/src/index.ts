@@ -27,10 +27,19 @@ export {
   SW_WRONG_P1P2,
 } from './apdu';
 export {
+  deriveHdNode,
   derivePrivateKey,
   ethereumAddressFromPrivateKey,
   mnemonicFromEntropy,
   personalMessageHash,
+  publicKeyCompressed,
   signPersonalMessage,
 } from './crypto';
+export {
+  bitcoinAddressFor,
+  bitcoinP2pkh,
+  bitcoinP2wpkh,
+  BITCOIN_APP_VERSION,
+  handleBitcoinApdu,
+} from './apps/bitcoin';
 export { bytesToHex, hexToBytes } from './bytes';

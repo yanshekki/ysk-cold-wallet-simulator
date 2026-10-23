@@ -50,7 +50,11 @@ describe('protobuf wire codec', () => {
       model: 'classic',
       serial: 'cldeadbeef',
       bleName: 'OneKey Classic',
-      onekeyVersion: '3.13.0',
+      onekeyVersion: '3.12.0',
+      bleVersion: '1.4.1',
+      bootVersion: '2.0.0',
+      boardVersion: '1.0.0',
+      seVersion: '1.1.7',
       sessionId: new Uint8Array(32),
       deviceType: 0,
     });

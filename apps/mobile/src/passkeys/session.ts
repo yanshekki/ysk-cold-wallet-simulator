@@ -3,12 +3,13 @@
  *
  * Full WebAuthn passkeys need a relying-party domain plus hosted
  * AASA / Digital Asset Links files. This repo has no associated domain,
- * so unlock uses the OS authenticator (biometric / device PIN) and
- * SecureStore `requireAuthentication` remains the second gate on entropy.
+ * so unlock uses the OS authenticator (biometric / device PIN).
+ * Debug builds skip the OS prompt so USB-device tests can proceed.
  */
 
 import { Platform } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
+import { isDevBuild } from './devFlag';
 
 export const SESSION_MS = 15 * 60 * 1000;
 
@@ -17,10 +18,13 @@ export const NOT_ENROLLED_MESSAGE =
 
 export const WEB_DEV_MESSAGE = 'Web skip — use an Android/iOS device for real unlock.';
 
+export const DEV_SKIP_MESSAGE =
+  'DEV build — Unlock skips Face ID. Release still requires biometric / device PIN.';
+
 export const ENROLLED_MESSAGE =
   'Platform authenticator (biometric / device PIN) unlocks a 15-minute session. Seeds stay in SecureStore.';
 
-export type UnlockKind = 'web-dev' | 'enrolled' | 'not-enrolled';
+export type UnlockKind = 'web-dev' | 'dev-skip' | 'enrolled' | 'not-enrolled';
 
 export type UnlockStatus = {
   kind: UnlockKind;
@@ -42,6 +46,9 @@ export async function describeUnlock(): Promise<UnlockStatus> {
   if (Platform.OS === 'web') {
     return { kind: 'web-dev', message: WEB_DEV_MESSAGE };
   }
+  if (isDevBuild()) {
+    return { kind: 'dev-skip', message: DEV_SKIP_MESSAGE };
+  }
   const level = await LocalAuthentication.getEnrolledLevelAsync();
   if (level < LocalAuthentication.SecurityLevel.SECRET) {
     return { kind: 'not-enrolled', message: NOT_ENROLLED_MESSAGE };
@@ -50,7 +57,7 @@ export async function describeUnlock(): Promise<UnlockStatus> {
 }
 
 export async function unlock(): Promise<boolean> {
-  if (Platform.OS === 'web') {
+  if (Platform.OS === 'web' || isDevBuild()) {
     return true;
   }
   const level = await LocalAuthentication.getEnrolledLevelAsync();

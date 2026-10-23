@@ -69,6 +69,77 @@ export function signPersonalMessage(privateKey: Uint8Array, message: Uint8Array)
   return concatBytes(compact, Uint8Array.of(v));
 }
 
+function rlpHeader(length: number, offset: number): Uint8Array {
+  if (length < 56) {
+    return Uint8Array.of(offset + length);
+  }
+  const lenBytes: number[] = [];
+  let n = length;
+  while (n > 0) {
+    lenBytes.unshift(n & 0xff);
+    n >>= 8;
+  }
+  return Uint8Array.from([offset + 55 + lenBytes.length, ...lenBytes]);
+}
+
+export function rlpEncodeBytes(data: Uint8Array): Uint8Array {
+  if (data.length === 1 && data[0] < 0x80) {
+    return data;
+  }
+  return concatBytes(rlpHeader(data.length, 0x80), data);
+}
+
+export function rlpEncodeList(items: Uint8Array[]): Uint8Array {
+  const body = concatBytes(...items.map((item) => rlpEncodeBytes(item)));
+  return concatBytes(rlpHeader(body.length, 0xc0), body);
+}
+
+export function signLegacyTx(
+  privateKey: Uint8Array,
+  tx: {
+    nonce: Uint8Array;
+    gasPrice: Uint8Array;
+    gasLimit: Uint8Array;
+    to: Uint8Array;
+    value: Uint8Array;
+    data: Uint8Array;
+    chainId: number;
+  },
+): { v: number; r: Uint8Array; s: Uint8Array } {
+  const unsigned = rlpEncodeList([
+    tx.nonce,
+    tx.gasPrice,
+    tx.gasLimit,
+    tx.to,
+    tx.value,
+    tx.data,
+    rlpInteger(tx.chainId),
+    new Uint8Array(),
+    new Uint8Array(),
+  ]);
+  const hash = keccak_256(unsigned);
+  const sig = secp256k1.sign(hash, privateKey);
+  const compact = sig.toCompactRawBytes();
+  return {
+    v: (sig.recovery ?? 0) + tx.chainId * 2 + 35,
+    r: compact.subarray(0, 32),
+    s: compact.subarray(32),
+  };
+}
+
+function rlpInteger(value: number): Uint8Array {
+  if (value === 0) {
+    return new Uint8Array();
+  }
+  const bytes: number[] = [];
+  let n = value;
+  while (n > 0) {
+    bytes.unshift(n & 0xff);
+    n >>>= 8;
+  }
+  return Uint8Array.from(bytes);
+}
+
 export function hash160(bytes: Uint8Array): Uint8Array {
   return ripemd160(sha256(bytes));
 }

@@ -1,4 +1,5 @@
 import type { BackupKind, Brand, ConfirmationPort, DeviceModel, ProtocolHandler, SigningRequest } from '@cws/contracts';
+import { TREZOR_FIRMWARE } from '@cws/contracts';
 import { keccak_256 } from '@noble/hashes/sha3';
 import { sha256 } from '@noble/hashes/sha2';
 import {
@@ -329,6 +330,8 @@ export class TrezorThpProtocolHandler implements ProtocolHandler {
     }
     const ok = await this.confirmation.confirm({
       brand: 'trezor',
+      kind: 'pairing',
+      title: 'Pair with host',
       path: 'pairing',
       message: `${request.appName} on ${request.hostName} wants to pair`,
       rawPayload: payload,
@@ -477,6 +480,8 @@ export class TrezorThpProtocolHandler implements ProtocolHandler {
     }
     const request: SigningRequest = {
       brand: 'trezor',
+      kind: pending.kind === 'eth-sign' ? 'sign' : 'address',
+      title: pending.kind === 'eth-sign' ? 'Sign message' : 'Export Ethereum address',
       path: pending.path,
       message: pending.kind === 'eth-sign' ? previewMessage(pending.message) : `Export ${pending.path}`,
       rawPayload: pending.rawPayload,
@@ -507,9 +512,9 @@ export class TrezorThpProtocolHandler implements ProtocolHandler {
   private featuresInput() {
     return {
       vendor: 'trezor.io',
-      major: 2,
-      minor: 9,
-      patch: 0,
+      major: TREZOR_FIRMWARE.major,
+      minor: TREZOR_FIRMWARE.minor,
+      patch: TREZOR_FIRMWARE.patch,
       deviceId: this.serial,
       label: 'YSK Simulator',
       model: this.model.name.replace(/^Trezor /, ''),

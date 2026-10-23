@@ -2,6 +2,7 @@ import { Redirect, Tabs } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ledgerAppChip } from '@cws/contracts';
 import {
   Hud,
   PairingTakeover,
@@ -18,6 +19,8 @@ export default function AppShell() {
     advertising,
     connected,
     connectedLabel,
+    model,
+    currentApp,
     pending,
     pairingCode,
     passphrase,
@@ -43,6 +46,11 @@ export default function AppShell() {
           sessionLabel={formatSessionRemaining(unlockedUntil, now)}
           radio={radioMode(advertising, connected)}
           host={connected ? connectedLabel : undefined}
+          appChip={
+            model?.brand === 'ledger' && (advertising || connected)
+              ? ledgerAppChip(currentApp)
+              : undefined
+          }
           onLock={lock}
         />
       </SafeAreaView>

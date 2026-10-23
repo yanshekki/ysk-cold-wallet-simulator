@@ -8,6 +8,7 @@ type Props = {
   sessionLabel: string;
   radio: RadioMode;
   host?: string;
+  appChip?: string;
   onLock?: () => void;
 };
 
@@ -31,7 +32,7 @@ export function radioMode(advertising: boolean, connected: boolean): RadioMode {
   return 'IDLE';
 }
 
-export function Hud({ sessionLabel, radio, host, onLock }: Props) {
+export function Hud({ sessionLabel, radio, host, appChip, onLock }: Props) {
   const locked = sessionLabel === 'LOCKED';
   const live = radio !== 'IDLE';
 
@@ -44,6 +45,11 @@ export function Hud({ sessionLabel, radio, host, onLock }: Props) {
         <RadioPip active={live} />
         <Text style={[styles.radio, live && styles.radioOn]}>{radio}</Text>
       </View>
+      {appChip ? (
+        <View style={styles.cluster}>
+          <Text style={[styles.chip, live && styles.chipOn]}>{appChip}</Text>
+        </View>
+      ) : null}
       <View style={[styles.cluster, styles.hostCluster]}>
         <Text style={styles.host} numberOfLines={1}>
           {host ? host : 'NO HOST'}
@@ -138,6 +144,23 @@ const styles = StyleSheet.create({
   },
   radioOn: {
     color: colors.ok,
+  },
+  chip: {
+    color: colors.muted,
+    fontFamily: fonts.mono,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    overflow: 'hidden',
+    borderRadius: 4,
+  },
+  chipOn: {
+    color: colors.ok,
+    borderColor: colors.ok,
   },
   host: {
     flexShrink: 1,

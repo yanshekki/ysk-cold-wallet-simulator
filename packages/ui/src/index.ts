@@ -5,6 +5,8 @@ export { BrandGrid } from './BrandGrid';
 export { SeedCard, backupBadge } from './SeedCard';
 export { AddressInspector } from './AddressInspector';
 export { SigningModal } from './SigningModal';
+export { SelectSheet, type SelectSheetOption } from './SelectSheet';
+export { SlideToConfirm } from './SlideToConfirm';
 export { ApduLog } from './ApduLog';
 export { LogEditor } from './LogEditor';
 export { formatHex, formatLogText } from './logFormat';

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import type { DeviceModel } from '@cws/contracts';
+import { bleAdvertiseName, type DeviceModel } from '@cws/contracts';
 import { BRAND_LABEL, brandColor, colors, fonts, radius, space } from './theme';
 
 type Props = {
@@ -51,7 +51,7 @@ export function DeviceCard({
       {selected && enabled ? (
         <View style={styles.bezel}>
           <Text style={styles.meta}>Local name</Text>
-          <Text style={styles.mono}>{model.name}</Text>
+          <Text style={styles.mono}>{bleAdvertiseName(model)}</Text>
           <Text style={styles.meta}>Service UUID</Text>
           <Text style={styles.mono} selectable>
             {model.serviceUUID}

@@ -15,8 +15,15 @@ import {
   signPersonalMessage,
 } from '../crypto';
 import type { BackupKind, ConfirmationPort, SigningRequest } from '@cws/contracts';
+import { LEDGER_INSTALLED_APPS } from '@cws/contracts';
 
-export const ETH_APP_VERSION = Uint8Array.of(0x00, 0x01, 0x11, 0x00);
+function ethAppVersionBytes(): Uint8Array {
+  const version = LEDGER_INSTALLED_APPS.find((app) => app.id === 'ethereum')?.version ?? '1.23.0';
+  const [major, minor, patch] = version.split('.').map((part) => Number.parseInt(part, 10) || 0);
+  return Uint8Array.of(0x00, major & 0xff, minor & 0xff, patch & 0xff);
+}
+
+export const ETH_APP_VERSION = ethAppVersionBytes();
 
 export type EthSession = {
   pendingPersonal?: {
@@ -53,6 +60,8 @@ async function handleGetAddress(apdu: Apdu, ctx: EthContext): Promise<Uint8Array
   const { path } = parseBip32Path(apdu.data);
   const request: SigningRequest = {
     brand: 'ledger',
+    kind: 'address',
+    title: 'Export Ethereum address',
     path,
     message: `Export Ethereum address\n${path}`,
     rawPayload: apdu.data,
@@ -109,6 +118,8 @@ async function handlePersonalSign(apdu: Apdu, ctx: EthContext): Promise<Uint8Arr
   const preview = previewMessage(message);
   const request: SigningRequest = {
     brand: 'ledger',
+    kind: 'sign',
+    title: 'Sign message',
     path: pending.path,
     message: `Sign personal message\n${pending.path}\n${preview}`,
     rawPayload: message,

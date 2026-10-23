@@ -1,6 +1,7 @@
 import { Modal, StyleSheet, Text, TextInput, View } from 'react-native';
-import type { SigningRequest } from '@cws/contracts';
+import { signingNeedsPassphrase, signingSlideLabel, type SigningRequest } from '@cws/contracts';
 import { Button } from './Button';
+import { SlideToConfirm } from './SlideToConfirm';
 import { BRAND_LABEL, brandColor, colors, fonts, radius, space } from './theme';
 
 type Props = {
@@ -21,34 +22,44 @@ export function SigningModal({
   onReject,
 }: Props) {
   const brand = request?.brand;
+  const kind = request?.kind ?? 'sign';
+  const showPassphrase = request ? signingNeedsPassphrase(kind) : false;
   return (
     <Modal visible={visible} transparent animationType="fade">
       <View style={styles.backdrop}>
         <View style={styles.sheet}>
-          <Text style={styles.kicker}>Confirm on device</Text>
+          <Text style={styles.kicker}>{request?.title ?? 'Confirm on device'}</Text>
           {brand ? (
             <Text style={[styles.brand, { color: brandColor(brand) }]}>{BRAND_LABEL[brand]}</Text>
           ) : null}
           <Text style={styles.path}>{request?.path ?? ''}</Text>
           <Text style={styles.message}>{request?.message ?? ''}</Text>
-          <Text style={styles.hint}>BIP39 passphrase is never stored. Leave blank if unused.</Text>
-          <TextInput
-            value={passphrase}
-            onChangeText={onChangePassphrase}
-            placeholder="Optional passphrase"
-            placeholderTextColor={colors.muted}
-            secureTextEntry
-            autoCapitalize="none"
-            autoCorrect={false}
-            autoComplete="off"
-            textContentType="oneTimeCode"
-            importantForAutofill="no"
-            spellCheck={false}
-            style={styles.input}
+          {showPassphrase ? (
+            <>
+              <Text style={styles.hint}>BIP39 passphrase is never stored. Leave blank if unused.</Text>
+              <TextInput
+                value={passphrase}
+                onChangeText={onChangePassphrase}
+                placeholder="Optional passphrase"
+                placeholderTextColor={colors.muted}
+                secureTextEntry
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="off"
+                textContentType="oneTimeCode"
+                importantForAutofill="no"
+                spellCheck={false}
+                style={styles.input}
+              />
+            </>
+          ) : null}
+          <SlideToConfirm
+            label={signingSlideLabel(kind)}
+            onConfirm={onConfirm}
+            resetKey={request ? `${request.kind}:${request.path}:${request.message}` : ''}
           />
           <View style={styles.actions}>
             <Button label="Reject" variant="danger" onPress={onReject} />
-            <Button label="Confirm" onPress={onConfirm} />
           </View>
         </View>
       </View>

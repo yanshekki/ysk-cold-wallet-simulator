@@ -1,4 +1,10 @@
-import type { BackupKind, ConfirmationPort, DeviceModel, ProtocolHandler } from '@cws/contracts';
+import type {
+  BackupKind,
+  ConfirmationPort,
+  DeviceModel,
+  LedgerApp,
+  ProtocolHandler,
+} from '@cws/contracts';
 import {
   DEFAULT_MTU,
   LedgerProtocolHandler,
@@ -19,6 +25,7 @@ export type CreateHandlerOptions = {
   entropy: Uint8Array;
   backup?: BackupKind;
   mtu?: number;
+  onAppChange?: (app: LedgerApp) => void;
 };
 
 export function createHandler(options: CreateHandlerOptions): ProtocolHandler {
@@ -26,6 +33,7 @@ export function createHandler(options: CreateHandlerOptions): ProtocolHandler {
     case 'ledger-apdu':
       return new LedgerProtocolHandler(options);
     case 'onekey-v1':
+    case 'onekey-v2':
       return new OneKeyV1ProtocolHandler(options);
     case 'thp':
       return new TrezorThpProtocolHandler(options);
@@ -43,6 +51,7 @@ export function splitNotify(model: DeviceModel, framed: Uint8Array, mtu: number)
     case 'ledger-apdu':
       return splitFramedPackets(framed, mtu);
     case 'onekey-v1':
+    case 'onekey-v2':
       return splitOneKeyV1(framed, mtu);
     case 'thp':
       return splitThpPackets(framed, Math.max(THP_MTU, mtu));
@@ -55,6 +64,7 @@ export function isSimulatable(model: DeviceModel): boolean {
   return (
     model.protocol === 'ledger-apdu' ||
     model.protocol === 'onekey-v1' ||
+    model.protocol === 'onekey-v2' ||
     model.protocol === 'thp'
   );
 }

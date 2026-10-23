@@ -10,25 +10,48 @@ export function mnemonicFromEntropy(entropy: Uint8Array): string {
   return entropyToMnemonic(entropy, wordlist);
 }
 
+export type HdNode = {
+  privateKey: Uint8Array;
+  publicKey: Uint8Array;
+  chainCode: Uint8Array;
+};
+
+export function deriveHdNode(
+  entropy: Uint8Array,
+  path: string,
+  passphrase?: string,
+  backup: BackupKind = 'bip39',
+): HdNode {
+  const seed =
+    backup === 'slip39'
+      ? entropy
+      : mnemonicToSeedSync(mnemonicFromEntropy(entropy), passphrase ?? '');
+  const child = HDKey.fromMasterSeed(seed).derive(path);
+  if (!child.privateKey || !child.publicKey || !child.chainCode) {
+    throw new Error('derived key is incomplete');
+  }
+  return {
+    privateKey: child.privateKey,
+    publicKey: child.publicKey,
+    chainCode: child.chainCode,
+  };
+}
+
 export function derivePrivateKey(
   entropy: Uint8Array,
   path: string,
   passphrase?: string,
   backup: BackupKind = 'bip39',
 ): Uint8Array {
-  const seed =
-    backup === 'slip39'
-      ? entropy
-      : mnemonicToSeedSync(mnemonicFromEntropy(entropy), passphrase ?? '');
-  const child = HDKey.fromMasterSeed(seed).derive(path);
-  if (!child.privateKey) {
-    throw new Error('derived key has no private key');
-  }
-  return child.privateKey;
+  return deriveHdNode(entropy, path, passphrase, backup).privateKey;
 }
 
 export function publicKeyUncompressed(privateKey: Uint8Array): Uint8Array {
   return secp256k1.getPublicKey(privateKey, false);
+}
+
+export function publicKeyCompressed(privateKey: Uint8Array): Uint8Array {
+  return secp256k1.getPublicKey(privateKey, true);
 }
 
 export function ethereumAddressFromPrivateKey(privateKey: Uint8Array): string {

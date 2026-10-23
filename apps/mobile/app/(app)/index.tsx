@@ -1,9 +1,15 @@
 import { useState } from 'react';
 import { Platform, StyleSheet, Text, View } from 'react-native';
-import type { Brand, DeviceModel } from '@cws/contracts';
-import { ALL_MODELS } from '@cws/contracts';
+import type { Brand, DeviceModel, LedgerApp } from '@cws/contracts';
+import {
+  ALL_MODELS,
+  LEDGER_APPS,
+  bleAdvertiseName,
+  ledgerAppChip,
+  ledgerAppLabel,
+} from '@cws/contracts';
 import { isSimulatable } from '@cws/sdk';
-import { BRAND_LABEL, Button, DeviceCard, Screen, colors, space } from '@cws/ui';
+import { BRAND_LABEL, Button, DeviceCard, Screen, SelectSheet, colors, space } from '@cws/ui';
 import { copyText } from '../../src/lab/copy';
 import { useAppState } from '../../src/state/AppState';
 
@@ -25,6 +31,7 @@ export default function DeviceScreen() {
   const [busy, setBusy] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [appSheet, setAppSheet] = useState(false);
 
   const isLedger = model?.protocol === 'ledger-apdu';
   const canStart = !!seed && !!model && isSimulatable(model) && !advertising;
@@ -78,7 +85,7 @@ export default function DeviceScreen() {
                 enabled={ready}
                 badge={ready ? undefined : 'Not implemented'}
                 onSelect={() => onSelect(item)}
-                onCopyName={() => void onCopy('name', item.name)}
+                onCopyName={() => void onCopy('name', bleAdvertiseName(item))}
                 onCopyUuid={() => void onCopy('uuid', item.serviceUUID)}
               >
                 {model?.id === item.id ? (
@@ -95,14 +102,35 @@ export default function DeviceScreen() {
                     {advertising ? (
                       <>
                         <Text style={styles.live}>
-                          {connected ? 'Host on GATT' : `Advertising as ${item.name}`}
+                          {connected ? 'Host on GATT' : `Advertising as ${bleAdvertiseName(item)}`}
                         </Text>
                         {isLedger ? (
-                          <Button
-                            label={currentApp === 'ethereum' ? 'BOLOS dashboard' : 'Ethereum app'}
-                            variant="ghost"
-                            onPress={() => setApp(currentApp === 'ethereum' ? 'dashboard' : 'ethereum')}
-                          />
+                          <>
+                            <Text style={styles.appNow}>{ledgerAppLabel(currentApp)}</Text>
+                            <Button
+                              label="Select app"
+                              variant="ghost"
+                              onPress={() => setAppSheet(true)}
+                            />
+                            <SelectSheet
+                              visible={appSheet}
+                              title="Open Ledger app"
+                              selectedId={currentApp}
+                              options={LEDGER_APPS.map((app) => ({
+                                id: app,
+                                label: ledgerAppLabel(app),
+                                chip: ledgerAppChip(app),
+                              }))}
+                              onSelect={(id) => {
+                                setApp(id as LedgerApp);
+                                setAppSheet(false);
+                              }}
+                              onClose={() => setAppSheet(false)}
+                            />
+                            <Text style={styles.hint}>
+                              Host can OPEN_APP from Ledger Wallet. This picker is the device screen.
+                            </Text>
+                          </>
                         ) : null}
                         <Button label="Stop radio" variant="danger" onPress={() => void stopSimulation()} />
                       </>
@@ -162,6 +190,11 @@ const styles = StyleSheet.create({
     color: colors.ok,
     fontSize: 13,
     fontWeight: '600',
+  },
+  appNow: {
+    color: colors.text,
+    fontSize: 20,
+    fontWeight: '700',
   },
   radioHint: {
     color: colors.muted,

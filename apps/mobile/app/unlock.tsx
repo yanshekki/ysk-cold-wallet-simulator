@@ -14,8 +14,28 @@ export default function UnlockScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      void describeUnlock().then(setStatus);
-    }, []),
+      let cancelled = false;
+      void (async () => {
+        const next = await describeUnlock();
+        if (cancelled) {
+          return;
+        }
+        setStatus(next);
+        if (next.kind === 'dev-skip') {
+          setBusy(true);
+          try {
+            await unlock();
+          } finally {
+            if (!cancelled) {
+              setBusy(false);
+            }
+          }
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [unlock]),
   );
 
   const onUnlock = async () => {

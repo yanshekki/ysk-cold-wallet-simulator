@@ -55,11 +55,17 @@ describe('createHandler', () => {
     expect(isSimulatable(model)).toBe(true);
   });
 
-  it('rejects OneKey V2 until a later phase', () => {
-    const pro2 = ALL_MODELS.find((item) => item.id === 'pro2')!;
-    expect(isSimulatable(pro2)).toBe(false);
-    expect(() =>
-      createHandler({ model: pro2, confirmation, slotId: 'slot', entropy }),
-    ).toThrow(/not implemented/);
+  it('builds a OneKey V2 handler for Pro 2 and Neo', () => {
+    for (const id of ['pro2', 'neo']) {
+      const model = ALL_MODELS.find((item) => item.id === id)!;
+      const handler = createHandler({
+        model,
+        confirmation,
+        slotId: 'slot',
+        entropy,
+      });
+      expect(handler.brand).toBe('onekey');
+      expect(isSimulatable(model)).toBe(true);
+    }
   });
 });

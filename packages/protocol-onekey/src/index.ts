@@ -11,6 +11,18 @@ export {
   type V1Message,
 } from './framing';
 export {
+  CRC8_INIT,
+  PROTO_HEAD_SOF,
+  V2FrameAssembler,
+  V2MessageType,
+  decodeFrame,
+  encodeAck,
+  encodeProtobufFrame,
+  inspectFrameHeader,
+  isAckFrame,
+  type V2Frame,
+} from './v2';
+export {
   ButtonRequestType,
   Capability,
   FailureType,
@@ -24,6 +36,10 @@ export {
   encodeEthereumAddress,
   encodeFailure,
   encodeFeatures,
+  encodeDeviceInfo,
+  encodeDeviceStatus,
+  encodeProtocolInfo,
+  encodeV2Failure,
 } from './messages';
 export { encodeRepeatedUint32, encodeString, encodeUint32 } from './proto';
 export {

@@ -381,6 +381,8 @@ export function decodeFailure(payload: Uint8Array): { code: number; message: str
 export function decodeFeatures(payload: Uint8Array): {
   vendor: string;
   major: number;
+  minor: number;
+  patch: number;
   model: string;
   internalModel: string;
   initialized: boolean;
@@ -389,6 +391,8 @@ export function decodeFeatures(payload: Uint8Array): {
   return {
     vendor: readOptionalString(fields, 1) ?? '',
     major: readOptionalUint32(fields, 2) ?? 0,
+    minor: readOptionalUint32(fields, 3) ?? 0,
+    patch: readOptionalUint32(fields, 4) ?? 0,
     model: readOptionalString(fields, 21) ?? '',
     internalModel: readOptionalString(fields, 44) ?? '',
     initialized: readOptionalBool(fields, 12) === true,

@@ -66,6 +66,24 @@ export const ONEKEY_MODELS: DeviceModel[] = [
     protocol: 'onekey-v1',
   },
   {
+    id: 'classic1s',
+    brand: 'onekey',
+    name: 'OneKey Classic 1s',
+    serviceUUID: '00000001-0000-1000-8000-00805f9b34fb',
+    writeCharUUID: '00000002-0000-1000-8000-00805f9b34fb',
+    notifyCharUUID: '00000003-0000-1000-8000-00805f9b34fb',
+    protocol: 'onekey-v1',
+  },
+  {
+    id: 'pure',
+    brand: 'onekey',
+    name: 'OneKey Pure',
+    serviceUUID: '00000001-0000-1000-8000-00805f9b34fb',
+    writeCharUUID: '00000002-0000-1000-8000-00805f9b34fb',
+    notifyCharUUID: '00000003-0000-1000-8000-00805f9b34fb',
+    protocol: 'onekey-v1',
+  },
+  {
     id: 'touch',
     brand: 'onekey',
     name: 'OneKey Touch',
@@ -104,3 +122,36 @@ export const ONEKEY_MODELS: DeviceModel[] = [
 ];
 
 export const ALL_MODELS = [...LEDGER_MODELS, ...TREZOR_MODELS, ...ONEKEY_MODELS];
+
+/**
+ * BLE GAP local name. OneKey desktop ignores peripherals with an empty
+ * advertisement name, and iOS only fits a short name next to a 128-bit UUID.
+ * Classic/Touch use the 5-character serial form; Pro uses `Pro XXXX`.
+ */
+const ONEKEY_BLE_NAMES: Record<string, string> = {
+  classic: 'K1234',
+  classic1s: '1S A1B2',
+  pure: 'P1234',
+  touch: 'T1234',
+  pro: 'Pro A1B2',
+  pro2: 'Pro 2 A1B2',
+  neo: 'Neo A1B2',
+};
+
+/** iOS ADV packets only fit ~8 chars next to a 128-bit service UUID. */
+const LEDGER_BLE_NAMES: Record<string, string> = {
+  'nano-x': 'Nano X',
+  flex: 'Flex',
+  stax: 'Stax',
+  gen5: 'Nano G5',
+};
+
+export function bleAdvertiseName(model: DeviceModel): string {
+  if (model.brand === 'onekey') {
+    return ONEKEY_BLE_NAMES[model.id] ?? model.name;
+  }
+  if (model.brand === 'ledger') {
+    return LEDGER_BLE_NAMES[model.id] ?? model.name;
+  }
+  return model.name;
+}
