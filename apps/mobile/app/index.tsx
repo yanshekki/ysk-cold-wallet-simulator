@@ -25,7 +25,7 @@ export default function HomeScreen() {
       title={unlocked ? 'Ready to simulate' : 'Unlock'}
       subtitle={
         unlocked
-          ? 'Android first. Keep the app in the foreground — iOS background BLE is limited.'
+          ? 'Android keeps advertising with a persistent notification. iOS must stay in the foreground.'
           : lockedSubtitle
       }
     >

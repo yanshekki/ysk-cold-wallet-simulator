@@ -49,7 +49,7 @@ export async function startAdvertising(
   callbacks: PeripheralCallbacks,
 ): Promise<PeripheralHandle> {
   const ble = await import('munim-bluetooth');
-  const allowed = await ble.requestBluetoothPermission(['advertise']);
+  const allowed = await ble.requestBluetoothPermission(['advertise', 'connect']);
   if (!allowed) {
     throw new Error('Bluetooth advertising permission was not granted');
   }
@@ -111,9 +111,11 @@ export async function startAdvertising(
     }),
   );
 
-  ble.startAdvertising({
+  ble.startBackgroundSession({
     serviceUUIDs: [model.serviceUUID],
     localName: model.name,
+    androidNotificationTitle: 'YSK Cold Wallet Simulator',
+    androidNotificationText: `Advertising as ${model.name}`,
   });
 
   return {
@@ -121,6 +123,7 @@ export async function startAdvertising(
       for (const sub of subscriptions) {
         unsubscribe(sub);
       }
+      ble.stopBackgroundSession();
       ble.stopAdvertising();
     },
   };
@@ -128,5 +131,6 @@ export async function startAdvertising(
 
 export async function stopAdvertising(): Promise<void> {
   const ble = await import('munim-bluetooth');
+  ble.stopBackgroundSession();
   ble.stopAdvertising();
 }

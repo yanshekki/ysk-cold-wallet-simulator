@@ -43,7 +43,7 @@ export default function SimulateScreen() {
   return (
     <Screen
       title={`${modelName} simulation`}
-      subtitle="Requires a physical Android device. Host apps may still reject this simulator if they check device certificates — transport answers are real, attestation is not faked."
+      subtitle="Android keeps advertising via a foreground notification. iOS must stay in the foreground. Host apps may still reject this simulator if they check device certificates — transport answers are real, attestation is not faked."
     >
       <View style={styles.status}>
         <Text style={styles.meta}>
@@ -53,7 +53,7 @@ export default function SimulateScreen() {
           {advertising
             ? connected
               ? `Host connected (${connectedLabel})`
-              : `Advertising as ${modelName}`
+              : `Advertising as ${modelName} — Android shows a persistent notification`
             : 'Stopped'}
         </Text>
         {isLedger ? (

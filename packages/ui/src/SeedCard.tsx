@@ -11,21 +11,32 @@ type Props = {
 
 export function SeedCard({ slot, selected, onPress, onDelete }: Props) {
   return (
-    <Pressable onPress={onPress} style={[styles.card, selected && styles.selected]}>
+    <View style={[styles.card, selected && styles.selected]}>
       <View style={styles.row}>
-        <View style={styles.copy}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={slot.label}
+          accessibilityState={{ selected: !!selected }}
+          onPress={onPress}
+          style={styles.copy}
+        >
           <Text style={styles.label}>{slot.label}</Text>
           <Text style={styles.meta}>
             {slot.wordCount} words · {slot.brand} · {slot.modelId}
           </Text>
-        </View>
+        </Pressable>
         {onDelete ? (
-          <Pressable onPress={onDelete} hitSlop={8}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Delete ${slot.label}`}
+            onPress={onDelete}
+            hitSlop={8}
+          >
             <Text style={styles.delete}>Delete</Text>
           </Pressable>
         ) : null}
       </View>
-    </Pressable>
+    </View>
   );
 }
 
