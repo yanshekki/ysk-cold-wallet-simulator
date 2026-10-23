@@ -14,16 +14,19 @@ const confirmation: ConfirmationPort = {
 const entropy = new Uint8Array(16).map((_, i) => i + 1);
 
 describe('createHandler', () => {
-  it('builds a Ledger handler for Nano X', () => {
-    const model = ALL_MODELS.find((item) => item.id === 'nano-x')!;
-    const handler = createHandler({
-      model,
-      confirmation,
-      slotId: 'slot',
-      entropy,
-    });
-    expect(handler.brand).toBe('ledger');
-    expect(isSimulatable(model)).toBe(true);
+  it('builds a Ledger handler for Nano X, Flex, Stax, and Gen5', () => {
+    for (const id of ['nano-x', 'flex', 'stax', 'gen5']) {
+      const model = ALL_MODELS.find((item) => item.id === id)!;
+      const handler = createHandler({
+        model,
+        confirmation,
+        slotId: 'slot',
+        entropy,
+      });
+      expect(handler.brand).toBe('ledger');
+      expect(handler.getServiceUUID()).toBe(model.serviceUUID);
+      expect(isSimulatable(model)).toBe(true);
+    }
   });
 
   it('builds a OneKey V1 handler for Classic', () => {

@@ -52,7 +52,7 @@ export function splitNotify(model: DeviceModel, framed: Uint8Array, mtu: number)
 
 export function isSimulatable(model: DeviceModel): boolean {
   return (
-    (model.protocol === 'ledger-apdu' && model.id === 'nano-x') ||
+    model.protocol === 'ledger-apdu' ||
     model.protocol === 'onekey-v1' ||
     model.protocol === 'thp'
   );

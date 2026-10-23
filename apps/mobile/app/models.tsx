@@ -12,7 +12,7 @@ export default function ModelsScreen() {
   return (
     <Screen
       title="Brand & model"
-      subtitle="This phase advertises Ledger Nano X, OneKey Classic / Touch / Pro, and Trezor Safe 7. Remaining models stay listed so the catalog matches the architecture."
+      subtitle="This phase advertises every Ledger BLE model, OneKey Classic / Touch / Pro, and Trezor Safe 7. OneKey Pro 2 and Neo stay listed for the next protocol phase."
     >
       <Text style={styles.copy}>
         Hosts scan for the exact Service UUID and local name of the selected device. Transport
@@ -27,11 +27,7 @@ export default function ModelsScreen() {
         items={ALL_MODELS.map((item) => ({
           model: item,
           enabled: isSimulatable(item),
-          badge: isSimulatable(item)
-            ? 'BLE ready'
-            : item.brand === 'ledger'
-              ? 'UUID catalogued'
-              : 'Next phase',
+          badge: isSimulatable(item) ? 'BLE ready' : 'Next phase',
         }))}
       />
     </Screen>

@@ -47,6 +47,16 @@ async function exchange(handler: LedgerProtocolHandler, framed: Uint8Array): Pro
   return assembled!.payload;
 }
 
+function handlerFor(modelId: string): LedgerProtocolHandler {
+  const model = LEDGER_MODELS.find((item) => item.id === modelId)!;
+  return new LedgerProtocolHandler({
+    model,
+    confirmation: autoConfirm(),
+    slotId: 'slot',
+    entropy: entropyFromMnemonic(FOUNDATION),
+  });
+}
+
 describe('LedgerProtocolHandler', () => {
   const nanoX = LEDGER_MODELS.find((m) => m.id === 'nano-x')!;
   const entropy = entropyFromMnemonic(FOUNDATION);
@@ -77,6 +87,21 @@ describe('LedgerProtocolHandler', () => {
     expect(text).toContain('BOLOS');
     expect(payload[payload.length - 2]).toBe(0x90);
     expect(payload[payload.length - 1]).toBe(0x00);
+  });
+
+  it('answers GET_VERSION with a model-specific targetId', async () => {
+    const expected: Record<string, number[]> = {
+      'nano-x': [0x33, 0x00, 0x00, 0x04],
+      stax: [0x33, 0x20, 0x00, 0x04],
+      flex: [0x33, 0x30, 0x00, 0x04],
+      gen5: [0x33, 0x40, 0x00, 0x04],
+    };
+    for (const [id, targetId] of Object.entries(expected)) {
+      const payload = await exchange(handlerFor(id), apdu([0xe0, 0x01, 0x00, 0x00, 0x00]));
+      expect(Array.from(payload.slice(0, 4)), id).toEqual(targetId);
+      expect(payload[payload.length - 2]).toBe(0x90);
+      expect(payload[payload.length - 1]).toBe(0x00);
+    }
   });
 
   it('returns 0x6D00 for unknown INS', async () => {

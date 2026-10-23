@@ -140,7 +140,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   const startSimulation = useCallback(async () => {
     if (!model || !isSimulatable(model)) {
-      throw new Error('This phase only advertises Ledger Nano X, OneKey V1, and Trezor Safe 7');
+      throw new Error(
+        'This phase advertises Ledger Nano X / Flex / Stax / Nano Gen5, OneKey V1, and Trezor Safe 7',
+      );
     }
     if (!seed) {
       throw new Error('Select a seed first');

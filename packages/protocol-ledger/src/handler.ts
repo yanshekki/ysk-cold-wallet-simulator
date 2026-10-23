@@ -142,7 +142,7 @@ export class LedgerProtocolHandler implements ProtocolHandler {
       return encodeResponse(new Uint8Array(), SW_INS_NOT_SUPPORTED);
     }
     if (apdu.cla === 0xe0 && apdu.ins === 0x01 && this.app === 'dashboard') {
-      return getFirmwareVersion();
+      return getFirmwareVersion(this.model.id);
     }
 
     if (this.app === 'ethereum' && apdu.cla === 0xe0) {
