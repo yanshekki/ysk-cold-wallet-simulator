@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import type { GATTCharacteristicPermission } from 'munim-bluetooth';
 import type { DeviceModel, ProtocolHandler } from '@cws/contracts';
 import { DEFAULT_MTU, splitNotify } from '@cws/sdk';
@@ -13,6 +14,18 @@ function unsubscribe(sub: Subscription): void {
   if (typeof sub === 'function') {
     sub();
   }
+}
+
+function mapBleError(error: unknown): Error {
+  const raw = error instanceof Error ? error.message : String(error);
+  if (/unsupported|not powered on|Bluetooth is not powered/i.test(raw)) {
+    return new Error(
+      Platform.OS === 'ios'
+        ? 'Bluetooth is not available in the iOS Simulator. Use a physical iPhone to advertise.'
+        : 'Bluetooth is not available on this emulator. Use a physical Android device to advertise.',
+    );
+  }
+  return error instanceof Error ? error : new Error(raw);
 }
 
 function configureServices(ble: BleModule, model: DeviceModel, encrypted: boolean): void {
@@ -55,9 +68,13 @@ export async function startAdvertising(
   }
 
   try {
-    configureServices(ble, model, true);
-  } catch {
-    configureServices(ble, model, false);
+    try {
+      configureServices(ble, model, true);
+    } catch {
+      configureServices(ble, model, false);
+    }
+  } catch (error) {
+    throw mapBleError(error);
   }
 
   const subscriptions: Subscription[] = [];
@@ -111,12 +128,16 @@ export async function startAdvertising(
     }),
   );
 
-  ble.startBackgroundSession({
-    serviceUUIDs: [model.serviceUUID],
-    localName: model.name,
-    androidNotificationTitle: 'YSK Cold Wallet Simulator',
-    androidNotificationText: `Advertising as ${model.name}`,
-  });
+  try {
+    ble.startBackgroundSession({
+      serviceUUIDs: [model.serviceUUID],
+      localName: model.name,
+      androidNotificationTitle: 'YSK Cold Wallet Simulator',
+      androidNotificationText: `Advertising as ${model.name}`,
+    });
+  } catch (error) {
+    throw mapBleError(error);
+  }
 
   return {
     stop: async () => {

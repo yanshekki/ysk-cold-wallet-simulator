@@ -148,6 +148,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   const lock = useCallback(() => {
     void stopSimulation();
+    setError(null);
     setUnlockedUntil(null);
   }, [stopSimulation]);
 

@@ -90,6 +90,9 @@ export default function ImportSeedScreen() {
         onChangeText={setLabel}
         placeholder="Label"
         placeholderTextColor={colors.muted}
+        autoComplete="off"
+        textContentType="none"
+        importantForAutofill="no"
         style={styles.input}
       />
       {shares.map((share, index) => (
@@ -105,6 +108,10 @@ export default function ImportSeedScreen() {
           placeholderTextColor={colors.muted}
           autoCapitalize="none"
           autoCorrect={false}
+          autoComplete="off"
+          textContentType="none"
+          importantForAutofill="no"
+          spellCheck={false}
           multiline
           style={[styles.input, styles.area]}
         />
@@ -116,6 +123,11 @@ export default function ImportSeedScreen() {
         placeholderTextColor={colors.muted}
         secureTextEntry
         autoCapitalize="none"
+        autoCorrect={false}
+        autoComplete="off"
+        textContentType="oneTimeCode"
+        importantForAutofill="no"
+        spellCheck={false}
         style={styles.input}
       />
       {error ? <Text style={styles.error}>{error}</Text> : null}

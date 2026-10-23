@@ -93,6 +93,9 @@ export default function NewSeedScreen() {
         onChangeText={setLabel}
         placeholder="Label"
         placeholderTextColor={colors.muted}
+        autoComplete="off"
+        textContentType="none"
+        importantForAutofill="no"
         style={styles.input}
       />
       <View style={styles.row}>

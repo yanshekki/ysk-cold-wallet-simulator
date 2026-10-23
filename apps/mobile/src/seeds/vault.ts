@@ -2,12 +2,9 @@ import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import type { SeedSlot } from '@cws/contracts';
 import { wordCountFromEntropy } from '@cws/sdk';
+import { entropyKey, LEGACY_SLOTS_KEY, SLOTS_KEY } from './vaultKeys';
 
-const SLOTS_KEY = 'cws:slots';
-
-function entropyKey(id: string): string {
-  return `cws:entropy:${id}`;
-}
+export { entropyKey, secureStoreKey, SLOTS_KEY } from './vaultKeys';
 
 const BASE_OPTIONS = {
   keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
@@ -37,12 +34,23 @@ function webDelete(key: string): void {
   globalThis.localStorage?.removeItem(key);
 }
 
-export async function listSlots(): Promise<SeedSlot[]> {
-  const raw = Platform.OS === 'web' ? webGet(SLOTS_KEY) : await SecureStore.getItemAsync(SLOTS_KEY);
-  if (!raw) {
-    return [];
+async function readSlotsRaw(): Promise<string | null> {
+  if (Platform.OS === 'web') {
+    return webGet(SLOTS_KEY) ?? webGet(LEGACY_SLOTS_KEY);
   }
   try {
+    return await SecureStore.getItemAsync(SLOTS_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export async function listSlots(): Promise<SeedSlot[]> {
+  try {
+    const raw = await readSlotsRaw();
+    if (!raw) {
+      return [];
+    }
     const parsed = JSON.parse(raw) as SeedSlot[];
     if (!Array.isArray(parsed)) {
       return [];
@@ -70,11 +78,10 @@ async function writeSecret(key: string, value: string): Promise<void> {
     webSet(key, value);
     return;
   }
-  try {
-    await SecureStore.setItemAsync(key, value, authOptions());
-  } catch {
-    await SecureStore.setItemAsync(key, value, BASE_OPTIONS);
-  }
+  // WHEN_UNLOCKED_THIS_DEVICE_ONLY is the device-side gate. The 15-minute
+  // session already required the platform authenticator. Extra
+  // requireAuthentication prompts fail under iPhone Mirroring ("continue on iPhone").
+  await SecureStore.setItemAsync(key, value, BASE_OPTIONS);
 }
 
 async function readSecret(key: string): Promise<string | null> {
@@ -82,9 +89,17 @@ async function readSecret(key: string): Promise<string | null> {
     return webGet(key);
   }
   try {
+    const stored = await SecureStore.getItemAsync(key, BASE_OPTIONS);
+    if (stored) {
+      return stored;
+    }
+  } catch {
+    // Fall through to the authenticated copy of older slots.
+  }
+  try {
     return await SecureStore.getItemAsync(key, authOptions());
   } catch {
-    return SecureStore.getItemAsync(key, BASE_OPTIONS);
+    return null;
   }
 }
 
@@ -115,7 +130,11 @@ export async function deleteSlot(id: string): Promise<void> {
     webDelete(entropyKey(id));
     return;
   }
-  await SecureStore.deleteItemAsync(entropyKey(id));
+  try {
+    await SecureStore.deleteItemAsync(entropyKey(id));
+  } catch {
+    // Missing or previously invalid keys should not block delete.
+  }
 }
 
 function bytesToBase64(bytes: Uint8Array): string {

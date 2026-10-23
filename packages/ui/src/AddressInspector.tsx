@@ -29,6 +29,11 @@ export function AddressInspector({ rows, passphrase, onPassphrase, onCopy, warni
         placeholderTextColor={colors.muted}
         secureTextEntry
         autoCapitalize="none"
+        autoCorrect={false}
+        autoComplete="off"
+        textContentType="oneTimeCode"
+        importantForAutofill="no"
+        spellCheck={false}
         style={styles.input}
       />
       {warning ? <Text style={styles.warning}>{warning}</Text> : null}

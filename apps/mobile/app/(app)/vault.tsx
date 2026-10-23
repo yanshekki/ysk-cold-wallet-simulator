@@ -17,7 +17,11 @@ export default function VaultScreen() {
   const [deriveError, setDeriveError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    setSlots(await listSlots());
+    try {
+      setSlots(await listSlots());
+    } catch {
+      setSlots([]);
+    }
   }, []);
 
   const loadInspector = useCallback(

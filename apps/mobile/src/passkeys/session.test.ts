@@ -41,6 +41,22 @@ describe('passkeys session', () => {
     const { unlock } = await import('./session');
     await expect(unlock()).resolves.toBe(true);
     expect(authenticateAsync).toHaveBeenCalledTimes(1);
+    expect(authenticateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ disableDeviceFallback: true }),
+    );
+  });
+
+  it('falls back to device passcode when biometrics are unavailable', async () => {
+    getEnrolledLevelAsync.mockResolvedValue(1);
+    authenticateAsync
+      .mockResolvedValueOnce({ success: false, error: 'not_available' })
+      .mockResolvedValueOnce({ success: true });
+    const { unlock } = await import('./session');
+    await expect(unlock()).resolves.toBe(true);
+    expect(authenticateAsync).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ disableDeviceFallback: false }),
+    );
   });
 
   it('returns false when the user cancels', async () => {
@@ -63,5 +79,17 @@ describe('passkeys session', () => {
     authenticateAsync.mockRejectedValue(new Error('keystore exploded'));
     const { unlock } = await import('./session');
     await expect(unlock()).rejects.toThrow('keystore exploded');
+  });
+
+  it('sends a locked Device tab to /unlock because (app) shares the / URL', async () => {
+    const { sessionRedirect } = await import('./session');
+    expect(sessionRedirect(false, '(app)')).toBe('/unlock');
+    expect(sessionRedirect(false, 'seeds')).toBe('/unlock');
+    expect(sessionRedirect(false, undefined)).toBe('/unlock');
+    expect(sessionRedirect(false, 'unlock')).toBeNull();
+    expect(sessionRedirect(true, 'unlock')).toBe('/(app)');
+    expect(sessionRedirect(true, undefined)).toBe('/(app)');
+    expect(sessionRedirect(true, '(app)')).toBeNull();
+    expect(sessionRedirect(true, 'seeds')).toBeNull();
   });
 });

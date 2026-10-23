@@ -4,7 +4,9 @@ export {
   SESSION_MS,
   WEB_DEV_MESSAGE,
   describeUnlock,
+  sessionRedirect,
   unlock,
+  type SessionHref,
   type UnlockKind,
   type UnlockStatus,
 } from './session';

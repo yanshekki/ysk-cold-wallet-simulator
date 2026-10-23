@@ -23,6 +23,7 @@
     "@noble/hashes": "^1.8.0",
     "@scure/bip39": "^1.6.0",
     "expo": "~57.0.17",
+    "expo-build-properties": "~57.0.22",
     "expo-clipboard": "~57.0.2",
     "expo-constants": "~57.0.22",
     "expo-crypto": "~57.0.4",

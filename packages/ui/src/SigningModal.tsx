@@ -39,6 +39,11 @@ export function SigningModal({
             placeholderTextColor={colors.muted}
             secureTextEntry
             autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="off"
+            textContentType="oneTimeCode"
+            importantForAutofill="no"
+            spellCheck={false}
             style={styles.input}
           />
           <View style={styles.actions}>

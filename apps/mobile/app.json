@@ -7,10 +7,24 @@
     "scheme": "cws",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "backgroundColor": "#0d1117",
+      "resizeMode": "contain"
+    },
     "plugins": [
       "expo-router",
       "expo-secure-store",
       "expo-local-authentication",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "enableSceneSupport": true
+          }
+        }
+      ],
       [
         "munim-bluetooth",
         {
@@ -22,6 +36,10 @@
     ],
     "android": {
       "package": "hk.ysk.coldwalletsimulator",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0d1117"
+      },
       "permissions": [
         "android.permission.BLUETOOTH",
         "android.permission.BLUETOOTH_ADMIN",
@@ -37,10 +55,12 @@
     },
     "web": {
       "bundler": "metro",
-      "output": "single"
+      "output": "single",
+      "favicon": "./assets/favicon.png"
     },
     "ios": {
       "bundleIdentifier": "hk.ysk.coldwalletsimulator",
+      "appleTeamId": "K897VVZW77",
       "infoPlist": {
         "NSBluetoothAlwaysUsageDescription": "This app simulates a hardware wallet over Bluetooth",
         "NSFaceIDUsageDescription": "Unlock the seed vault",

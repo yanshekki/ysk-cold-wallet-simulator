@@ -27,6 +27,17 @@ export type UnlockStatus = {
   message: string;
 };
 
+export type SessionHref = '/unlock' | '/(app)';
+
+/** Expo Router groups hide `(app)` from the URL, so Device is also `/`. Unlock lives at `/unlock`. */
+export function sessionRedirect(unlocked: boolean, rootSegment: string | undefined): SessionHref | null {
+  const inApp = rootSegment === '(app)' || rootSegment === 'seeds';
+  if (unlocked) {
+    return inApp ? null : '/(app)';
+  }
+  return rootSegment === 'unlock' ? null : '/unlock';
+}
+
 export async function describeUnlock(): Promise<UnlockStatus> {
   if (Platform.OS === 'web') {
     return { kind: 'web-dev', message: WEB_DEV_MESSAGE };
@@ -46,13 +57,27 @@ export async function unlock(): Promise<boolean> {
   if (level < LocalAuthentication.SecurityLevel.SECRET) {
     throw new Error(NOT_ENROLLED_MESSAGE);
   }
+  const prompt = {
+    promptMessage: 'Unlock YSK Cold Wallet Simulator',
+    biometricsSecurityLevel: 'strong' as const,
+  };
+
   try {
-    const result = await LocalAuthentication.authenticateAsync({
-      promptMessage: 'Unlock YSK Cold Wallet Simulator',
-      biometricsSecurityLevel: 'strong',
+    const biometric = await LocalAuthentication.authenticateAsync({
+      ...prompt,
+      disableDeviceFallback: true,
+    });
+    if (biometric.success) {
+      return true;
+    }
+    if (biometric.error === 'user_cancel') {
+      return false;
+    }
+    const fallback = await LocalAuthentication.authenticateAsync({
+      ...prompt,
       disableDeviceFallback: false,
     });
-    return result.success;
+    return fallback.success;
   } catch (err) {
     throw err instanceof Error ? err : new Error('Unlock failed');
   }
