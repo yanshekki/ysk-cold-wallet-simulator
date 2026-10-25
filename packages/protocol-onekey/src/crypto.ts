@@ -14,6 +14,10 @@ export function mnemonicFromEntropy(entropy: Uint8Array): string {
   return entropyToMnemonic(entropy, wordlist);
 }
 
+export function deriveHdKeyFromSeed(seed: Uint8Array, path: string): HDKey {
+  return HDKey.fromMasterSeed(seed).derive(path);
+}
+
 export function deriveHdKey(
   entropy: Uint8Array,
   path: string,
@@ -24,7 +28,7 @@ export function deriveHdKey(
     backup === 'slip39'
       ? entropy
       : mnemonicToSeedSync(mnemonicFromEntropy(entropy), passphrase ?? '');
-  return HDKey.fromMasterSeed(seed).derive(path);
+  return deriveHdKeyFromSeed(seed, path);
 }
 
 export function derivePrivateKey(

@@ -20,8 +20,7 @@ Usage:
 Opens http://127.0.0.1:8788 and waits for Start. --no-ui scans immediately (headless).
 
 Linux: copy apps/proxy/udev/99-cws-uhid.rules to /etc/udev/rules.d and re-login.
-macOS: Bluetooth permission for Terminal. Virtual HID needs Apple's
-com.apple.developer.hid.virtual.device entitlement (DriverKit follow-up).
+macOS HID: open the signed CWS Proxy app (apps/proxy/macos/CWSProxy), not yarn proxy.
 
 Models: ${ALL_MODELS.map((model) => model.id).join(', ')}
 Env: CWS_PAIRING_CODE`;
@@ -100,7 +99,7 @@ async function main(): Promise<void> {
       modelId: argValue(argv, '--model'),
       trezordPort: Number(argValue(argv, '--trezord-port') ?? 21325),
       skipHid: argv.includes('--no-hid'),
-      nativeReady: ready,
+      nativeReady: ready || Boolean(process.env.CWS_HID_SOCKET && process.env.CWS_BLE_SOCKET),
     },
     pairing,
   );
@@ -128,7 +127,9 @@ async function main(): Promise<void> {
     port: uiPort,
   });
   log(`ui ${server.url}`);
-  openBrowser(server.url);
+  if (process.env.CWS_NO_OPEN !== '1') {
+    openBrowser(server.url);
+  }
   await waitForAbort(parent.signal);
   runtime.stop();
   await runtime.wait();

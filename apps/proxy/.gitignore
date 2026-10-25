@@ -1,1 +1,5 @@
 bin/cws-node
+dist/
+macos/CWSProxy/DerivedData/
+macos/CWSProxy/CWSProxy.xcodeproj/xcuserdata/
+macos/CWSProxy/CWSProxy.xcodeproj/project.xcworkspace/xcuserdata/

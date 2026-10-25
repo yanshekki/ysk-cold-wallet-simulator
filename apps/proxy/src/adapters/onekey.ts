@@ -16,7 +16,13 @@ export function attachOneKey(
   let bleCount = 0;
   const offHid = hid.onInput((report) => {
     hidCount += 1;
-    const packets = bridge.pushHid(report);
+    let packets: Uint8Array[] | null;
+    try {
+      packets = bridge.pushHid(report);
+    } catch (error) {
+      log(`onekey HID: ${String(error)}`);
+      return;
+    }
     if (!packets) {
       return;
     }
@@ -28,7 +34,13 @@ export function attachOneKey(
   });
   const offBle = ble.onNotify((packet) => {
     bleCount += 1;
-    const reports = bridge.pushBle(packet);
+    let reports: Uint8Array[] | null;
+    try {
+      reports = bridge.pushBle(packet);
+    } catch (error) {
+      log(`onekey BLE: ${String(error)}`);
+      return;
+    }
     if (!reports) {
       return;
     }
@@ -38,6 +50,7 @@ export function attachOneKey(
   });
   return {
     close() {
+      queue.abort();
       offHid();
       offBle();
       log(`onekey reports hid=${hidCount} notify=${bleCount}`);

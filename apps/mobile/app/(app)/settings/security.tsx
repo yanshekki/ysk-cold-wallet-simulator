@@ -19,6 +19,14 @@ export default function SecuritySettingsScreen() {
             onValueChange={(value) => void patchSettings({ faceIdEnabled: value })}
           />
         </View>
+        <View style={styles.switchRow}>
+          <Text style={styles.label}>{t('settings.signReauth')}</Text>
+          <Switch
+            value={settings.signReauth}
+            onValueChange={(value) => void patchSettings({ signReauth: value })}
+          />
+        </View>
+        <Text style={styles.meta}>{t('settings.signReauthHelp')}</Text>
         <Text style={styles.label}>{t('settings.autoLock')}</Text>
         <TextInput
           value={String(settings.autoLockMinutes)}

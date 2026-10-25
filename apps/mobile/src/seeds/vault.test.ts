@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { entropyKey, secureStoreKey, SLOTS_KEY } from './vaultKeys';
+import { entropyKey, secureStoreKey, sharesKey, SLOTS_KEY } from './vaultKeys';
 
 const SECURE_STORE_KEY = /^[A-Za-z0-9._-]+$/;
 
@@ -19,6 +19,8 @@ describe('secureStoreKey', () => {
     const id = '00000000-0000-4000-8000-000000000000';
     expect(entropyKey(id)).toBe(`cws.entropy.${id}`);
     expect(entropyKey(id)).toMatch(SECURE_STORE_KEY);
+    expect(sharesKey(id)).toBe(`cws.shares.${id}`);
+    expect(sharesKey(id)).toMatch(SECURE_STORE_KEY);
   });
 
   it('rejects empty parts', () => {

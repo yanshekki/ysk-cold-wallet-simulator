@@ -235,7 +235,8 @@ export function icarusAddress(
   path: string,
   passphrase: string | undefined,
   backup: BackupKind,
+  root?: Uint8Array,
 ): string {
-  const node = deriveIcarus(entropy, path, passphrase, backup);
+  const node = deriveIcarus(entropy, path, passphrase, backup, root);
   return cardanoEnterprise(node.publicKey);
 }

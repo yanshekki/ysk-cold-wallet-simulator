@@ -76,6 +76,7 @@ export function icarusAddress(
   path: string,
   passphrase: string | undefined,
   backup: BackupKind,
+  root?: Uint8Array,
 ): string {
-  return cardanoEnterprise(deriveIcarus(entropy, path, passphrase, backup).publicKey);
+  return cardanoEnterprise(deriveIcarus(entropy, path, passphrase, backup, root).publicKey);
 }

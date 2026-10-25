@@ -62,6 +62,103 @@ describe('proxy runtime', () => {
     parent.abort();
   });
 
+  it('stop returns idle even if BLE isConnected hangs', async () => {
+    const model = LEDGER_MODELS.find((item) => item.id === 'nano-x')!;
+    const { gadget } = memoryHidPair();
+    const connected: ConnectedBle = {
+      async write() {
+        return;
+      },
+      onNotify() {
+        return () => undefined;
+      },
+      async close() {
+        return;
+      },
+      isConnected() {
+        return new Promise(() => undefined);
+      },
+    };
+    const io: ProxyIo = {
+      async scan() {
+        return [{ id: 'phone', name: 'Nano X', services: [model.serviceUUID] }];
+      },
+      async openBle() {
+        return connected;
+      },
+      createHid() {
+        return gadget;
+      },
+      async askPairingCode() {
+        return '000000';
+      },
+    };
+    const bus = createStatusBus();
+    const parent = new AbortController();
+    const runtime = createRuntime(io, () => undefined, bus, parent.signal, { scanMs: 20 });
+    runtime.start();
+    await expect.poll(() => bus.snapshot().hid, { timeout: 1_000 }).toBe('up');
+    runtime.stop();
+    await Promise.race([
+      runtime.wait(),
+      sleep(500).then(() => {
+        throw new Error('stop hung on isConnected');
+      }),
+    ]);
+    expect(bus.snapshot().running).toBe(false);
+    expect(runtime.busy()).toBe(false);
+    parent.abort();
+  });
+
+  it('stop returns idle even if BLE close hangs', async () => {
+    const model = LEDGER_MODELS.find((item) => item.id === 'nano-x')!;
+    const { gadget } = memoryHidPair();
+    const connected: ConnectedBle = {
+      async write() {
+        return;
+      },
+      onNotify() {
+        return () => undefined;
+      },
+      close() {
+        return new Promise(() => undefined);
+      },
+      async isConnected() {
+        return true;
+      },
+    };
+    const io: ProxyIo = {
+      async scan() {
+        return [{ id: 'phone', name: 'Nano X', services: [model.serviceUUID] }];
+      },
+      async openBle() {
+        return connected;
+      },
+      createHid() {
+        return gadget;
+      },
+      async askPairingCode() {
+        return '000000';
+      },
+    };
+    const bus = createStatusBus();
+    const parent = new AbortController();
+    const runtime = createRuntime(io, () => undefined, bus, parent.signal, { scanMs: 20 });
+    runtime.start();
+    await expect.poll(() => bus.snapshot().hid, { timeout: 1_000 }).toBe('up');
+    runtime.stop();
+    expect(bus.snapshot().running).toBe(false);
+    expect(bus.snapshot().radio).toBe('IDLE');
+    await Promise.race([
+      runtime.wait(),
+      sleep(800).then(() => {
+        throw new Error('stop hung on ble.close');
+      }),
+    ]);
+    expect(runtime.busy()).toBe(false);
+    parent.abort();
+  });
+
   it('surfaces a missing native build without scanning', () => {
     const bus = createStatusBus(false);
     const io: ProxyIo = {

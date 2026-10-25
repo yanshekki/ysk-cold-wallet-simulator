@@ -1,0 +1,341 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A01000000000000000000011 /* CWSProxyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A01000000000000000000010 /* CWSProxyApp.swift */; };
+		A01000000000000000000013 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A01000000000000000000012 /* ContentView.swift */; };
+		A01000000000000000000015 /* ProxySession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A01000000000000000000014 /* ProxySession.swift */; };
+		A01000000000000000000017 /* HidDevice.swift in Sources */ = {isa = PBXBuildFile; fileRef = A01000000000000000000016 /* HidDevice.swift */; };
+		A01000000000000000000019 /* HidServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A01000000000000000000018 /* HidServer.swift */; };
+		A0100000000000000000001B /* HidFrame.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0100000000000000000001A /* HidFrame.swift */; };
+		A0100000000000000000001D /* NodeProcess.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0100000000000000000001C /* NodeProcess.swift */; };
+		A01000000000000000000071 /* BleCentral.swift in Sources */ = {isa = PBXBuildFile; fileRef = A01000000000000000000070 /* BleCentral.swift */; };
+		A01000000000000000000073 /* BleServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A01000000000000000000072 /* BleServer.swift */; };
+		A01000000000000000000031 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A01000000000000000000030 /* WebKit.framework */; };
+		A01000000000000000000033 /* IOKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A01000000000000000000032 /* IOKit.framework */; };
+		A01000000000000000000075 /* CoreBluetooth.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A01000000000000000000074 /* CoreBluetooth.framework */; };
+		A01000000000000000000061 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A01000000000000000000060 /* Assets.xcassets */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		A01000000000000000000010 /* CWSProxyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CWSProxyApp.swift; sourceTree = "<group>"; };
+		A01000000000000000000012 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		A01000000000000000000014 /* ProxySession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxySession.swift; sourceTree = "<group>"; };
+		A01000000000000000000016 /* HidDevice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HidDevice.swift; sourceTree = "<group>"; };
+		A01000000000000000000018 /* HidServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HidServer.swift; sourceTree = "<group>"; };
+		A0100000000000000000001A /* HidFrame.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HidFrame.swift; sourceTree = "<group>"; };
+		A0100000000000000000001C /* NodeProcess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NodeProcess.swift; sourceTree = "<group>"; };
+		A01000000000000000000070 /* BleCentral.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BleCentral.swift; sourceTree = "<group>"; };
+		A01000000000000000000072 /* BleServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BleServer.swift; sourceTree = "<group>"; };
+		A0100000000000000000001E /* CWSProxy-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "CWSProxy-Bridging-Header.h"; sourceTree = "<group>"; };
+		A0100000000000000000001F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A01000000000000000000020 /* CWSProxy.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CWSProxy.entitlements; sourceTree = "<group>"; };
+		A01000000000000000000021 /* node.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = node.entitlements; sourceTree = "<group>"; };
+		A01000000000000000000022 /* bundle-proxy.sh */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "bundle-proxy.sh"; sourceTree = "<group>"; };
+		A01000000000000000000030 /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
+		A01000000000000000000032 /* IOKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IOKit.framework; path = System/Library/Frameworks/IOKit.framework; sourceTree = SDKROOT; };
+		A01000000000000000000074 /* CoreBluetooth.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreBluetooth.framework; path = System/Library/Frameworks/CoreBluetooth.framework; sourceTree = SDKROOT; };
+		A01000000000000000000044 /* CWS Proxy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "CWS Proxy.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A01000000000000000000060 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A01000000000000000000004 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A01000000000000000000031 /* WebKit.framework in Frameworks */,
+				A01000000000000000000033 /* IOKit.framework in Frameworks */,
+				A01000000000000000000075 /* CoreBluetooth.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A01000000000000000000040 /* Root */ = {
+			isa = PBXGroup;
+			children = (
+				A01000000000000000000022 /* bundle-proxy.sh */,
+				A01000000000000000000041 /* CWSProxy */,
+				A01000000000000000000043 /* Frameworks */,
+				A01000000000000000000042 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A01000000000000000000041 /* CWSProxy */ = {
+			isa = PBXGroup;
+			children = (
+				A01000000000000000000010 /* CWSProxyApp.swift */,
+				A01000000000000000000012 /* ContentView.swift */,
+				A01000000000000000000014 /* ProxySession.swift */,
+				A01000000000000000000016 /* HidDevice.swift */,
+				A01000000000000000000018 /* HidServer.swift */,
+				A0100000000000000000001A /* HidFrame.swift */,
+				A0100000000000000000001C /* NodeProcess.swift */,
+				A01000000000000000000070 /* BleCentral.swift */,
+				A01000000000000000000072 /* BleServer.swift */,
+				A0100000000000000000001E /* CWSProxy-Bridging-Header.h */,
+				A0100000000000000000001F /* Info.plist */,
+				A01000000000000000000020 /* CWSProxy.entitlements */,
+				A01000000000000000000021 /* node.entitlements */,
+				A01000000000000000000060 /* Assets.xcassets */,
+			);
+			path = CWSProxy;
+			sourceTree = "<group>";
+		};
+		A01000000000000000000042 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A01000000000000000000044 /* CWS Proxy.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		A01000000000000000000043 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				A01000000000000000000032 /* IOKit.framework */,
+				A01000000000000000000030 /* WebKit.framework */,
+				A01000000000000000000074 /* CoreBluetooth.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A01000000000000000000002 /* CWSProxy */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A01000000000000000000051 /* Build configuration list for PBXNativeTarget "CWSProxy" */;
+			buildPhases = (
+				A01000000000000000000003 /* Sources */,
+				A01000000000000000000004 /* Frameworks */,
+				A01000000000000000000005 /* Resources */,
+				A01000000000000000000006 /* Bundle Proxy */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = CWSProxy;
+			productName = CWSProxy;
+			productReference = A01000000000000000000044 /* CWS Proxy.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A01000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					A01000000000000000000002 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+				};
+			};
+			buildConfigurationList = A01000000000000000000050 /* Build configuration list for PBXProject "CWSProxy" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = A01000000000000000000040 /* Root */;
+			productRefGroup = A01000000000000000000042 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A01000000000000000000002 /* CWSProxy */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A01000000000000000000005 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A01000000000000000000061 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		A01000000000000000000006 /* Bundle Proxy */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Bundle Proxy";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "\"$SRCROOT/bundle-proxy.sh\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A01000000000000000000003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A01000000000000000000011 /* CWSProxyApp.swift in Sources */,
+				A01000000000000000000013 /* ContentView.swift in Sources */,
+				A01000000000000000000015 /* ProxySession.swift in Sources */,
+				A0100000000000000000001B /* HidFrame.swift in Sources */,
+				A01000000000000000000017 /* HidDevice.swift in Sources */,
+				A01000000000000000000019 /* HidServer.swift in Sources */,
+				A0100000000000000000001D /* NodeProcess.swift in Sources */,
+				A01000000000000000000071 /* BleCentral.swift in Sources */,
+				A01000000000000000000073 /* BleServer.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		A01000000000000000000052 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		A01000000000000000000053 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+			};
+			name = Release;
+		};
+		A01000000000000000000054 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = CWSProxy/CWSProxy.entitlements;
+				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = K897VVZW77;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_DEBUG_DYLIB = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = NO;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = CWSProxy/Info.plist;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				EXECUTABLE_NAME = CWSProxy;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = hk.ysk.cws.proxy;
+				PRODUCT_NAME = "CWS Proxy";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "CWSProxy/CWSProxy-Bridging-Header.h";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		A01000000000000000000055 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = CWSProxy/CWSProxy.entitlements;
+				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = K897VVZW77;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_DEBUG_DYLIB = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = NO;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = CWSProxy/Info.plist;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				EXECUTABLE_NAME = CWSProxy;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = hk.ysk.cws.proxy;
+				PRODUCT_NAME = "CWS Proxy";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "CWSProxy/CWSProxy-Bridging-Header.h";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A01000000000000000000050 /* Build configuration list for PBXProject "CWSProxy" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A01000000000000000000052 /* Debug */,
+				A01000000000000000000053 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A01000000000000000000051 /* Build configuration list for PBXNativeTarget "CWSProxy" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A01000000000000000000054 /* Debug */,
+				A01000000000000000000055 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = A01000000000000000000001 /* Project object */;
+}

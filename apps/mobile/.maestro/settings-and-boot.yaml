@@ -3,6 +3,23 @@ appId: hk.ysk.coldwalletsimulator
 - launchApp
 - extendedWaitUntil:
     visible:
+      id: "disclaimer-agree"
+    timeout: 15000
+    optional: true
+- tapOn:
+    id: "disclaimer-agree"
+    optional: true
+- tapOn:
+    id: "legal-tab-privacy"
+    optional: true
+- tapOn:
+    id: "privacy-agree"
+    optional: true
+- tapOn:
+    id: "disclaimer-continue"
+    optional: true
+- extendedWaitUntil:
+    visible:
       id: "tab-device"
     timeout: 45000
 - tapOn:
@@ -14,19 +31,17 @@ appId: hk.ysk.coldwalletsimulator
 - assertVisible:
     id: "screen-back"
 - tapOn:
+    id: "language-open"
+- assertVisible:
+    id: "language-en"
+- assertVisible:
+    id: "language-zh-HK"
+- tapOn:
+    id: "language-zh-HK"
+- tapOn:
     id: "screen-back"
 - tapOn:
     id: "settings-link-security"
-- tapOn:
-    id: "screen-back"
-- tapOn:
-    id: "settings-link-accounts"
-- assertVisible:
-    id: "activation-near"
-- assertVisible:
-    id: "activation-ton"
-- assertVisible:
-    id: "activation-xrp"
 - tapOn:
     id: "screen-back"
 - tapOn:
@@ -55,3 +70,14 @@ appId: hk.ysk.coldwalletsimulator
     id: "screen-back"
 - assertVisible:
     id: "settings-link-language"
+- scrollUntilVisible:
+    element:
+      id: "settings-link-ysk"
+    direction: DOWN
+    timeout: 8000
+- assertVisible:
+    id: "settings-link-privacy"
+- assertVisible:
+    id: "settings-link-disclaimer"
+- assertVisible:
+    id: "settings-link-ysk"

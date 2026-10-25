@@ -12,12 +12,13 @@ import { colors, fonts, radius, space } from '@cws/ui';
 
 type Props = {
   label: string;
+  busyLabel?: string;
   onPress: () => void;
   disabled?: boolean;
   busy?: boolean;
 };
 
-export function ScanButton({ label, onPress, disabled, busy }: Props) {
+export function ScanButton({ label, busyLabel = 'Unlocking…', onPress, disabled, busy }: Props) {
   const travel = useSharedValue(-1);
 
   useEffect(() => {
@@ -49,7 +50,7 @@ export function ScanButton({ label, onPress, disabled, busy }: Props) {
       <View pointerEvents="none" style={StyleSheet.absoluteFill}>
         <Animated.View style={[styles.scan, scanStyle]} />
       </View>
-      <Text style={styles.label}>{busy ? 'Unlocking…' : label}</Text>
+      <Text style={styles.label}>{busy ? busyLabel : label}</Text>
     </Pressable>
   );
 }

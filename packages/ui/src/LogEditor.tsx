@@ -58,7 +58,7 @@ type Props = {
 
 export function LogEditor({
   entries,
-  emptyLabel = 'Waiting for host… advertise from Device.',
+  emptyLabel = 'Waiting for host',
   onCopy,
   onClear,
   onExport,

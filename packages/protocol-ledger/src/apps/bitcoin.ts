@@ -15,9 +15,10 @@ import {
   type Apdu,
 } from '../apdu';
 import {
-  deriveHdNode,
-  derivePrivateKey,
+  deriveHdNodeFromSeed,
+  derivePrivateKeyFromSeed,
   publicKeyCompressed,
+  seedFor,
   signSecp256k1Recoverable,
   type HdNode,
 } from '../crypto';
@@ -151,8 +152,8 @@ async function handleGetWalletPublicKey(apdu: Apdu, ctx: BtcContext): Promise<Ui
   if (!ok) {
     return encodeResponse(new Uint8Array(), SW_DENY);
   }
-  const passphrase = await ctx.confirmation.getPassphrase(ctx.slotId);
-  const node = deriveHdNode(ctx.entropy, path, passphrase, ctx.backup);
+  const seed = await seedFor(ctx.confirmation, ctx.slotId, ctx.entropy, ctx.backup ?? 'bip39');
+  const node = deriveHdNodeFromSeed(seed, path);
   const address = bitcoinAddressFor(node, path, apdu.p2, coin);
   const addressBytes = encodeAscii(address);
   const body = concatBytes(
@@ -240,8 +241,8 @@ async function handleUntrustedHashSign(apdu: Apdu, ctx: BtcContext): Promise<Uin
   if (!ok) {
     return encodeResponse(new Uint8Array(), SW_DENY);
   }
-  const passphrase = await ctx.confirmation.getPassphrase(ctx.slotId);
-  const privateKey = derivePrivateKey(ctx.entropy, path, passphrase, ctx.backup);
+  const seed = await seedFor(ctx.confirmation, ctx.slotId, ctx.entropy, ctx.backup ?? 'bip39');
+  const privateKey = derivePrivateKeyFromSeed(seed, path);
   if (assembled && session.prevout && session.outputs && session.amount != null && session.version != null) {
     const pub = publicKeyCompressed(privateKey);
     hash = bip143Sighash({
@@ -295,8 +296,8 @@ async function handleSignMessage(apdu: Apdu, ctx: BtcContext): Promise<Uint8Arra
   if (!ok) {
     return encodeResponse(new Uint8Array(), SW_DENY);
   }
-  const passphrase = await ctx.confirmation.getPassphrase(ctx.slotId);
-  const privateKey = derivePrivateKey(ctx.entropy, path, passphrase, ctx.backup);
+  const seed = await seedFor(ctx.confirmation, ctx.slotId, ctx.entropy, ctx.backup ?? 'bip39');
+  const privateKey = derivePrivateKeyFromSeed(seed, path);
   const hash = sha256(sha256(rest));
   return encodeResponse(signSecp256k1Recoverable(privateKey, hash), SW_OK);
 }

@@ -3,7 +3,7 @@ import { sessionRedirect } from '../src/passkeys';
 import { useAppState } from '../src/state/AppState';
 
 export default function Index() {
-  const { unlockedUntil } = useAppState();
+  const { unlockedUntil, disclaimerAccepted } = useAppState();
   const unlocked = !!unlockedUntil && unlockedUntil > Date.now();
-  return <Redirect href={sessionRedirect(unlocked, undefined) ?? '/unlock'} />;
+  return <Redirect href={sessionRedirect(unlocked, undefined, disclaimerAccepted) ?? '/disclaimer'} />;
 }

@@ -52,13 +52,21 @@ export {
 } from './apdu';
 export {
   deriveEd25519PrivateKey,
+  deriveEd25519PrivateKeyFromSeed,
   deriveHdNode,
+  deriveHdNodeFromSeed,
   derivePrivateKey,
+  derivePrivateKeyFromSeed,
   ed25519PublicKey,
   ethereumAddressFromPrivateKey,
+  icarusRootFor,
   mnemonicFromEntropy,
+  replaceSeedCache,
+  wrapSeedPort,
+  type SeedCache,
   personalMessageHash,
   publicKeyCompressed,
+  seedFor,
   signEd25519,
   signPersonalMessage,
   signSecp256k1Recoverable,
@@ -98,4 +106,9 @@ export {
   tronBase58,
   xrpClassic,
 } from './apps/addresses';
-export { deriveIcarus, signIcarus } from './apps/icarus';
+export {
+  deriveIcarus,
+  deriveIcarusFromRoot,
+  icarusRootFromEntropy,
+  signIcarus,
+} from './apps/icarus';

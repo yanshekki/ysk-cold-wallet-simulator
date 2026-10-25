@@ -172,8 +172,38 @@ export const LEDGER_APPS: LedgerApp[] = [
   ...LEDGER_INSTALLED_APPS.map((app) => app.id),
 ];
 
+/** Hardware-wallet usage: BTC, ETH, SOL, then other large-cap apps. Unknown ids follow alphabetically. */
+const PICKER_RANK: Record<string, number> = {
+  bitcoin: 0,
+  ethereum: 1,
+  solana: 2,
+  xrp: 3,
+  dogecoin: 4,
+  cardano: 5,
+  litecoin: 6,
+  tron: 7,
+  ton: 8,
+  avalanche: 9,
+  sui: 10,
+  polkadot: 11,
+  near: 12,
+  cosmos: 13,
+  aptos: 14,
+};
+
+export function ledgerPickerRank(id: string): number {
+  return PICKER_RANK[id] ?? 1000;
+}
+
 export function ledgerPickerApps(): LedgerApp[] {
-  return ['dashboard', ...ledgerCatalog().map((app) => app.id)];
+  const apps = [...ledgerCatalog()].sort((a, b) => {
+    const rank = ledgerPickerRank(a.id) - ledgerPickerRank(b.id);
+    if (rank !== 0) {
+      return rank;
+    }
+    return a.openAppName.localeCompare(b.openAppName);
+  });
+  return ['dashboard', ...apps.map((app) => app.id)];
 }
 
 export function ledgerInstalledApp(id: LedgerApp): LedgerInstalledApp | undefined {

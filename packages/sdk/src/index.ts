@@ -15,8 +15,9 @@ export {
 } from './entropy';
 
 export { combineSlip39, generateSlip39, isSlip39Mnemonic, type Slip39Backup, type Slip39Scheme } from './slip39';
+export { SLIP39_WORDLIST, isSlip39Word, type Slip39Word } from './slip39Wordlist';
 
-export { toBip32Seed } from './seed';
+export { passphraseBytes, seedFingerprint, toBip32Seed, wipeBytes } from './seed';
 
 export {
   inspectAddresses,

@@ -82,6 +82,7 @@ export type StatusSink = {
 export type StatusBus = StatusSink & {
   snapshot(): ProxyStatus;
   idle(): void;
+  clearLogs(): void;
   subscribe(listener: (status: ProxyStatus) => void): () => void;
 };
 
@@ -123,6 +124,10 @@ export function createStatusBus(nativeOk = true): StatusBus {
     idle() {
       const keepNative = state.nativeOk;
       state = emptyState(keepNative);
+      emit();
+    },
+    clearLogs() {
+      logs.length = 0;
       emit();
     },
     subscribe(listener) {

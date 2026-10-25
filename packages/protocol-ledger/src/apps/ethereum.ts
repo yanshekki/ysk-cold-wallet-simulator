@@ -9,9 +9,11 @@ import {
   type Apdu,
 } from '../apdu';
 import {
-  derivePrivateKey,
+  deriveHdNodeFromSeed,
+  derivePrivateKeyFromSeed,
   ethereumAddressFromPrivateKey,
   publicKeyUncompressed,
+  seedFor,
   signPersonalMessage,
   signSecp256k1Recoverable,
 } from '../crypto';
@@ -71,28 +73,31 @@ function ethPath(ctx: EthContext, path: string): string {
 async function handleGetAddress(apdu: Apdu, ctx: EthContext): Promise<Uint8Array> {
   const { path: apduPath } = parseBip32Path(apdu.data);
   const path = ethPath(ctx, apduPath);
-  const request: SigningRequest = {
-    brand: 'ledger',
-    kind: 'address',
-    title: 'Export Ethereum address',
-    path,
-    message: `Export Ethereum address\n${path}`,
-    rawPayload: apdu.data,
-  };
-  const ok = await ctx.confirmation.confirm(request);
-  if (!ok) {
-    return encodeResponse(new Uint8Array(), SW_DENY);
+  if (apdu.p1 === 0x01) {
+    const request: SigningRequest = {
+      brand: 'ledger',
+      kind: 'address',
+      title: 'Export Ethereum address',
+      path,
+      message: `Export Ethereum address\n${path}`,
+      rawPayload: apdu.data,
+    };
+    const ok = await ctx.confirmation.confirm(request);
+    if (!ok) {
+      return encodeResponse(new Uint8Array(), SW_DENY);
+    }
   }
-  const passphrase = await ctx.confirmation.getPassphrase(ctx.slotId);
-  const privateKey = derivePrivateKey(ctx.entropy, path, passphrase, ctx.backup);
-  const pub = publicKeyUncompressed(privateKey);
-  const address = ethereumAddressFromPrivateKey(privateKey);
+  const seed = await seedFor(ctx.confirmation, ctx.slotId, ctx.entropy, ctx.backup ?? 'bip39');
+  const node = deriveHdNodeFromSeed(seed, path);
+  const pub = publicKeyUncompressed(node.privateKey);
+  const address = ethereumAddressFromPrivateKey(node.privateKey);
   const addressBytes = encodeAscii(address);
   const body = concatBytes(
     Uint8Array.of(pub.length),
     pub,
     Uint8Array.of(addressBytes.length),
     addressBytes,
+    apdu.p2 === 0x01 ? node.chainCode : new Uint8Array(),
   );
   return encodeResponse(body, SW_OK);
 }
@@ -142,8 +147,8 @@ async function handlePersonalSign(apdu: Apdu, ctx: EthContext): Promise<Uint8Arr
   if (!ok) {
     return encodeResponse(new Uint8Array(), SW_DENY);
   }
-  const passphrase = await ctx.confirmation.getPassphrase(ctx.slotId);
-  const privateKey = derivePrivateKey(ctx.entropy, pending.path, passphrase, ctx.backup);
+  const seed = await seedFor(ctx.confirmation, ctx.slotId, ctx.entropy, ctx.backup ?? 'bip39');
+  const privateKey = derivePrivateKeyFromSeed(seed, pending.path);
   const signature = signPersonalMessage(privateKey, message);
   return encodeResponse(signature, SW_OK);
 }
@@ -193,8 +198,8 @@ async function handleSignTx(apdu: Apdu, ctx: EthContext): Promise<Uint8Array | n
   if (!ok) {
     return encodeResponse(new Uint8Array(), SW_DENY);
   }
-  const passphrase = await ctx.confirmation.getPassphrase(ctx.slotId);
-  const privateKey = derivePrivateKey(ctx.entropy, pending.path, passphrase, ctx.backup);
+  const seed = await seedFor(ctx.confirmation, ctx.slotId, ctx.entropy, ctx.backup ?? 'bip39');
+  const privateKey = derivePrivateKeyFromSeed(seed, pending.path);
   const hash = keccak_256(raw);
   const sig = signSecp256k1Recoverable(privateKey, hash);
   const typed = raw[0] <= 0x03;
@@ -230,8 +235,8 @@ async function handleEip712Hashed(apdu: Apdu, ctx: EthContext): Promise<Uint8Arr
   if (!ok) {
     return encodeResponse(new Uint8Array(), SW_DENY);
   }
-  const passphrase = await ctx.confirmation.getPassphrase(ctx.slotId);
-  const privateKey = derivePrivateKey(ctx.entropy, path, passphrase, ctx.backup);
+  const seed = await seedFor(ctx.confirmation, ctx.slotId, ctx.entropy, ctx.backup ?? 'bip39');
+  const privateKey = derivePrivateKeyFromSeed(seed, path);
   const sig = signSecp256k1Recoverable(privateKey, digest);
   const v = (sig[64] ?? 0) + 27;
   return encodeResponse(concatBytes(Uint8Array.of(v), sig.subarray(0, 64)), SW_OK);

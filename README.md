@@ -32,4 +32,6 @@ yarn workspace @cws/native-proxy build   # once, needs Rust
 yarn proxy                               # opens http://127.0.0.1:8788 — Start, then MetaMask / Rabby / Phantom / Keplr → Ledger over “USB”
 ```
 
-The local page is on/off plus live radio, HID, and logs. The daemon stays the BLE/HID process. `--no-ui` scans immediately without the page. Signing still confirms on the phone. Linux needs `apps/proxy/udev/99-cws-uhid.rules`. Trezor Suite talks to `http://127.0.0.1:21325`. Do not expect Ledger Live Genuine to pass. macOS virtual HID needs Apple’s `com.apple.developer.hid.virtual.device` entitlement.
+The local page is on/off plus live radio, HID, and logs. The daemon stays the BLE/HID process. `--no-ui` scans immediately without the page. Signing still confirms on the phone. Linux needs `apps/proxy/udev/99-cws-uhid.rules`. Trezor Suite talks to `http://127.0.0.1:21325`. Do not expect Ledger Live Genuine to pass.
+
+macOS virtual HID runs inside the signed **CWS Proxy** app (`apps/proxy/macos/CWSProxy`, bundle `hk.ysk.cws.proxy`). Open that app (Xcode Run / `yarn workspace @cws/proxy app`). The development profile must include this Mac’s provisioning UDID (`0000xxxx-…` from `xcodebuild -showdestinations`), not only the Hardware UUID. `yarn proxy` is the Linux / headless path.

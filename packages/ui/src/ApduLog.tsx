@@ -14,7 +14,7 @@ type Props = {
 
 export function ApduLog({
   entries,
-  emptyLabel = 'Waiting for host… advertise from Device.',
+  emptyLabel = 'Waiting for host',
   fill,
   onCopyLast,
 }: Props) {

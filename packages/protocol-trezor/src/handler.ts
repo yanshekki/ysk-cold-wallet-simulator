@@ -11,13 +11,22 @@ import { TREZOR_FIRMWARE, describeEthMessage } from '@cws/contracts';
 import {
   bitcoinP2pkh,
   deriveEd25519PrivateKey,
+  deriveEd25519PrivateKeyFromSeed,
   deriveHdNode,
+  deriveHdNodeFromSeed,
   deriveIcarus,
+  deriveIcarusFromRoot,
+  derivePrivateKeyFromSeed,
   ed25519PublicKey,
+  icarusRootFor,
   publicKeyCompressed,
+  replaceSeedCache,
+  seedFor,
   signEd25519,
   signIcarus,
   signSecp256k1Recoverable,
+  wrapSeedPort,
+  type SeedCache,
 } from '@cws/protocol-ledger';
 import { sha256 } from '@noble/hashes/sha2';
 import { keccak_256 } from '@noble/hashes/sha3';
@@ -245,6 +254,7 @@ export class TrezorThpProtocolHandler implements ProtocolHandler {
   private nextSessionId = 1;
   private readonly sessions = new Map<number, string>();
   private readonly onTrace?: (note: string) => void;
+  private readonly seedCache: SeedCache = {};
 
   constructor(options: TrezorHandlerOptions) {
     if (options.rng) {
@@ -273,6 +283,14 @@ export class TrezorThpProtocolHandler implements ProtocolHandler {
       write: this.model.writeCharUUID,
       notify: this.model.notifyCharUUID,
     };
+  }
+
+  replaceSeed(seed: Uint8Array, icarusRoot?: Uint8Array): void {
+    replaceSeedCache(this.seedCache, seed, icarusRoot);
+  }
+
+  private port(): ConfirmationPort {
+    return wrapSeedPort(this.confirmation, this.seedCache);
   }
 
   observeIncomingSize(size: number): void {
@@ -783,10 +801,18 @@ export class TrezorThpProtocolHandler implements ProtocolHandler {
         encodeFailure(FailureType.ActionCancelled, 'Cancelled'),
       );
     }
-    const passphrase =
+    const overlay =
       (await this.confirmation.getPassphrase(this.slotId)) ?? this.sessions.get(pending.sessionId) ?? '';
+    const seed = overlay ? undefined : await seedFor(this.port(), this.slotId, this.entropy, this.backup);
+    const icarusRoot = overlay
+      ? undefined
+      : await icarusRootFor(this.port(), this.slotId, this.entropy, this.backup);
+    const secp = (path: string) =>
+      seed ? derivePrivateKeyFromSeed(seed, path) : derivePrivateKey(this.entropy, path, overlay, this.backup);
+    const hd = (path: string) =>
+      seed ? deriveHdNodeFromSeed(seed, path) : deriveHdNode(this.entropy, path, overlay, this.backup);
     if (pending.kind === 'eth-address' || pending.kind === 'eth-pubkey') {
-      const privateKey = derivePrivateKey(this.entropy, pending.path, passphrase, this.backup);
+      const privateKey = secp(pending.path);
       if (pending.kind === 'eth-pubkey') {
         return encodeL4(pending.sessionId, MessageType.EthereumPublicKey, encodeBytesSignature(publicKeyCompressed(privateKey)));
       }
@@ -797,7 +823,7 @@ export class TrezorThpProtocolHandler implements ProtocolHandler {
       );
     }
     if (pending.kind === 'eth-sign') {
-      const privateKey = derivePrivateKey(this.entropy, pending.path, passphrase, this.backup);
+      const privateKey = secp(pending.path);
       const address = ethereumAddressFromPrivateKey(privateKey);
       return encodeL4(
         pending.sessionId,
@@ -806,15 +832,15 @@ export class TrezorThpProtocolHandler implements ProtocolHandler {
       );
     }
     if (pending.kind === 'eth-tx') {
-      const signature = signLegacyTx(derivePrivateKey(this.entropy, pending.path, passphrase, this.backup), pending.tx);
+      const signature = signLegacyTx(secp(pending.path), pending.tx);
       return encodeL4(pending.sessionId, MessageType.EthereumTxRequest, encodeEthereumTxRequest(signature));
     }
     if (pending.kind === 'eth-tx-1559') {
-      const signature = signEip1559Tx(derivePrivateKey(this.entropy, pending.path, passphrase, this.backup), pending.tx);
+      const signature = signEip1559Tx(secp(pending.path), pending.tx);
       return encodeL4(pending.sessionId, MessageType.EthereumTxRequest, encodeEthereumTxRequest(signature));
     }
     if (pending.kind === 'eth-712') {
-      const privateKey = derivePrivateKey(this.entropy, pending.path, passphrase, this.backup);
+      const privateKey = secp(pending.path);
       const address = ethereumAddressFromPrivateKey(privateKey);
       return encodeL4(
         pending.sessionId,
@@ -823,15 +849,15 @@ export class TrezorThpProtocolHandler implements ProtocolHandler {
       );
     }
     if (pending.kind === 'btc-address') {
-      const node = deriveHdNode(this.entropy, pending.path, passphrase, this.backup);
+      const node = hd(pending.path);
       return encodeL4(pending.sessionId, MessageType.Address, encodeStringAddress(bitcoinP2pkh(node.publicKey)));
     }
     if (pending.kind === 'btc-pubkey') {
-      const node = deriveHdNode(this.entropy, pending.path, passphrase, this.backup);
+      const node = hd(pending.path);
       return encodeL4(pending.sessionId, MessageType.PublicKey, encodeBytesSignature(node.publicKey));
     }
     if (pending.kind === 'btc-sign-msg') {
-      const privateKey = derivePrivateKey(this.entropy, pending.path, passphrase, this.backup);
+      const privateKey = secp(pending.path);
       const message = pending.message ?? new Uint8Array();
       const prefix = encodeUtf8('\x18Bitcoin Signed Message:\n');
       const compact =
@@ -840,7 +866,7 @@ export class TrezorThpProtocolHandler implements ProtocolHandler {
           : concatBytes(Uint8Array.of(0xfd, message.length & 0xff, message.length >> 8));
       const hash = sha256(sha256(concatBytes(prefix, compact, message)));
       const sig = signSecp256k1Recoverable(privateKey, hash);
-      const node = deriveHdNode(this.entropy, pending.path, passphrase, this.backup);
+      const node = hd(pending.path);
       return encodeL4(
         pending.sessionId,
         MessageType.MessageSignature,
@@ -848,47 +874,58 @@ export class TrezorThpProtocolHandler implements ProtocolHandler {
       );
     }
     if (pending.kind === 'btc-tx') {
-      const privateKey = derivePrivateKey(this.entropy, pending.path, passphrase, this.backup);
+      const privateKey = secp(pending.path);
       const hash = sha256(sha256(concatBytes(pending.prevout, u64le(pending.amount), u64le(pending.outputAmount))));
       const sig = signSecp256k1Recoverable(privateKey, hash).subarray(0, 64);
       return encodeL4(pending.sessionId, MessageType.TxRequest, encodeTxRequest(TxRequestType.TXFINISHED, 0, sig));
     }
     if (pending.kind === 'coin') {
-      return this.coinFinish(pending, passphrase);
+      return this.coinFinish(pending, overlay, seed, icarusRoot);
     }
     return encodeL4(pending.sessionId, MessageType.Failure, encodeFailure(FailureType.ProcessError, 'Unknown pending'));
   }
 
   private coinFinish(
     pending: Extract<PendingAction, { kind: 'coin' }>,
-    passphrase: string,
+    overlay: string,
+    seed: Uint8Array | undefined,
+    icarusRoot: Uint8Array | undefined,
   ): Uint8Array {
     const op = pending.op;
+    const ed = (path: string) =>
+      seed
+        ? deriveEd25519PrivateKeyFromSeed(seed, path)
+        : deriveEd25519PrivateKey(this.entropy, path, overlay, this.backup);
+    const secp = (path: string) =>
+      seed ? derivePrivateKeyFromSeed(seed, path) : derivePrivateKey(this.entropy, path, overlay, this.backup);
     if (op.kind === 'address' || op.kind === 'pubkey') {
       if (op.curve === 'icarus') {
-        const address = icarusAddress(this.entropy, pending.path, passphrase, this.backup);
+        const address = icarusAddress(this.entropy, pending.path, overlay || undefined, this.backup, icarusRoot);
         return encodeL4(pending.sessionId, op.reply, encodeStringAddress(address));
       }
       if (op.curve === 'ed25519') {
-        const pub = ed25519PublicKey(deriveEd25519PrivateKey(this.entropy, pending.path, passphrase, this.backup));
+        const pub = ed25519PublicKey(ed(pending.path));
         if (op.kind === 'pubkey') {
           return encodeL4(pending.sessionId, op.reply, encodeBytesSignature(pub));
         }
         return encodeL4(pending.sessionId, op.reply, encodeStringAddress(op.addressOf?.(pub) ?? bytesToHex(pub)));
       }
-      const pub = publicKeyCompressed(derivePrivateKey(this.entropy, pending.path, passphrase, this.backup));
+      const pub = publicKeyCompressed(secp(pending.path));
       return encodeL4(pending.sessionId, op.reply, encodeStringAddress(op.addressOf?.(pub) ?? bytesToHex(pub)));
     }
     if (op.curve === 'ed25519') {
-      const sig = signEd25519(deriveEd25519PrivateKey(this.entropy, pending.path, passphrase, this.backup), pending.payload);
+      const sig = signEd25519(ed(pending.path), pending.payload);
       return encodeL4(pending.sessionId, op.reply, encodeBytesSignature(sig));
     }
     if (op.curve === 'icarus') {
-      const sig = signIcarus(deriveIcarus(this.entropy, pending.path, passphrase, this.backup), pending.payload);
+      const node = icarusRoot
+        ? deriveIcarusFromRoot(icarusRoot, pending.path)
+        : deriveIcarus(this.entropy, pending.path, overlay, this.backup);
+      const sig = signIcarus(node, pending.payload);
       return encodeL4(pending.sessionId, op.reply, encodeBytesSignature(sig));
     }
     const hash = pending.payload.length === 32 ? pending.payload : sha256(pending.payload);
-    const sig = signSecp256k1Recoverable(derivePrivateKey(this.entropy, pending.path, passphrase, this.backup), hash);
+    const sig = signSecp256k1Recoverable(secp(pending.path), hash);
     return encodeL4(pending.sessionId, op.reply, encodeBytesSignature(sig));
   }
 

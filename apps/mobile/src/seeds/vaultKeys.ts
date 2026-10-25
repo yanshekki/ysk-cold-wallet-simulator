@@ -16,3 +16,7 @@ export const LEGACY_SLOTS_KEY = 'cws:slots';
 export function entropyKey(id: string): string {
   return secureStoreKey('cws', 'entropy', id);
 }
+
+export function sharesKey(id: string): string {
+  return secureStoreKey('cws', 'shares', id);
+}

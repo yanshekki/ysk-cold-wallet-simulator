@@ -12,7 +12,8 @@ import {
 } from '../apdu';
 import { versionTriple, type FamilyContext, type FamilySession } from './generic';
 import { cardanoEnterprise, encodePubAndAddress } from './addresses';
-import { deriveIcarus, signIcarus } from './icarus';
+import { icarusRootFor } from '../crypto';
+import { deriveIcarus, deriveIcarusFromRoot, signIcarus } from './icarus';
 
 export type CardanoSession = FamilySession;
 
@@ -126,8 +127,11 @@ function parseBip32PathSafe(data: Uint8Array): { path: string; rest: Uint8Array 
 }
 
 async function icarusAt(ctx: FamilyContext, path: string) {
-  const passphrase = await ctx.confirmation.getPassphrase(ctx.slotId);
-  return deriveIcarus(ctx.entropy, path, passphrase, ctx.backup);
+  const root = await icarusRootFor(ctx.confirmation, ctx.slotId, ctx.entropy, ctx.backup ?? 'bip39');
+  if (root) {
+    return deriveIcarusFromRoot(root, path);
+  }
+  return deriveIcarus(ctx.entropy, path, undefined, ctx.backup);
 }
 
 async function confirm(

@@ -31,8 +31,35 @@ export type UiServer = {
   close(): Promise<void>;
 };
 
+function uiDirFromImportMeta(): string | undefined {
+  try {
+    const url = import.meta.url;
+    if (!url) {
+      return undefined;
+    }
+    return fileURLToPath(new URL('../ui', url));
+  } catch {
+    return undefined;
+  }
+}
+
 export function defaultUiDir(): string {
-  return fileURLToPath(new URL('../ui', import.meta.url));
+  const execDir = path.dirname(process.execPath);
+  const fromEnv = process.env.CWS_UI_DIR?.trim();
+  const fromMeta = uiDirFromImportMeta();
+  const candidates = [
+    ...(fromEnv ? [fromEnv] : []),
+    path.join(execDir, 'ui'),
+    path.join(execDir, '..', 'Resources', 'ui'),
+    path.join(execDir, '..', '..', '..', '..', 'Resources', 'ui'),
+    ...(fromMeta ? [fromMeta] : []),
+  ];
+  for (const dir of candidates) {
+    if (fs.existsSync(path.join(dir, 'index.html'))) {
+      return dir;
+    }
+  }
+  return candidates[0];
 }
 
 export function startUiServer(opts: {
@@ -60,6 +87,11 @@ export function startUiServer(opts: {
     if (method === 'POST' && url.pathname === '/stop') {
       opts.commands.stop();
       json(res, 200, { ok: true, running: false });
+      return;
+    }
+    if (method === 'POST' && url.pathname === '/logs/clear') {
+      opts.bus.clearLogs();
+      json(res, 200, { ok: true });
       return;
     }
     if (method === 'POST' && url.pathname === '/pairing') {

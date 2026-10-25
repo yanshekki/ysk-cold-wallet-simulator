@@ -50,6 +50,7 @@ import { handleTonApdu } from './apps/ton';
 import { handleAptosApdu } from './apps/aptos';
 import { handleSuiApdu } from './apps/sui';
 import type { FamilySession } from './apps/generic';
+import { replaceSeedCache, wrapSeedPort, type SeedCache } from './crypto';
 
 export type LedgerHandlerOptions = {
   model: DeviceModel;
@@ -80,6 +81,7 @@ export class LedgerProtocolHandler implements ProtocolHandler {
   private mtu: number;
   private app: LedgerApp = 'dashboard';
   private managerAllowed = false;
+  private readonly seedCache: SeedCache = {};
 
   constructor(options: LedgerHandlerOptions) {
     this.model = options.model;
@@ -102,6 +104,10 @@ export class LedgerProtocolHandler implements ProtocolHandler {
       notify: this.model.notifyCharUUID,
       writeCmd: this.model.writeCmdCharUUID,
     };
+  }
+
+  replaceSeed(seed: Uint8Array, icarusRoot?: Uint8Array): void {
+    replaceSeedCache(this.seedCache, seed, icarusRoot);
   }
 
   setApp(app: LedgerApp): void {
@@ -208,6 +214,13 @@ export class LedgerProtocolHandler implements ProtocolHandler {
     if (this.app === 'dashboard' && apdu.cla === 0xe0 && MANAGER_INS.has(apdu.ins)) {
       return this.allowManager();
     }
+    if (
+      this.app === 'dashboard' &&
+      apdu.cla === 0xe0 &&
+      (apdu.ins === 0x02 || apdu.ins === 0x04 || apdu.ins === 0x06 || apdu.ins === 0x08 || apdu.ins === 0x0c)
+    ) {
+      this.setApp('ethereum');
+    }
 
     return this.handleFamilyApdu(apdu);
   }
@@ -215,7 +228,7 @@ export class LedgerProtocolHandler implements ProtocolHandler {
   private async handleFamilyApdu(apdu: ReturnType<typeof parseApdu>): Promise<Uint8Array | null> {
     const family = ledgerAppFamily(this.app);
     const ctx = {
-      confirmation: this.confirmation,
+      confirmation: wrapSeedPort(this.confirmation, this.seedCache),
       slotId: this.slotId,
       entropy: this.entropy,
       backup: this.backup,

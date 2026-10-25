@@ -3,6 +3,23 @@ appId: hk.ysk.coldwalletsimulator
 - launchApp
 - extendedWaitUntil:
     visible:
+      id: "disclaimer-agree"
+    timeout: 15000
+    optional: true
+- tapOn:
+    id: "disclaimer-agree"
+    optional: true
+- tapOn:
+    id: "legal-tab-privacy"
+    optional: true
+- tapOn:
+    id: "privacy-agree"
+    optional: true
+- tapOn:
+    id: "disclaimer-continue"
+    optional: true
+- extendedWaitUntil:
+    visible:
       id: "tab-device"
     timeout: 45000
 - extendedWaitUntil:
@@ -13,17 +30,24 @@ appId: hk.ysk.coldwalletsimulator
     id: "tab-vault"
 - tapOn: "種子, tab, 2 of 4"
 - extendedWaitUntil:
-    visible: "產生種子"
+    visible:
+      id: "vault-generate"
     timeout: 15000
-- scrollUntilVisible:
-    element:
-      id: "vault-phrase-dev-local"
-    direction: DOWN
-    timeout: 25000
-    centerElement: true
-    visibilityPercentage: 100
 - tapOn:
-    id: "vault-phrase-dev-local"
+    id: "vault-import"
+- extendedWaitUntil:
+    visible:
+      id: "import-draft"
+    timeout: 15000
+- tapOn:
+    id: "import-draft"
+- inputText: "absent much beef salmon theme settle absorb festival fancy dinner tiny flavor"
+- tapOn:
+    id: "import-submit"
+- extendedWaitUntil:
+    visible: "顯示助記詞"
+    timeout: 20000
+- tapOn: "顯示助記詞"
 - extendedWaitUntil:
     visible:
       id: "vault-phrase-sheet"
@@ -39,8 +63,7 @@ appId: hk.ysk.coldwalletsimulator
     notVisible:
       id: "vault-phrase-sheet"
     timeout: 8000
-- tapOn:
-    id: "vault-accounts-dev-local"
+- tapOn: "帳戶"
 - assertVisible:
     id: "vault-accounts-sheet"
 - extendedWaitUntil:
@@ -54,24 +77,3 @@ appId: hk.ysk.coldwalletsimulator
     notVisible:
       id: "vault-accounts-sheet"
     timeout: 15000
-- scrollUntilVisible:
-    element: "Personal, SLIP39 1-of-1"
-    direction: UP
-    timeout: 20000
-    visibilityPercentage: 80
-- tapOn: "Personal, SLIP39 1-of-1"
-- extendedWaitUntil:
-    notVisible:
-      id: "vault-phrase-dev-local"
-    timeout: 15000
-- extendedWaitUntil:
-    notVisible: "載入中"
-    timeout: 30000
-- tapOn:
-    text: "顯示助記詞"
-    below: "Personal, SLIP39 1-of-1"
-- extendedWaitUntil:
-    visible: "OK"
-    timeout: 8000
-- takeScreenshot: slip39-alert
-- tapOn: "OK"

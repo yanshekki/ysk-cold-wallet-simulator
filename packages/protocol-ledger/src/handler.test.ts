@@ -1,4 +1,4 @@
-import { mnemonicToEntropy } from '@scure/bip39';
+import { mnemonicToEntropy, mnemonicToSeedSync } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
 import { describe, expect, it } from 'vitest';
 import { LEDGER_MODELS, describeSigning, overlayDerivationPath, type ConfirmationPort } from '@cws/contracts';
@@ -274,6 +274,77 @@ describe('LedgerProtocolHandler', () => {
       (b) => String.fromCharCode(b),
     ).join('');
     expect(address.toLowerCase()).toBe(EXPECTED_ADDRESS.toLowerCase());
+  });
+
+  it('returns ETH GET_ADDRESS without a confirmation when P1 is silent', async () => {
+    let confirms = 0;
+    const handler = new LedgerProtocolHandler({
+      model: nanoX,
+      confirmation: {
+        async confirm() {
+          confirms += 1;
+          return true;
+        },
+        async getPassphrase() {
+          return undefined;
+        },
+      },
+      slotId: 'slot',
+      entropy,
+    });
+    handler.setApp('ethereum');
+    const path = [0x8000002c, 0x8000003c, 0x80000000, 0x00000000, 0x00000000];
+    const pathBytes: number[] = [path.length];
+    for (const component of path) {
+      pathBytes.push(
+        (component >>> 24) & 0xff,
+        (component >>> 16) & 0xff,
+        (component >>> 8) & 0xff,
+        component & 0xff,
+      );
+    }
+    const silent = await exchange(
+      handler,
+      apdu([0xe0, 0x02, 0x00, 0x01, pathBytes.length, ...pathBytes]),
+    );
+    expect((silent[silent.length - 2] << 8) | silent[silent.length - 1]).toBe(SW_OK);
+    expect(confirms).toBe(0);
+    const pubLen = silent[0];
+    const addrLen = silent[1 + pubLen];
+    const chainCode = silent.slice(2 + pubLen + addrLen, silent.length - 2);
+    expect(chainCode.length).toBe(32);
+    const shown = await exchange(
+      handler,
+      apdu([0xe0, 0x02, 0x01, 0x00, pathBytes.length, ...pathBytes]),
+    );
+    expect((shown[shown.length - 2] << 8) | shown[shown.length - 1]).toBe(SW_OK);
+    expect(confirms).toBe(1);
+  });
+
+  it('opens Ethereum when GET_ADDRESS arrives on the dashboard', async () => {
+    const handler = new LedgerProtocolHandler({
+      model: nanoX,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy,
+    });
+    expect(handler.getApp()).toBe('dashboard');
+    const path = [0x8000002c, 0x8000003c, 0x80000000, 0x00000000, 0x00000000];
+    const pathBytes: number[] = [path.length];
+    for (const component of path) {
+      pathBytes.push(
+        (component >>> 24) & 0xff,
+        (component >>> 16) & 0xff,
+        (component >>> 8) & 0xff,
+        component & 0xff,
+      );
+    }
+    const payload = await exchange(
+      handler,
+      apdu([0xe0, 0x02, 0x00, 0x00, pathBytes.length, ...pathBytes]),
+    );
+    expect(handler.getApp()).toBe('ethereum');
+    expect((payload[payload.length - 2] << 8) | payload[payload.length - 1]).toBe(SW_OK);
   });
 
   it('does not sign when the user rejects', async () => {
@@ -841,6 +912,42 @@ describe('LedgerProtocolHandler', () => {
     const sw = (payload[payload.length - 2] << 8) | payload[payload.length - 1];
     expect(sw).toBe(SW_OK);
     expect(payload.length).toBe(32 + 2);
+  });
+
+  it('uses a cached seed from replaceSeed instead of getPassphrase', async () => {
+    const confirmation: ConfirmationPort = {
+      async confirm() {
+        return true;
+      },
+      async getPassphrase() {
+        return 'WRONG';
+      },
+    };
+    const handler = new LedgerProtocolHandler({
+      model: nanoX,
+      confirmation,
+      slotId: 'slot',
+      entropy,
+    });
+    handler.setApp('ethereum');
+    const hidden = mnemonicToSeedSync(FOUNDATION, 'TREZOR');
+    handler.replaceSeed(hidden);
+    const pathBytes = [
+      0x05, 0x80, 0x00, 0x00, 0x2c, 0x80, 0x00, 0x00, 0x3c, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+      0x00, 0x00, 0x00, 0x00,
+    ];
+    const payload = await exchange(handler, apdu([0xe0, 0x02, 0x01, 0x00, pathBytes.length, ...pathBytes]));
+    const sw = (payload[payload.length - 2] << 8) | payload[payload.length - 1];
+    expect(sw).toBe(SW_OK);
+    const pubLen = payload[0];
+    const addrLen = payload[1 + pubLen];
+    const address = Array.from(
+      payload.slice(2 + pubLen, 2 + pubLen + addrLen),
+      (b) => String.fromCharCode(b),
+    ).join('');
+    expect(address.toLowerCase()).toBe(
+      ethereumAddressFromPrivateKey(derivePrivateKey(entropy, PATH, 'TREZOR')).toLowerCase(),
+    );
   });
 });
 

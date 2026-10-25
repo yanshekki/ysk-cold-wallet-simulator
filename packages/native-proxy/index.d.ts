@@ -18,6 +18,7 @@ export declare class VirtualHid {
   close(): void
 }
 export declare class BleDevice {
+  debugInfo(): string
   write(data: Buffer): Promise<void>
   onNotify(callback: (...args: any[]) => any): void
   disconnect(): Promise<void>

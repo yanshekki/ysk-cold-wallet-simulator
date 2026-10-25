@@ -79,6 +79,33 @@ function rootFromMnemonic(mnemonic: string, passphrase: string): IcarusNode {
   return { kL, kR, chainCode, publicKey: pubFromKL(kL) };
 }
 
+/** 96-byte Icarus root: kL || kR || chainCode. */
+export function icarusRootFromEntropy(entropy: Uint8Array, passphrase = ''): Uint8Array {
+  const node = rootFromMnemonic(mnemonicFromEntropy(entropy), passphrase);
+  return concatBytes(node.kL, node.kR, node.chainCode);
+}
+
+export function icarusNodeFromRoot(root: Uint8Array): IcarusNode {
+  if (root.length < 96) {
+    throw new Error('Icarus root is truncated');
+  }
+  const kL = root.subarray(0, 32).slice();
+  const kR = root.subarray(32, 64).slice();
+  const chainCode = root.subarray(64, 96).slice();
+  return { kL, kR, chainCode, publicKey: pubFromKL(kL) };
+}
+
+export function deriveIcarusFromRoot(root: Uint8Array, path: string): IcarusNode {
+  let node = icarusNodeFromRoot(root);
+  const parts = path.replace(/^m\/?/, '').split('/').filter(Boolean);
+  for (const part of parts) {
+    const hardened = part.endsWith("'");
+    const index = Number.parseInt(hardened ? part.slice(0, -1) : part, 10);
+    node = deriveChild(node, (hardened ? 0x80000000 : 0) + index);
+  }
+  return node;
+}
+
 function deriveChild(parent: IcarusNode, index: number): IcarusNode {
   const hardened = (index & 0x80000000) !== 0;
   const data = hardened
@@ -104,18 +131,15 @@ export function deriveIcarus(
   path: string,
   passphrase?: string,
   backup: BackupKind = 'bip39',
+  root?: Uint8Array,
 ): IcarusNode {
   if (backup === 'slip39') {
     throw new Error('Cardano Icarus needs BIP39');
   }
-  let node = rootFromMnemonic(mnemonicFromEntropy(entropy), passphrase ?? '');
-  const parts = path.replace(/^m\/?/, '').split('/').filter(Boolean);
-  for (const part of parts) {
-    const hardened = part.endsWith("'");
-    const index = Number.parseInt(hardened ? part.slice(0, -1) : part, 10);
-    node = deriveChild(node, (hardened ? 0x80000000 : 0) + index);
+  if (root && root.length >= 96) {
+    return deriveIcarusFromRoot(root, path);
   }
-  return node;
+  return deriveIcarusFromRoot(icarusRootFromEntropy(entropy, passphrase ?? ''), path);
 }
 
 export function signIcarus(node: IcarusNode, message: Uint8Array): Uint8Array {

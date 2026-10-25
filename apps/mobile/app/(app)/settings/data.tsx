@@ -124,7 +124,6 @@ export default function DataSettingsScreen() {
         <Text style={styles.meta}>
           Ledger SE {os.se} / MCU {os.mcu}
         </Text>
-        <Text style={styles.meta}>{t('settings.appearance')}</Text>
       </View>
 
       <View style={styles.card} testID="data-danger">

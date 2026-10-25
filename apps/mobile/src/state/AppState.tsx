@@ -20,26 +20,26 @@ import type {
   SigningRequest,
 } from '@cws/contracts';
 import { ledgerCatalog } from '@cws/contracts';
-import { createHandler, fetchManagerCatalog, getModel, isSimulatable } from '@cws/sdk';
+import { createHandler, getModel, isSimulatable, toBip32Seed } from '@cws/sdk';
 import { LedgerProtocolHandler } from '@cws/protocol-ledger';
 import { startAdvertising } from '../ble/peripheral';
 import type { PeripheralHandle } from '../ble/types';
+import { clearDisclaimerAcceptance, loadDisclaimerAccepted, saveDisclaimerAcceptance } from '../disclaimer/store';
+import { I18nProvider, translate } from '../i18n';
 import { describeBlePayload, redactLogHex } from '../lab/apduNote';
 import { expoRng } from '../lab/polyfillCrypto';
-import { I18nProvider } from '../i18n';
 import { ensureNearAccount } from '../near/service';
-import { isDevBuild } from '../passkeys/devFlag';
 import { setFaceIdEnabled, unlock as requestUnlock } from '../passkeys';
-import { ensureDevLocalSeed } from '../seeds/labSeed';
-import { listSlots, loadEntropy, updateSlotMeta } from '../seeds/vault';
+import { SecretSession } from '../seeds/secretSession';
+import { listSlots, loadEntropy, setVaultAuthPrompt, updateSlotMeta, wipeAllSlots } from '../seeds/vault';
 import {
   DEFAULT_SETTINGS,
+  clearCatalogOverlay,
+  detectLanguage,
   loadActiveSlotId,
-  loadCatalogOverlay,
   loadSettings,
   resolveDefaultSlot,
   saveActiveSlotId,
-  saveCatalogOverlay,
   saveSettings,
   type AppSettings,
 } from '../settings/store';
@@ -61,6 +61,7 @@ type AppStateValue = {
   pending: SigningRequest | null;
   pairingCode: string | null;
   sessionPassphraseApplied: boolean;
+  passphraseFingerprint: string | null;
   error: string | null;
   toast: string | null;
   settings: AppSettings;
@@ -72,17 +73,19 @@ type AppStateValue = {
   startSimulation: () => Promise<void>;
   stopSimulation: () => Promise<void>;
   setApp: (app: LedgerApp) => void;
-  applySessionPassphrase: (value: string) => void;
+  applySessionPassphrase: (value: string) => Promise<boolean>;
   clearSessionPassphrase: () => void;
   resolveSigning: (ok: boolean) => void;
   clearLogs: () => void;
   appendAppLog: (channel: LogChannel, note: string, hex?: string) => void;
   patchSettings: (patch: Partial<AppSettings>) => Promise<void>;
-  updateLedgerCatalog: () => Promise<number>;
-  refreshNear: (slot: SeedSlot, sponsor: boolean) => Promise<SeedSlot>;
+  refreshNear: (slot: SeedSlot) => Promise<SeedSlot>;
   showToast: (message: string) => void;
   loading: string | null;
   hydrated: boolean;
+  disclaimerAccepted: boolean;
+  acceptDisclaimer: () => Promise<void>;
+  clearAllData: () => Promise<void>;
   runWithLoading: <T>(label: string, work: () => Promise<T>) => Promise<T>;
 };
 
@@ -100,17 +103,19 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [pending, setPending] = useState<SigningRequest | null>(null);
   const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [sessionPassphraseApplied, setSessionPassphraseApplied] = useState(false);
+  const [passphraseFingerprint, setPassphraseFingerprint] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [catalog, setCatalog] = useState<readonly LedgerInstalledApp[]>(() => [...ledgerCatalog()]);
   const [loading, setLoading] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
 
   const peripheralRef = useRef<PeripheralHandle | null>(null);
   const handlerRef = useRef<ProtocolHandler | null>(null);
   const pendingRef = useRef<PendingConfirm | null>(null);
-  const passphraseRef = useRef('');
+  const secretSession = useRef(new SecretSession());
   const logSeq = useRef(0);
   const settingsRef = useRef(settings);
   const seedRef = useRef(seed);
@@ -168,11 +173,17 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setLogs([]);
   }, []);
 
+  const acceptDisclaimer = useCallback(async () => {
+    await saveDisclaimerAcceptance();
+    setDisclaimerAccepted(true);
+  }, []);
+
   const patchSettings = useCallback(async (patch: Partial<AppSettings>) => {
     const next = { ...settingsRef.current, ...patch };
     settingsRef.current = next;
     setSettings(next);
     setFaceIdEnabled(next.faceIdEnabled);
+    setVaultAuthPrompt(translate(next.language, 'vault.authPrompt'));
     await saveSettings(next);
   }, []);
 
@@ -192,7 +203,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         });
       },
       async getPassphrase() {
-        return passphraseRef.current || undefined;
+        return undefined;
+      },
+      async getSeed() {
+        return secretSession.current.copySeed();
+      },
+      async getIcarusRoot() {
+        return secretSession.current.copyIcarusRoot();
       },
       onPairingCode(code) {
         setPairingCode(code);
@@ -211,7 +228,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         settingsRef.current = loaded;
         setSettings(loaded);
         setFaceIdEnabled(loaded.faceIdEnabled);
-        await loadCatalogOverlay();
+        setVaultAuthPrompt(translate(loaded.language, 'vault.authPrompt'));
         setCatalog([...ledgerCatalog()]);
         const slots = await listSlots();
         const activeId = await loadActiveSlotId();
@@ -220,6 +237,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           setSeed(resolved);
           seedRef.current = resolved;
         }
+        setDisclaimerAccepted(await loadDisclaimerAccepted());
       } finally {
         setHydrated(true);
       }
@@ -228,23 +246,17 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   const unlock = useCallback(async () => {
     try {
-      const ok = await requestUnlock();
+      const ok = await requestUnlock(translate(settingsRef.current.language, 'unlock.prompt'));
       if (ok) {
         setUnlockedUntil(Date.now() + settingsRef.current.autoLockMinutes * 60 * 1000);
         setError(null);
-        if (isDevBuild()) {
-          const lab = await ensureDevLocalSeed(model?.brand ?? 'ledger', model?.id ?? 'nano-x');
-          if (!seedRef.current) {
-            selectSeed(lab);
-          }
-        }
       }
       return ok;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unlock failed');
+      setError(translate(settingsRef.current.language, err instanceof Error ? err.message : 'unlock.failed'));
       return false;
     }
-  }, [model, selectSeed]);
+  }, []);
 
   const stopSimulation = useCallback(async () => {
     await peripheralRef.current?.stop();
@@ -259,8 +271,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       pendingRef.current = null;
     }
     setPending(null);
-    passphraseRef.current = '';
+    secretSession.current.wipe();
     setSessionPassphraseApplied(false);
+    setPassphraseFingerprint(null);
     setPairingCode(null);
     appendAppLog('ble', 'advertise stop');
   }, [appendAppLog]);
@@ -287,30 +300,24 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   }, [lock, unlockedUntil]);
 
   const refreshNear = useCallback(
-    async (slot: SeedSlot, sponsor: boolean) => {
-      appendAppLog('near', sponsor ? 'near: lookup+sponsor' : 'near: lookup');
+    async (slot: SeedSlot) => {
+      appendAppLog('near', 'near: derive');
       try {
         const entropy = await loadEntropy(slot.id);
-        const status = await ensureNearAccount(entropy, slot, passphraseRef.current, sponsor);
+        const seedBytes =
+          secretSession.current.copySeed() ?? toBip32Seed(entropy, slot.backup ?? 'bip39', '');
+        const status = ensureNearAccount(seedBytes, slot);
         const updated = await updateSlotMeta({
           ...slot,
           nearAccountId: status.accountId,
           nearPublicKey: status.publicKey,
-          nearCreatedAt: status.exists ? Date.now() : slot.nearCreatedAt,
           nearPath: slot.nearPath ?? slot.paths?.near,
         });
         if (seedRef.current?.id === updated.id) {
           setSeed(updated);
           seedRef.current = updated;
         }
-        appendAppLog(
-          'near',
-          status.exists
-            ? status.created
-              ? 'near: create sponsored'
-              : 'near: exists'
-            : 'near: missing',
-        );
+        appendAppLog('near', 'near: derived');
         return updated;
       } catch (err) {
         const message = err instanceof Error ? err.message : 'NEAR failed';
@@ -320,6 +327,27 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     },
     [appendAppLog],
   );
+
+  const clearAllData = useCallback(async () => {
+    await stopSimulation();
+    await wipeAllSlots();
+    await saveActiveSlotId(null);
+    await clearCatalogOverlay();
+    await clearDisclaimerAcceptance();
+    const next = { ...DEFAULT_SETTINGS, language: detectLanguage() };
+    settingsRef.current = next;
+    setSettings(next);
+    setFaceIdEnabled(next.faceIdEnabled);
+    setVaultAuthPrompt(translate(next.language, 'vault.authPrompt'));
+    await saveSettings(next);
+    setSeed(null);
+    seedRef.current = null;
+    setCatalog([...ledgerCatalog()]);
+    setLogs([]);
+    setDisclaimerAccepted(false);
+    setError(null);
+    setUnlockedUntil(null);
+  }, [stopSimulation]);
 
   const startSimulation = useCallback(async () => {
     if (!model || !isSimulatable(model)) {
@@ -336,13 +364,15 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       }
     }
     if (!active) {
-      throw new Error('Select a seed first');
+      throw new Error('errors.selectSeed');
     }
     setError(null);
-    passphraseRef.current = '';
+    secretSession.current.wipe();
     setSessionPassphraseApplied(false);
+    setPassphraseFingerprint(null);
     try {
       const entropy = await loadEntropy(active.id);
+      secretSession.current.load(entropy, active.backup ?? 'bip39');
       const handler = createHandler({
         model,
         confirmation,
@@ -356,6 +386,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         rng: expoRng,
         onTrace: (note) => appendAppLog('pair', note),
       });
+      const seedBytes = secretSession.current.copySeed();
+      if (seedBytes) {
+        handler.replaceSeed?.(seedBytes, secretSession.current.copyIcarusRoot());
+      }
       handlerRef.current = handler;
       appendAppLog('ble', 'advertise start');
       const handle = await startAdvertising(model, handler, {
@@ -380,9 +414,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       setAdvertising(true);
       setCurrentApp(handler instanceof LedgerProtocolHandler ? handler.getApp() : 'dashboard');
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'failed to advertise';
-      setError(message);
-      appendAppLog('error', message);
+      secretSession.current.wipe();
+      handlerRef.current = null;
+      const message = err instanceof Error ? err.message : 'errors.advertiseFailed';
+      const shown = translate(settingsRef.current.language, message);
+      setError(shown);
+      appendAppLog('error', shown);
     }
   }, [appendAppLog, appendLog, confirmation, model, selectSeed]);
 
@@ -395,48 +432,71 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     }
   }, [appendAppLog]);
 
-  const applySessionPassphrase = useCallback((value: string) => {
-    passphraseRef.current = value;
-    setSessionPassphraseApplied(true);
+  const applySessionPassphrase = useCallback(async (value: string) => {
+    try {
+      if (!(await requestUnlock(translate(settingsRef.current.language, 'unlock.prompt')))) {
+        return false;
+      }
+    } catch (err) {
+      setError(translate(settingsRef.current.language, err instanceof Error ? err.message : 'unlock.failed'));
+      return false;
+    }
+    try {
+      secretSession.current.applyPassphraseText(value);
+    } catch (err) {
+      setError(translate(settingsRef.current.language, err instanceof Error ? err.message : 'errors.passphraseFailed'));
+      return false;
+    }
+    const seedBytes = secretSession.current.copySeed();
+    if (seedBytes) {
+      handlerRef.current?.replaceSeed?.(seedBytes, secretSession.current.copyIcarusRoot());
+    }
+    setSessionPassphraseApplied(secretSession.current.passphraseApplied);
+    setPassphraseFingerprint(
+      secretSession.current.passphraseApplied ? secretSession.current.fingerprint : null,
+    );
+    return true;
   }, []);
 
   const clearSessionPassphrase = useCallback(() => {
-    passphraseRef.current = '';
+    secretSession.current.clearPassphrase();
+    const seedBytes = secretSession.current.copySeed();
+    if (seedBytes) {
+      handlerRef.current?.replaceSeed?.(seedBytes, secretSession.current.copyIcarusRoot());
+    }
     setSessionPassphraseApplied(false);
+    setPassphraseFingerprint(null);
   }, []);
 
-  const resolveSigning = useCallback((ok: boolean) => {
+  const resolveSigning = useCallback(async (ok: boolean) => {
     const request = pendingRef.current?.request;
+    if (
+      ok &&
+      request?.kind === 'sign' &&
+      settingsRef.current.signReauth
+    ) {
+      try {
+        if (!(await requestUnlock(translate(settingsRef.current.language, 'unlock.prompt')))) {
+          pendingRef.current?.resolve(false);
+          pendingRef.current = null;
+          setPending(null);
+          appendAppLog('sign', 'reject');
+          return;
+        }
+      } catch (err) {
+        pendingRef.current?.resolve(false);
+        pendingRef.current = null;
+        setPending(null);
+        appendAppLog('sign', 'reject');
+        setError(translate(settingsRef.current.language, err instanceof Error ? err.message : 'unlock.failed'));
+        return;
+      }
+    }
     pendingRef.current?.resolve(ok);
     pendingRef.current = null;
     setPending(null);
     appendAppLog(ok ? 'sign' : 'sign', ok ? 'confirm' : 'reject');
-    if (!ok) {
-      return;
-    }
-    if (
-      ok &&
-      request?.kind === 'address' &&
-      request.path.includes("397'") &&
-      settingsRef.current.nearAutoSponsor &&
-      seedRef.current
-    ) {
-      void refreshNear(seedRef.current, true).catch((err) => {
-        setError(err instanceof Error ? err.message : 'NEAR sponsor failed');
-      });
-    }
-  }, [appendAppLog, refreshNear]);
-
-  const updateLedgerCatalog = useCallback(async () => {
-    const modelId = model?.id ?? 'nano-x';
-    appendAppLog('manager', 'manager: fetch');
-    const apps = await fetchManagerCatalog(modelId);
-    await saveCatalogOverlay(apps);
-    setCatalog(apps);
-    await patchSettings({ catalogUpdatedAt: Date.now() });
-    appendAppLog('manager', `manager: updated ${apps.length} apps`);
-    return apps.length;
-  }, [appendAppLog, model, patchSettings]);
+  }, [appendAppLog]);
 
   const value = useMemo<AppStateValue>(
     () => ({
@@ -451,6 +511,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       pending,
       pairingCode,
       sessionPassphraseApplied,
+      passphraseFingerprint,
       error,
       toast,
       settings,
@@ -468,21 +529,26 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       clearLogs,
       appendAppLog,
       patchSettings,
-      updateLedgerCatalog,
       refreshNear,
       showToast,
       loading,
       hydrated,
+      disclaimerAccepted,
+      acceptDisclaimer,
+      clearAllData,
       runWithLoading,
     }),
     [
+      acceptDisclaimer,
       advertising,
+      clearAllData,
       appendAppLog,
       catalog,
       clearLogs,
       connected,
       connectedLabel,
       currentApp,
+      disclaimerAccepted,
       error,
       hydrated,
       loading,
@@ -498,6 +564,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       seed,
       selectSeed,
       sessionPassphraseApplied,
+      passphraseFingerprint,
       applySessionPassphrase,
       clearSessionPassphrase,
       setApp,
@@ -508,7 +575,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       toast,
       unlock,
       unlockedUntil,
-      updateLedgerCatalog,
     ],
   );
 

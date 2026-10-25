@@ -65,11 +65,14 @@ export interface ProtocolHandler {
   handleWrite(data: Uint8Array): Promise<Uint8Array | null>;
   getServiceUUID(): string;
   getCharacteristics(): { write: string; notify: string; writeCmd?: string };
+  replaceSeed?(seed: Uint8Array, icarusRoot?: Uint8Array): void;
 }
 
 export interface ConfirmationPort {
   confirm(request: SigningRequest): Promise<boolean>;
   getPassphrase(slotId: string): Promise<string | undefined>;
+  getSeed?(slotId: string): Promise<Uint8Array | undefined>;
+  getIcarusRoot?(slotId: string): Promise<Uint8Array | undefined>;
   onPairingCode?(code: string | null): void;
   resolvePath?(apduPath: string, chains: readonly ChainPathId[]): string;
 }
@@ -92,6 +95,7 @@ export {
   ledgerCatalog,
   ledgerInstalledApp,
   ledgerPickerApps,
+  ledgerPickerRank,
   matchLedgerApp,
   resetLedgerCatalogOverlay,
   setLedgerCatalogOverlay,

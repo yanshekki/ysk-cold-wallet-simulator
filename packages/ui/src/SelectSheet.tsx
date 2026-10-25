@@ -18,6 +18,7 @@ type Props = {
   onClose: () => void;
   cancelLabel?: string;
   searchPlaceholder?: string;
+  testIDPrefix?: string;
 };
 
 export function SelectSheet({
@@ -29,6 +30,7 @@ export function SelectSheet({
   onClose,
   cancelLabel = 'Cancel',
   searchPlaceholder = 'Search',
+  testIDPrefix,
 }: Props) {
   const [query, setQuery] = useState('');
   useEffect(() => {
@@ -83,6 +85,7 @@ export function SelectSheet({
               return (
                 <Pressable
                   key={option.id}
+                  testID={testIDPrefix ? `${testIDPrefix}${option.id}` : undefined}
                   accessibilityRole="button"
                   accessibilityState={{ selected: active }}
                   onPress={() => onSelect(option.id)}

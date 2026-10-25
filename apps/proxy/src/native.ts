@@ -1,13 +1,35 @@
 import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { hidDescriptorFor, USB_HID_REPORT_SIZE, type DeviceModel } from '@cws/contracts';
+import { openBleSocket, scanBleSocket } from './bleSocket';
+import { openHidSocket } from './hidSocket';
 import type { BlePort, HidPort, Unsubscribe } from './ports';
 
-const require = createRequire(import.meta.url);
+function requireFilename(): string {
+  try {
+    if (import.meta.url) {
+      return import.meta.url;
+    }
+  } catch {
+    // bundled cjs has an empty import.meta
+  }
+  return pathToFileURL(join(dirname(process.execPath), 'proxy', 'main.cjs')).href;
+}
+
+const require = createRequire(requireFilename());
 const native = require('@cws/native-proxy') as typeof import('@cws/native-proxy');
 
 export const nativeOk: () => boolean = native.nativeOk;
-export const scanBle: typeof native.scanBle = native.scanBle;
 export const connectBle: typeof native.connectBle = native.connectBle;
+
+export async function scanBle(serviceUuids: string[], timeoutMs: number) {
+  const socketPath = process.env.CWS_BLE_SOCKET?.trim();
+  if (socketPath) {
+    return scanBleSocket(socketPath, timeoutMs);
+  }
+  return native.scanBle(serviceUuids, timeoutMs);
+}
 
 function asBytes(value: unknown): Uint8Array {
   if (value instanceof Uint8Array) {
@@ -47,29 +69,64 @@ export function wrapNativeHid(device: InstanceType<typeof native.VirtualHid>): H
   };
 }
 
+function withTimeout<T>(task: Promise<T>, ms: number, message: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), ms);
+    task.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
 export function wrapNativeBle(device: InstanceType<typeof native.BleDevice>): BlePort & {
   isConnected(): Promise<boolean>;
 } {
+  const listeners: Array<(packet: Uint8Array) => void> = [];
+  device.onNotify((packet: unknown) => {
+    const bytes = asBytes(packet);
+    for (const listener of listeners) {
+      listener(bytes);
+    }
+  });
   return {
     async write(packet) {
-      await device.write(Buffer.from(packet));
+      await withTimeout(device.write(Buffer.from(packet)), 1_500, 'ble write timed out');
     },
     onNotify(callback) {
-      device.onNotify((packet: unknown) => {
-        callback(asBytes(packet));
-      });
-      return () => undefined;
+      listeners.push(callback);
+      return () => {
+        const index = listeners.indexOf(callback);
+        if (index >= 0) {
+          listeners.splice(index, 1);
+        }
+      };
     },
     async close() {
-      await device.disconnect();
+      await withTimeout(device.disconnect(), 500, 'ble disconnect timed out').catch(() => undefined);
     },
     isConnected() {
-      return device.isConnected();
+      return withTimeout(device.isConnected(), 1_000, 'ble isConnected timed out').catch(
+        () => false,
+      );
     },
   };
 }
 
-export function createVirtualHid(model: DeviceModel): HidPort {
+export function createVirtualHid(
+  model: DeviceModel,
+  signal?: AbortSignal,
+): HidPort | Promise<HidPort> {
+  const socketPath = process.env.CWS_HID_SOCKET?.trim();
+  if (socketPath) {
+    return openHidSocket(socketPath, model, signal);
+  }
   const hid = new native.VirtualHid(
     model.usb.vendorId,
     model.usb.productId,
@@ -80,6 +137,11 @@ export function createVirtualHid(model: DeviceModel): HidPort {
 }
 
 export async function openBle(id: string, model: DeviceModel) {
+  const socketPath = process.env.CWS_BLE_SOCKET?.trim();
+  if (socketPath) {
+    return openBleSocket(socketPath, id, model.writeCharUUID, model.notifyCharUUID);
+  }
   const device = await connectBle(id, model.writeCharUUID, model.notifyCharUUID);
-  return wrapNativeBle(device);
+  const wrapped = wrapNativeBle(device);
+  return Object.assign(wrapped, { debugInfo: () => device.debugInfo() });
 }

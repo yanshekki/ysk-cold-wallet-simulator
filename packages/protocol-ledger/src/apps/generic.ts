@@ -10,10 +10,11 @@ import {
   type Apdu,
 } from '../apdu';
 import {
-  deriveEd25519PrivateKey,
-  derivePrivateKey,
+  deriveEd25519PrivateKeyFromSeed,
+  derivePrivateKeyFromSeed,
   ed25519PublicKey,
   publicKeyCompressed,
+  seedFor,
   signEd25519,
   signSecp256k1Recoverable,
 } from '../crypto';
@@ -107,11 +108,11 @@ async function exportKey(apdu: Apdu, spec: FamilySpec, ctx: FamilyContext): Prom
   if (!ok) {
     return encodeResponse(new Uint8Array(), SW_DENY);
   }
-  const passphrase = await ctx.confirmation.getPassphrase(ctx.slotId);
+  const seed = await seedFor(ctx.confirmation, ctx.slotId, ctx.entropy, ctx.backup ?? 'bip39');
   const publicKey =
     spec.curve === 'ed25519'
-      ? ed25519PublicKey(deriveEd25519PrivateKey(ctx.entropy, path, passphrase, ctx.backup))
-      : publicKeyCompressed(derivePrivateKey(ctx.entropy, path, passphrase, ctx.backup));
+      ? ed25519PublicKey(deriveEd25519PrivateKeyFromSeed(seed, path))
+      : publicKeyCompressed(derivePrivateKeyFromSeed(seed, path));
   return encodeResponse(spec.encodePubkey(publicKey, path), SW_OK);
 }
 
@@ -156,12 +157,12 @@ async function signPayload(
   if (!ok) {
     return encodeResponse(new Uint8Array(), SW_DENY);
   }
-  const passphrase = await ctx.confirmation.getPassphrase(ctx.slotId);
+  const seed = await seedFor(ctx.confirmation, ctx.slotId, ctx.entropy, ctx.backup ?? 'bip39');
   const message = spec.hashForSign ? spec.hashForSign(pending.payload) : pending.payload;
   const signature =
     spec.curve === 'ed25519'
-      ? signEd25519(deriveEd25519PrivateKey(ctx.entropy, pending.path, passphrase, ctx.backup), message)
-      : signSecp256k1Recoverable(derivePrivateKey(ctx.entropy, pending.path, passphrase, ctx.backup), message);
+      ? signEd25519(deriveEd25519PrivateKeyFromSeed(seed, pending.path), message)
+      : signSecp256k1Recoverable(derivePrivateKeyFromSeed(seed, pending.path), message);
   return encodeResponse(signature, SW_OK);
 }
 

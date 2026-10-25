@@ -15,13 +15,23 @@ function serviceMatch(advertised: string[], model: DeviceModel): boolean {
   return advertised.some((item) => normalizeUuid(item) === want);
 }
 
+function gapLabel(advertised: string): string {
+  const name = advertised.trim();
+  const bracket = name.match(/\[([^\]]+)\]\s*$/);
+  return (bracket?.[1] ?? name).trim();
+}
+
 function nameScore(advertised: string, model: DeviceModel): number {
   const name = advertised.trim().toLowerCase();
   if (!name) {
     return 0;
   }
+  const label = gapLabel(advertised).toLowerCase();
   const expected = bleAdvertiseName(model).toLowerCase();
   const modelName = model.name.toLowerCase();
+  if (label === expected || label === modelName) {
+    return 5;
+  }
   if (name.includes(modelName) || name === expected) {
     return 4;
   }
@@ -50,10 +60,11 @@ export function pickModel(
   let best: { hit: ScanHit; model: DeviceModel; score: number } | null = null;
   for (const hit of hits) {
     for (const model of pool) {
-      if (!serviceMatch(hit.services, model)) {
+      const named = nameScore(hit.name, model);
+      if (!serviceMatch(hit.services, model) && named < 4) {
         continue;
       }
-      const score = nameScore(hit.name, model);
+      const score = serviceMatch(hit.services, model) ? named : named - 0.5;
       if (!best || score > best.score) {
         best = { hit, model, score };
       }

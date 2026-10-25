@@ -4,7 +4,15 @@ import { formatError } from './ble';
 import { LAB_ACTIONS, type LabAction, type LabDraft } from './cases';
 import { looksLikeBrave } from './gatt';
 import { LabHost } from './host';
-import { t, type CopyKey, type LabLang } from './i18n';
+import {
+  detectLabLanguage,
+  isLabLang,
+  isRtl,
+  LAB_LANGUAGES,
+  t,
+  type CopyKey,
+  type LabLang,
+} from './i18n';
 import { NEAR_FAUCET } from './rpc';
 
 const LANG_KEY = 'cws-lab-lang';
@@ -41,7 +49,13 @@ const host = new LabHost(
 );
 
 function loadLang(): LabLang {
-  return localStorage.getItem(LANG_KEY) === 'en' ? 'en' : 'zh-HK';
+  const stored = localStorage.getItem(LANG_KEY);
+  return isLabLang(stored) ? stored : detectLabLanguage(navigator.language);
+}
+
+function applyDocumentLang(): void {
+  document.documentElement.lang = lang;
+  document.documentElement.dir = isRtl(lang) ? 'rtl' : 'ltr';
 }
 
 function loadBrand(): Brand {
@@ -58,6 +72,7 @@ function loadSection(brand: Brand): CopyKey {
 function setLang(next: LabLang): void {
   lang = next;
   localStorage.setItem(LANG_KEY, next);
+  applyDocumentLang();
   render();
 }
 
@@ -127,17 +142,21 @@ function render(): void {
   const heading = document.createElement('h1');
   heading.textContent = t(lang, 'title');
   titles.append(kicker, heading);
-  const langRow = document.createElement('div');
-  langRow.className = 'row';
-  langRow.append(
-    button(t(lang, 'langEn'), () => setLang('en'), lang === 'en' ? 'primary' : undefined),
-    button(t(lang, 'langZh'), () => setLang('zh-HK'), lang === 'zh-HK' ? 'primary' : undefined),
-  );
-  top.append(titles, langRow);
-
-  const hint = document.createElement('p');
-  hint.className = 'hint';
-  hint.textContent = t(lang, 'hint');
+  const langSelect = document.createElement('select');
+  langSelect.setAttribute('aria-label', 'Language');
+  for (const item of LAB_LANGUAGES) {
+    const option = document.createElement('option');
+    option.value = item.id;
+    option.textContent = item.label;
+    option.selected = item.id === lang;
+    langSelect.append(option);
+  }
+  langSelect.addEventListener('change', () => {
+    if (isLabLang(langSelect.value)) {
+      setLang(langSelect.value);
+    }
+  });
+  top.append(titles, langSelect);
 
   const brands = document.createElement('div');
   brands.className = 'brand-bar';
@@ -224,7 +243,7 @@ function render(): void {
   log.id = 'log';
   logDock.append(logHead, log);
 
-  shell.append(top, hint, brands, actions, status, tabs, catalog);
+  shell.append(top, brands, actions, status, tabs, catalog);
   app.append(shell, logDock);
   renderLog();
 
@@ -239,16 +258,9 @@ function render(): void {
 function actionRow(action: LabAction): HTMLElement {
   const row = document.createElement('div');
   row.className = 'action';
-  const btn = button(lang === 'zh-HK' ? action.zh : action.en, () => void onAction(action.id));
+  const btn = button(action.en, () => void onAction(action.id));
   btn.disabled = busy || !host.connected;
   row.append(btn);
-  const note = lang === 'zh-HK' ? action.noteZh : action.noteEn;
-  if (note) {
-    const meta = document.createElement('p');
-    meta.className = 'meta';
-    meta.textContent = note;
-    row.append(meta);
-  }
   return row;
 }
 
@@ -280,7 +292,7 @@ function editorModal(action: LabAction, draft: LabDraft): HTMLElement {
   row.className = 'row';
   row.append(
     button(t(lang, 'run'), () => void runAction(action, draft), 'primary'),
-    button(lang === 'zh-HK' ? '關閉' : 'Close', () => {
+    button(t(lang, 'close'), () => {
       editor = null;
       render();
     }),
@@ -451,4 +463,5 @@ function friendlyError(error: unknown): string {
   return message;
 }
 
+applyDocumentLang();
 render();

@@ -10,7 +10,7 @@ import {
   SW_WRONG_LENGTH,
   type Apdu,
 } from '../apdu';
-import { deriveEd25519PrivateKey, ed25519PublicKey, signEd25519 } from '../crypto';
+import { deriveEd25519PrivateKeyFromSeed, ed25519PublicKey, seedFor, signEd25519 } from '../crypto';
 
 /** NEAR Ledger default: m/44'/397'/0'/0'/1' — five hardened components, no length prefix. */
 const NEAR_PATH_BYTES = 20;
@@ -137,14 +137,14 @@ async function handleSign(apdu: Apdu, ctx: NearContext): Promise<Uint8Array> {
   if (!ok) {
     return encodeResponse(new Uint8Array(), SW_DENY);
   }
-  const passphrase = await ctx.confirmation.getPassphrase(ctx.slotId);
-  const secret = deriveEd25519PrivateKey(ctx.entropy, pending.path, passphrase, ctx.backup);
+  const seed = await seedFor(ctx.confirmation, ctx.slotId, ctx.entropy, ctx.backup ?? 'bip39');
+  const secret = deriveEd25519PrivateKeyFromSeed(seed, pending.path);
   return encodeResponse(signEd25519(secret, pending.payload), SW_OK);
 }
 
 async function publicKeyAt(ctx: NearContext, path: string): Promise<Uint8Array> {
-  const passphrase = await ctx.confirmation.getPassphrase(ctx.slotId);
-  const secret = deriveEd25519PrivateKey(ctx.entropy, path, passphrase, ctx.backup);
+  const seed = await seedFor(ctx.confirmation, ctx.slotId, ctx.entropy, ctx.backup ?? 'bip39');
+  const secret = deriveEd25519PrivateKeyFromSeed(seed, path);
   return ed25519PublicKey(secret);
 }
 

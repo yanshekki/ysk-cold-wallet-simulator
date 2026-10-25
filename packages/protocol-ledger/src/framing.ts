@@ -43,7 +43,10 @@ export class BleReassembler {
       this.expected = readU16BE(packet, 3);
       this.buffer = Uint8Array.from(packet.subarray(5));
     } else {
-      if (this.seq < 0 || seq !== this.seq + 1 || tag !== this.tag) {
+      if (this.seq < 0) {
+        return null;
+      }
+      if (seq !== this.seq + 1 || tag !== this.tag) {
         this.reset();
         throw new Error('BLE sequence mismatch');
       }

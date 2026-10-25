@@ -1,7 +1,7 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { Screen, colors, fonts, hairline, space } from '@cws/ui';
+import { StyleSheet, Text } from 'react-native';
+import { Screen, colors, fonts } from '@cws/ui';
 import { useT } from '../src/i18n';
 import { ScanButton } from '../src/lab/ScanButton';
 import { describeUnlock, type UnlockStatus } from '../src/passkeys';
@@ -53,20 +53,17 @@ export default function UnlockScreen() {
     <Screen
       kicker={null}
       title={t('unlock.title')}
-      subtitle={status?.message ?? t('unlock.fallback')}
+      subtitle={status ? t(status.message) : t('unlock.fallback')}
     >
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <ScanButton
         label={t('unlock.button')}
+        busyLabel={t('common.unlocking')}
         disabled={unlockDisabled}
         busy={busy}
         onPress={() => void onUnlock()}
       />
-      {unlockDisabled ? (
-        <Text style={styles.hint}>{t('unlock.enroll')}</Text>
-      ) : null}
-      <View style={styles.rule} />
-      <Text style={styles.meta}>{t('unlock.meta')}</Text>
+      {unlockDisabled ? <Text style={styles.hint}>{t('unlock.enroll')}</Text> : null}
     </Screen>
   );
 }
@@ -80,16 +77,5 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontFamily: fonts.sans,
     lineHeight: 20,
-  },
-  rule: {
-    height: hairline,
-    backgroundColor: colors.border,
-    marginTop: space.sm,
-  },
-  meta: {
-    color: colors.muted,
-    fontFamily: fonts.mono,
-    fontSize: 11,
-    letterSpacing: 0.6,
   },
 });

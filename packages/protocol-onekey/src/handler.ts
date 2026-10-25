@@ -18,24 +18,30 @@ import { bytesToHex, concatBytes, encodeUtf8 } from './bytes';
 import {
   attachPartialSig,
   bip143Sighash,
-  deriveEd25519PrivateKey,
+  deriveEd25519PrivateKeyFromSeed,
   deriveIcarus,
+  deriveIcarusFromRoot,
+  derivePrivateKeyFromSeed,
   ed25519PublicKey,
   encodeDerSignature,
+  icarusRootFor,
   parsePsbt,
   p2wpkhScriptCode,
   publicKeyCompressed,
+  replaceSeedCache,
+  seedFor,
   signEd25519,
   signIcarus,
   signSecp256k1Recoverable,
+  wrapSeedPort,
+  type SeedCache,
 } from '@cws/protocol-ledger';
 import { ripemd160 } from '@noble/hashes/ripemd160';
 import { sha256 } from '@noble/hashes/sha2';
 import { COIN_BY_REQUEST, icarusAddress, type CoinOp } from './coins';
 import {
   bitcoinP2pkhAddress,
-  deriveHdKey,
-  derivePrivateKey,
+  deriveHdKeyFromSeed,
   ethereumAddressFromPrivateKey,
   pathToString,
   signEip1559Tx,
@@ -281,6 +287,7 @@ export class OneKeyV1ProtocolHandler implements ProtocolHandler {
   private readonly serial: string;
   private pending: PendingAction | undefined;
   private v2TxSeq = 1;
+  private readonly seedCache: SeedCache = {};
 
   constructor(options: OneKeyHandlerOptions) {
     this.model = options.model;
@@ -304,6 +311,22 @@ export class OneKeyV1ProtocolHandler implements ProtocolHandler {
       notify: this.model.notifyCharUUID,
       writeCmd: this.model.writeCmdCharUUID,
     };
+  }
+
+  replaceSeed(seed: Uint8Array, icarusRoot?: Uint8Array): void {
+    replaceSeedCache(this.seedCache, seed, icarusRoot);
+  }
+
+  private port(): ConfirmationPort {
+    return wrapSeedPort(this.confirmation, this.seedCache);
+  }
+
+  private async signingSeed(): Promise<Uint8Array> {
+    return seedFor(this.port(), this.slotId, this.entropy, this.backup);
+  }
+
+  private async signingIcarusRoot(): Promise<Uint8Array | undefined> {
+    return icarusRootFor(this.port(), this.slotId, this.entropy, this.backup);
   }
 
   observeIncomingSize(size: number): void {
@@ -824,8 +847,7 @@ export class OneKeyV1ProtocolHandler implements ProtocolHandler {
   }
 
   private async ethPublicKeyReply(path: string, replyType: number): Promise<EncodedMessage> {
-    const passphrase = await this.confirmation.getPassphrase(this.slotId);
-    const node = deriveHdKey(this.entropy, path, passphrase, this.backup);
+    const node = deriveHdKeyFromSeed(await this.signingSeed(), path);
     if (!node.publicKey || !node.chainCode) {
       return this.message(
         MessageType.Failure,
@@ -846,8 +868,7 @@ export class OneKeyV1ProtocolHandler implements ProtocolHandler {
   }
 
   private async ethAddressReply(path: string, replyType: number): Promise<EncodedMessage> {
-    const passphrase = await this.confirmation.getPassphrase(this.slotId);
-    const privateKey = derivePrivateKey(this.entropy, path, passphrase, this.backup);
+    const privateKey = derivePrivateKeyFromSeed(await this.signingSeed(), path);
     const address = ethereumAddressFromPrivateKey(privateKey);
     return this.message(replyType, encodeEthereumAddress(address));
   }
@@ -857,8 +878,7 @@ export class OneKeyV1ProtocolHandler implements ProtocolHandler {
     message: Uint8Array,
     replyType: number,
   ): Promise<EncodedMessage> {
-    const passphrase = await this.confirmation.getPassphrase(this.slotId);
-    const privateKey = derivePrivateKey(this.entropy, path, passphrase, this.backup);
+    const privateKey = derivePrivateKeyFromSeed(await this.signingSeed(), path);
     const address = ethereumAddressFromPrivateKey(privateKey);
     const signature = signPersonalMessage(privateKey, message);
     return this.message(replyType, encodeEthereumMessageSignature(signature, address));
@@ -868,23 +888,20 @@ export class OneKeyV1ProtocolHandler implements ProtocolHandler {
     path: string,
     tx: ReturnType<typeof decodeEthereumSignTx>,
   ): Promise<EncodedMessage> {
-    const passphrase = await this.confirmation.getPassphrase(this.slotId);
-    const privateKey = derivePrivateKey(this.entropy, path, passphrase, this.backup);
+    const privateKey = derivePrivateKeyFromSeed(await this.signingSeed(), path);
     const signature = signLegacyTx(privateKey, tx);
     return this.message(MessageType.EthereumTxRequest, encodeEthereumTxRequest(signature));
   }
 
   private async bitcoinAddressReply(path: string, coinName: string): Promise<EncodedMessage> {
-    const passphrase = await this.confirmation.getPassphrase(this.slotId);
-    const privateKey = derivePrivateKey(this.entropy, path, passphrase, this.backup);
+    const privateKey = derivePrivateKeyFromSeed(await this.signingSeed(), path);
     const testnet = /testnet|regtest/i.test(coinName);
     const address = bitcoinP2pkhAddress(privateKey, testnet);
     return this.message(MessageType.Address, encodeBitcoinAddress(address));
   }
 
   private async bitcoinPublicKeyReply(path: string): Promise<EncodedMessage> {
-    const passphrase = await this.confirmation.getPassphrase(this.slotId);
-    const node = deriveHdKey(this.entropy, path, passphrase, this.backup);
+    const node = deriveHdKeyFromSeed(await this.signingSeed(), path);
     if (!node.publicKey || !node.chainCode) {
       return this.message(MessageType.Failure, encodeFailure(FailureType.ProcessError, 'Missing HD node'));
     }
@@ -902,8 +919,7 @@ export class OneKeyV1ProtocolHandler implements ProtocolHandler {
   }
 
   private async bitcoinSignMessageReply(path: string, message: Uint8Array): Promise<EncodedMessage> {
-    const passphrase = await this.confirmation.getPassphrase(this.slotId);
-    const privateKey = derivePrivateKey(this.entropy, path, passphrase, this.backup);
+    const privateKey = derivePrivateKeyFromSeed(await this.signingSeed(), path);
     const prefix = encodeUtf8('\x18Bitcoin Signed Message:\n');
     const compact = message.length < 0xfd ? Uint8Array.of(message.length) : concatBytes(Uint8Array.of(0xfd, message.length & 0xff, message.length >> 8));
     const hash = sha256(sha256(concatBytes(prefix, compact, message)));
@@ -923,8 +939,7 @@ export class OneKeyV1ProtocolHandler implements ProtocolHandler {
     if (!first) {
       return this.message(MessageType.Failure, encodeFailure(FailureType.DataError, 'PSBT has no inputs'));
     }
-    const passphrase = await this.confirmation.getPassphrase(this.slotId);
-    const privateKey = derivePrivateKey(this.entropy, path, passphrase, this.backup);
+    const privateKey = derivePrivateKeyFromSeed(await this.signingSeed(), path);
     const pub = publicKeyCompressed(privateKey);
     const amount = parsed.inputMaps[0]?.witnessUtxo?.amount ?? 0n;
     const hash = bip143Sighash({
@@ -952,8 +967,7 @@ export class OneKeyV1ProtocolHandler implements ProtocolHandler {
   }
 
   private async ethTx1559Reply(path: string, tx: EthereumSignTxEip1559Msg): Promise<EncodedMessage> {
-    const passphrase = await this.confirmation.getPassphrase(this.slotId);
-    const privateKey = derivePrivateKey(this.entropy, path, passphrase, this.backup);
+    const privateKey = derivePrivateKeyFromSeed(await this.signingSeed(), path);
     const signature = signEip1559Tx(privateKey, tx);
     return this.message(MessageType.EthereumTxRequest, encodeEthereumTxRequest(signature));
   }
@@ -964,36 +978,42 @@ export class OneKeyV1ProtocolHandler implements ProtocolHandler {
     structHash: Uint8Array,
     replyType: number,
   ): Promise<EncodedMessage> {
-    const passphrase = await this.confirmation.getPassphrase(this.slotId);
-    const privateKey = derivePrivateKey(this.entropy, path, passphrase, this.backup);
+    const privateKey = derivePrivateKeyFromSeed(await this.signingSeed(), path);
     const address = ethereumAddressFromPrivateKey(privateKey);
     const signature = signTypedHash(privateKey, domain, structHash);
     return this.message(replyType, encodeTypedDataSignature(signature, address));
   }
 
   private async coinReply(op: CoinOp, path: string, payload: Uint8Array): Promise<EncodedMessage> {
-    const passphrase = await this.confirmation.getPassphrase(this.slotId);
+    const seed = await this.signingSeed();
+    const icarusRoot = await this.signingIcarusRoot();
     if (op.kind === 'address') {
       if (op.curve === 'icarus') {
-        return this.message(op.reply, encodeStringAddress(icarusAddress(this.entropy, path, passphrase, this.backup)));
+        return this.message(
+          op.reply,
+          encodeStringAddress(icarusAddress(this.entropy, path, undefined, this.backup, icarusRoot)),
+        );
       }
       if (op.curve === 'ed25519') {
-        const pub = ed25519PublicKey(deriveEd25519PrivateKey(this.entropy, path, passphrase, this.backup));
+        const pub = ed25519PublicKey(deriveEd25519PrivateKeyFromSeed(seed, path));
         return this.message(op.reply, encodeStringAddress(op.addressOf?.(pub) ?? bytesToHex(pub)));
       }
-      const pub = publicKeyCompressed(derivePrivateKey(this.entropy, path, passphrase, this.backup));
+      const pub = publicKeyCompressed(derivePrivateKeyFromSeed(seed, path));
       return this.message(op.reply, encodeStringAddress(op.addressOf?.(pub) ?? bytesToHex(pub)));
     }
     if (op.curve === 'ed25519') {
-      const sig = signEd25519(deriveEd25519PrivateKey(this.entropy, path, passphrase, this.backup), payload);
+      const sig = signEd25519(deriveEd25519PrivateKeyFromSeed(seed, path), payload);
       return this.message(op.reply, encodeBytesSignature(sig));
     }
     if (op.curve === 'icarus') {
-      const sig = signIcarus(deriveIcarus(this.entropy, path, passphrase, this.backup), payload);
+      const node = icarusRoot
+        ? deriveIcarusFromRoot(icarusRoot, path)
+        : deriveIcarus(this.entropy, path, undefined, this.backup);
+      const sig = signIcarus(node, payload);
       return this.message(op.reply, encodeBytesSignature(sig));
     }
     const hash = payload.length === 32 ? payload : sha256(payload);
-    const sig = signSecp256k1Recoverable(derivePrivateKey(this.entropy, path, passphrase, this.backup), hash);
+    const sig = signSecp256k1Recoverable(derivePrivateKeyFromSeed(seed, path), hash);
     return this.message(op.reply, encodeBytesSignature(sig));
   }
 

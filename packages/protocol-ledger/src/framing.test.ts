@@ -52,6 +52,11 @@ describe('Ledger BLE framing', () => {
     expect(framed[0]).toBe(TAG_ERROR);
   });
 
+  it('ignores a stray continuation when idle', () => {
+    const assembler = new BleReassembler();
+    expect(assembler.push(Uint8Array.of(0x05, 0x00, 0x01, 0x90, 0x00))).toBeNull();
+  });
+
   it('rejects broken sequence numbers', () => {
     const assembler = new BleReassembler();
     const first = framePayload(TAG_APDU, new Uint8Array(30), DEFAULT_MTU);

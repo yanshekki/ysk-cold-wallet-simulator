@@ -36,7 +36,7 @@ export function AddressInspector({
   copyPathLabel = 'path',
   copyIcon,
   createIcon,
-  passphrasePlaceholder = 'Optional passphrase (not stored)',
+  passphrasePlaceholder = 'Passphrase',
   showCreateNear = false,
   onCreateNear,
 }: Props) {
@@ -77,7 +77,7 @@ export function AddressInspector({
                 {nearCreate ? (
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel="Create NEAR account"
+                    accessibilityLabel="Derive NEAR account"
                     onPress={onCreateNear}
                     hitSlop={8}
                     style={styles.iconHit}

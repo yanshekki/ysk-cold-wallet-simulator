@@ -55,6 +55,18 @@ h1 {
   font-weight: 600;
 }
 
+select {
+  min-height: 36px;
+  max-width: 220px;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  background: var(--elevated);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 13px;
+  padding: 0 8px;
+}
+
 .kicker {
   color: var(--muted);
   font-family: var(--mono);

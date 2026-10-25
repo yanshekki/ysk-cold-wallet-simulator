@@ -32,11 +32,11 @@ describe('slide-to-confirm math', () => {
   });
 
   it('labels the bar from kind', () => {
-    expect(signingSlideLabel('sign')).toBe('Slide to sign');
-    expect(signingSlideLabel('verify')).toBe('Slide to verify');
-    expect(signingSlideLabel('address')).toBe('Slide to export');
-    expect(signingSlideLabel('allow-manager')).toBe('Slide to allow');
-    expect(signingSlideLabel('open-app')).toBe('Slide to open');
-    expect(signingSlideLabel('pairing')).toBe('Slide to pair');
+    expect(signingSlideLabel('sign')).toBe('signing.slideSign');
+    expect(signingSlideLabel('verify')).toBe('signing.slideVerify');
+    expect(signingSlideLabel('address')).toBe('signing.slideExport');
+    expect(signingSlideLabel('allow-manager')).toBe('signing.slideAllow');
+    expect(signingSlideLabel('open-app')).toBe('signing.slideOpen');
+    expect(signingSlideLabel('pairing')).toBe('signing.slidePair');
   });
 });

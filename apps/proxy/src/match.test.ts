@@ -41,6 +41,28 @@ describe('pickModel', () => {
     expect(picked?.model.id).toBe('safe-7');
   });
 
+  it('matches a GAP name when the advertisement omits service UUIDs', () => {
+    const picked = pickModel([
+      {
+        id: 'ee',
+        name: 'Shek Ki的iPhone [Nano X]',
+        services: [],
+      },
+    ]);
+    expect(picked?.model.id).toBe('nano-x');
+  });
+
+  it('ignores unnamed devices with empty service lists', () => {
+    const picked = pickModel([
+      {
+        id: 'ff',
+        name: 'Shek Ki的iPhone',
+        services: [],
+      },
+    ]);
+    expect(picked).toBeNull();
+  });
+
   it('filters by --model', () => {
     const picked = pickModel(
       [

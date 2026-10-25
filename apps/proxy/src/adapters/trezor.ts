@@ -35,6 +35,7 @@ export function attachTrezor(hid: HidPort, thp: ThpClient, log: LogFn): AdapterH
   });
   return {
     close() {
+      queue.abort();
       offHid();
       log(`trezor reports hid=${hidCount}`);
     },

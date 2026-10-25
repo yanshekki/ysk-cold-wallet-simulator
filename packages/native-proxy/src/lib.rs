@@ -75,6 +75,11 @@ pub struct BleDevice {
 #[napi]
 impl BleDevice {
   #[napi]
+  pub fn debug_info(&self) -> String {
+    self.inner.debug_info()
+  }
+
+  #[napi]
   pub async fn write(&self, data: Buffer) -> Result<()> {
     self.inner.write(data.as_ref()).await
   }

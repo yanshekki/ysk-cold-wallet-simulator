@@ -8,6 +8,7 @@
   },
   "scripts": {
     "start": "tsx src/main.ts",
+    "app": "DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project macos/CWSProxy/CWSProxy.xcodeproj -scheme 'CWS Proxy' -configuration Debug -destination 'generic/platform=macOS' -derivedDataPath macos/CWSProxy/DerivedData ARCHS=arm64 ONLY_ACTIVE_ARCH=YES ENABLE_DEBUG_DYLIB=NO ENABLE_PREVIEWS=NO CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY='Apple Development: Shek Ki Yan (G8P899XYGC)' DEVELOPMENT_TEAM=K897VVZW77 PROVISIONING_PROFILE_SPECIFIER='CWS Proxy Dev'",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run"
   },
@@ -21,6 +22,7 @@
   "devDependencies": {
     "@scure/bip39": "^1.6.0",
     "@types/node": "^24.7.2",
+    "esbuild": "^0.25.11",
     "tsx": "^4.20.6",
     "typescript": "~5.9.2",
     "vitest": "^3.2.4"

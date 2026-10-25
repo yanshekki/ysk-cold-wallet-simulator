@@ -12,10 +12,11 @@ export default function SettingsLayout() {
       <Stack.Screen name="index" />
       <Stack.Screen name="language" />
       <Stack.Screen name="security" />
-      <Stack.Screen name="accounts" />
       <Stack.Screen name="catalog" />
       <Stack.Screen name="paths" />
       <Stack.Screen name="data" />
+      <Stack.Screen name="disclaimer" />
+      <Stack.Screen name="privacy" />
     </Stack>
   );
 }

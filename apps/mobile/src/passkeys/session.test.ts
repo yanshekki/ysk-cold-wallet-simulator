@@ -115,13 +115,24 @@ describe('passkeys session', () => {
 
   it('sends a locked Device tab to /unlock because (app) shares the / URL', async () => {
     const { sessionRedirect } = await import('./session');
-    expect(sessionRedirect(false, '(app)')).toBe('/unlock');
-    expect(sessionRedirect(false, 'seeds')).toBe('/unlock');
-    expect(sessionRedirect(false, undefined)).toBe('/unlock');
-    expect(sessionRedirect(false, 'unlock')).toBeNull();
-    expect(sessionRedirect(true, 'unlock')).toBe('/(app)');
-    expect(sessionRedirect(true, undefined)).toBe('/(app)');
-    expect(sessionRedirect(true, '(app)')).toBeNull();
-    expect(sessionRedirect(true, 'seeds')).toBeNull();
+    expect(sessionRedirect(false, '(app)', true)).toBe('/unlock');
+    expect(sessionRedirect(false, 'seeds', true)).toBe('/unlock');
+    expect(sessionRedirect(false, undefined, true)).toBe('/unlock');
+    expect(sessionRedirect(false, 'unlock', true)).toBeNull();
+    expect(sessionRedirect(true, 'unlock', true)).toBe('/(app)');
+    expect(sessionRedirect(true, undefined, true)).toBe('/(app)');
+    expect(sessionRedirect(true, '(app)', true)).toBeNull();
+    expect(sessionRedirect(true, 'seeds', true)).toBeNull();
+  });
+
+  it('blocks every route until the disclaimer is accepted', async () => {
+    const { sessionRedirect } = await import('./session');
+    expect(sessionRedirect(false, undefined, false)).toBe('/disclaimer');
+    expect(sessionRedirect(false, 'unlock', false)).toBe('/disclaimer');
+    expect(sessionRedirect(true, '(app)', false)).toBe('/disclaimer');
+    expect(sessionRedirect(true, 'seeds', false)).toBe('/disclaimer');
+    expect(sessionRedirect(false, 'disclaimer', false)).toBeNull();
+    expect(sessionRedirect(false, 'disclaimer', true)).toBe('/unlock');
+    expect(sessionRedirect(true, 'disclaimer', true)).toBe('/(app)');
   });
 });

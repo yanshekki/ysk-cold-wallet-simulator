@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { Brand, DeviceModel, LedgerApp } from '@cws/contracts';
 import {
   ALL_MODELS,
@@ -38,7 +38,6 @@ export default function DeviceScreen() {
     connected,
     currentApp,
     error,
-    catalog,
     selectModel,
     startSimulation,
     stopSimulation,
@@ -46,6 +45,7 @@ export default function DeviceScreen() {
     showToast,
     hydrated,
     sessionPassphraseApplied,
+    passphraseFingerprint,
     applySessionPassphrase,
     clearSessionPassphrase,
   } = useAppState();
@@ -67,7 +67,7 @@ export default function DeviceScreen() {
 
   const isLedger = model?.protocol === 'ledger-apdu';
   const canStart = !!seed && !!model && isSimulatable(model) && !advertising;
-  const pickerApps = catalog.length ? ['dashboard', ...catalog.map((app) => app.id)] : ledgerPickerApps();
+  const pickerApps = ledgerPickerApps();
 
   const onSelect = (next: DeviceModel) => {
     if (!isSimulatable(next)) {
@@ -92,7 +92,7 @@ export default function DeviceScreen() {
     try {
       await startSimulation();
     } catch (err) {
-      setLocalError(err instanceof Error ? err.message : 'failed to advertise');
+      setLocalError(err instanceof Error ? t(err.message) : t('errors.advertiseFailed'));
     } finally {
       setBusy(false);
     }
@@ -100,7 +100,7 @@ export default function DeviceScreen() {
 
   if (!hydrated) {
     return (
-      <Screen kicker={t('device.kicker')} title={model?.name ?? 'CWS'} subtitle={t('device.subtitle')} edges={[]}>
+      <Screen kicker={t('device.kicker')} title={model?.name ?? 'CWS'} edges={[]}>
         <View style={styles.loading}>
           <ActivityIndicator color={colors.ok} />
           <Text style={styles.hint}>{t('common.loading')}</Text>
@@ -117,10 +117,12 @@ export default function DeviceScreen() {
     setPassSheet(false);
   };
 
-  const onApplyPassphrase = () => {
-    applySessionPassphrase(passDraft);
-    setPassDraft('');
-    setPassSheet(false);
+  const onApplyPassphrase = async () => {
+    const ok = await applySessionPassphrase(passDraft);
+    if (ok) {
+      setPassDraft('');
+      setPassSheet(false);
+    }
   };
 
   const onClearPassphrase = () => {
@@ -136,7 +138,7 @@ export default function DeviceScreen() {
 
   return (
     <>
-    <Screen kicker={t('device.kicker')} title={model?.name ?? 'CWS'} subtitle={t('device.subtitle')} edges={[]}>
+    <Screen kicker={t('device.kicker')} title={model?.name ?? 'CWS'} edges={[]}>
       {BRANDS.map((brand) => (
         <View key={brand} style={styles.group}>
           <Text style={styles.groupLabel}>{BRAND_LABEL[brand]}</Text>
@@ -202,7 +204,11 @@ export default function DeviceScreen() {
                           sessionPassphraseApplied ? (
                             <Button
                               testID="device-passphrase-applied"
-                              label={t('device.passphraseApplied')}
+                              label={
+                                passphraseFingerprint
+                                  ? t('device.fingerprint', { hex: passphraseFingerprint })
+                                  : t('device.passphraseApplied')
+                              }
                               variant="ghost"
                               onPress={onClearPassphrase}
                             />
@@ -225,13 +231,6 @@ export default function DeviceScreen() {
                         onPress={() => void onStart()}
                       />
                     )}
-                    <Text style={styles.radioHint}>
-                      {Platform.OS === 'ios'
-                        ? 'iOS must stay in the foreground while advertising.'
-                        : Platform.OS === 'android'
-                          ? 'Android keeps advertising with a persistent notification.'
-                          : 'BLE advertising needs a physical Android or iOS device.'}
-                    </Text>
                     {error || localError ? <Text style={styles.error}>{localError ?? error}</Text> : null}
                   </View>
                 ) : null}
@@ -309,12 +308,6 @@ const styles = StyleSheet.create({
     color: colors.ok,
     fontFamily: fonts.monoMedium,
     fontSize: 12,
-  },
-  radioHint: {
-    color: colors.muted,
-    fontFamily: fonts.sans,
-    fontSize: 12,
-    lineHeight: 18,
   },
   error: {
     color: colors.danger,

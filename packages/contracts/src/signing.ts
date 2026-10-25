@@ -26,17 +26,17 @@ export function signingNeedsPassphrase(kind: SigningKind): boolean {
 export function signingSlideLabel(kind: SigningKind): string {
   switch (kind) {
     case 'address':
-      return 'Slide to export';
+      return 'signing.slideExport';
     case 'verify':
-      return 'Slide to verify';
+      return 'signing.slideVerify';
     case 'allow-manager':
-      return 'Slide to allow';
+      return 'signing.slideAllow';
     case 'pairing':
-      return 'Slide to pair';
+      return 'signing.slidePair';
     case 'open-app':
-      return 'Slide to open';
+      return 'signing.slideOpen';
     default:
-      return 'Slide to sign';
+      return 'signing.slideSign';
   }
 }
 

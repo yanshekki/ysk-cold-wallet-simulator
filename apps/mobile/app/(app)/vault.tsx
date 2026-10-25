@@ -26,7 +26,7 @@ import { copyText } from '../../src/lab/copy';
 import { useT } from '../../src/i18n';
 import { unlock as requestUnlock } from '../../src/passkeys';
 import { useSecretScreen } from '../../src/seeds/screenGuard';
-import { deleteSlot, listSlots, loadEntropy } from '../../src/seeds/vault';
+import { deleteSlot, listSlots, loadEntropy, loadShares } from '../../src/seeds/vault';
 import { useAppState } from '../../src/state/AppState';
 
 function inspectKey(slot: SeedSlot): string {
@@ -41,6 +41,7 @@ export default function VaultScreen() {
   const [rows, setRows] = useState<InspectRow[]>([]);
   const [deriveError, setDeriveError] = useState<string | null>(null);
   const [backupWords, setBackupWords] = useState<string | null>(null);
+  const [backupShares, setBackupShares] = useState<string[] | null>(null);
   const [accountsSlot, setAccountsSlot] = useState<SeedSlot | null>(null);
   const [slotsReady, setSlotsReady] = useState(false);
   const cache = useRef(new Map<string, InspectRow[]>());
@@ -129,6 +130,7 @@ export default function VaultScreen() {
 
   const closePhrase = () => {
     setBackupWords(null);
+    setBackupShares(null);
   };
 
   const closeAccounts = () => {
@@ -165,15 +167,20 @@ export default function VaultScreen() {
 
   const onBackup = async (slot: SeedSlot) => {
     selectSeed(slot);
-    if (slot.backup === 'slip39') {
-      Alert.alert(t('vault.backup'), t('vault.backupSlip39'));
-      return;
-    }
-    const ok = await requestUnlock();
+    const ok = await requestUnlock(t('unlock.prompt'));
     if (!ok) {
       return;
     }
     try {
+      if (slot.backup === 'slip39') {
+        const stored = await runWithLoading(t('common.loading'), () => loadShares(slot.id));
+        if (!stored || stored.length === 0) {
+          Alert.alert(t('vault.backupShares'), t('vault.backupSlip39'));
+          return;
+        }
+        setBackupShares(stored);
+        return;
+      }
       await runWithLoading(t('common.loading'), async () => {
         const entropy = await loadEntropy(slot.id);
         setBackupWords(mnemonicFromEntropy(entropy));
@@ -189,7 +196,7 @@ export default function VaultScreen() {
   };
 
   const onCreateNear = (slot: SeedSlot) => {
-    void runWithLoading(t('common.loading'), () => refreshNear(slot, true))
+    void runWithLoading(t('common.loading'), () => refreshNear(slot))
       .then(async (updated) => {
         setAccountsSlot(updated);
         await refresh();
@@ -202,9 +209,9 @@ export default function VaultScreen() {
 
   return (
     <>
-    <Screen kicker={t('vault.kicker')} title={t('vault.title')} subtitle={t('vault.subtitle')} edges={[]}>
-      <Button label={t('vault.generate')} onPress={() => router.push('/seeds/new')} />
-      <Button label={t('vault.import')} variant="ghost" onPress={() => router.push('/seeds/import')} />
+    <Screen kicker={t('vault.kicker')} title={t('vault.title')} edges={[]}>
+      <Button testID="vault-generate" label={t('vault.generate')} onPress={() => router.push('/seeds/new')} />
+      <Button testID="vault-import" label={t('vault.import')} variant="ghost" onPress={() => router.push('/seeds/import')} />
       {!slotsReady ? <Text style={styles.empty}>{t('common.loading')}</Text> : null}
       {slotsReady && slots.length === 0 ? <Text style={styles.empty}>{t('vault.empty')}</Text> : null}
       {deriveError ? <Text style={styles.error}>{deriveError}</Text> : null}
@@ -222,8 +229,8 @@ export default function VaultScreen() {
         >
           <View style={styles.actions}>
             <Button
-              testID={`vault-phrase-${slot.id}`}
-              label={t('vault.backup')}
+              testID={slot.backup === 'slip39' ? `vault-shares-${slot.id}` : `vault-phrase-${slot.id}`}
+              label={slot.backup === 'slip39' ? t('vault.backupShares') : t('vault.backup')}
               variant="ghost"
               onPress={() => void onBackup(slot)}
             />
@@ -262,6 +269,34 @@ export default function VaultScreen() {
             }}
           />
         ) : null}
+      </Sheet>
+
+      <Sheet
+        visible={!!backupShares}
+        title={t('vault.backupShares')}
+        onClose={closePhrase}
+        closeLabel={t('common.close')}
+        closeIcon={closeIcon}
+        testID="vault-shares-sheet"
+      >
+        {backupShares?.map((share, index) => (
+          <View key={`${index}-${share.slice(0, 12)}`} style={styles.shareBlock}>
+            <Text style={styles.shareTitle}>{t('import.shareN', { n: index + 1 })}</Text>
+            <MnemonicGrid
+              phrase={share}
+              onCopy={(value) => {
+                void copyText(value).then(() => showToast(t('common.copied')));
+              }}
+              labels={{
+                copy: t('vault.copyShare'),
+                copyTitle: t('vault.copyShareTitle'),
+                copyBody: t('vault.copyShareBody'),
+                confirm: t('common.confirm'),
+                cancel: t('common.cancel'),
+              }}
+            />
+          </View>
+        ))}
       </Sheet>
 
       <Sheet
@@ -304,6 +339,16 @@ const styles = StyleSheet.create({
   },
   actions: {
     gap: space.sm,
+  },
+  shareBlock: {
+    gap: space.sm,
+  },
+  shareTitle: {
+    color: colors.muted,
+    fontFamily: fonts.monoMedium,
+    fontSize: 10,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
   },
   tabInset: {
     height: 180,

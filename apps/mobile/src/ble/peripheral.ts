@@ -79,7 +79,7 @@ function configureServices(ble: BleModule, model: DeviceModel): void {
   if (model.writeCmdCharUUID) {
     chars.push({
       uuid: model.writeCmdCharUUID,
-      properties: ['writeWithoutResponse'],
+      properties: ['write', 'writeWithoutResponse'],
       permissions: writePermissions,
       value: '00',
     });
@@ -153,6 +153,8 @@ export async function startAdvertising(
   }
 
   const subscriptions: Subscription[] = [];
+  let lastWriteHex = '';
+  let lastWriteAt = 0;
 
   subscriptions.push(ble.addEventListener('adapterStateChanged', () => undefined));
   subscriptions.push(ble.addEventListener('backgroundSessionStarted', () => undefined));
@@ -179,43 +181,54 @@ export async function startAdvertising(
     }),
   );
 
+  let writeTail = Promise.resolve();
   subscriptions.push(
-    ble.addEventListener('peripheralWriteRequest', async (event) => {
+    ble.addEventListener('peripheralWriteRequest', (event) => {
       if (event.responseRequired && event.requestId) {
-        try {
-          await ble.respondToPeripheralWriteRequest(event.requestId, true);
-        } catch {
-          // Write-without-response has nothing to ack.
-        }
+        void ble.respondToPeripheralWriteRequest(event.requestId, true).catch(() => undefined);
       }
-      if (!event.value) {
-        return;
-      }
-      callbacks.onConnected(event.centralId ?? 'host');
-      try {
-        const incoming = hexToBytes(event.value);
-        callbacks.onLog('in', bytesToHex(incoming), 'GATT write');
-        const outgoing = await handler.handleWrite(incoming);
-        if (!outgoing || outgoing.length === 0) {
-          return;
-        }
-        const packets = splitNotify(model, outgoing, notifyMtu(model, incoming.length));
-        for (let index = 0; index < packets.length; index += 1) {
-          const packet = packets[index];
-          const hex = bytesToHex(packet);
-          callbacks.onLog('out', hex, 'GATT notify');
-          await ble.updateCharacteristicValue(model.serviceUUID, model.notifyCharUUID, hex, true);
-          if (index < packets.length - 1) {
-            await delay(NOTIFY_GAP_MS);
+      writeTail = writeTail
+        .then(async () => {
+          if (!event.value) {
+            return;
           }
-        }
-      } catch (error) {
-        callbacks.onLog(
-          'out',
-          '',
-          error instanceof Error ? error.message : 'write handling failed',
-        );
-      }
+          callbacks.onConnected(event.centralId ?? 'host');
+          const incoming = hexToBytes(event.value);
+          const hex = bytesToHex(incoming);
+          const now = Date.now();
+          if (hex === lastWriteHex && now - lastWriteAt < 250) {
+            return;
+          }
+          lastWriteHex = hex;
+          lastWriteAt = now;
+          callbacks.onLog('in', hex, `GATT write ${event.characteristicUUID ?? ''}`.trim());
+          const outgoing = await handler.handleWrite(incoming);
+          if (!outgoing || outgoing.length === 0) {
+            return;
+          }
+          const packets = splitNotify(model, outgoing, notifyMtu(model, incoming.length));
+          for (let index = 0; index < packets.length; index += 1) {
+            const packet = packets[index];
+            const packetHex = bytesToHex(packet);
+            callbacks.onLog('out', packetHex, 'GATT notify');
+            await ble.updateCharacteristicValue(
+              model.serviceUUID,
+              model.notifyCharUUID,
+              packetHex,
+              true,
+            );
+            if (index < packets.length - 1) {
+              await delay(NOTIFY_GAP_MS);
+            }
+          }
+        })
+        .catch((error) => {
+          callbacks.onLog(
+            'out',
+            '',
+            error instanceof Error ? error.message : 'write handling failed',
+          );
+        });
     }),
   );
 

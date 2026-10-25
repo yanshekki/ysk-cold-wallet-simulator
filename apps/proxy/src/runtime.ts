@@ -32,12 +32,15 @@ export function createRuntime(
   let abort: AbortController | undefined;
   let loop = Promise.resolve();
   let inFlight = false;
+  let pendingStart = false;
   const nativeReady = options.nativeReady ?? true;
   const proxyLog = teeLog(log, bus);
-
-  return {
+  const runtime: ProxyRuntime = {
     start() {
       if (inFlight) {
+        pendingStart = true;
+        abort?.abort();
+        pairing?.reset();
         return;
       }
       if (!nativeReady) {
@@ -48,6 +51,7 @@ export function createRuntime(
         return;
       }
       inFlight = true;
+      pendingStart = false;
       abort = new AbortController();
       const session = abort;
       const onParent = () => session.abort();
@@ -56,6 +60,9 @@ export function createRuntime(
       loop = runProxy(io, proxyLog, session.signal, { ...options, status: bus })
         .catch((error) => {
           const message = error instanceof Error ? error.message : String(error);
+          if (message === 'aborted') {
+            return;
+          }
           bus.patch({ phase: 'error', error: message });
           proxyLog(message);
         })
@@ -65,11 +72,20 @@ export function createRuntime(
           abort = undefined;
           inFlight = false;
           bus.idle();
+          if (pendingStart) {
+            pendingStart = false;
+            runtime.start();
+          }
         });
     },
     stop() {
+      pendingStart = false;
       abort?.abort();
       pairing?.reset();
+      if (inFlight) {
+        proxyLog('stopping');
+      }
+      bus.idle();
     },
     wait() {
       return loop;
@@ -78,4 +94,5 @@ export function createRuntime(
       return inFlight;
     },
   };
+  return runtime;
 }

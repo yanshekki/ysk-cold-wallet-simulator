@@ -60,6 +60,21 @@ describe('proxy ui http', () => {
     expect(page.status).toBe(200);
     expect(html).toContain('CWS Proxy');
     expect(html).toContain('id="start"');
+    expect(html).toContain('id="stop"');
+    expect(html).toContain('id="tab-console"');
+    expect(html).toContain('id="logs"');
+
+    const script = await fetch(`${server.url}/app.js`);
+    const js = await script.text();
+    expect(js).toContain("bindCommand('stop', '/stop')");
+    expect(js).not.toContain("$('clock').textContent = 'IDLE'");
+
+    const css = await fetch(`${server.url}/styles.css`);
+    const styles = await css.text();
+    expect(styles).toContain('.dock .danger');
+    expect(styles).toContain('#ff5c7a');
+    expect(styles).toContain('html.native-shell .dock');
+    expect(js).toContain("get('native')");
 
     const start = await fetch(`${server.url}/start`, { method: 'POST' });
     expect(start.status).toBe(200);
@@ -75,6 +90,11 @@ describe('proxy ui http', () => {
     expect(stop.status).toBe(200);
     expect(stopped).toBe(1);
     expect(bus.snapshot().running).toBe(false);
+
+    bus.log('keep me');
+    const cleared = await fetch(`${server.url}/logs/clear`, { method: 'POST' });
+    expect(cleared.status).toBe(200);
+    expect(bus.snapshot().logs).toEqual([]);
 
     const pair = await fetch(`${server.url}/pairing`, {
       method: 'POST',

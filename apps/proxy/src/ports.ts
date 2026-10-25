@@ -99,20 +99,30 @@ export function bleToHandler(
 export type WriteQueue = {
   push(task: () => Promise<void>): void;
   idle(): Promise<void>;
+  abort(): void;
 };
 
 export function serializeWrites(onError?: (error: unknown) => void): WriteQueue {
   let queue = Promise.resolve();
+  let aborted = false;
   return {
     push(task) {
+      if (aborted) {
+        return;
+      }
       queue = queue
-        .then(task)
+        .then(() => (aborted ? undefined : task()))
         .catch((error) => {
-          onError?.(error);
+          if (!aborted) {
+            onError?.(error);
+          }
         });
     },
     idle() {
       return queue;
+    },
+    abort() {
+      aborted = true;
     },
   };
 }

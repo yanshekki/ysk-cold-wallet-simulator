@@ -14,10 +14,11 @@ import {
   type Apdu,
 } from '../apdu';
 import {
-  deriveEd25519PrivateKey,
-  deriveHdNode,
+  deriveEd25519PrivateKeyFromSeed,
+  deriveHdNodeFromSeed,
   ed25519PublicKey,
   publicKeyCompressed,
+  seedFor,
   signEd25519,
   signSecp256k1Recoverable,
 } from '../crypto';
@@ -147,8 +148,8 @@ async function handleWalletId(apdu: Apdu, ctx: AvaxContext): Promise<Uint8Array>
       return encodeResponse(new Uint8Array(), SW_DENY);
     }
   }
-  const passphrase = await ctx.confirmation.getPassphrase(ctx.slotId);
-  const node = deriveHdNode(ctx.entropy, path, passphrase, ctx.backup);
+  const seed = await seedFor(ctx.confirmation, ctx.slotId, ctx.entropy, ctx.backup ?? 'bip39');
+  const node = deriveHdNodeFromSeed(seed, path);
   return encodeResponse(avalancheWalletId(node.publicKey), SW_OK);
 }
 
@@ -171,13 +172,13 @@ async function handleGetAddr(apdu: Apdu, ctx: AvaxContext): Promise<Uint8Array> 
       return encodeResponse(new Uint8Array(), SW_DENY);
     }
   }
-  const passphrase = await ctx.confirmation.getPassphrase(ctx.slotId);
+  const seed = await seedFor(ctx.confirmation, ctx.slotId, ctx.entropy, ctx.backup ?? 'bip39');
   if (ed25519) {
-    const secret = deriveEd25519PrivateKey(ctx.entropy, parsed.path, passphrase, ctx.backup);
+    const secret = deriveEd25519PrivateKeyFromSeed(seed, parsed.path);
     const pub = ed25519PublicKey(secret);
     return encodeResponse(concatBytes(Uint8Array.of(pub.length), pub, ed25519AddressBytes(pub)), SW_OK);
   }
-  const node = deriveHdNode(ctx.entropy, parsed.path, passphrase, ctx.backup);
+  const node = deriveHdNodeFromSeed(seed, parsed.path);
   const pub = node.publicKey.length === 33 ? node.publicKey : publicKeyCompressed(node.privateKey);
   const hash = avalancheHash160(pub);
   const addr = encodeAscii(avalancheBech32Address(pub, parsed.hrp));
@@ -200,8 +201,8 @@ async function handleGetXpub(apdu: Apdu, ctx: AvaxContext): Promise<Uint8Array> 
       return encodeResponse(new Uint8Array(), SW_DENY);
     }
   }
-  const passphrase = await ctx.confirmation.getPassphrase(ctx.slotId);
-  const node = deriveHdNode(ctx.entropy, parsed.path, passphrase, ctx.backup);
+  const seed = await seedFor(ctx.confirmation, ctx.slotId, ctx.entropy, ctx.backup ?? 'bip39');
+  const node = deriveHdNodeFromSeed(seed, parsed.path);
   const pub = node.publicKey.length === 33 ? node.publicKey : publicKeyCompressed(node.privateKey);
   return encodeResponse(concatBytes(Uint8Array.of(pub.length), pub, node.chainCode), SW_OK);
 }
@@ -256,12 +257,12 @@ async function handleSignHash(apdu: Apdu, ctx: AvaxContext): Promise<Uint8Array>
     ctx.session.pendingHash = undefined;
     ctx.session.rootPath = undefined;
   }
-  const passphrase = await ctx.confirmation.getPassphrase(ctx.slotId);
+  const seed = await seedFor(ctx.confirmation, ctx.slotId, ctx.entropy, ctx.backup ?? 'bip39');
   if (ed25519) {
-    const secret = deriveEd25519PrivateKey(ctx.entropy, path, passphrase, ctx.backup);
+    const secret = deriveEd25519PrivateKeyFromSeed(seed, path);
     return encodeResponse(signEd25519(secret, hash), SW_OK);
   }
-  const node = deriveHdNode(ctx.entropy, path, passphrase, ctx.backup);
+  const node = deriveHdNodeFromSeed(seed, path);
   return encodeResponse(signSecp256k1Recoverable(node.privateKey, hash), SW_OK);
 }
 

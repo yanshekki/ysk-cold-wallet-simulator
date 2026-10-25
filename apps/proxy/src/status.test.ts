@@ -21,6 +21,8 @@ describe('status bus', () => {
     expect(bus.snapshot().radio).toBe('IDLE');
     expect(seen.includes('SCAN')).toBe(true);
     expect(bus.snapshot().logs[0].line).toBe('hello');
+    bus.clearLogs();
+    expect(bus.snapshot().logs).toEqual([]);
   });
 });
 

@@ -70,6 +70,10 @@ export class UsbBleProxy {
 
   constructor(private readonly mtu: number) {}
 
+  resetBle(): void {
+    this.ble.reset();
+  }
+
   pushHid(report: Uint8Array): Uint8Array[] | null {
     const frame = this.hid.push(report);
     if (!frame) {

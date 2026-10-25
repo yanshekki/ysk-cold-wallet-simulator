@@ -6,7 +6,7 @@ import { secp256k1 } from '@noble/curves/secp256k1';
 import { hmac } from '@noble/hashes/hmac';
 import { sha512 } from '@noble/hashes/sha2';
 import { keccak_256 } from '@noble/hashes/sha3';
-import type { BackupKind } from '@cws/contracts';
+import type { BackupKind, ConfirmationPort } from '@cws/contracts';
 import { bytesToHex, concatBytes, encodeAscii } from './bytes';
 
 const utf8 = new TextEncoder();
@@ -30,16 +30,7 @@ export type HdNode = {
   chainCode: Uint8Array;
 };
 
-export function deriveHdNode(
-  entropy: Uint8Array,
-  path: string,
-  passphrase?: string,
-  backup: BackupKind = 'bip39',
-): HdNode {
-  const seed =
-    backup === 'slip39'
-      ? entropy
-      : mnemonicToSeedSync(mnemonicFromEntropy(entropy), passphrase ?? '');
+export function deriveHdNodeFromSeed(seed: Uint8Array, path: string): HdNode {
   const child = HDKey.fromMasterSeed(seed).derive(path);
   if (!child.privateKey || !child.publicKey || !child.chainCode) {
     throw new Error('derived key is incomplete');
@@ -51,6 +42,23 @@ export function deriveHdNode(
   };
 }
 
+export function deriveHdNode(
+  entropy: Uint8Array,
+  path: string,
+  passphrase?: string,
+  backup: BackupKind = 'bip39',
+): HdNode {
+  const seed =
+    backup === 'slip39'
+      ? entropy
+      : mnemonicToSeedSync(mnemonicFromEntropy(entropy), passphrase ?? '');
+  return deriveHdNodeFromSeed(seed, path);
+}
+
+export function derivePrivateKeyFromSeed(seed: Uint8Array, path: string): Uint8Array {
+  return deriveHdNodeFromSeed(seed, path).privateKey;
+}
+
 export function derivePrivateKey(
   entropy: Uint8Array,
   path: string,
@@ -58,6 +66,66 @@ export function derivePrivateKey(
   backup: BackupKind = 'bip39',
 ): Uint8Array {
   return deriveHdNode(entropy, path, passphrase, backup).privateKey;
+}
+
+export async function seedFor(
+  confirmation: ConfirmationPort,
+  slotId: string,
+  entropy: Uint8Array,
+  backup: BackupKind = 'bip39',
+): Promise<Uint8Array> {
+  const cached = await confirmation.getSeed?.(slotId);
+  if (cached) {
+    return cached;
+  }
+  const pass = await confirmation.getPassphrase(slotId);
+  if (backup === 'slip39') {
+    return entropy;
+  }
+  return mnemonicToSeedSync(mnemonicFromEntropy(entropy), pass ?? '');
+}
+
+export type SeedCache = {
+  seed?: Uint8Array;
+  icarusRoot?: Uint8Array;
+};
+
+export function wrapSeedPort(confirmation: ConfirmationPort, cache: SeedCache): ConfirmationPort {
+  return {
+    confirm: (request) => confirmation.confirm(request),
+    getPassphrase: (slotId) => confirmation.getPassphrase(slotId),
+    getSeed: async (slotId) => cache.seed ?? (await confirmation.getSeed?.(slotId)),
+    getIcarusRoot: async (slotId) => cache.icarusRoot ?? (await confirmation.getIcarusRoot?.(slotId)),
+    onPairingCode: confirmation.onPairingCode ? (code) => confirmation.onPairingCode?.(code) : undefined,
+    resolvePath: confirmation.resolvePath
+      ? (path, chains) => confirmation.resolvePath?.(path, chains) ?? path
+      : undefined,
+  };
+}
+
+export function replaceSeedCache(cache: SeedCache, seed: Uint8Array, icarusRoot?: Uint8Array): void {
+  cache.seed?.fill(0);
+  cache.icarusRoot?.fill(0);
+  cache.seed = seed.slice();
+  cache.icarusRoot = icarusRoot?.slice();
+}
+
+export async function icarusRootFor(
+  confirmation: ConfirmationPort,
+  slotId: string,
+  entropy: Uint8Array,
+  backup: BackupKind = 'bip39',
+): Promise<Uint8Array | undefined> {
+  const cached = await confirmation.getIcarusRoot?.(slotId);
+  if (cached) {
+    return cached;
+  }
+  if (backup === 'slip39') {
+    return undefined;
+  }
+  const pass = await confirmation.getPassphrase(slotId);
+  const { icarusRootFromEntropy } = await import('./apps/icarus');
+  return icarusRootFromEntropy(entropy, pass ?? '');
 }
 
 export function publicKeyUncompressed(privateKey: Uint8Array): Uint8Array {
@@ -122,6 +190,10 @@ export function slip10Ed25519(seed: Uint8Array, path: string): Uint8Array {
   return key;
 }
 
+export function deriveEd25519PrivateKeyFromSeed(seed: Uint8Array, path: string): Uint8Array {
+  return slip10Ed25519(seed, path);
+}
+
 export function deriveEd25519PrivateKey(
   entropy: Uint8Array,
   path: string,
@@ -132,7 +204,7 @@ export function deriveEd25519PrivateKey(
     backup === 'slip39'
       ? entropy
       : mnemonicToSeedSync(mnemonicFromEntropy(entropy), passphrase ?? '');
-  return slip10Ed25519(seed, path);
+  return deriveEd25519PrivateKeyFromSeed(seed, path);
 }
 
 export function ed25519PublicKey(privateKey: Uint8Array): Uint8Array {

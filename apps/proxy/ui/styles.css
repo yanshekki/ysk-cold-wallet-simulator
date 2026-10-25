@@ -6,6 +6,7 @@
   --text: #e6e8ec;
   --muted: #7c8491;
   --accent: #ff5a1f;
+  --accent-dim: #3a180c;
   --ok: #c8f542;
   --danger: #ff5c7a;
   --ledger: #ff5a1f;
@@ -22,7 +23,7 @@
 html,
 body {
   margin: 0;
-  min-height: 100%;
+  height: 100%;
   background: var(--bg);
   color: var(--text);
   font-family: var(--sans);
@@ -30,15 +31,17 @@ body {
 
 .stage {
   min-height: 100vh;
+  height: 100vh;
   display: flex;
   justify-content: center;
-  padding: 24px 16px;
+  align-items: stretch;
+  padding: 16px 16px 28px;
 }
 
 .phone {
-  width: 390px;
-  max-width: 100%;
-  min-height: min(844px, calc(100vh - 48px));
+  width: min(720px, 100%);
+  height: 100%;
+  min-height: 0;
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -114,6 +117,7 @@ body {
   border: 1px solid var(--border);
   padding: 1px 5px;
   border-radius: 2px;
+  background: var(--bg);
 }
 
 .chip.on {
@@ -131,6 +135,55 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--elevated);
+  padding: 0 8px;
+}
+
+.tab {
+  flex: 1;
+  min-height: 40px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: var(--elevated);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.tab.on {
+  color: var(--ok);
+  border-bottom-color: var(--ok);
+}
+
+.badge {
+  display: inline-block;
+  margin-left: 6px;
+  min-width: 16px;
+  padding: 0 4px;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.tab.on .badge {
+  color: var(--ok);
+  border-color: var(--ok);
 }
 
 .top {
@@ -151,12 +204,13 @@ body {
   padding: 0 6px;
   border: 1px solid var(--border);
   border-radius: 2px;
-  background: transparent;
+  background: var(--elevated);
   color: var(--muted);
   font-family: var(--mono);
   font-size: 10px;
   font-weight: 500;
   cursor: pointer;
+  -webkit-app-region: no-drag;
 }
 
 .lang.on {
@@ -335,67 +389,193 @@ dd {
   padding: 0 8px;
 }
 
-.console {
+.console-root {
   flex: 1;
-  min-height: 180px;
-  border: 1px solid var(--border);
-  border-radius: 2px;
-  background: var(--card);
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  gap: 8px;
+  padding: 8px 12px 12px;
 }
 
-.console-head {
-  padding: 8px 12px 0;
+.instrument {
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  background: var(--elevated);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.console h2,
-.console-head h2 {
-  margin: 0;
+.log-chips,
+.log-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.log-chip {
+  min-height: 24px;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  background: var(--bg);
   color: var(--muted);
   font-family: var(--mono);
   font-size: 10px;
   font-weight: 500;
-  letter-spacing: 1.4px;
-  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.log-chip.on {
+  color: var(--ok);
+  border-color: var(--ok);
+}
+
+.search-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#log-search {
+  flex: 1;
+  min-height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 0 8px;
+}
+
+#log-count {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 10px;
+  min-width: 48px;
+}
+
+.log-action {
+  min-height: 24px;
+  padding: 0 4px;
+  border: 0;
+  background: var(--elevated);
+  color: var(--ok);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.log-action:disabled {
+  color: var(--muted);
+  opacity: 1;
+  cursor: default;
+}
+
+.log-action.danger {
+  color: var(--danger);
+  background: var(--elevated);
+  flex: none;
+  border: 0;
 }
 
 .logs {
   list-style: none;
   margin: 0;
-  padding: 8px 12px 12px;
+  padding: 8px;
   overflow: auto;
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.45;
   flex: 1;
+  min-height: 0;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  background: var(--bg);
 }
 
 .logs li {
   color: var(--text);
-  word-break: break-word;
+  padding: 4px 6px;
+  border-radius: 2px;
 }
 
-.logs .ts {
+.logs li.active {
+  background: var(--elevated);
+}
+
+.logs li.nowrap {
+  white-space: nowrap;
+}
+
+.logs .gutter {
+  display: block;
   color: var(--muted);
-  margin-right: 8px;
+  font-size: 11px;
+}
+
+.logs .channel {
+  font-weight: 700;
+  letter-spacing: 0.6px;
+}
+
+.logs .channel.ble,
+.logs .channel.gatt {
+  color: var(--ok);
+}
+
+.logs .channel.hid {
+  color: var(--accent);
+}
+
+.logs .channel.error {
+  color: var(--danger);
+}
+
+.logs .body {
+  display: block;
 }
 
 .logs .empty {
   color: var(--muted);
 }
 
+.hit {
+  background: var(--accent-dim);
+  color: var(--ok);
+}
+
+html.native-shell .dock {
+  display: none !important;
+}
+
+html.native-shell .stage {
+  padding-bottom: 16px;
+}
+
 .dock {
   display: flex;
   gap: 8px;
-  padding: 12px;
+  padding: 12px 12px 22px;
   border-top: 1px solid var(--border);
   background: var(--elevated);
+  position: relative;
+  z-index: 40;
+  flex-shrink: 0;
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
 }
 
 button {
-  min-height: 44px;
+  min-height: 48px;
   border-radius: 2px;
   border: 1px solid var(--border);
   background: var(--card);
@@ -406,24 +586,30 @@ button {
   letter-spacing: 0.4px;
   padding: 0 16px;
   cursor: pointer;
+  -webkit-app-region: no-drag;
 }
 
-button.primary {
+.dock .primary {
   flex: 1;
   background: var(--accent);
   border-color: var(--accent);
   color: #0a0c10;
 }
 
-button.danger {
+.dock .danger {
   flex: 1;
-  background: transparent;
-  color: var(--danger);
-  border-color: var(--danger);
+  background: #ff5c7a;
+  color: #14080c;
+  border-color: #ff5c7a;
+}
+
+.dock button {
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
 }
 
 button.ghost {
-  background: transparent;
+  background: var(--elevated);
   color: var(--text);
 }
 
@@ -438,12 +624,11 @@ button:disabled {
 
 @media (max-width: 430px) {
   .stage {
-    padding: 0;
+    padding: 0 0 16px;
   }
 
   .phone {
     width: 100%;
-    min-height: 100vh;
     border: 0;
     border-radius: 0;
   }

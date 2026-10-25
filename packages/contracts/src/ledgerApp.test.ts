@@ -5,6 +5,7 @@ import {
   inferLedgerFamily,
   ledgerAppChip,
   ledgerAppLabel,
+  ledgerPickerApps,
   matchLedgerApp,
   slugLedgerApp,
 } from './index';
@@ -25,6 +26,13 @@ describe('ledger app labels', () => {
     expect(LEDGER_APPS[0]).toBe('dashboard');
     expect(LEDGER_APPS).toContain('solana');
     expect(LEDGER_INSTALLED_APPS.length).toBeGreaterThanOrEqual(8);
+  });
+
+  it('orders the open-app picker by common hardware-wallet usage', () => {
+    const apps = ledgerPickerApps();
+    expect(apps.slice(0, 4)).toEqual(['dashboard', 'bitcoin', 'ethereum', 'solana']);
+    expect(apps.indexOf('xrp')).toBeLessThan(apps.indexOf('avalanche'));
+    expect(apps.indexOf('dogecoin')).toBeLessThan(apps.indexOf('aptos'));
   });
 
   it('matches OPEN_APP names from Ledger Wallet', () => {

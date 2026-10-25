@@ -11,6 +11,9 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/styles.css" />
+    <script>
+      if (/\bnative=1\b/.test(location.search)) document.documentElement.classList.add('native-shell');
+    </script>
   </head>
   <body>
     <div class="stage">
@@ -24,7 +27,14 @@
           <span id="chip" class="chip hidden"></span>
           <span id="host" class="host">NO PHONE</span>
         </header>
-        <main class="screen">
+        <nav class="tabs" role="tablist">
+          <button type="button" id="tab-proxy" class="tab on" role="tab" aria-selected="true" data-tab="proxy"></button>
+          <button type="button" id="tab-console" class="tab" role="tab" aria-selected="false" data-tab="console">
+            <span id="tab-console-label"></span>
+            <span id="log-badge" class="badge hidden">0</span>
+          </button>
+        </nav>
+        <main id="pane-proxy" class="screen">
           <div class="top">
             <div>
               <p class="kicker" id="kicker">/ PROXY</p>
@@ -78,16 +88,42 @@
               <button type="button" id="pair" class="ghost"></button>
             </div>
           </section>
-          <section class="console">
-            <div class="console-head">
-              <h2 id="logs-label">Console</h2>
-            </div>
-            <ol id="logs" class="logs"></ol>
-          </section>
         </main>
+        <section id="pane-console" class="console-root hidden">
+          <div class="instrument">
+            <div class="log-chips">
+              <button type="button" class="log-chip on" data-filter="all" id="filter-all"></button>
+              <button type="button" class="log-chip" data-filter="ble" id="filter-ble">BLE</button>
+              <button type="button" class="log-chip" data-filter="hid" id="filter-hid">HID</button>
+              <button type="button" class="log-chip" data-filter="gatt" id="filter-gatt">GATT</button>
+              <button type="button" class="log-chip" data-filter="error" id="filter-error">ERR</button>
+              <button type="button" class="log-chip on" id="log-wrap"></button>
+              <button type="button" class="log-chip on" id="log-follow"></button>
+            </div>
+            <div class="search-row">
+              <input id="log-search" type="search" spellcheck="false" autocomplete="off" />
+              <span id="log-count">0/0</span>
+              <button type="button" class="log-chip" id="log-case">Aa</button>
+              <button type="button" class="log-chip" id="log-regex">.*</button>
+            </div>
+            <div class="log-actions">
+              <button type="button" class="log-action" id="log-prev"></button>
+              <button type="button" class="log-action" id="log-next"></button>
+              <button type="button" class="log-action" id="log-copy-line"></button>
+              <button type="button" class="log-action" id="log-copy-match"></button>
+              <button type="button" class="log-action" id="log-copy-all"></button>
+              <button type="button" class="log-action" id="log-font-up">A+</button>
+              <button type="button" class="log-action" id="log-font-down">A-</button>
+              <button type="button" class="log-action" id="log-export"></button>
+              <button type="button" class="log-action danger" id="log-clear"></button>
+              <button type="button" class="log-action" id="log-latest"></button>
+            </div>
+          </div>
+          <ol id="logs" class="logs"></ol>
+        </section>
         <footer class="dock">
           <button type="button" id="start" class="primary"></button>
-          <button type="button" id="stop" class="danger" disabled></button>
+          <button type="button" id="stop" class="danger"></button>
         </footer>
       </div>
     </div>

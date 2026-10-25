@@ -8,19 +8,16 @@ import {
   bytesToEntropyHex,
   entropyBitsForWordCount,
   generateSlip39,
-  inspectAddresses,
   isKnownUnsafeMnemonic,
   minDiceRolls,
   minHexChars,
   mixExtraEntropy,
   mnemonicFromEntropy,
   parseCustomEntropy,
-  PREVIEW_INSPECT_IDS,
   type Bip39WordCount,
   type CustomEntropyKind,
-  type InspectRow,
 } from '@cws/sdk';
-import { AddressInspector, Button, MnemonicGrid, Screen, colors, fonts, hairline, radius, space } from '@cws/ui';
+import { Button, MnemonicGrid, Screen, colors, fonts, hairline, radius, space } from '@cws/ui';
 import { useT } from '../../src/i18n';
 import { unlock as requestUnlock } from '../../src/passkeys';
 import { generateSecureEntropy, generateSecureSecret, newSlotId } from '../../src/seeds/generate';
@@ -56,7 +53,6 @@ export default function NewSeedScreen() {
   const [error, setError] = useState<string | null>(null);
   const [verify, setVerify] = useState<{ index: number; word: string }[]>([]);
   const [guess, setGuess] = useState<Record<number, string>>({});
-  const [preview, setPreview] = useState<InspectRow[]>([]);
   const [customOpen, setCustomOpen] = useState(false);
   const [customKind, setCustomKind] = useState<CustomEntropyKind>('hex');
   const [customDraft, setCustomDraft] = useState('');
@@ -69,10 +65,9 @@ export default function NewSeedScreen() {
   const generate = async () => {
     setBusy(true);
     setError(null);
-    setMnemonic(null);
-    setShares([]);
-    setPreview([]);
-    try {
+        setMnemonic(null);
+        setShares([]);
+        try {
       await runWithLoading(t('common.loading'), async () => {
         const extra = shake ? await collectMotionMix(1500) : undefined;
         if (backup === 'bip39') {
@@ -135,13 +130,13 @@ export default function NewSeedScreen() {
       setError('Generate a seed and select a model first');
       return;
     }
-    const ok = await requestUnlock();
+    const ok = await requestUnlock(t('unlock.prompt'));
     if (!ok) {
       return;
     }
     try {
       await runWithLoading(t('common.loading'), async () => {
-        const slot = await saveSlot(
+        const saved = await saveSlot(
           {
             id: newSlotId(),
             label: label.trim() || 'Unnamed',
@@ -154,13 +149,15 @@ export default function NewSeedScreen() {
             paths: mergeChainPaths(settings.defaultPaths),
           },
           secret,
+          backup === 'slip39' ? shares : undefined,
         );
-        selectSeed(slot);
-        setPreview(inspectAddresses(secret, backup, '', slot.paths, PREVIEW_INSPECT_IDS));
-        setMnemonic(null);
-        setShares([]);
-        setRevealMeta(null);
+        selectSeed(saved);
       });
+      if (router.canDismiss()) {
+        router.dismiss();
+      } else {
+        router.back();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'failed to store seed');
     }
@@ -174,7 +171,7 @@ export default function NewSeedScreen() {
       backLabel={t('common.back')}
       backIcon={<Ionicons name="chevron-back" size={22} color={colors.text} />}
     >
-      {preview.length === 0 && !revealing ? (
+      {!revealing ? (
         <>
           <TextInput
             value={label}
@@ -219,7 +216,6 @@ export default function NewSeedScreen() {
               />
             </View>
           )}
-          {backup === 'bip39' ? <Text style={styles.meta}>{t('generate.csprngNote')}</Text> : null}
           {backup === 'bip39' ? (
             <>
               <Button
@@ -229,7 +225,6 @@ export default function NewSeedScreen() {
               />
               {customOpen ? (
                 <>
-                  <Text style={styles.meta}>{t('generate.customHint')}</Text>
                   <View style={styles.row}>
                     <Button
                       label={t('generate.customHex')}
@@ -329,27 +324,13 @@ export default function NewSeedScreen() {
       ) : null}
       {shares.length > 0 ? (
         <View style={styles.words}>
-          <Text style={styles.warn}>{t('vault.backupSlip39')}</Text>
+          <Text style={styles.warn}>{t('generate.revealShares')}</Text>
           {shares.map((share, index) => (
             <Text key={index} style={styles.mnemonic}>
               {index + 1}. {share}
             </Text>
           ))}
           <Button label={t('generate.confirm')} onPress={() => void confirm()} />
-        </View>
-      ) : null}
-      {preview.length > 0 ? (
-        <View style={styles.words}>
-          <Text style={styles.warn}>{t('generate.preview')}</Text>
-          <AddressInspector
-            rows={preview}
-            title={t('generate.preview')}
-            copyPathLabel={t('vault.copyPath')}
-            onCopy={(value) => {
-              void copyText(value).then(() => showToast(t('common.copied')));
-            }}
-          />
-          <Button label={t('generate.done')} onPress={() => router.back()} />
         </View>
       ) : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}

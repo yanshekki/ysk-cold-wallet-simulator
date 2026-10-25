@@ -3,7 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 import type { SeedSlot } from '@cws/contracts';
 import { wordCountFromEntropy } from '@cws/sdk';
 import { isDevBuild } from '../passkeys/devFlag';
-import { entropyKey, LEGACY_SLOTS_KEY, SLOTS_KEY } from './vaultKeys';
+import { entropyKey, LEGACY_SLOTS_KEY, sharesKey, SLOTS_KEY } from './vaultKeys';
 
 export { entropyKey, secureStoreKey, SLOTS_KEY } from './vaultKeys';
 
@@ -11,11 +11,17 @@ const BASE_OPTIONS = {
   keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
 } as const;
 
+let vaultAuthPrompt = 'Unlock';
+
+export function setVaultAuthPrompt(value: string): void {
+  vaultAuthPrompt = value;
+}
+
 function authOptions() {
   return {
     ...BASE_OPTIONS,
     requireAuthentication: true,
-    authenticationPrompt: 'Unlock seed',
+    authenticationPrompt: vaultAuthPrompt,
   };
 }
 
@@ -108,7 +114,11 @@ async function readSecret(key: string): Promise<string | null> {
   }
 }
 
-export async function saveSlot(slot: SeedSlot, entropy: Uint8Array): Promise<SeedSlot> {
+export async function saveSlot(
+  slot: SeedSlot,
+  entropy: Uint8Array,
+  shares?: readonly string[],
+): Promise<SeedSlot> {
   if ((slot.backup ?? 'bip39') === 'bip39') {
     wordCountFromEntropy(entropy);
   }
@@ -117,7 +127,26 @@ export async function saveSlot(slot: SeedSlot, entropy: Uint8Array): Promise<See
   const next = [...slots.filter((item) => item.id !== stored.id), stored];
   await writeSlots(next);
   await writeSecret(entropyKey(stored.id), bytesToBase64(entropy));
+  if (shares && shares.length > 0) {
+    await writeSecret(sharesKey(stored.id), JSON.stringify(shares));
+  }
   return stored;
+}
+
+export async function loadShares(id: string): Promise<string[] | null> {
+  const raw = await readSecret(sharesKey(id));
+  if (!raw) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed) || parsed.some((item) => typeof item !== 'string')) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
 }
 
 export async function loadEntropy(id: string): Promise<Uint8Array> {
@@ -148,12 +177,18 @@ export async function deleteSlot(id: string): Promise<void> {
   await writeSlots(slots);
   if (Platform.OS === 'web') {
     webDelete(entropyKey(id));
+    webDelete(sharesKey(id));
     return;
   }
   try {
     await SecureStore.deleteItemAsync(entropyKey(id));
   } catch {
     // Missing or previously invalid keys should not block delete.
+  }
+  try {
+    await SecureStore.deleteItemAsync(sharesKey(id));
+  } catch {
+    // Missing share backups should not block delete.
   }
 }
 

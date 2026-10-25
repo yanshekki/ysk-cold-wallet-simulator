@@ -1,4 +1,6 @@
-use btleplug::api::{Central, Characteristic, Manager as _, Peripheral as _, ScanFilter, WriteType};
+use btleplug::api::{
+  Central, CharPropFlags, Characteristic, Manager as _, Peripheral as _, ScanFilter, WriteType,
+};
 use btleplug::platform::{Adapter, Manager, Peripheral};
 use futures::StreamExt;
 use napi::bindgen_prelude::*;
@@ -9,6 +11,7 @@ use std::collections::{BTreeSet, HashMap};
 use std::sync::Mutex;
 use std::time::Duration;
 use tokio::runtime::Runtime;
+use tokio::sync::mpsc;
 use tokio::sync::Mutex as AsyncMutex;
 use uuid::Uuid;
 
@@ -71,17 +74,31 @@ async fn known(id: &str) -> Option<Peripheral> {
   slot.as_ref().and_then(|hub| hub.known.get(id).cloned())
 }
 
+async fn disconnect_known() {
+  let known = {
+    let slot = HUB.lock().await;
+    slot
+      .as_ref()
+      .map(|hub| hub.known.values().cloned().collect::<Vec<_>>())
+      .unwrap_or_default()
+  };
+  for peripheral in known {
+    let _ = peripheral.disconnect().await;
+  }
+}
+
 pub async fn scan_ble(service_uuids: Vec<String>, timeout_ms: u32) -> Result<Vec<ScanResult>> {
   let uuids = service_uuids
     .iter()
     .map(|item| parse_uuid(item))
     .collect::<Result<Vec<_>>>()?;
+  disconnect_known().await;
   let adapter = ensure_central().await?;
   let _ = adapter.stop_scan().await;
+  // iOS often omits the 128-bit service UUID when the GAP name is long.
+  // Filter in JS by UUID *or* advertised name instead of at CoreBluetooth.
   adapter
-    .start_scan(ScanFilter {
-      services: uuids.clone(),
-    })
+    .start_scan(ScanFilter { services: Vec::new() })
     .await
     .map_err(|error| Error::from_reason(error.to_string()))?;
   tokio::time::sleep(Duration::from_millis(timeout_ms.max(300) as u64)).await;
@@ -101,6 +118,7 @@ pub async fn scan_ble(service_uuids: Vec<String>, timeout_ms: u32) -> Result<Vec
     };
     let services: BTreeSet<String> = props.services.iter().map(|uuid| uuid.to_string()).collect();
     if !uuids.is_empty()
+      && !services.is_empty()
       && !uuids
         .iter()
         .any(|uuid| props.services.iter().any(|item| item == uuid))
@@ -116,11 +134,33 @@ pub async fn scan_ble(service_uuids: Vec<String>, timeout_ms: u32) -> Result<Vec
   Ok(out)
 }
 
+fn flags_label(flags: CharPropFlags) -> String {
+  let mut parts = Vec::new();
+  if flags.contains(CharPropFlags::READ) {
+    parts.push("read");
+  }
+  if flags.contains(CharPropFlags::WRITE) {
+    parts.push("write");
+  }
+  if flags.contains(CharPropFlags::WRITE_WITHOUT_RESPONSE) {
+    parts.push("wwr");
+  }
+  if flags.contains(CharPropFlags::NOTIFY) {
+    parts.push("notify");
+  }
+  if flags.contains(CharPropFlags::INDICATE) {
+    parts.push("indicate");
+  }
+  if parts.is_empty() {
+    parts.push("none");
+  }
+  parts.join(",")
+}
+
 pub struct BleDevice {
   peripheral: Peripheral,
   write_char: Characteristic,
-  notify_char: Characteristic,
-  notify: Mutex<Option<ThreadsafeFunction<Vec<u8>, ErrorStrategy::CalleeHandled>>>,
+  notify_rx: Mutex<Option<mpsc::UnboundedReceiver<Vec<u8>>>>,
 }
 
 impl BleDevice {
@@ -149,27 +189,62 @@ impl BleDevice {
       .find(|item| item.uuid == notify)
       .cloned()
       .ok_or_else(|| Error::from_reason(format!("missing notify characteristic {notify_uuid}")))?;
+    // Subscribe to the broadcast *before* CCCD, on this task. Spawning
+    // notifications() races subscribe() and btleplug drops those packets.
+    let stream = peripheral
+      .notifications()
+      .await
+      .map_err(|error| Error::from_reason(error.to_string()))?;
+    let (tx, rx) = mpsc::unbounded_channel();
+    RT.spawn(async move {
+      let mut stream = stream;
+      while let Some(event) = stream.next().await {
+        if tx.send(event.value).is_err() {
+          break;
+        }
+      }
+    });
     peripheral
       .subscribe(&notify_char)
       .await
       .map_err(|error| Error::from_reason(error.to_string()))?;
+    // iOS sometimes drops the first ATT write if it races the CCCD.
+    tokio::time::sleep(Duration::from_millis(150)).await;
     if let Some(hub) = HUB.lock().await.as_ref() {
       let _ = hub.adapter.stop_scan().await;
     }
     Ok(Self {
       peripheral,
       write_char,
-      notify_char,
-      notify: Mutex::new(None),
+      notify_rx: Mutex::new(Some(rx)),
     })
   }
 
+  pub fn debug_info(&self) -> String {
+    format!(
+      "write={} flags={}",
+      self.write_char.uuid,
+      flags_label(self.write_char.properties)
+    )
+  }
+
   pub async fn write(&self, data: &[u8]) -> Result<()> {
-    self
-      .peripheral
-      .write(&self.write_char, data, WriteType::WithResponse)
+    let peripheral = self.peripheral.clone();
+    let write_char = self.write_char.clone();
+    let payload = data.to_vec();
+    // Never WriteWithResponse: macOS CoreBluetooth queues that ATT write
+    // until didWriteValue, which iOS/munim often never sends, and then
+    // scan/connect on the same central freeze.
+    runtime()
+      .spawn(async move {
+        peripheral
+          .write(&write_char, &payload, WriteType::WithoutResponse)
+          .await
+          .map_err(|error| Error::from_reason(error.to_string()))
+      })
       .await
-      .map_err(|error| Error::from_reason(error.to_string()))
+      .map_err(|error| Error::from_reason(error.to_string()))??;
+    Ok(())
   }
 
   pub fn on_notify(&self, callback: JsFunction) -> Result<()> {
@@ -178,34 +253,42 @@ impl BleDevice {
         let buffer = ctx.env.create_buffer_with_data(ctx.value)?;
         Ok(vec![buffer.into_unknown()])
       })?;
-    *self.notify.lock().unwrap() = Some(tsfn.clone());
-    let peripheral = self.peripheral.clone();
+    let rx = self.notify_rx.lock().unwrap().take();
     RT.spawn(async move {
-      let Ok(mut stream) = peripheral.notifications().await else {
+      let Some(mut rx) = rx else {
         return;
       };
-      while let Some(event) = stream.next().await {
-        tsfn.call(Ok(event.value), ThreadsafeFunctionCallMode::NonBlocking);
+      while let Some(value) = rx.recv().await {
+        tsfn.call(Ok(value), ThreadsafeFunctionCallMode::Blocking);
       }
     });
-    let _ = &self.notify_char;
     Ok(())
   }
 
   pub async fn disconnect(&self) -> Result<()> {
-    self
-      .peripheral
-      .disconnect()
+    let peripheral = self.peripheral.clone();
+    runtime()
+      .spawn(async move {
+        peripheral
+          .disconnect()
+          .await
+          .map_err(|error| Error::from_reason(error.to_string()))
+      })
       .await
-      .map_err(|error| Error::from_reason(error.to_string()))
+      .map_err(|error| Error::from_reason(error.to_string()))?
   }
 
   pub async fn is_connected(&self) -> Result<bool> {
-    self
-      .peripheral
-      .is_connected()
+    let peripheral = self.peripheral.clone();
+    runtime()
+      .spawn(async move {
+        peripheral
+          .is_connected()
+          .await
+          .map_err(|error| Error::from_reason(error.to_string()))
+      })
       .await
-      .map_err(|error| Error::from_reason(error.to_string()))
+      .map_err(|error| Error::from_reason(error.to_string()))?
   }
 }
 

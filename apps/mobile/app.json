@@ -22,6 +22,11 @@
         {
           "ios": {
             "enableSceneSupport": true
+          },
+          "android": {
+            "compileSdkVersion": 37,
+            "targetSdkVersion": 36,
+            "buildToolsVersion": "37.0.0"
           }
         }
       ],
@@ -40,7 +45,8 @@
       "expo-font"
     ],
     "android": {
-      "package": "hk.ysk.coldwalletsimulator",
+      "package": "hk.ysk.cws",
+      "versionCode": 2,
       "label": "CWS",
       "softwareKeyboardLayoutMode": "resize",
       "navigationBar": {
@@ -61,6 +67,10 @@
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.USE_BIOMETRIC",
         "android.permission.USE_FINGERPRINT"
+      ],
+      "blockedPermissions": [
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE"
       ]
     },
     "web": {
@@ -69,7 +79,8 @@
       "favicon": "./assets/favicon.png"
     },
     "ios": {
-      "bundleIdentifier": "hk.ysk.coldwalletsimulator",
+      "bundleIdentifier": "hk.ysk.cws",
+      "buildNumber": "2",
       "appleTeamId": "K897VVZW77",
       "infoPlist": {
         "CFBundleDisplayName": "CWS",
@@ -77,6 +88,7 @@
         "NSFaceIDUsageDescription": "Unlock the seed vault",
         "NSMotionUsageDescription": "Optional extra entropy while generating a seed",
         "UIStatusBarStyle": "UIStatusBarStyleLightContent",
+        "ITSAppUsesNonExemptEncryption": false,
         "UIBackgroundModes": [
           "bluetooth-peripheral"
         ]

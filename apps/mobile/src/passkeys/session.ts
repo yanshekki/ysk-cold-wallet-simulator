@@ -13,16 +13,10 @@ import { isDevBuild } from './devFlag';
 
 export const SESSION_MS = 15 * 60 * 1000;
 
-export const NOT_ENROLLED_MESSAGE =
-  'Set a lock screen PIN or biometric in system settings.';
-
-export const WEB_DEV_MESSAGE = 'Web skip — use an Android/iOS device for real unlock.';
-
-export const DEV_SKIP_MESSAGE =
-  'DEV build — Unlock skips Face ID. Release still requires biometric / device PIN.';
-
-export const ENROLLED_MESSAGE =
-  'Platform authenticator (biometric / device PIN) unlocks a 15-minute session. Seeds stay in SecureStore.';
+export const NOT_ENROLLED_MESSAGE = 'unlock.notEnrolled';
+export const WEB_DEV_MESSAGE = 'unlock.webDev';
+export const DEV_SKIP_MESSAGE = 'unlock.devSkip';
+export const ENROLLED_MESSAGE = 'unlock.enrolled';
 
 export type UnlockKind = 'web-dev' | 'dev-skip' | 'enrolled' | 'not-enrolled';
 
@@ -31,10 +25,20 @@ export type UnlockStatus = {
   message: string;
 };
 
-export type SessionHref = '/unlock' | '/(app)';
+export type SessionHref = '/unlock' | '/(app)' | '/disclaimer';
 
 /** Expo Router groups hide `(app)` from the URL, so Device is also `/`. Unlock lives at `/unlock`. */
-export function sessionRedirect(unlocked: boolean, rootSegment: string | undefined): SessionHref | null {
+export function sessionRedirect(
+  unlocked: boolean,
+  rootSegment: string | undefined,
+  accepted: boolean,
+): SessionHref | null {
+  if (!accepted) {
+    return rootSegment === 'disclaimer' ? null : '/disclaimer';
+  }
+  if (rootSegment === 'disclaimer') {
+    return unlocked ? '/(app)' : '/unlock';
+  }
   const inApp = rootSegment === '(app)' || rootSegment === 'seeds';
   if (unlocked) {
     return inApp ? null : '/(app)';
@@ -62,7 +66,7 @@ export function setFaceIdEnabled(value: boolean): void {
   faceIdEnabled = value;
 }
 
-export async function unlock(): Promise<boolean> {
+export async function unlock(promptMessage = 'Unlock'): Promise<boolean> {
   if (Platform.OS === 'web' || isDevBuild() || !faceIdEnabled) {
     return true;
   }
@@ -71,7 +75,7 @@ export async function unlock(): Promise<boolean> {
     throw new Error(NOT_ENROLLED_MESSAGE);
   }
   const prompt = {
-    promptMessage: 'Unlock YSK Cold Wallet Simulator',
+    promptMessage,
     biometricsSecurityLevel: 'strong' as const,
   };
 
@@ -92,6 +96,6 @@ export async function unlock(): Promise<boolean> {
     });
     return fallback.success;
   } catch (err) {
-    throw err instanceof Error ? err : new Error('Unlock failed');
+    throw err instanceof Error ? err : new Error('unlock.failed');
   }
 }

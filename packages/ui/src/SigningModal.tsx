@@ -1,6 +1,6 @@
 import { Dimensions, Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { describeSigning, signingNeedsPassphrase, signingSlideLabel, type SigningRequest } from '@cws/contracts';
+import { describeSigning, signingNeedsPassphrase, type SigningRequest } from '@cws/contracts';
 import { Button } from './Button';
 import { SigningDetailView, type SigningCopy } from './SigningDetail';
 import { SlideToConfirm } from './SlideToConfirm';
@@ -11,6 +11,7 @@ type Props = {
   request: SigningRequest | null;
   onConfirm: () => void;
   onReject: () => void;
+  slideLabel?: string;
   rejectLabel?: string;
   confirmTitle?: string;
   sessionPassphraseApplied?: boolean;
@@ -24,11 +25,12 @@ export function SigningModal({
   request,
   onConfirm,
   onReject,
+  slideLabel = 'Slide to sign',
   rejectLabel = 'Reject',
   confirmTitle = 'Confirm on device',
   sessionPassphraseApplied = false,
-  passphraseAppliedLabel = 'Session passphrase applied',
-  passphraseIdleLabel = 'No session passphrase',
+  passphraseAppliedLabel = 'Passphrase on',
+  passphraseIdleLabel = 'No passphrase',
   copy,
 }: Props) {
   const brand = request?.brand;
@@ -62,7 +64,7 @@ export function SigningModal({
                 {sessionPassphraseApplied ? passphraseAppliedLabel : passphraseIdleLabel}
               </Text>
             ) : null}
-            <SlideToConfirm label={signingSlideLabel(kind)} onConfirm={onConfirm} resetKey={resetKey} />
+            <SlideToConfirm label={slideLabel} onConfirm={onConfirm} resetKey={resetKey} />
             <View style={styles.actions}>
               <Button label={rejectLabel} variant="danger" onPress={onReject} />
             </View>

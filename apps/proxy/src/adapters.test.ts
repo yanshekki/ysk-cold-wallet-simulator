@@ -128,6 +128,95 @@ describe('attachLedger', () => {
     expect(address.toLowerCase()).toBe(EXPECTED_ADDRESS.toLowerCase());
     adapter.close();
   });
+
+  it('does not forward a BLE APDU before a HID command', async () => {
+    const { host, gadget } = memoryHidPair();
+    let notify: ((packet: Uint8Array) => void) | undefined;
+    const ble = {
+      async write() {
+        return;
+      },
+      onNotify(callback: (packet: Uint8Array) => void) {
+        notify = callback;
+        return () => undefined;
+      },
+      async close() {
+        return;
+      },
+    };
+    const adapter = attachLedger(gadget, ble, DEFAULT_MTU, () => undefined);
+    const replies: Uint8Array[] = [];
+    host.onInput((report) => replies.push(report));
+    notify?.(Uint8Array.of(0x05, 0x00, 0x00, 0x00, 0x02, 0x6d, 0x00));
+    expect(replies).toEqual([]);
+    adapter.close();
+  });
+
+  it('holds the next HID APDU until the previous BLE reply arrives', async () => {
+    const { host, gadget } = memoryHidPair();
+    const writes: Uint8Array[] = [];
+    const ble = {
+      async write(packet: Uint8Array) {
+        writes.push(packet);
+      },
+      onNotify() {
+        return () => undefined;
+      },
+      async close() {
+        return;
+      },
+    };
+    const adapter = attachLedger(gadget, ble, DEFAULT_MTU, () => undefined);
+    const version = wrapHidApdu(Uint8Array.of(0xb0, 0x01, 0x00, 0x00, 0x00));
+    const config = wrapHidApdu(Uint8Array.of(0xe0, 0x06, 0x00, 0x00, 0x00));
+    for (const report of version) {
+      host.write(report);
+    }
+    await Promise.resolve();
+    await Promise.resolve();
+    const first = writes.length;
+    expect(first).toBeGreaterThan(0);
+    for (const report of config) {
+      host.write(report);
+    }
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(writes.length).toBe(first);
+    adapter.close();
+  });
+
+  it('ignores a 6D00 that arrives before the GET_ADDRESS payload', async () => {
+    const { host, gadget } = memoryHidPair();
+    let notify: ((packet: Uint8Array) => void) | undefined;
+    const ble = {
+      async write() {
+        return;
+      },
+      onNotify(callback: (packet: Uint8Array) => void) {
+        notify = callback;
+        return () => undefined;
+      },
+      async close() {
+        return;
+      },
+    };
+    const adapter = attachLedger(gadget, ble, DEFAULT_MTU, () => undefined);
+    const replies: Uint8Array[] = [];
+    host.onInput((report) => replies.push(report));
+    for (const report of wrapHidApdu(getAddress())) {
+      host.write(report);
+    }
+    await Promise.resolve();
+    await Promise.resolve();
+    notify?.(Uint8Array.of(0x05, 0x00, 0x00, 0x00, 0x02, 0x6d, 0x00));
+    await Promise.resolve();
+    expect(replies).toEqual([]);
+    notify?.(Uint8Array.of(0x05, 0x00, 0x00, 0x00, 0x02, 0x90, 0x00));
+    await adapter.idle();
+    expect(replies.length).toBeGreaterThan(0);
+    expect(replies[0]?.[7]).toBe(0x90);
+    adapter.close();
+  });
 });
 
 describe('attachOneKey', () => {

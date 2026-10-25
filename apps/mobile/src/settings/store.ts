@@ -2,8 +2,8 @@ import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import * as Localization from 'expo-localization';
 import type { ChainPathMap, LedgerInstalledApp } from '@cws/contracts';
-import { setLedgerCatalogOverlay, type SeedSlot } from '@cws/contracts';
-import type { AppLanguage } from '../i18n';
+import { resetLedgerCatalogOverlay, setLedgerCatalogOverlay, type SeedSlot } from '@cws/contracts';
+import { isAppLanguage, type AppLanguage } from '../i18n';
 
 const SETTINGS_KEY = 'cws.settings.v1';
 const ACTIVE_KEY = 'cws.activeSlot';
@@ -16,6 +16,7 @@ export type AppSettings = {
   confirmClearLogs: boolean;
   bleNameSuffix: string;
   faceIdEnabled: boolean;
+  signReauth: boolean;
   autoLockMinutes: number;
   catalogUpdatedAt: number | null;
   defaultPaths: ChainPathMap;
@@ -23,11 +24,12 @@ export type AppSettings = {
 
 export const DEFAULT_SETTINGS: AppSettings = {
   language: 'en',
-  nearAutoSponsor: true,
+  nearAutoSponsor: false,
   logCap: 1000,
   confirmClearLogs: true,
   bleNameSuffix: '',
   faceIdEnabled: true,
+  signReauth: false,
   autoLockMinutes: 15,
   catalogUpdatedAt: null,
   defaultPaths: {},
@@ -66,9 +68,17 @@ async function writeRaw(key: string, value: string): Promise<void> {
 
 export function detectLanguage(): AppLanguage {
   try {
-    const tag = Localization.getLocales()[0]?.languageTag ?? '';
-    if (/zh-Hant-HK|zh-HK|hk/i.test(tag) && /zh/i.test(tag)) {
+    const locale = Localization.getLocales()[0];
+    const code = locale?.languageCode ?? '';
+    const tag = locale?.languageTag ?? '';
+    if (/^zh/i.test(code) || /^zh/i.test(tag)) {
       return 'zh-HK';
+    }
+    if (/^pt/i.test(code) || /^pt/i.test(tag)) {
+      return 'pt';
+    }
+    if (isAppLanguage(code)) {
+      return code;
     }
   } catch {
     // native module may be missing until rebuild
@@ -84,7 +94,9 @@ export async function loadSettings(): Promise<AppSettings> {
   }
   try {
     const parsed = JSON.parse(raw) as Partial<AppSettings>;
-    return { ...DEFAULT_SETTINGS, language: detected, ...parsed };
+    const storedLang = parsed.language ?? '';
+    const language = isAppLanguage(storedLang) ? storedLang : detected;
+    return { ...DEFAULT_SETTINGS, ...parsed, language };
   } catch {
     return { ...DEFAULT_SETTINGS, language: detected };
   }
@@ -134,6 +146,23 @@ export async function loadCatalogOverlay(): Promise<LedgerInstalledApp[] | undef
 export async function saveCatalogOverlay(apps: LedgerInstalledApp[]): Promise<void> {
   setLedgerCatalogOverlay(apps);
   await writeRaw(CATALOG_KEY, JSON.stringify(apps));
+}
+
+export async function clearCatalogOverlay(): Promise<void> {
+  resetLedgerCatalogOverlay();
+  if (Platform.OS === 'web') {
+    try {
+      globalThis.localStorage?.removeItem(CATALOG_KEY);
+    } catch {
+      // ignore
+    }
+    return;
+  }
+  try {
+    await SecureStore.deleteItemAsync(CATALOG_KEY);
+  } catch {
+    // ignore
+  }
 }
 
 export function resolveDefaultSlot(slots: SeedSlot[], activeId: string | null): SeedSlot | null {
