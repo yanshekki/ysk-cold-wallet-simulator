@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { bleAdvertiseName, type DeviceModel } from '@cws/contracts';
-import { BRAND_LABEL, brandColor, colors, fonts, radius, space } from './theme';
+import { BRAND_LABEL, brandColor, colors, fonts, hairline, radius, space } from './theme';
 
 type Props = {
   model: DeviceModel;
@@ -27,14 +27,7 @@ export function DeviceCard({
   const rail = brandColor(model.brand);
 
   return (
-    <View
-      style={[
-        styles.card,
-        { borderLeftColor: rail },
-        selected && styles.selected,
-        !enabled && styles.disabled,
-      ]}
-    >
+    <View style={[styles.card, selected && styles.selected, !enabled && styles.disabled]}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={model.name}
@@ -43,9 +36,11 @@ export function DeviceCard({
         onPress={onSelect}
         style={styles.hit}
       >
-        <Text style={[styles.brand, { color: rail }]}>{BRAND_LABEL[model.brand]}</Text>
+        <View style={styles.head}>
+          <Text style={[styles.brand, { color: rail }]}>{BRAND_LABEL[model.brand]}</Text>
+          <Text style={styles.protocol}>{model.protocol}</Text>
+        </View>
         <Text style={styles.name}>{model.name}</Text>
-        <Text style={styles.protocol}>{model.protocol}</Text>
         {badge ? <Text style={styles.badge}>{badge}</Text> : null}
       </Pressable>
       {selected && enabled ? (
@@ -79,14 +74,11 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.card,
     borderColor: colors.border,
-    borderWidth: 1,
-    borderLeftWidth: 3,
-    borderRadius: radius.md,
-    overflow: 'hidden',
+    borderWidth: hairline,
+    borderRadius: radius.sm,
   },
   selected: {
     borderColor: colors.accent,
-    backgroundColor: colors.bgElevated,
   },
   disabled: {
     opacity: 0.45,
@@ -95,37 +87,44 @@ const styles = StyleSheet.create({
     padding: space.md,
     gap: 4,
   },
+  head: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: space.sm,
+  },
   brand: {
-    fontSize: 11,
-    fontWeight: '700',
+    fontFamily: fonts.monoMedium,
+    fontSize: 10,
     letterSpacing: 1.2,
     textTransform: 'uppercase',
   },
   name: {
     color: colors.text,
-    fontSize: 17,
-    fontWeight: '700',
+    fontFamily: fonts.sansSemi,
+    fontSize: 16,
   },
   protocol: {
     color: colors.muted,
     fontFamily: fonts.mono,
-    fontSize: 11,
+    fontSize: 10,
   },
   badge: {
-    marginTop: 4,
+    marginTop: 2,
     color: colors.accent,
-    fontSize: 11,
-    fontWeight: '600',
+    fontFamily: fonts.mono,
+    fontSize: 10,
   },
   bezel: {
-    borderTopWidth: 1,
+    borderTopWidth: hairline,
     borderTopColor: colors.border,
     padding: space.md,
     gap: 6,
   },
   meta: {
     color: colors.muted,
-    fontSize: 11,
+    fontFamily: fonts.mono,
+    fontSize: 10,
     letterSpacing: 1,
     textTransform: 'uppercase',
     marginTop: 4,
@@ -142,7 +141,7 @@ const styles = StyleSheet.create({
   },
   copy: {
     color: colors.ok,
-    fontSize: 12,
-    fontWeight: '700',
+    fontFamily: fonts.monoMedium,
+    fontSize: 11,
   },
 });

@@ -19,17 +19,46 @@ function bytesFrom(value: ArrayBuffer | ArrayBufferView | ArrayLike<number>): Ui
   return Uint8Array.from(value);
 }
 
+export function expoRng(length: number): Uint8Array {
+  const bytes = getRandomBytes(length);
+  return bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+}
+
+const cryptoShim = { getRandomValues };
+
 const g = globalThis as typeof globalThis & {
   crypto?: { getRandomValues?: (buffer: ArrayBufferView) => ArrayBufferView };
 };
 
-if (!g.crypto) {
-  Object.defineProperty(globalThis, 'crypto', {
-    configurable: true,
-    value: { getRandomValues },
-  });
-} else if (typeof g.crypto.getRandomValues !== 'function') {
-  g.crypto.getRandomValues = getRandomValues;
+try {
+  if (!g.crypto) {
+    Object.defineProperty(globalThis, 'crypto', {
+      configurable: true,
+      writable: true,
+      value: cryptoShim,
+    });
+  } else if (typeof g.crypto.getRandomValues !== 'function') {
+    try {
+      g.crypto.getRandomValues = getRandomValues;
+    } catch {
+      Object.defineProperty(g.crypto, 'getRandomValues', {
+        configurable: true,
+        writable: true,
+        value: getRandomValues,
+      });
+    }
+  }
+} catch {
+  // Hermes may freeze the host crypto object; protocol handlers inject expoRng.
+}
+
+try {
+  const unbound = (globalThis as { crypto?: typeof cryptoShim }).crypto;
+  if (unbound && typeof unbound.getRandomValues !== 'function') {
+    unbound.getRandomValues = getRandomValues;
+  }
+} catch {
+  // ignore
 }
 
 if (typeof (globalThis as { Buffer?: unknown }).Buffer === 'undefined') {

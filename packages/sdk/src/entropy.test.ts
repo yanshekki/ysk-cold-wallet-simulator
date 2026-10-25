@@ -3,6 +3,7 @@ import {
   entropyByteLength,
   entropyFromMnemonic,
   generateEntropy,
+  isValidBip39Mnemonic,
   mnemonicFromEntropy,
   wordCountFromEntropy,
 } from './entropy';
@@ -36,6 +37,12 @@ describe('entropy helpers', () => {
 
   it('rejects invalid mnemonics', () => {
     expect(() => entropyFromMnemonic('not a mnemonic at all')).toThrow(/invalid/);
+    expect(isValidBip39Mnemonic('not a mnemonic at all')).toBe(false);
+    expect(
+      isValidBip39Mnemonic(
+        'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about',
+      ),
+    ).toBe(true);
   });
 
   it('uses the provided rng and never Math.random', async () => {

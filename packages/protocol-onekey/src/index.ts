@@ -11,6 +11,13 @@ export {
   type V1Message,
 } from './framing';
 export {
+  OneKeyUsbBleBridge,
+  bleV1ToUsbStream,
+  decodeUsbV1,
+  encodeUsbV1,
+  usbStreamToBleV1,
+} from './usbHid';
+export {
   CRC8_INIT,
   PROTO_HEAD_SOF,
   V2FrameAssembler,
@@ -28,11 +35,14 @@ export {
   FailureType,
   MessageType,
   OneKeyDeviceType,
+  decodeBitcoinAddress,
   decodeButtonRequest,
   decodeEthereumAddress,
   decodeEthereumMessageSignature,
   decodeFailure,
   decodeFeatures,
+  encodeBytesSignature,
+  encodeStringAddress,
   encodeEthereumAddress,
   encodeFailure,
   encodeFeatures,
@@ -41,7 +51,7 @@ export {
   encodeProtocolInfo,
   encodeV2Failure,
 } from './messages';
-export { encodeRepeatedUint32, encodeString, encodeUint32 } from './proto';
+export { encodeBool, encodeBytes, encodeRepeatedUint32, encodeString, encodeUint32 } from './proto';
 export {
   bitcoinP2pkhAddress,
   derivePrivateKey,

@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { DeviceModel } from '@cws/contracts';
-import { colors, radius, space } from './theme';
+import { colors, fonts, hairline, radius, space } from './theme';
 
 type Item = {
   model: DeviceModel;
@@ -27,11 +27,7 @@ export function BrandGrid({ items, selectedId, onSelect }: Props) {
             accessibilityLabel={model.name}
             accessibilityState={{ disabled: !enabled, selected }}
             onPress={() => onSelect(model)}
-            style={[
-              styles.card,
-              selected && styles.selected,
-              !enabled && styles.disabled,
-            ]}
+            style={[styles.card, selected && styles.selected, !enabled && styles.disabled]}
           >
             <Text style={styles.brand}>{model.brand}</Text>
             <Text style={styles.name}>{model.name}</Text>
@@ -55,33 +51,34 @@ const styles = StyleSheet.create({
     maxWidth: '48%',
     backgroundColor: colors.card,
     borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radius.md,
+    borderWidth: hairline,
+    borderRadius: radius.sm,
     padding: space.md,
-    minHeight: 108,
+    minHeight: 96,
   },
   selected: {
     borderColor: colors.accent,
-    backgroundColor: colors.accentDim,
   },
   disabled: {
     opacity: 0.45,
   },
   brand: {
     color: colors.muted,
-    fontSize: 11,
+    fontFamily: fonts.monoMedium,
+    fontSize: 10,
     textTransform: 'uppercase',
-    letterSpacing: 1,
+    letterSpacing: 1.2,
     marginBottom: 6,
   },
   name: {
     color: colors.text,
-    fontSize: 16,
-    fontWeight: '600',
+    fontFamily: fonts.sansSemi,
+    fontSize: 15,
   },
   badge: {
     marginTop: 8,
     color: colors.accent,
-    fontSize: 11,
+    fontFamily: fonts.mono,
+    fontSize: 10,
   },
 });

@@ -19,6 +19,9 @@ export const MessageType = {
   Success: 2,
   Failure: 3,
   GetPublicKey: 11,
+  PublicKey: 12,
+  SignMessage: 38,
+  MessageSignature: 40,
   GetAddress: 29,
   Address: 30,
   Features: 17,
@@ -34,14 +37,73 @@ export const MessageType = {
   EthereumMessageSignature: 66,
   EndSession: 83,
   EthereumSignTxEIP1559: 452,
+  EthereumGetPublicKey: 450,
+  EthereumPublicKey: 451,
+  EthereumSignTypedHash: 470,
+  EthereumTypedDataSignature: 469,
+  CardanoGetAddress: 307,
+  CardanoAddress: 308,
+  RippleGetAddress: 400,
+  RippleAddress: 401,
+  RippleSignTx: 402,
+  RippleSignedTx: 403,
+  SolanaGetAddress: 10100,
+  SolanaAddress: 10101,
+  SolanaSignTx: 10102,
+  SolanaSignedTx: 10103,
+  SolanaSignOffChainMessage: 10104,
+  SolanaMessageSignature: 10105,
+  TronGetAddress: 10501,
+  TronAddress: 10502,
+  TronSignTx: 10503,
+  TronSignedTx: 10504,
+  TronSignMessage: 10505,
+  TronMessageSignature: 10506,
+  AptosGetAddress: 10600,
+  AptosAddress: 10601,
+  AptosSignTx: 10602,
+  AptosSignedTx: 10603,
+  AptosSignMessage: 10604,
+  AptosMessageSignature: 10605,
+  NearGetAddress: 10701,
+  NearAddress: 10702,
+  NearSignTx: 10703,
+  NearSignedTx: 10704,
+  CosmosGetAddress: 10800,
+  CosmosAddress: 10801,
+  CosmosSignTx: 10802,
+  CosmosSignedTx: 10803,
+  PolkadotGetAddress: 11000,
+  PolkadotAddress: 11001,
+  PolkadotSignTx: 11002,
+  PolkadotSignedTx: 11003,
+  SuiGetAddress: 11100,
+  SuiAddress: 11101,
+  SuiSignTx: 11102,
+  SuiSignedTx: 11103,
+  SuiSignMessage: 11104,
+  SuiMessageSignature: 11105,
+  TonGetAddress: 11901,
+  TonAddress: 11902,
+  TonSignMessage: 11903,
+  TonSignedMessage: 11904,
+  SignPsbt: 10052,
+  SignedPsbt: 10053,
   OnekeyGetFeatures: 10025,
   OnekeyFeatures: 10026,
+  GetPassphraseState: 10028,
+  PassphraseState: 10029,
+  UnLockDevice: 10030,
+  UnLockDeviceResponse: 10031,
+  EthereumGetPublicKeyOneKey: 20100,
+  EthereumPublicKeyOneKey: 20101,
   EthereumGetAddressOneKey: 20102,
   EthereumAddressOneKey: 20103,
   EthereumSignTxOneKey: 20104,
   EthereumSignTxEIP1559OneKey: 20105,
   EthereumSignMessageOneKey: 20108,
   EthereumMessageSignatureOneKey: 20110,
+  EthereumSignTypedHashOneKey: 20117,
   ReadSEPublicCert: 10007,
   SEPublicCert: 10008,
   SESignMessage: 10012,
@@ -106,6 +168,24 @@ export type EthereumSignTxMsg = {
   value: Uint8Array;
   data: Uint8Array;
   chainId: number;
+};
+
+export type EthereumSignTxEip1559Msg = {
+  addressN: number[];
+  nonce: Uint8Array;
+  maxPriorityFee: Uint8Array;
+  maxFee: Uint8Array;
+  gasLimit: Uint8Array;
+  to: Uint8Array;
+  value: Uint8Array;
+  data: Uint8Array;
+  chainId: number;
+};
+
+export type PathBytesMsg = {
+  addressN: number[];
+  payload: Uint8Array;
+  showDisplay: boolean;
 };
 
 export type FeaturesInput = {
@@ -209,6 +289,30 @@ export function encodeDeviceStatus(deviceId: string): Uint8Array {
   );
 }
 
+export function encodePassphraseState(input: {
+  sessionId: Uint8Array;
+  passphraseState?: string;
+  unlockedAttachPin?: boolean;
+}): Uint8Array {
+  return concatBytes(
+    encodeString(1, input.passphraseState ?? ''),
+    encodeBytes(2, input.sessionId),
+    encodeBool(3, input.unlockedAttachPin === true),
+  );
+}
+
+export function encodeUnLockDeviceResponse(input?: {
+  unlocked?: boolean;
+  unlockedAttachPin?: boolean;
+  passphraseProtection?: boolean;
+}): Uint8Array {
+  return concatBytes(
+    encodeBool(1, input?.unlocked !== false),
+    encodeBool(2, input?.unlockedAttachPin === true),
+    encodeBool(3, input?.passphraseProtection === true),
+  );
+}
+
 export function encodeButtonRequest(code: number): Uint8Array {
   return encodeUint32(1, code);
 }
@@ -270,6 +374,33 @@ export function encodeOnekeyFeatures(input: FeaturesInput): Uint8Array {
   );
 }
 
+export function encodeHdNode(node: {
+  depth: number;
+  fingerprint: number;
+  childNum: number;
+  chainCode: Uint8Array;
+  publicKey: Uint8Array;
+}): Uint8Array {
+  return concatBytes(
+    encodeUint32(1, node.depth),
+    encodeUint32(2, node.fingerprint),
+    encodeUint32(3, node.childNum),
+    encodeBytes(4, node.chainCode),
+    encodeBytes(6, node.publicKey),
+  );
+}
+
+export function encodeEthereumPublicKey(node: {
+  depth: number;
+  fingerprint: number;
+  childNum: number;
+  chainCode: Uint8Array;
+  publicKey: Uint8Array;
+  xpub: string;
+}): Uint8Array {
+  return concatBytes(encodeBytes(1, encodeHdNode(node)), encodeString(2, node.xpub));
+}
+
 export function encodeEthereumAddress(address: string): Uint8Array {
   return encodeString(2, address.startsWith('0x') ? address : `0x${address}`);
 }
@@ -281,6 +412,10 @@ export function encodeEthereumMessageSignature(signature: Uint8Array, address: s
 
 export function encodeBitcoinAddress(address: string): Uint8Array {
   return encodeString(1, address);
+}
+
+export function decodeBitcoinAddress(payload: Uint8Array): string {
+  return readOptionalString(decodeFields(payload), 1) ?? '';
 }
 
 export function decodeEthereumGetAddress(payload: Uint8Array): EthereumGetAddressMsg {
@@ -403,6 +538,12 @@ export function isEthGetAddress(type: number): boolean {
   return type === MessageType.EthereumGetAddress || type === MessageType.EthereumGetAddressOneKey;
 }
 
+export function isEthGetPublicKey(type: number): boolean {
+  return (
+    type === MessageType.EthereumGetPublicKey || type === MessageType.EthereumGetPublicKeyOneKey
+  );
+}
+
 export function isEthSignMessage(type: number): boolean {
   return (
     type === MessageType.EthereumSignMessage || type === MessageType.EthereumSignMessageOneKey
@@ -412,16 +553,103 @@ export function isEthSignMessage(type: number): boolean {
 export function isEthSignTx(type: number): boolean {
   return (
     type === MessageType.EthereumSignTx ||
+    type === MessageType.EthereumSignTxOneKey
+  );
+}
+
+export function isEthSignTxEip1559(type: number): boolean {
+  return (
     type === MessageType.EthereumSignTxEIP1559 ||
-    type === MessageType.EthereumSignTxOneKey ||
     type === MessageType.EthereumSignTxEIP1559OneKey
   );
+}
+
+export function isEthSignTypedHash(type: number): boolean {
+  return type === MessageType.EthereumSignTypedHash || type === MessageType.EthereumSignTypedHashOneKey;
+}
+
+export function decodeEthereumSignTxEip1559(payload: Uint8Array): EthereumSignTxEip1559Msg {
+  const fields = decodeFields(payload);
+  const toString = readOptionalString(fields, 6);
+  let to: Uint8Array = new Uint8Array();
+  if (toString) {
+    const hex = toString.startsWith('0x') || toString.startsWith('0X') ? toString.slice(2) : toString;
+    if (hex.length % 2 === 0 && hex.length > 0) {
+      to = hexToBytes(hex);
+    }
+  }
+  return {
+    addressN: readPackedOrRepeatedUint32(fields, 1),
+    nonce: readOptionalBytes(fields, 2) ?? new Uint8Array(),
+    maxPriorityFee: readOptionalBytes(fields, 3) ?? new Uint8Array(),
+    maxFee: readOptionalBytes(fields, 4) ?? new Uint8Array(),
+    gasLimit: readOptionalBytes(fields, 5) ?? new Uint8Array(),
+    to,
+    value: readOptionalBytes(fields, 7) ?? new Uint8Array(),
+    data: readOptionalBytes(fields, 8) ?? new Uint8Array(),
+    chainId: fields.find((field) => field.field === 10)?.varint ?? 1,
+  };
+}
+
+export function decodeEthereumSignTypedHash(payload: Uint8Array): {
+  addressN: number[];
+  domain: Uint8Array;
+  structHash: Uint8Array;
+} {
+  const fields = decodeFields(payload);
+  return {
+    addressN: readPackedOrRepeatedUint32(fields, 1),
+    domain: readOptionalBytes(fields, 2) ?? new Uint8Array(),
+    structHash: readOptionalBytes(fields, 3) ?? new Uint8Array(),
+  };
+}
+
+export function decodePathBytes(payload: Uint8Array, bytesField = 2): PathBytesMsg {
+  const fields = decodeFields(payload);
+  return {
+    addressN: readPackedOrRepeatedUint32(fields, 1),
+    payload: readOptionalBytes(fields, bytesField) ?? new Uint8Array(),
+    showDisplay: readOptionalBool(fields, 2) === true || readOptionalBool(fields, 3) === true,
+  };
+}
+
+export function encodeStringAddress(address: string): Uint8Array {
+  return encodeString(1, address);
+}
+
+export function encodeBytesSignature(signature: Uint8Array): Uint8Array {
+  return encodeBytes(1, signature);
+}
+
+export function encodeTypedDataSignature(signature: Uint8Array, address: string): Uint8Array {
+  return concatBytes(encodeBytes(1, signature), encodeString(2, address));
+}
+
+export function encodeHdPublicKey(node: {
+  depth: number;
+  fingerprint: number;
+  childNum: number;
+  chainCode: Uint8Array;
+  publicKey: Uint8Array;
+  xpub: string;
+}): Uint8Array {
+  return concatBytes(encodeBytes(1, encodeHdNode(node)), encodeString(2, node.xpub));
+}
+
+export function encodeMessageSignature(address: string, signature: Uint8Array): Uint8Array {
+  return concatBytes(encodeString(1, address), encodeBytes(2, signature));
 }
 
 export function ethAddressReplyType(requestType: number): number {
   return requestType === MessageType.EthereumGetAddressOneKey
     ? MessageType.EthereumAddressOneKey
     : MessageType.EthereumAddress;
+}
+
+export function ethPublicKeyReplyType(requestType: number): number {
+  return requestType === MessageType.EthereumGetPublicKeyOneKey
+    ? MessageType.EthereumPublicKeyOneKey
+    : MessageType.EthereumPublicKey;
 }
 
 export function ethSignReplyType(requestType: number): number {

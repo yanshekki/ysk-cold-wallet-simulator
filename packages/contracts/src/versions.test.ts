@@ -10,6 +10,7 @@ const EXPECTED = {
     gen5: '1.1.1',
     bitcoin: '2.4.2',
     ethereum: '1.23.0',
+    avalanche: '1.4.23',
     solana: '1.16.0',
   },
   onekey: {
@@ -41,6 +42,9 @@ describe('firmware catalog', () => {
     );
     expect(LEDGER_INSTALLED_APPS.find((app) => app.id === 'solana')?.version).toBe(
       EXPECTED.ledger.solana,
+    );
+    expect(LEDGER_INSTALLED_APPS.find((app) => app.id === 'avalanche')?.version).toBe(
+      EXPECTED.ledger.avalanche,
     );
   });
 

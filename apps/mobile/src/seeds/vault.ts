@@ -128,6 +128,21 @@ export async function loadEntropy(id: string): Promise<Uint8Array> {
   return base64ToBytes(raw);
 }
 
+export async function updateSlotMeta(slot: SeedSlot): Promise<SeedSlot> {
+  const stored: SeedSlot = { ...slot, backup: slot.backup ?? 'bip39' };
+  const slots = await listSlots();
+  const next = [...slots.filter((item) => item.id !== stored.id), stored];
+  await writeSlots(next);
+  return stored;
+}
+
+export async function wipeAllSlots(): Promise<void> {
+  const slots = await listSlots();
+  for (const slot of slots) {
+    await deleteSlot(slot.id);
+  }
+}
+
 export async function deleteSlot(id: string): Promise<void> {
   const slots = (await listSlots()).filter((slot) => slot.id !== id);
   await writeSlots(slots);

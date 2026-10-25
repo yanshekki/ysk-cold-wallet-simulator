@@ -1,10 +1,24 @@
 import { HDKey } from '@scure/bip32';
 import { entropyToMnemonic, mnemonicToSeedSync } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
+import { ed25519 } from '@noble/curves/ed25519';
 import { secp256k1 } from '@noble/curves/secp256k1';
+import { hmac } from '@noble/hashes/hmac';
+import { sha512 } from '@noble/hashes/sha2';
 import { keccak_256 } from '@noble/hashes/sha3';
 import type { BackupKind } from '@cws/contracts';
 import { bytesToHex, concatBytes, encodeAscii } from './bytes';
+
+const utf8 = new TextEncoder();
+
+function u32be(value: number): Uint8Array {
+  return Uint8Array.of(
+    (value >>> 24) & 0xff,
+    (value >>> 16) & 0xff,
+    (value >>> 8) & 0xff,
+    value & 0xff,
+  );
+}
 
 export function mnemonicFromEntropy(entropy: Uint8Array): string {
   return entropyToMnemonic(entropy, wordlist);
@@ -83,4 +97,48 @@ export function signPersonalMessage(privateKey: Uint8Array, message: Uint8Array)
   const compact = sig.toCompactRawBytes();
   const v = (sig.recovery ?? 0) + 27;
   return concatBytes(Uint8Array.of(v), compact);
+}
+
+/** Avalanche SIGN_HASH: r||s||v with v in {0,1}. */
+export function signSecp256k1Recoverable(privateKey: Uint8Array, hash: Uint8Array): Uint8Array {
+  const sig = secp256k1.sign(hash, privateKey);
+  return concatBytes(sig.toCompactRawBytes(), Uint8Array.of(sig.recovery ?? 0));
+}
+
+export function slip10Ed25519(seed: Uint8Array, path: string): Uint8Array {
+  let block = hmac(sha512, utf8.encode('ed25519 seed'), seed);
+  let key = block.subarray(0, 32);
+  let chain = block.subarray(32);
+  const parts = path.replace(/^m\/?/, '').split('/').filter(Boolean);
+  for (const part of parts) {
+    if (!part.endsWith("'")) {
+      throw new Error(`SLIP-10 ed25519 path must be hardened (${path})`);
+    }
+    const index = 0x80000000 + Number.parseInt(part.slice(0, -1), 10);
+    block = hmac(sha512, chain, concatBytes(Uint8Array.of(0x00), key, u32be(index)));
+    key = block.subarray(0, 32);
+    chain = block.subarray(32);
+  }
+  return key;
+}
+
+export function deriveEd25519PrivateKey(
+  entropy: Uint8Array,
+  path: string,
+  passphrase?: string,
+  backup: BackupKind = 'bip39',
+): Uint8Array {
+  const seed =
+    backup === 'slip39'
+      ? entropy
+      : mnemonicToSeedSync(mnemonicFromEntropy(entropy), passphrase ?? '');
+  return slip10Ed25519(seed, path);
+}
+
+export function ed25519PublicKey(privateKey: Uint8Array): Uint8Array {
+  return ed25519.getPublicKey(privateKey);
+}
+
+export function signEd25519(privateKey: Uint8Array, message: Uint8Array): Uint8Array {
+  return ed25519.sign(message, privateKey);
 }

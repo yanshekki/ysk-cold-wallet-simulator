@@ -1,73 +1,82 @@
-import { Modal, StyleSheet, Text, TextInput, View } from 'react-native';
-import { signingNeedsPassphrase, signingSlideLabel, type SigningRequest } from '@cws/contracts';
+import { Dimensions, Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { describeSigning, signingNeedsPassphrase, signingSlideLabel, type SigningRequest } from '@cws/contracts';
 import { Button } from './Button';
+import { SigningDetailView, type SigningCopy } from './SigningDetail';
 import { SlideToConfirm } from './SlideToConfirm';
-import { BRAND_LABEL, brandColor, colors, fonts, radius, space } from './theme';
+import { BRAND_LABEL, brandColor, colors, fonts, hairline, radius, space } from './theme';
 
 type Props = {
   visible: boolean;
   request: SigningRequest | null;
-  passphrase: string;
-  onChangePassphrase: (value: string) => void;
   onConfirm: () => void;
   onReject: () => void;
+  rejectLabel?: string;
+  confirmTitle?: string;
+  sessionPassphraseApplied?: boolean;
+  passphraseAppliedLabel?: string;
+  passphraseIdleLabel?: string;
+  copy?: SigningCopy;
 };
 
 export function SigningModal({
   visible,
   request,
-  passphrase,
-  onChangePassphrase,
   onConfirm,
   onReject,
+  rejectLabel = 'Reject',
+  confirmTitle = 'Confirm on device',
+  sessionPassphraseApplied = false,
+  passphraseAppliedLabel = 'Session passphrase applied',
+  passphraseIdleLabel = 'No session passphrase',
+  copy,
 }: Props) {
   const brand = request?.brand;
   const kind = request?.kind ?? 'sign';
-  const showPassphrase = request ? signingNeedsPassphrase(kind) : false;
+  const sheetMax = Math.round(Dimensions.get('window').height * 0.8);
+  const previewMax = Math.round(Dimensions.get('window').height * 0.42);
+  const showChip = request ? signingNeedsPassphrase(kind) : false;
+  const resetKey = request
+    ? `${request.kind}:${request.path}:${request.title}:${describeSigning(request).headline}`
+    : '';
   return (
-    <Modal visible={visible} transparent animationType="fade">
-      <View style={styles.backdrop}>
-        <View style={styles.sheet}>
-          <Text style={styles.kicker}>{request?.title ?? 'Confirm on device'}</Text>
-          {brand ? (
-            <Text style={[styles.brand, { color: brandColor(brand) }]}>{BRAND_LABEL[brand]}</Text>
-          ) : null}
-          <Text style={styles.path}>{request?.path ?? ''}</Text>
-          <Text style={styles.message}>{request?.message ?? ''}</Text>
-          {showPassphrase ? (
-            <>
-              <Text style={styles.hint}>BIP39 passphrase is never stored. Leave blank if unused.</Text>
-              <TextInput
-                value={passphrase}
-                onChangeText={onChangePassphrase}
-                placeholder="Optional passphrase"
-                placeholderTextColor={colors.muted}
-                secureTextEntry
-                autoCapitalize="none"
-                autoCorrect={false}
-                autoComplete="off"
-                textContentType="oneTimeCode"
-                importantForAutofill="no"
-                spellCheck={false}
-                style={styles.input}
-              />
-            </>
-          ) : null}
-          <SlideToConfirm
-            label={signingSlideLabel(kind)}
-            onConfirm={onConfirm}
-            resetKey={request ? `${request.kind}:${request.path}:${request.message}` : ''}
-          />
-          <View style={styles.actions}>
-            <Button label="Reject" variant="danger" onPress={onReject} />
+    <Modal visible={visible} transparent animationType="fade" statusBarTranslucent>
+      <GestureHandlerRootView style={styles.flex}>
+        <View style={styles.backdrop}>
+          <View style={[styles.sheet, { maxHeight: sheetMax }]}>
+            <Text style={styles.kicker}>{request?.title ?? confirmTitle}</Text>
+            {brand ? (
+              <Text style={[styles.brand, { color: brandColor(brand) }]}>{BRAND_LABEL[brand]}</Text>
+            ) : null}
+            {request ? (
+              <ScrollView
+                style={[styles.preview, { maxHeight: previewMax }]}
+                contentContainerStyle={styles.previewInner}
+                nestedScrollEnabled
+              >
+                <SigningDetailView request={request} copy={copy} />
+              </ScrollView>
+            ) : null}
+            {showChip ? (
+              <Text style={sessionPassphraseApplied ? styles.chipOn : styles.chipOff}>
+                {sessionPassphraseApplied ? passphraseAppliedLabel : passphraseIdleLabel}
+              </Text>
+            ) : null}
+            <SlideToConfirm label={signingSlideLabel(kind)} onConfirm={onConfirm} resetKey={resetKey} />
+            <View style={styles.actions}>
+              <Button label={rejectLabel} variant="danger" onPress={onReject} />
+            </View>
           </View>
         </View>
-      </View>
+      </GestureHandlerRootView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.72)',
@@ -76,49 +85,46 @@ const styles = StyleSheet.create({
   },
   sheet: {
     backgroundColor: colors.bgElevated,
-    borderRadius: radius.lg,
-    borderWidth: 1,
+    borderRadius: radius.md,
+    borderWidth: hairline,
     borderColor: colors.border,
     padding: space.lg,
     gap: space.sm,
   },
   kicker: {
-    color: colors.accent,
+    color: colors.muted,
+    fontFamily: fonts.monoMedium,
     textTransform: 'uppercase',
-    letterSpacing: 1.2,
-    fontSize: 12,
-    fontWeight: '700',
+    letterSpacing: 1.4,
+    fontSize: 10,
   },
   brand: {
-    fontSize: 13,
-    fontWeight: '700',
+    fontFamily: fonts.monoMedium,
+    fontSize: 11,
     letterSpacing: 1,
     textTransform: 'uppercase',
   },
-  path: {
+  preview: {
+    flexGrow: 0,
+  },
+  previewInner: {
+    gap: space.sm,
+    paddingBottom: space.xs,
+  },
+  chipOn: {
     color: colors.ok,
-    fontFamily: fonts.mono,
-    fontSize: 13,
+    fontFamily: fonts.monoMedium,
+    fontSize: 11,
+    letterSpacing: 0.6,
   },
-  message: {
-    color: colors.text,
-    lineHeight: 22,
-    fontSize: 15,
-  },
-  hint: {
+  chipOff: {
     color: colors.muted,
-    fontSize: 12,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    color: colors.text,
-    paddingHorizontal: space.md,
-    minHeight: 44,
+    fontFamily: fonts.monoMedium,
+    fontSize: 11,
+    letterSpacing: 0.6,
   },
   actions: {
-    marginTop: space.sm,
+    marginTop: space.xs,
     gap: space.sm,
   },
 });

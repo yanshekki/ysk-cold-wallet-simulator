@@ -11,7 +11,8 @@ describe('logFormat', () => {
     const text = formatLogText([
       { id: '1', at: Date.UTC(2026, 0, 1, 12, 0, 0, 12), direction: 'out', hex: 'e001', note: 'GET' },
     ]);
-    expect(text).toContain('TX GET');
+    expect(text).toContain('TX');
+    expect(text).toContain('GET');
     expect(text).toContain('e0 01');
     expect(formatTime(Date.UTC(2026, 0, 1, 12, 0, 0, 12))).toMatch(/00\.012$/);
   });

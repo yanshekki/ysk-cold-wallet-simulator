@@ -1,16 +1,18 @@
 import { Pressable, StyleSheet, Text } from 'react-native';
-import { colors, radius, space } from './theme';
+import { colors, fonts, hairline, radius, space } from './theme';
 
 type Props = {
   label: string;
   onPress: () => void;
   variant?: 'primary' | 'ghost' | 'danger';
   disabled?: boolean;
+  testID?: string;
 };
 
-export function Button({ label, onPress, variant = 'primary', disabled }: Props) {
+export function Button({ label, onPress, variant = 'primary', disabled, testID }: Props) {
   return (
     <Pressable
+      testID={testID}
       accessibilityRole="button"
       disabled={disabled}
       onPress={onPress}
@@ -38,8 +40,8 @@ export function Button({ label, onPress, variant = 'primary', disabled }: Props)
 
 const styles = StyleSheet.create({
   base: {
-    minHeight: 48,
-    borderRadius: radius.md,
+    minHeight: 44,
+    borderRadius: radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: space.lg,
@@ -50,24 +52,25 @@ const styles = StyleSheet.create({
   },
   ghost: {
     backgroundColor: 'transparent',
-    borderWidth: 1,
+    borderWidth: hairline,
     borderColor: colors.border,
   },
   danger: {
-    backgroundColor: colors.accentDim,
-    borderWidth: 1,
+    backgroundColor: 'transparent',
+    borderWidth: hairline,
     borderColor: colors.danger,
   },
   disabled: {
     opacity: 0.4,
   },
   pressed: {
-    opacity: 0.85,
+    opacity: 0.82,
   },
   label: {
     color: colors.bg,
-    fontSize: 16,
-    fontWeight: '700',
+    fontFamily: fonts.sansSemi,
+    fontSize: 14,
+    letterSpacing: 0.4,
   },
   ghostLabel: {
     color: colors.text,

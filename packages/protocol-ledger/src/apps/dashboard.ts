@@ -1,4 +1,4 @@
-import { LEDGER_INSTALLED_APPS, ledgerOsFor, type LedgerApp } from '@cws/contracts';
+import { ledgerCatalog, ledgerOsFor, type LedgerApp } from '@cws/contracts';
 import { sha256 } from '@noble/hashes/sha2';
 import { concatBytes, encodeAscii } from '../bytes';
 import { encodeResponse, SW_OK } from '../apdu';
@@ -75,7 +75,7 @@ export function getAppAndVersionFor(app: LedgerApp, modelId: string): Uint8Array
   if (app === 'dashboard') {
     return getAppAndVersion(modelId);
   }
-  const installed = LEDGER_INSTALLED_APPS.find((item) => item.id === app);
+  const installed = ledgerCatalog().find((item) => item.id === app);
   if (installed) {
     return encodeAppAndVersion(installed.openAppName, installed.version);
   }
@@ -135,7 +135,7 @@ export function openAppName(data: Uint8Array): string {
  * [entryLen][blocks:u16][hash:32][nameLen][name]
  */
 export function encodeListApps(): Uint8Array {
-  const entries = LEDGER_INSTALLED_APPS.map((app) => {
+  const entries = ledgerCatalog().map((app) => {
     const name = encodeAscii(app.openAppName);
     const hash = sha256(encodeAscii(app.id));
     const inner = concatBytes(Uint8Array.of(0x00, 0x08), hash, Uint8Array.of(name.length), name);

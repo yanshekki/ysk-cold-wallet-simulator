@@ -16,3 +16,20 @@ npx expo run:android   # or run:ios
 ```
 
 **Requires physical device.** BLE peripheral does not work in simulators or Expo Go.
+
+Ledger BLE testnet host (desktop Chrome, no USB):
+
+```bash
+yarn lab
+```
+
+Open the printed localhost URL, start radio on a physical iPhone advertising a Ledger model, then Connect Ledger (Bluetooth). Signing still confirms on the phone.
+
+Desktop wallets that only speak USB HID can use the phone through a local gadget:
+
+```bash
+yarn workspace @cws/native-proxy build   # once, needs Rust
+yarn proxy                               # opens http://127.0.0.1:8788 — Start, then MetaMask / Rabby / Phantom / Keplr → Ledger over “USB”
+```
+
+The local page is on/off plus live radio, HID, and logs. The daemon stays the BLE/HID process. `--no-ui` scans immediately without the page. Signing still confirms on the phone. Linux needs `apps/proxy/udev/99-cws-uhid.rules`. Trezor Suite talks to `http://127.0.0.1:21325`. Do not expect Ledger Live Genuine to pass. macOS virtual HID needs Apple’s `com.apple.developer.hid.virtual.device` entitlement.

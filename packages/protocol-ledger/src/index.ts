@@ -14,6 +14,30 @@ export {
   TAG_PROTOCOL_VERSION,
 } from './framing';
 export {
+  HID_CHANNEL,
+  HID_PACKET_SIZE,
+  HID_TAG_APDU,
+  HidReassembler,
+  LEDGER_HID_USAGE,
+  LEDGER_HID_USAGE_PAGE,
+  LEDGER_USB_MODEL,
+  LEDGER_USB_VID,
+  ledgerGenericHidProductId,
+  metamaskWebHidFilters,
+  normalizeHidReport,
+  unwrapHidReports,
+  wrapHidApdu,
+  wrapHidFrame,
+  type HidFrame,
+} from './hid';
+export {
+  blePacketsToHidReports,
+  hidReportsToBlePackets,
+  proxyHidThroughBleWrite,
+  UsbBleProxy,
+  assertApduTag,
+} from './usbBleBridge';
+export {
   encodeResponse,
   encodeSw,
   parseApdu,
@@ -27,13 +51,17 @@ export {
   SW_WRONG_P1P2,
 } from './apdu';
 export {
+  deriveEd25519PrivateKey,
   deriveHdNode,
   derivePrivateKey,
+  ed25519PublicKey,
   ethereumAddressFromPrivateKey,
   mnemonicFromEntropy,
   personalMessageHash,
   publicKeyCompressed,
+  signEd25519,
   signPersonalMessage,
+  signSecp256k1Recoverable,
 } from './crypto';
 export {
   bitcoinAddressFor,
@@ -42,4 +70,32 @@ export {
   BITCOIN_APP_VERSION,
   handleBitcoinApdu,
 } from './apps/bitcoin';
+export {
+  attachPartialSig,
+  bip143Sighash,
+  buildP2wpkhPsbt,
+  ledgerFlowFromPsbt,
+  parsePsbt,
+  p2wpkhScriptCode,
+  u32le,
+} from './apps/psbt';
 export { bytesToHex, hexToBytes } from './bytes';
+export {
+  FUJI_C_CHAIN_ID,
+  FUJI_HRP,
+  FUJI_X_CHAIN_ID,
+  avalancheChainLabel,
+} from './apps/avalanche';
+export {
+  aptosAuthKey,
+  cardanoEnterprise,
+  cosmosBech32,
+  encodeDerSignature,
+  encodePubAndAddress,
+  ss58Encode,
+  suiAddress,
+  tonBounceable,
+  tronBase58,
+  xrpClassic,
+} from './apps/addresses';
+export { deriveIcarus, signIcarus } from './apps/icarus';

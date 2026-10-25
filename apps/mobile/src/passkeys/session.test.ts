@@ -27,12 +27,23 @@ vi.mock('expo-local-authentication', () => ({
 }));
 
 describe('passkeys session', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     platform.OS = 'ios';
     isDevBuild.mockReset();
     isDevBuild.mockReturnValue(false);
     getEnrolledLevelAsync.mockReset();
     authenticateAsync.mockReset();
+    const session = await import('./session');
+    session.setFaceIdEnabled(true);
+  });
+
+  it('skips Face ID when the production toggle is off', async () => {
+    getEnrolledLevelAsync.mockResolvedValue(1);
+    const { unlock, setFaceIdEnabled } = await import('./session');
+    setFaceIdEnabled(false);
+    await expect(unlock()).resolves.toBe(true);
+    expect(authenticateAsync).not.toHaveBeenCalled();
+    setFaceIdEnabled(true);
   });
 
   it('skips Face ID in a DEV build without calling the platform authenticator', async () => {

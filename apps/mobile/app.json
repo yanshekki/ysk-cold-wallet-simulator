@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "YSK Cold Wallet Simulator",
+    "name": "CWS",
     "slug": "ysk-cold-wallet-simulator",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -10,7 +10,7 @@
     "icon": "./assets/icon.png",
     "splash": {
       "image": "./assets/splash-icon.png",
-      "backgroundColor": "#0d1117",
+      "backgroundColor": "#07080A",
       "resizeMode": "contain"
     },
     "plugins": [
@@ -29,16 +29,26 @@
         "munim-bluetooth",
         {
           "isBackgroundEnabled": true,
-          "modes": ["peripheral", "central"],
+          "modes": [
+            "peripheral",
+            "central"
+          ],
           "bluetoothAlwaysPermission": "Allow YSK Cold Wallet Simulator to act as a hardware wallet over Bluetooth"
         }
-      ]
+      ],
+      "expo-localization",
+      "expo-font"
     ],
     "android": {
       "package": "hk.ysk.coldwalletsimulator",
+      "label": "CWS",
+      "softwareKeyboardLayoutMode": "resize",
+      "navigationBar": {
+          "backgroundColor": "#07080A"
+      },
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#0d1117"
+        "backgroundColor": "#07080A"
       },
       "permissions": [
         "android.permission.BLUETOOTH",
@@ -62,9 +72,14 @@
       "bundleIdentifier": "hk.ysk.coldwalletsimulator",
       "appleTeamId": "K897VVZW77",
       "infoPlist": {
+        "CFBundleDisplayName": "CWS",
         "NSBluetoothAlwaysUsageDescription": "This app simulates a hardware wallet over Bluetooth",
         "NSFaceIDUsageDescription": "Unlock the seed vault",
-        "UIBackgroundModes": ["bluetooth-peripheral"]
+        "NSMotionUsageDescription": "Optional extra entropy while generating a seed",
+        "UIStatusBarStyle": "UIStatusBarStyleLightContent",
+        "UIBackgroundModes": [
+          "bluetooth-peripheral"
+        ]
       }
     }
   }

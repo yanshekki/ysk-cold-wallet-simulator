@@ -1,4 +1,5 @@
 import type { Brand } from './index';
+import type { SigningDetail } from './signingPreview';
 
 export type SigningKind =
   | 'sign'
@@ -15,6 +16,7 @@ export interface SigningRequest {
   path: string;
   message: string;
   rawPayload: Uint8Array;
+  detail?: SigningDetail;
 }
 
 export function signingNeedsPassphrase(kind: SigningKind): boolean {
@@ -38,7 +40,7 @@ export function signingSlideLabel(kind: SigningKind): string {
   }
 }
 
-export const SLIDE_COMMIT_RATIO = 0.85;
+export const SLIDE_COMMIT_RATIO = 0.5;
 
 export function slideProgress(translationX: number, travel: number): number {
   if (travel <= 0) {

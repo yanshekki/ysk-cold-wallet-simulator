@@ -1,32 +1,68 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import type { BackupKind } from '@cws/contracts';
+import { mergeChainPaths } from '@cws/contracts';
 import {
+  bytesToEntropyHex,
+  entropyBitsForWordCount,
   generateSlip39,
+  inspectAddresses,
+  isKnownUnsafeMnemonic,
+  minDiceRolls,
+  minHexChars,
+  mixExtraEntropy,
   mnemonicFromEntropy,
+  parseCustomEntropy,
+  PREVIEW_INSPECT_IDS,
   type Bip39WordCount,
+  type CustomEntropyKind,
+  type InspectRow,
 } from '@cws/sdk';
-import { Button, Screen, colors, radius, space } from '@cws/ui';
+import { AddressInspector, Button, MnemonicGrid, Screen, colors, fonts, hairline, radius, space } from '@cws/ui';
+import { useT } from '../../src/i18n';
+import { unlock as requestUnlock } from '../../src/passkeys';
 import { generateSecureEntropy, generateSecureSecret, newSlotId } from '../../src/seeds/generate';
+import { collectMotionMix } from '../../src/seeds/motion';
+import { useSecretScreen } from '../../src/seeds/screenGuard';
 import { saveSlot } from '../../src/seeds/vault';
 import { useAppState } from '../../src/state/AppState';
+import { copyText } from '../../src/lab/copy';
 
 const BIP39_COUNTS: Bip39WordCount[] = [12, 15, 18, 21, 24];
 
+type RevealMeta = {
+  bits: number;
+  mixed: boolean;
+  custom: boolean;
+  hex: string;
+};
+
 export default function NewSeedScreen() {
+  const t = useT();
   const router = useRouter();
-  const { model, selectSeed } = useAppState();
+  const { model, settings, selectSeed, showToast, runWithLoading } = useAppState();
   const [label, setLabel] = useState('Personal');
   const [backup, setBackup] = useState<BackupKind>('bip39');
   const [wordCount, setWordCount] = useState<Bip39WordCount>(24);
-  const [threshold, setThreshold] = useState(1);
-  const [shareCount, setShareCount] = useState(1);
+  const [threshold, setThreshold] = useState(2);
+  const [shareCount, setShareCount] = useState(3);
+  const [shake, setShake] = useState(false);
   const [mnemonic, setMnemonic] = useState<string | null>(null);
   const [shares, setShares] = useState<string[]>([]);
   const [secret, setSecret] = useState<Uint8Array | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [verify, setVerify] = useState<{ index: number; word: string }[]>([]);
+  const [guess, setGuess] = useState<Record<number, string>>({});
+  const [preview, setPreview] = useState<InspectRow[]>([]);
+  const [customOpen, setCustomOpen] = useState(false);
+  const [customKind, setCustomKind] = useState<CustomEntropyKind>('hex');
+  const [customDraft, setCustomDraft] = useState('');
+  const [revealMeta, setRevealMeta] = useState<RevealMeta | null>(null);
+  const revealing = Boolean(mnemonic || shares.length);
+  useSecretScreen(() => undefined);
 
   const slipScheme = backup === 'slip39' ? { threshold: shareCount === 1 ? 1 : threshold, count: shareCount } : null;
 
@@ -35,48 +71,96 @@ export default function NewSeedScreen() {
     setError(null);
     setMnemonic(null);
     setShares([]);
+    setPreview([]);
     try {
-      if (backup === 'bip39') {
-        const next = await generateSecureEntropy(wordCount);
-        setSecret(next);
-        setMnemonic(mnemonicFromEntropy(next));
-        return;
-      }
-      const master = await generateSecureSecret(16);
-      const created = generateSlip39(master, slipScheme ?? { threshold: 1, count: 1 });
-      setSecret(created.secret);
-      setShares(created.shares);
+      await runWithLoading(t('common.loading'), async () => {
+        const extra = shake ? await collectMotionMix(1500) : undefined;
+        if (backup === 'bip39') {
+          const usingCustom = customOpen && customDraft.trim().length > 0;
+          let next: Uint8Array;
+          if (usingCustom) {
+            next = parseCustomEntropy(customKind, customDraft, wordCount);
+            if (extra && extra.length > 0) {
+              next = mixExtraEntropy(next, extra);
+            }
+          } else {
+            next = await generateSecureEntropy(wordCount, extra);
+          }
+          if (next.every((byte) => byte === 0)) {
+            throw new Error('rng returned all zeros');
+          }
+          const phrase = mnemonicFromEntropy(next);
+          if (isKnownUnsafeMnemonic(phrase)) {
+            throw new Error(t('generate.knownVector'));
+          }
+          setSecret(next);
+          setMnemonic(phrase);
+          setRevealMeta({
+            bits: entropyBitsForWordCount(wordCount),
+            mixed: Boolean(extra && extra.length > 0),
+            custom: usingCustom,
+            hex: bytesToEntropyHex(next),
+          });
+          const picks = pickVerify(phrase.split(' '));
+          setVerify(picks);
+          setGuess({});
+          return;
+        }
+        const master = await generateSecureSecret(16);
+        const created = generateSlip39(master, slipScheme ?? { threshold: 1, count: 1 });
+        setSecret(created.secret);
+        setShares(created.shares);
+      });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'generate failed');
+      const message = err instanceof Error ? err.message : 'generate failed';
+      if (message === 'too few events') {
+        setError(
+          customKind === 'dice'
+            ? t('generate.customTooShortDice', { n: minDiceRolls(wordCount) })
+            : t('generate.customTooShortHex', { n: minHexChars(wordCount) }),
+        );
+      } else {
+        setError(message);
+      }
     } finally {
       setBusy(false);
     }
   };
 
+  const verified =
+    verify.length === 0 || verify.every((item) => (guess[item.index] ?? '').trim().toLowerCase() === item.word);
+
   const confirm = async () => {
-    if (!secret || !model) {
+    if (!secret || !model || !verified) {
       setError('Generate a seed and select a model first');
       return;
     }
+    const ok = await requestUnlock();
+    if (!ok) {
+      return;
+    }
     try {
-      const slot = await saveSlot(
-        {
-          id: newSlotId(),
-          label: label.trim() || 'Unnamed',
-          brand: model.brand,
-          modelId: model.id,
-          backup,
-          wordCount: backup === 'slip39' ? 20 : wordCount,
-          shares: slipScheme ?? undefined,
-          createdAt: Date.now(),
-        },
-        secret,
-      );
-      selectSeed(slot);
-      setMnemonic(null);
-      setShares([]);
-      setSecret(null);
-      router.back();
+      await runWithLoading(t('common.loading'), async () => {
+        const slot = await saveSlot(
+          {
+            id: newSlotId(),
+            label: label.trim() || 'Unnamed',
+            brand: model.brand,
+            modelId: model.id,
+            backup,
+            wordCount: backup === 'slip39' ? 20 : wordCount,
+            shares: slipScheme ?? undefined,
+            createdAt: Date.now(),
+            paths: mergeChainPaths(settings.defaultPaths),
+          },
+          secret,
+        );
+        selectSeed(slot);
+        setPreview(inspectAddresses(secret, backup, '', slot.paths, PREVIEW_INSPECT_IDS));
+        setMnemonic(null);
+        setShares([]);
+        setRevealMeta(null);
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'failed to store seed');
     }
@@ -84,105 +168,188 @@ export default function NewSeedScreen() {
 
   return (
     <Screen
-      kicker="Vault"
-      title="Generate backup"
-      subtitle="Words appear once. Only the reconstructed secret is stored. SLIP-39 is Trezor/OneKey; Ledger Live expects BIP39."
+      kicker={t('generate.kicker')}
+      title={t('generate.title')}
+      onBack={() => router.back()}
+      backLabel={t('common.back')}
+      backIcon={<Ionicons name="chevron-back" size={22} color={colors.text} />}
     >
-      <TextInput
-        value={label}
-        onChangeText={setLabel}
-        placeholder="Label"
-        placeholderTextColor={colors.muted}
-        autoComplete="off"
-        textContentType="none"
-        importantForAutofill="no"
-        style={styles.input}
-      />
-      <View style={styles.row}>
-        <Button
-          label="BIP39"
-          variant={backup === 'bip39' ? 'primary' : 'ghost'}
-          onPress={() => {
-            setBackup('bip39');
-            setMnemonic(null);
-            setShares([]);
-            setSecret(null);
-          }}
-        />
-        <Button
-          label="SLIP-39"
-          variant={backup === 'slip39' ? 'primary' : 'ghost'}
-          onPress={() => {
-            setBackup('slip39');
-            setMnemonic(null);
-            setShares([]);
-            setSecret(null);
-          }}
-        />
-      </View>
-      {backup === 'bip39' ? (
-        <View style={styles.wrap}>
-          {BIP39_COUNTS.map((count) => (
-            <Button
-              key={count}
-              label={`${count}`}
-              variant={wordCount === count ? 'primary' : 'ghost'}
-              onPress={() => setWordCount(count)}
+      {preview.length === 0 && !revealing ? (
+        <>
+          <TextInput
+            value={label}
+            onChangeText={setLabel}
+            placeholder={t('generate.name')}
+            placeholderTextColor={colors.muted}
+            autoComplete="off"
+            style={styles.input}
+          />
+          <View style={styles.row}>
+            <Button label="BIP39" variant={backup === 'bip39' ? 'primary' : 'ghost'} onPress={() => setBackup('bip39')} />
+            <Button label="SLIP-39" variant={backup === 'slip39' ? 'primary' : 'ghost'} onPress={() => setBackup('slip39')} />
+          </View>
+          {backup === 'bip39' ? (
+            <View style={styles.row}>
+              {BIP39_COUNTS.map((count) => (
+                <Button
+                  key={count}
+                  label={`${count}`}
+                  variant={wordCount === count ? 'primary' : 'ghost'}
+                  onPress={() => setWordCount(count)}
+                />
+              ))}
+            </View>
+          ) : (
+            <View style={styles.row}>
+              <Button
+                label="2-of-3"
+                variant={shareCount === 3 ? 'primary' : 'ghost'}
+                onPress={() => {
+                  setShareCount(3);
+                  setThreshold(2);
+                }}
+              />
+              <Button
+                label="3-of-5"
+                variant={shareCount === 5 ? 'primary' : 'ghost'}
+                onPress={() => {
+                  setShareCount(5);
+                  setThreshold(3);
+                }}
+              />
+            </View>
+          )}
+          {backup === 'bip39' ? <Text style={styles.meta}>{t('generate.csprngNote')}</Text> : null}
+          {backup === 'bip39' ? (
+            <>
+              <Button
+                label={t('generate.custom')}
+                variant={customOpen ? 'primary' : 'ghost'}
+                onPress={() => setCustomOpen((value) => !value)}
+              />
+              {customOpen ? (
+                <>
+                  <Text style={styles.meta}>{t('generate.customHint')}</Text>
+                  <View style={styles.row}>
+                    <Button
+                      label={t('generate.customHex')}
+                      variant={customKind === 'hex' ? 'primary' : 'ghost'}
+                      onPress={() => setCustomKind('hex')}
+                    />
+                    <Button
+                      label={t('generate.customDice')}
+                      variant={customKind === 'dice' ? 'primary' : 'ghost'}
+                      onPress={() => setCustomKind('dice')}
+                    />
+                  </View>
+                  <TextInput
+                    value={customDraft}
+                    onChangeText={setCustomDraft}
+                    placeholder={
+                      customKind === 'dice'
+                        ? t('generate.customPlaceholderDice', { n: minDiceRolls(wordCount) })
+                        : t('generate.customPlaceholderHex', { n: minHexChars(wordCount) })
+                    }
+                    placeholderTextColor={colors.muted}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    autoComplete="off"
+                    spellCheck={false}
+                    multiline
+                    style={[styles.input, styles.area]}
+                  />
+                </>
+              ) : null}
+            </>
+          ) : null}
+          <Button
+            label={busy && shake ? t('generate.shaking') : t('generate.extraShake')}
+            variant={shake ? 'primary' : 'ghost'}
+            onPress={() => setShake((value) => !value)}
+          />
+          <Button label={busy ? '…' : t('vault.generate')} disabled={busy} onPress={() => void generate()} />
+        </>
+      ) : null}
+      {mnemonic && revealing ? (
+        <View style={styles.words}>
+          <Text style={styles.warn}>{t('generate.reveal')}</Text>
+          {revealMeta ? (
+            <View style={styles.proof}>
+              <Text style={styles.proofLabel}>{t('generate.bits', { n: revealMeta.bits })}</Text>
+              <Text style={styles.meta}>
+                {t('generate.source')}:{' '}
+                {revealMeta.custom
+                  ? revealMeta.mixed
+                    ? t('generate.sourceCustomMixed')
+                    : t('generate.sourceCustom')
+                  : revealMeta.mixed
+                    ? t('generate.sourceMixed')
+                    : t('generate.sourceCsprng')}
+              </Text>
+              <Text style={styles.proofLabel}>{t('generate.hex')}</Text>
+              <Text
+                style={styles.hex}
+                selectable
+                onPress={() => {
+                  void copyText(revealMeta.hex).then(() => showToast(t('common.copied')));
+                }}
+              >
+                {revealMeta.hex}
+              </Text>
+            </View>
+          ) : null}
+          <MnemonicGrid
+            phrase={mnemonic}
+            onCopy={(value) => {
+              void copyText(value).then(() => showToast(t('common.copied')));
+            }}
+            labels={{
+              copy: t('generate.copy'),
+              copyTitle: t('generate.copyTitle'),
+              copyBody: t('generate.copyBody'),
+              confirm: t('common.confirm'),
+              cancel: t('common.cancel'),
+            }}
+          />
+          <Text style={styles.warn}>{t('generate.verify')}</Text>
+          {verify.map((item) => (
+            <TextInput
+              key={item.index}
+              value={guess[item.index] ?? ''}
+              onChangeText={(value) => setGuess((current) => ({ ...current, [item.index]: value }))}
+              placeholder={`#${item.index + 1}`}
+              placeholderTextColor={colors.muted}
+              autoCapitalize="none"
+              autoCorrect={false}
+              style={styles.input}
             />
           ))}
-        </View>
-      ) : (
-        <View style={styles.group}>
-          <Text style={styles.meta}>Basic shares. Single-share is Trezor Safe 7 default.</Text>
-          <View style={styles.row}>
-            <Button
-              label="Single"
-              variant={shareCount === 1 ? 'primary' : 'ghost'}
-              onPress={() => {
-                setShareCount(1);
-                setThreshold(1);
-              }}
-            />
-            <Button
-              label="2-of-3"
-              variant={shareCount === 3 && threshold === 2 ? 'primary' : 'ghost'}
-              onPress={() => {
-                setShareCount(3);
-                setThreshold(2);
-              }}
-            />
-            <Button
-              label="3-of-5"
-              variant={shareCount === 5 && threshold === 3 ? 'primary' : 'ghost'}
-              onPress={() => {
-                setShareCount(5);
-                setThreshold(3);
-              }}
-            />
-          </View>
-        </View>
-      )}
-      <Button label={busy ? 'Generating…' : 'Generate'} disabled={busy} onPress={() => void generate()} />
-      <Button label="Cancel" variant="ghost" onPress={() => router.back()} />
-      {mnemonic ? (
-        <View style={styles.words}>
-          <Text style={styles.warn}>Shown once. This app will not display it again.</Text>
-          <Text style={styles.mnemonic}>{mnemonic}</Text>
-          <Button label="I wrote it down" onPress={() => void confirm()} />
+          <Button label={t('generate.confirm')} disabled={!verified} onPress={() => void confirm()} />
         </View>
       ) : null}
       {shares.length > 0 ? (
         <View style={styles.words}>
-          <Text style={styles.warn}>Each share is shown once. Store them separately.</Text>
+          <Text style={styles.warn}>{t('vault.backupSlip39')}</Text>
           {shares.map((share, index) => (
-            <View key={index} style={styles.share}>
-              <Text style={styles.meta}>
-                Share {index + 1} of {shares.length}
-              </Text>
-              <Text style={styles.mnemonic}>{share}</Text>
-            </View>
+            <Text key={index} style={styles.mnemonic}>
+              {index + 1}. {share}
+            </Text>
           ))}
-          <Button label="I wrote them down" onPress={() => void confirm()} />
+          <Button label={t('generate.confirm')} onPress={() => void confirm()} />
+        </View>
+      ) : null}
+      {preview.length > 0 ? (
+        <View style={styles.words}>
+          <Text style={styles.warn}>{t('generate.preview')}</Text>
+          <AddressInspector
+            rows={preview}
+            title={t('generate.preview')}
+            copyPathLabel={t('vault.copyPath')}
+            onCopy={(value) => {
+              void copyText(value).then(() => showToast(t('common.copied')));
+            }}
+          />
+          <Button label={t('generate.done')} onPress={() => router.back()} />
         </View>
       ) : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -190,47 +357,67 @@ export default function NewSeedScreen() {
   );
 }
 
+function pickVerify(words: string[]): { index: number; word: string }[] {
+  const indexes = [...words.keys()].sort(() => 0.5 - Math.random()).slice(0, 3);
+  return indexes.map((index) => ({ index, word: words[index] ?? '' }));
+}
+
 const styles = StyleSheet.create({
   input: {
-    borderWidth: 1,
+    borderWidth: hairline,
     borderColor: colors.border,
     borderRadius: radius.sm,
     color: colors.text,
+    fontFamily: fonts.sans,
     paddingHorizontal: space.md,
-    minHeight: 44,
+    minHeight: 40,
+  },
+  area: {
+    minHeight: 96,
+    textAlignVertical: 'top',
+    paddingTop: space.sm,
+  },
+  proof: {
+    gap: 4,
+  },
+  proofLabel: {
+    color: colors.muted,
+    fontFamily: fonts.monoMedium,
+    fontSize: 10,
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+  },
+  hex: {
+    color: colors.ok,
+    fontFamily: fonts.mono,
+    fontSize: 12,
+    lineHeight: 18,
   },
   row: {
     flexDirection: 'row',
     gap: space.sm,
     flexWrap: 'wrap',
   },
-  wrap: {
-    flexDirection: 'row',
-    gap: space.sm,
-    flexWrap: 'wrap',
-  },
-  group: {
-    gap: space.sm,
-  },
   words: {
     gap: space.sm,
   },
-  share: {
-    gap: 4,
+  mnemonic: {
+    color: colors.text,
+    fontFamily: fonts.mono,
+    fontSize: 13,
+    lineHeight: 20,
   },
   warn: {
     color: colors.accent,
+    fontFamily: fonts.sans,
   },
   meta: {
     color: colors.muted,
+    fontFamily: fonts.sans,
     fontSize: 13,
-  },
-  mnemonic: {
-    color: colors.text,
-    fontSize: 16,
-    lineHeight: 26,
   },
   error: {
     color: colors.danger,
+    fontFamily: fonts.sans,
   },
 });

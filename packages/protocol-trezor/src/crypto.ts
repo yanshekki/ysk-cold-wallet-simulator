@@ -72,3 +72,110 @@ export function pathToString(components: number[]): string {
   });
   return `m/${parts.join('/')}`;
 }
+
+function rlpHeader(length: number, offset: number): Uint8Array {
+  if (length < 56) {
+    return Uint8Array.of(offset + length);
+  }
+  const lenBytes: number[] = [];
+  let n = length;
+  while (n > 0) {
+    lenBytes.unshift(n & 0xff);
+    n >>= 8;
+  }
+  return Uint8Array.from([offset + 55 + lenBytes.length, ...lenBytes]);
+}
+
+function rlpEncodeBytes(data: Uint8Array): Uint8Array {
+  if (data.length === 1 && data[0] < 0x80) {
+    return data;
+  }
+  return concatBytes(rlpHeader(data.length, 0x80), data);
+}
+
+function rlpEncodeList(items: Uint8Array[]): Uint8Array {
+  const body = concatBytes(...items.map((item) => rlpEncodeBytes(item)));
+  return concatBytes(rlpHeader(body.length, 0xc0), body);
+}
+
+function rlpInteger(value: number): Uint8Array {
+  if (value === 0) {
+    return new Uint8Array();
+  }
+  const bytes: number[] = [];
+  let n = value;
+  while (n > 0) {
+    bytes.unshift(n & 0xff);
+    n >>>= 8;
+  }
+  return Uint8Array.from(bytes);
+}
+
+export function signLegacyTx(
+  privateKey: Uint8Array,
+  tx: {
+    nonce: Uint8Array;
+    gasPrice: Uint8Array;
+    gasLimit: Uint8Array;
+    to: Uint8Array;
+    value: Uint8Array;
+    data: Uint8Array;
+    chainId: number;
+  },
+): { v: number; r: Uint8Array; s: Uint8Array } {
+  const unsigned = rlpEncodeList([
+    tx.nonce,
+    tx.gasPrice,
+    tx.gasLimit,
+    tx.to,
+    tx.value,
+    tx.data,
+    rlpInteger(tx.chainId),
+    new Uint8Array(),
+    new Uint8Array(),
+  ]);
+  const sig = secp256k1.sign(keccak_256(unsigned), privateKey);
+  const compact = sig.toCompactRawBytes();
+  return {
+    v: (sig.recovery ?? 0) + tx.chainId * 2 + 35,
+    r: compact.subarray(0, 32),
+    s: compact.subarray(32),
+  };
+}
+
+export function signEip1559Tx(
+  privateKey: Uint8Array,
+  tx: {
+    nonce: Uint8Array;
+    maxPriorityFee: Uint8Array;
+    maxFee: Uint8Array;
+    gasLimit: Uint8Array;
+    to: Uint8Array;
+    value: Uint8Array;
+    data: Uint8Array;
+    chainId: number;
+  },
+): { v: number; r: Uint8Array; s: Uint8Array } {
+  const items = [
+    rlpEncodeBytes(rlpInteger(tx.chainId)),
+    rlpEncodeBytes(tx.nonce),
+    rlpEncodeBytes(tx.maxPriorityFee),
+    rlpEncodeBytes(tx.maxFee),
+    rlpEncodeBytes(tx.gasLimit),
+    rlpEncodeBytes(tx.to),
+    rlpEncodeBytes(tx.value),
+    rlpEncodeBytes(tx.data),
+    Uint8Array.of(0xc0),
+  ];
+  const body = concatBytes(...items);
+  const encoded = concatBytes(rlpHeader(body.length, 0xc0), body);
+  const sig = secp256k1.sign(keccak_256(concatBytes(Uint8Array.of(0x02), encoded)), privateKey);
+  const compact = sig.toCompactRawBytes();
+  return { v: sig.recovery ?? 0, r: compact.subarray(0, 32), s: compact.subarray(32) };
+}
+
+export function signTypedHash(privateKey: Uint8Array, domain: Uint8Array, structHash: Uint8Array): Uint8Array {
+  const digest = keccak_256(concatBytes(Uint8Array.of(0x19, 0x01), domain, structHash));
+  const sig = secp256k1.sign(digest, privateKey);
+  return concatBytes(sig.toCompactRawBytes(), Uint8Array.of((sig.recovery ?? 0) + 27));
+}

@@ -1,0 +1,96 @@
+appId: hk.ysk.coldwalletsimulator
+---
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: "tab-device"
+    timeout: 45000
+- tapOn:
+    id: "tab-device"
+- tapOn:
+    id: "device-start"
+    optional: true
+- tapOn:
+    id: "tab-console"
+- extendedWaitUntil:
+    visible:
+      id: "log-filter-all"
+    timeout: 10000
+- tapOn:
+    id: "log-filter-all"
+- tapOn:
+    id: "log-filter-in"
+- tapOn:
+    id: "log-filter-out"
+- tapOn:
+    id: "log-filter-ble"
+- tapOn:
+    id: "log-filter-apdu"
+- tapOn:
+    id: "log-filter-app"
+- tapOn:
+    id: "log-filter-sign"
+- tapOn:
+    id: "log-filter-pair"
+- tapOn:
+    id: "log-filter-near"
+- tapOn:
+    id: "log-filter-manager"
+- tapOn:
+    id: "log-filter-error"
+- tapOn:
+    id: "log-filter-all"
+- tapOn:
+    id: "log-wrap"
+- tapOn:
+    id: "log-follow"
+- tapOn:
+    id: "log-follow"
+- tapOn:
+    id: "log-search"
+- inputText: "advertise"
+- tapOn:
+    id: "log-case"
+- tapOn:
+    id: "log-case"
+- tapOn:
+    id: "log-regex"
+- tapOn:
+    id: "log-regex"
+- tapOn:
+    id: "log-prev"
+- tapOn:
+    id: "log-next"
+- tapOn:
+    id: "log-copy-line"
+- tapOn:
+    id: "log-copy-match"
+- tapOn:
+    id: "log-copy-all"
+- tapOn:
+    id: "log-font-up"
+- tapOn:
+    id: "log-font-down"
+- tapOn:
+    id: "log-export"
+- tapOn:
+    text: "Copy"
+    optional: true
+- tapOn:
+    text: "拷貝"
+    optional: true
+- tapOn:
+    point: "50%,18%"
+    optional: true
+- tapOn:
+    id: "log-latest"
+- tapOn:
+    id: "log-clear"
+- tapOn:
+    text: "Clear logs"
+    optional: true
+- tapOn:
+    text: "清除紀錄"
+    optional: true
+- assertVisible:
+    id: "log-filter-all"

@@ -6,8 +6,11 @@ import { hmac } from '@noble/hashes/hmac';
 import { ripemd160 } from '@noble/hashes/ripemd160';
 import { sha256 } from '@noble/hashes/sha2';
 import { sha512 } from '@noble/hashes/sha2';
-import { keccak_256 } from '@noble/hashes/sha3';
-import type { BackupKind } from '@cws/contracts';
+import { keccak_256, sha3_256 } from '@noble/hashes/sha3';
+import { blake2b } from '@noble/hashes/blake2b';
+import type { BackupKind, ChainPathMap } from '@cws/contracts';
+import { CHAIN_PATH_LABELS, mergeChainPaths, type ChainPathId } from '@cws/contracts';
+import { cardanoEnterprise as cardanoEnterpriseAddr, deriveIcarus, tonBounceable as tonBounceableAddr } from '@cws/protocol-ledger';
 import { toBip32Seed } from './seed';
 
 export type InspectRow = {
@@ -19,9 +22,10 @@ export type InspectRow = {
 
 const b58c = createBase58check(sha256);
 const utf8 = new TextEncoder();
+const RIPPLE_ALPHABET = 'rpshnaf39wBUDNEGHJKLM4PQRST7VWXYZ2bcdeCg65jkm8oFqi1tuvAxyz';
 
 function concatBytes(...parts: Uint8Array[]): Uint8Array {
-  const length = parts.reduce((sum, part) => sum + part.length, 0);
+  const length = parts.reduce((sum, part) => sum + sumLength(part), 0);
   const out = new Uint8Array(length);
   let offset = 0;
   for (const part of parts) {
@@ -29,6 +33,10 @@ function concatBytes(...parts: Uint8Array[]): Uint8Array {
     offset += part.length;
   }
   return out;
+}
+
+function sumLength(part: Uint8Array): number {
+  return part.length;
 }
 
 function hash160(bytes: Uint8Array): Uint8Array {
@@ -62,31 +70,31 @@ function checksumEth(address: string): string {
   return out;
 }
 
+function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
 function ethAddress(privateKey: Uint8Array): string {
   const pub = secp256k1.getPublicKey(privateKey, false);
   const hash = keccak_256(pub.subarray(1));
   return checksumEth(bytesToHex(hash.subarray(12)));
 }
 
-function bytesToHex(bytes: Uint8Array): string {
-  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
-}
-
-function bitcoinP2pkh(privateKey: Uint8Array): string {
+function bitcoinP2pkh(privateKey: Uint8Array, version = 0x00): string {
   const pub = secp256k1.getPublicKey(privateKey, true);
-  return b58c.encode(concatBytes(Uint8Array.of(0x00), hash160(pub)));
+  return b58c.encode(concatBytes(Uint8Array.of(version), hash160(pub)));
 }
 
-function bitcoinP2shP2wpkh(privateKey: Uint8Array): string {
+function bitcoinP2shP2wpkh(privateKey: Uint8Array, version = 0x05): string {
   const pub = secp256k1.getPublicKey(privateKey, true);
   const redeem = concatBytes(Uint8Array.of(0x00, 0x14), hash160(pub));
-  return b58c.encode(concatBytes(Uint8Array.of(0x05), hash160(redeem)));
+  return b58c.encode(concatBytes(Uint8Array.of(version), hash160(redeem)));
 }
 
-function bitcoinP2wpkh(privateKey: Uint8Array): string {
+function bitcoinP2wpkh(privateKey: Uint8Array, hrp = 'bc'): string {
   const pub = secp256k1.getPublicKey(privateKey, true);
   const words = bech32.toWords(hash160(pub));
-  return bech32.encode('bc', [0, ...words]);
+  return bech32.encode(hrp, [0, ...words]);
 }
 
 function bitcoinP2tr(privateKey: Uint8Array): string {
@@ -133,31 +141,292 @@ function solanaAddress(seed: Uint8Array, path: string): string {
   return base58.encode(ed25519.getPublicKey(secret));
 }
 
+function nearImplicit(seed: Uint8Array, path: string): string {
+  const secret = slip10Ed25519(seed, path);
+  return bytesToHex(ed25519.getPublicKey(secret));
+}
+
+function avalancheX(privateKey: Uint8Array): string {
+  const pub = secp256k1.getPublicKey(privateKey, true);
+  const words = bech32.toWords(hash160(pub));
+  return bech32.encode('avax', [0, ...words]);
+}
+
+function cosmosAddress(privateKey: Uint8Array, hrp = 'cosmos'): string {
+  const pub = secp256k1.getPublicKey(privateKey, true);
+  return bech32.encode(hrp, bech32.toWords(hash160(pub)));
+}
+
+function encodeRipple(payload: Uint8Array): string {
+  const alphabet = RIPPLE_ALPHABET;
+  const digits: number[] = [];
+  for (const byte of payload) {
+    let carry = byte;
+    for (let i = 0; i < digits.length; i++) {
+      carry += digits[i] << 8;
+      digits[i] = carry % 58;
+      carry = (carry / 58) | 0;
+    }
+    while (carry > 0) {
+      digits.push(carry % 58);
+      carry = (carry / 58) | 0;
+    }
+  }
+  let zeros = 0;
+  for (const byte of payload) {
+    if (byte !== 0) {
+      break;
+    }
+    zeros += 1;
+  }
+  let out = alphabet[0].repeat(zeros);
+  for (let i = digits.length - 1; i >= 0; i--) {
+    out += alphabet[digits[i]];
+  }
+  return out;
+}
+
+function xrpAddress(privateKey: Uint8Array): string {
+  const pub = secp256k1.getPublicKey(privateKey, true);
+  const payload = concatBytes(Uint8Array.of(0x00), hash160(pub));
+  const checksum = sha256(sha256(payload)).subarray(0, 4);
+  return encodeRipple(concatBytes(payload, checksum));
+}
+
+function tonBounceable(seed: Uint8Array, path: string): string {
+  const pub = ed25519.getPublicKey(slip10Ed25519(seed, path));
+  return tonBounceableAddr(pub);
+}
+
+function aptosAddress(seed: Uint8Array, path: string): string {
+  const pub = ed25519.getPublicKey(slip10Ed25519(seed, path));
+  const auth = sha3_256(concatBytes(pub, Uint8Array.of(0x00)));
+  return `0x${bytesToHex(auth)}`;
+}
+
+function suiAddress(seed: Uint8Array, path: string): string {
+  const pub = ed25519.getPublicKey(slip10Ed25519(seed, path));
+  const hash = blake2b(concatBytes(Uint8Array.of(0x00), pub), { dkLen: 32 });
+  return `0x${bytesToHex(hash)}`;
+}
+
+function cardanoEnterprise(secret: Uint8Array, path: string, passphrase: string, backup: BackupKind): string {
+  if (backup !== 'bip39') {
+    const hardened = path
+      .split('/')
+      .map((part) => (part === 'm' || part.endsWith("'") ? part : `${part}'`))
+      .join('/');
+    const seed = toBip32Seed(secret, backup, '');
+    const pub = ed25519.getPublicKey(slip10Ed25519(seed, hardened));
+    return cardanoEnterpriseAddr(pub);
+  }
+  return cardanoEnterpriseAddr(deriveIcarus(secret, path, passphrase, backup).publicKey);
+}
+
+function ss58Encode(publicKey: Uint8Array, prefix = 0): string {
+  const body = concatBytes(Uint8Array.of(prefix), publicKey);
+  const hash = blake2b(concatBytes(utf8.encode('SS58PRE'), body), { dkLen: 64 });
+  const checksumLen = publicKey.length === 32 ? 2 : 1;
+  return base58.encode(concatBytes(body, hash.subarray(0, checksumLen)));
+}
+
+function polkadotAddress(seed: Uint8Array, path: string): string {
+  const pub = ed25519.getPublicKey(slip10Ed25519(seed, path));
+  return ss58Encode(pub, 0);
+}
+
+export const FAST_INSPECT_IDS: ChainPathId[] = [
+  'btc-legacy',
+  'btc-nested',
+  'btc-native',
+  'btc-taproot',
+  'ltc',
+  'doge',
+  'eth',
+  'avax',
+  'trx',
+  'atom',
+  'xrp',
+  'near',
+  'sol-ledger',
+  'sol-phantom',
+  'dot',
+  'ton',
+  'apt',
+  'sui',
+];
+
+export const SLOW_INSPECT_IDS: ChainPathId[] = ['ada'];
+
+export const PREVIEW_INSPECT_IDS: ChainPathId[] = ['eth', 'btc-native', 'near', 'sol-ledger'];
+
+export const INSPECT_CHUNK_SIZE = 4;
+
+const DEFAULT_INSPECT_ORDER: ChainPathId[] = [
+  'btc-legacy',
+  'btc-nested',
+  'btc-native',
+  'btc-taproot',
+  'ltc',
+  'doge',
+  'eth',
+  'avax',
+  'trx',
+  'atom',
+  'xrp',
+  'near',
+  'sol-ledger',
+  'sol-phantom',
+  'ada',
+  'dot',
+  'ton',
+  'apt',
+  'sui',
+];
+
+type InspectCtx = {
+  secret: Uint8Array;
+  seed: Uint8Array;
+  backup: BackupKind;
+  passphrase: string;
+  map: ReturnType<typeof mergeChainPaths>;
+};
+
+function makeInspectCtx(
+  secret: Uint8Array,
+  backup: BackupKind,
+  passphrase: string,
+  paths?: ChainPathMap,
+): InspectCtx {
+  return {
+    secret,
+    seed: toBip32Seed(secret, backup, backup === 'bip39' ? passphrase : ''),
+    backup,
+    passphrase,
+    map: mergeChainPaths(paths),
+  };
+}
+
+function inspectWithCtx(ctx: InspectCtx, ids?: readonly ChainPathId[]): InspectRow[] {
+  const { seed, secret, passphrase, backup, map } = ctx;
+  const wanted = ids ? new Set(ids) : null;
+  const include = (id: ChainPathId) => !wanted || wanted.has(id);
+  const row = (id: ChainPathId, address: string): InspectRow => ({
+    id,
+    label: CHAIN_PATH_LABELS[id],
+    path: map[id],
+    address,
+  });
+  const rows: InspectRow[] = [];
+  if (include('btc-legacy')) {
+    rows.push(row('btc-legacy', bitcoinP2pkh(secpKey(seed, map['btc-legacy']))));
+  }
+  if (include('btc-nested')) {
+    rows.push(row('btc-nested', bitcoinP2shP2wpkh(secpKey(seed, map['btc-nested']))));
+  }
+  if (include('btc-native')) {
+    rows.push(row('btc-native', bitcoinP2wpkh(secpKey(seed, map['btc-native']))));
+  }
+  if (include('btc-taproot')) {
+    rows.push(row('btc-taproot', bitcoinP2tr(secpKey(seed, map['btc-taproot']))));
+  }
+  if (include('ltc')) {
+    rows.push(row('ltc', bitcoinP2wpkh(secpKey(seed, map.ltc), 'ltc')));
+  }
+  if (include('doge')) {
+    rows.push(row('doge', bitcoinP2pkh(secpKey(seed, map.doge), 0x1e)));
+  }
+  if (include('eth')) {
+    rows.push(row('eth', ethAddress(secpKey(seed, map.eth))));
+  }
+  if (include('avax')) {
+    rows.push(row('avax', avalancheX(secpKey(seed, map.avax))));
+  }
+  if (include('trx')) {
+    rows.push(row('trx', tronAddress(secpKey(seed, map.trx))));
+  }
+  if (include('atom')) {
+    rows.push(row('atom', cosmosAddress(secpKey(seed, map.atom))));
+  }
+  if (include('xrp')) {
+    rows.push(row('xrp', xrpAddress(secpKey(seed, map.xrp))));
+  }
+  if (include('near')) {
+    rows.push(row('near', nearImplicit(seed, map.near)));
+  }
+  if (include('sol-ledger')) {
+    rows.push(row('sol-ledger', solanaAddress(seed, map['sol-ledger'])));
+  }
+  if (include('sol-phantom')) {
+    rows.push(row('sol-phantom', solanaAddress(seed, map['sol-phantom'])));
+  }
+  if (include('ada')) {
+    rows.push(row('ada', cardanoEnterprise(secret, map.ada, passphrase, backup)));
+  }
+  if (include('dot')) {
+    rows.push(row('dot', polkadotAddress(seed, map.dot)));
+  }
+  if (include('ton')) {
+    rows.push(row('ton', tonBounceable(seed, map.ton)));
+  }
+  if (include('apt')) {
+    rows.push(row('apt', aptosAddress(seed, map.apt)));
+  }
+  if (include('sui')) {
+    rows.push(row('sui', suiAddress(seed, map.sui)));
+  }
+  return rows;
+}
+
 export function inspectAddresses(
   secret: Uint8Array,
   backup: BackupKind = 'bip39',
   passphrase = '',
+  paths?: ChainPathMap,
+  ids?: readonly ChainPathId[],
 ): InspectRow[] {
-  const seed = toBip32Seed(secret, backup, backup === 'bip39' ? passphrase : '');
-  const btcLegacy = secpKey(seed, "m/44'/0'/0'/0/0");
-  const btcNested = secpKey(seed, "m/49'/0'/0'/0/0");
-  const btcNative = secpKey(seed, "m/84'/0'/0'/0/0");
-  const btcTaproot = secpKey(seed, "m/86'/0'/0'/0/0");
-  const eth = secpKey(seed, "m/44'/60'/0'/0/0");
-  const trx = secpKey(seed, "m/44'/195'/0'/0/0");
-  return [
-    { id: 'btc-legacy', label: 'Bitcoin Legacy', path: "m/44'/0'/0'/0/0", address: bitcoinP2pkh(btcLegacy) },
-    { id: 'btc-nested', label: 'Bitcoin Nested SegWit', path: "m/49'/0'/0'/0/0", address: bitcoinP2shP2wpkh(btcNested) },
-    { id: 'btc-native', label: 'Bitcoin Native SegWit', path: "m/84'/0'/0'/0/0", address: bitcoinP2wpkh(btcNative) },
-    { id: 'btc-taproot', label: 'Bitcoin Taproot', path: "m/86'/0'/0'/0/0", address: bitcoinP2tr(btcTaproot) },
-    { id: 'eth', label: 'Ethereum / EVM', path: "m/44'/60'/0'/0/0", address: ethAddress(eth) },
-    { id: 'trx', label: 'Tron', path: "m/44'/195'/0'/0/0", address: tronAddress(trx) },
-    { id: 'sol-ledger', label: 'Solana (Ledger)', path: "m/44'/501'/0'", address: solanaAddress(seed, "m/44'/501'/0'") },
-    {
-      id: 'sol-trezor',
-      label: 'Solana (Trezor)',
-      path: "m/44'/501'/0'/0'",
-      address: solanaAddress(seed, "m/44'/501'/0'/0'"),
-    },
-  ];
+  return inspectWithCtx(makeInspectCtx(secret, backup, passphrase, paths), ids);
+}
+
+function yieldUi(): Promise<void> {
+  return new Promise((resolve) => {
+    const raf = (globalThis as { requestAnimationFrame?: (cb: () => void) => number }).requestAnimationFrame;
+    if (typeof raf === 'function') {
+      raf(() => raf(() => resolve()));
+      return;
+    }
+    setTimeout(resolve, 0);
+  });
+}
+
+export async function inspectAddressesChunked(
+  secret: Uint8Array,
+  backup: BackupKind = 'bip39',
+  passphrase = '',
+  paths?: ChainPathMap,
+  ids?: readonly ChainPathId[],
+  options?: {
+    onChunk?: (rows: InspectRow[]) => void;
+    chunkSize?: number;
+    yieldFrame?: () => Promise<void>;
+    shouldAbort?: () => boolean;
+  },
+): Promise<InspectRow[]> {
+  const ctx = makeInspectCtx(secret, backup, passphrase, paths);
+  const order = ids ?? DEFAULT_INSPECT_ORDER;
+  const size = options?.chunkSize ?? INSPECT_CHUNK_SIZE;
+  const yieldFrame = options?.yieldFrame ?? yieldUi;
+  const rows: InspectRow[] = [];
+  for (let i = 0; i < order.length; i += size) {
+    if (options?.shouldAbort?.()) {
+      return rows;
+    }
+    await yieldFrame();
+    if (options?.shouldAbort?.()) {
+      return rows;
+    }
+    rows.push(...inspectWithCtx(ctx, order.slice(i, i + size)));
+    options?.onChunk?.([...rows]);
+  }
+  return rows;
 }

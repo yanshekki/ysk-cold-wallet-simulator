@@ -1,23 +1,47 @@
 import {
   bleAdvertiseName,
+  describeEthMessage,
+  describeEthTransaction,
   formatVersion,
   onekeyFirmwareFor,
   type BackupKind,
   type Brand,
+  type ChainPathId,
   type ConfirmationPort,
   type DeviceModel,
   type ProtocolHandler,
+  type SigningDetail,
   type SigningRequest,
 } from '@cws/contracts';
 import { keccak_256 } from '@noble/hashes/sha3';
 import { bytesToHex, concatBytes, encodeUtf8 } from './bytes';
 import {
+  attachPartialSig,
+  bip143Sighash,
+  deriveEd25519PrivateKey,
+  deriveIcarus,
+  ed25519PublicKey,
+  encodeDerSignature,
+  parsePsbt,
+  p2wpkhScriptCode,
+  publicKeyCompressed,
+  signEd25519,
+  signIcarus,
+  signSecp256k1Recoverable,
+} from '@cws/protocol-ledger';
+import { ripemd160 } from '@noble/hashes/ripemd160';
+import { sha256 } from '@noble/hashes/sha2';
+import { COIN_BY_REQUEST, icarusAddress, type CoinOp } from './coins';
+import {
   bitcoinP2pkhAddress,
+  deriveHdKey,
   derivePrivateKey,
   ethereumAddressFromPrivateKey,
   pathToString,
+  signEip1559Tx,
   signLegacyTx,
   signPersonalMessage,
+  signTypedHash,
 } from './crypto';
 import { V1Reassembler, frameV1 } from './framing';
 import {
@@ -29,28 +53,44 @@ import {
   decodeEthereumGetAddress,
   decodeEthereumSignMessage,
   decodeEthereumSignTx,
+  decodeEthereumSignTxEip1559,
+  decodeEthereumSignTypedHash,
+  decodePathBytes,
   decodePing,
   decodeSESignMessage,
   encodeBitcoinAddress,
   encodeButtonRequest,
+  encodeBytesSignature,
   encodeEthereumAddress,
   encodeEthereumMessageSignature,
+  encodeEthereumPublicKey,
   encodeEthereumTxRequest,
   encodeFailure,
   encodeFeatures,
+  encodeHdPublicKey,
+  encodeMessageSignature,
   encodeOnekeyFeatures,
   encodeDeviceInfo,
   encodeDeviceStatus,
+  encodePassphraseState,
   encodeProtocolInfo,
+  encodeStringAddress,
+  encodeTypedDataSignature,
+  encodeUnLockDeviceResponse,
   encodeSEMessageSignature,
   encodeSEPublicCert,
   encodeSuccess,
   encodeV2Failure,
   ethAddressReplyType,
+  ethPublicKeyReplyType,
   ethSignReplyType,
   isEthGetAddress,
+  isEthGetPublicKey,
   isEthSignMessage,
   isEthSignTx,
+  isEthSignTxEip1559,
+  isEthSignTypedHash,
+  type EthereumSignTxEip1559Msg,
   type FeaturesInput,
 } from './messages';
 import {
@@ -87,6 +127,12 @@ type PendingAction =
       rawPayload: Uint8Array;
     }
   | {
+      kind: 'eth-pubkey';
+      path: string;
+      replyType: number;
+      rawPayload: Uint8Array;
+    }
+  | {
       kind: 'eth-sign';
       path: string;
       message: Uint8Array;
@@ -110,6 +156,44 @@ type PendingAction =
       path: string;
       challenge: Uint8Array;
       rawPayload: Uint8Array;
+    }
+  | {
+      kind: 'eth-tx-1559';
+      path: string;
+      tx: EthereumSignTxEip1559Msg;
+      rawPayload: Uint8Array;
+    }
+  | {
+      kind: 'eth-712';
+      path: string;
+      domain: Uint8Array;
+      structHash: Uint8Array;
+      replyType: number;
+      rawPayload: Uint8Array;
+    }
+  | {
+      kind: 'btc-pubkey';
+      path: string;
+      rawPayload: Uint8Array;
+    }
+  | {
+      kind: 'btc-sign-msg';
+      path: string;
+      message: Uint8Array;
+      rawPayload: Uint8Array;
+    }
+  | {
+      kind: 'btc-psbt';
+      path: string;
+      psbt: Uint8Array;
+      rawPayload: Uint8Array;
+    }
+  | {
+      kind: 'coin';
+      op: CoinOp;
+      path: string;
+      payload: Uint8Array;
+      rawPayload: Uint8Array;
     };
 
 const V2_FAILURE_PROCESS = 5;
@@ -128,6 +212,8 @@ const V2_SUPPORTED_MESSAGES = [
   MessageType.GetFeatures,
   MessageType.EthereumGetAddress,
   MessageType.EthereumAddress,
+  MessageType.EthereumGetPublicKey,
+  MessageType.EthereumPublicKey,
   MessageType.EthereumSignMessage,
   MessageType.EthereumMessageSignature,
   MessageType.EthereumSignTx,
@@ -135,8 +221,14 @@ const V2_SUPPORTED_MESSAGES = [
   MessageType.EndSession,
   MessageType.OnekeyGetFeatures,
   MessageType.OnekeyFeatures,
+  MessageType.GetPassphraseState,
+  MessageType.PassphraseState,
+  MessageType.UnLockDevice,
+  MessageType.UnLockDeviceResponse,
   MessageType.EthereumGetAddressOneKey,
   MessageType.EthereumAddressOneKey,
+  MessageType.EthereumGetPublicKeyOneKey,
+  MessageType.EthereumPublicKeyOneKey,
   MessageType.EthereumSignMessageOneKey,
   MessageType.EthereumMessageSignatureOneKey,
   V2MessageType.ProtocolInfoRequest,
@@ -289,6 +381,13 @@ export class OneKeyV1ProtocolHandler implements ProtocolHandler {
           MessageType.OnekeyFeatures,
           encodeOnekeyFeatures(this.featuresInput()),
         );
+      case MessageType.GetPassphraseState:
+        return this.message(
+          MessageType.PassphraseState,
+          encodePassphraseState({ sessionId: this.sessionId }),
+        );
+      case MessageType.UnLockDevice:
+        return this.message(MessageType.UnLockDeviceResponse, encodeUnLockDeviceResponse());
       case MessageType.Ping:
       case V2MessageType.Ping: {
         const ping = decodePing(payload);
@@ -317,6 +416,12 @@ export class OneKeyV1ProtocolHandler implements ProtocolHandler {
         return this.finishPending();
       case MessageType.GetAddress:
         return this.handleBitcoinGetAddress(payload);
+      case MessageType.GetPublicKey:
+        return this.handleBitcoinGetPublicKey(payload);
+      case MessageType.SignMessage:
+        return this.handleBitcoinSignMessage(payload);
+      case MessageType.SignPsbt:
+        return this.handleSignPsbt(payload);
       case MessageType.SESignMessage:
         return this.handleSESignMessage(payload);
       case MessageType.ReadSEPublicCert:
@@ -328,11 +433,24 @@ export class OneKeyV1ProtocolHandler implements ProtocolHandler {
     if (isEthGetAddress(type)) {
       return this.handleEthGetAddress(type, payload);
     }
+    if (isEthGetPublicKey(type)) {
+      return this.handleEthGetPublicKey(type, payload);
+    }
     if (isEthSignMessage(type)) {
       return this.handleEthSignMessage(type, payload);
     }
     if (isEthSignTx(type)) {
       return this.handleEthSignTx(payload);
+    }
+    if (isEthSignTxEip1559(type)) {
+      return this.handleEthSignTxEip1559(payload);
+    }
+    if (isEthSignTypedHash(type)) {
+      return this.handleEthSignTypedHash(type, payload);
+    }
+    const coin = COIN_BY_REQUEST.get(type);
+    if (coin) {
+      return this.handleCoin(coin, payload);
     }
 
     if (type >= PROTOCOL_V2_SYS_THRESHOLD) {
@@ -345,6 +463,39 @@ export class OneKeyV1ProtocolHandler implements ProtocolHandler {
     return this.message(
       MessageType.Failure,
       encodeFailure(FailureType.UnexpectedMessage, `Unsupported message ${type}`),
+    );
+  }
+
+  private async handleEthGetPublicKey(type: number, payload: Uint8Array): Promise<EncodedMessage> {
+    let decoded;
+    try {
+      decoded = decodeEthereumGetAddress(payload);
+    } catch {
+      return this.message(
+        MessageType.Failure,
+        encodeFailure(FailureType.DataError, 'Invalid EthereumGetPublicKey'),
+      );
+    }
+    if (decoded.addressN.length === 0) {
+      return this.message(
+        MessageType.Failure,
+        encodeFailure(FailureType.DataError, 'Missing BIP32 path'),
+      );
+    }
+    const path = overlayPath(this.confirmation, pathToString(decoded.addressN), ['eth']);
+    const replyType = ethPublicKeyReplyType(type);
+    if (!decoded.showDisplay) {
+      return this.ethPublicKeyReply(path, replyType);
+    }
+    this.pending = {
+      kind: 'eth-pubkey',
+      path,
+      replyType,
+      rawPayload: payload,
+    };
+    return this.message(
+      MessageType.ButtonRequest,
+      encodeButtonRequest(ButtonRequestType.Address),
     );
   }
 
@@ -366,7 +517,7 @@ export class OneKeyV1ProtocolHandler implements ProtocolHandler {
     }
     this.pending = {
       kind: 'eth-address',
-      path: pathToString(decoded.addressN),
+      path: overlayPath(this.confirmation, pathToString(decoded.addressN), ['eth']),
       replyType: ethAddressReplyType(type),
       rawPayload: payload,
     };
@@ -394,7 +545,7 @@ export class OneKeyV1ProtocolHandler implements ProtocolHandler {
     }
     this.pending = {
       kind: 'eth-tx',
-      path: pathToString(decoded.addressN),
+      path: overlayPath(this.confirmation, pathToString(decoded.addressN), ['eth']),
       tx: decoded,
       rawPayload: payload,
     };
@@ -451,7 +602,7 @@ export class OneKeyV1ProtocolHandler implements ProtocolHandler {
     }
     this.pending = {
       kind: 'eth-sign',
-      path: pathToString(decoded.addressN),
+      path: overlayPath(this.confirmation, pathToString(decoded.addressN), ['eth']),
       message: decoded.message,
       replyType: ethSignReplyType(type),
       rawPayload: payload,
@@ -478,7 +629,12 @@ export class OneKeyV1ProtocolHandler implements ProtocolHandler {
         encodeFailure(FailureType.DataError, 'Missing BIP32 path'),
       );
     }
-    const path = pathToString(decoded.addressN);
+    const path = overlayPath(this.confirmation, pathToString(decoded.addressN), [
+      'btc-legacy',
+      'btc-nested',
+      'btc-native',
+      'btc-taproot',
+    ]);
     if (!decoded.showDisplay) {
       return this.bitcoinAddressReply(path, decoded.coinName);
     }
@@ -491,6 +647,112 @@ export class OneKeyV1ProtocolHandler implements ProtocolHandler {
     return this.message(
       MessageType.ButtonRequest,
       encodeButtonRequest(ButtonRequestType.Address),
+    );
+  }
+
+  private async handleBitcoinGetPublicKey(payload: Uint8Array): Promise<EncodedMessage> {
+    const decoded = decodePathBytes(payload);
+    if (decoded.addressN.length === 0) {
+      return this.message(MessageType.Failure, encodeFailure(FailureType.DataError, 'Missing BIP32 path'));
+    }
+    const path = overlayPath(this.confirmation, pathToString(decoded.addressN), [
+      'btc-legacy',
+      'btc-nested',
+      'btc-native',
+      'btc-taproot',
+    ]);
+    if (!decoded.showDisplay) {
+      return this.bitcoinPublicKeyReply(path);
+    }
+    this.pending = { kind: 'btc-pubkey', path, rawPayload: payload };
+    return this.message(MessageType.ButtonRequest, encodeButtonRequest(ButtonRequestType.Address));
+  }
+
+  private async handleBitcoinSignMessage(payload: Uint8Array): Promise<EncodedMessage> {
+    const decoded = decodePathBytes(payload, 2);
+    if (decoded.addressN.length === 0) {
+      return this.message(MessageType.Failure, encodeFailure(FailureType.DataError, 'Missing BIP32 path'));
+    }
+    this.pending = {
+      kind: 'btc-sign-msg',
+      path: overlayPath(this.confirmation, pathToString(decoded.addressN), [
+        'btc-legacy',
+        'btc-nested',
+        'btc-native',
+        'btc-taproot',
+      ]),
+      message: decoded.payload,
+      rawPayload: payload,
+    };
+    return this.message(MessageType.ButtonRequest, encodeButtonRequest(ButtonRequestType.ProtectCall));
+  }
+
+  private async handleSignPsbt(payload: Uint8Array): Promise<EncodedMessage> {
+    const decoded = decodePathBytes(payload, 1);
+    const psbt = looksLikePsbt(decoded.payload) ? decoded.payload : looksLikePsbt(payload) ? payload : decoded.payload;
+    const path = looksLikePsbt(decoded.payload) || decoded.addressN.length === 0
+      ? "m/84'/0'/0'/0/0"
+      : pathToString(decoded.addressN);
+    this.pending = {
+      kind: 'btc-psbt',
+      path: overlayPath(this.confirmation, path, ['btc-legacy', 'btc-nested', 'btc-native', 'btc-taproot']),
+      psbt,
+      rawPayload: payload,
+    };
+    return this.message(MessageType.ButtonRequest, encodeButtonRequest(ButtonRequestType.SignTx));
+  }
+
+  private async handleEthSignTxEip1559(payload: Uint8Array): Promise<EncodedMessage> {
+    let decoded;
+    try {
+      decoded = decodeEthereumSignTxEip1559(payload);
+    } catch {
+      return this.message(MessageType.Failure, encodeFailure(FailureType.DataError, 'Invalid EthereumSignTxEIP1559'));
+    }
+    if (decoded.addressN.length === 0) {
+      return this.message(MessageType.Failure, encodeFailure(FailureType.DataError, 'Missing BIP32 path'));
+    }
+    this.pending = {
+      kind: 'eth-tx-1559',
+      path: overlayPath(this.confirmation, pathToString(decoded.addressN), ['eth']),
+      tx: decoded,
+      rawPayload: payload,
+    };
+    return this.message(MessageType.ButtonRequest, encodeButtonRequest(ButtonRequestType.SignTx));
+  }
+
+  private async handleEthSignTypedHash(type: number, payload: Uint8Array): Promise<EncodedMessage> {
+    const decoded = decodeEthereumSignTypedHash(payload);
+    if (decoded.addressN.length === 0 || decoded.domain.length < 32 || decoded.structHash.length < 32) {
+      return this.message(MessageType.Failure, encodeFailure(FailureType.DataError, 'Invalid EthereumSignTypedHash'));
+    }
+    this.pending = {
+      kind: 'eth-712',
+      path: overlayPath(this.confirmation, pathToString(decoded.addressN), ['eth']),
+      domain: decoded.domain.subarray(0, 32),
+      structHash: decoded.structHash.subarray(0, 32),
+      replyType:
+        type === MessageType.EthereumSignTypedHashOneKey
+          ? MessageType.EthereumTypedDataSignature
+          : MessageType.EthereumTypedDataSignature,
+      rawPayload: payload,
+    };
+    return this.message(MessageType.ButtonRequest, encodeButtonRequest(ButtonRequestType.ProtectCall));
+  }
+
+  private async handleCoin(op: CoinOp, payload: Uint8Array): Promise<EncodedMessage> {
+    const decoded = decodePathBytes(payload, op.kind === 'sign' ? (op.bytesField ?? 2) : 99);
+    if (decoded.addressN.length === 0) {
+      return this.message(MessageType.Failure, encodeFailure(FailureType.DataError, 'Missing BIP32 path'));
+    }
+    const path = overlayPath(this.confirmation, pathToString(decoded.addressN), op.chains);
+    if (op.kind === 'address' && !decoded.showDisplay) {
+      return this.coinReply(op, path, decoded.payload);
+    }
+    this.pending = { kind: 'coin', op, path, payload: decoded.payload, rawPayload: payload };
+    return this.message(
+      MessageType.ButtonRequest,
+      encodeButtonRequest(op.kind === 'sign' ? ButtonRequestType.SignTx : ButtonRequestType.Address),
     );
   }
 
@@ -517,7 +779,8 @@ export class OneKeyV1ProtocolHandler implements ProtocolHandler {
       title: pendingTitle(pending),
       path: pending.path,
       message: previewPending(pending),
-      rawPayload: pending.rawPayload,
+      rawPayload: pending.kind === 'eth-sign' ? pending.message : pending.rawPayload,
+      detail: pendingDetail(pending),
     };
     const ok = await this.confirmation.confirm(request);
     if (!ok) {
@@ -530,13 +793,56 @@ export class OneKeyV1ProtocolHandler implements ProtocolHandler {
     if (pending.kind === 'eth-address') {
       return this.ethAddressReply(pending.path, pending.replyType);
     }
+    if (pending.kind === 'eth-pubkey') {
+      return this.ethPublicKeyReply(pending.path, pending.replyType);
+    }
     if (pending.kind === 'eth-sign') {
       return this.ethSignReply(pending.path, pending.message, pending.replyType);
     }
     if (pending.kind === 'eth-tx') {
       return this.ethTxReply(pending.path, pending.tx);
     }
+    if (pending.kind === 'eth-tx-1559') {
+      return this.ethTx1559Reply(pending.path, pending.tx);
+    }
+    if (pending.kind === 'eth-712') {
+      return this.eth712Reply(pending.path, pending.domain, pending.structHash, pending.replyType);
+    }
+    if (pending.kind === 'btc-pubkey') {
+      return this.bitcoinPublicKeyReply(pending.path);
+    }
+    if (pending.kind === 'btc-sign-msg') {
+      return this.bitcoinSignMessageReply(pending.path, pending.message);
+    }
+    if (pending.kind === 'btc-psbt') {
+      return this.bitcoinPsbtReply(pending.path, pending.psbt);
+    }
+    if (pending.kind === 'coin') {
+      return this.coinReply(pending.op, pending.path, pending.payload);
+    }
     return this.bitcoinAddressReply(pending.path, pending.coinName);
+  }
+
+  private async ethPublicKeyReply(path: string, replyType: number): Promise<EncodedMessage> {
+    const passphrase = await this.confirmation.getPassphrase(this.slotId);
+    const node = deriveHdKey(this.entropy, path, passphrase, this.backup);
+    if (!node.publicKey || !node.chainCode) {
+      return this.message(
+        MessageType.Failure,
+        encodeFailure(FailureType.ProcessError, 'Missing HD node'),
+      );
+    }
+    return this.message(
+      replyType,
+      encodeEthereumPublicKey({
+        depth: node.depth,
+        fingerprint: node.parentFingerprint,
+        childNum: node.index,
+        chainCode: node.chainCode,
+        publicKey: node.publicKey,
+        xpub: node.publicExtendedKey,
+      }),
+    );
   }
 
   private async ethAddressReply(path: string, replyType: number): Promise<EncodedMessage> {
@@ -574,6 +880,121 @@ export class OneKeyV1ProtocolHandler implements ProtocolHandler {
     const testnet = /testnet|regtest/i.test(coinName);
     const address = bitcoinP2pkhAddress(privateKey, testnet);
     return this.message(MessageType.Address, encodeBitcoinAddress(address));
+  }
+
+  private async bitcoinPublicKeyReply(path: string): Promise<EncodedMessage> {
+    const passphrase = await this.confirmation.getPassphrase(this.slotId);
+    const node = deriveHdKey(this.entropy, path, passphrase, this.backup);
+    if (!node.publicKey || !node.chainCode) {
+      return this.message(MessageType.Failure, encodeFailure(FailureType.ProcessError, 'Missing HD node'));
+    }
+    return this.message(
+      MessageType.PublicKey,
+      encodeHdPublicKey({
+        depth: node.depth,
+        fingerprint: node.parentFingerprint,
+        childNum: node.index,
+        chainCode: node.chainCode,
+        publicKey: node.publicKey,
+        xpub: node.publicExtendedKey,
+      }),
+    );
+  }
+
+  private async bitcoinSignMessageReply(path: string, message: Uint8Array): Promise<EncodedMessage> {
+    const passphrase = await this.confirmation.getPassphrase(this.slotId);
+    const privateKey = derivePrivateKey(this.entropy, path, passphrase, this.backup);
+    const prefix = encodeUtf8('\x18Bitcoin Signed Message:\n');
+    const compact = message.length < 0xfd ? Uint8Array.of(message.length) : concatBytes(Uint8Array.of(0xfd, message.length & 0xff, message.length >> 8));
+    const hash = sha256(sha256(concatBytes(prefix, compact, message)));
+    const sig = signSecp256k1Recoverable(privateKey, hash);
+    const address = bitcoinP2pkhAddress(privateKey, false);
+    return this.message(MessageType.MessageSignature, encodeMessageSignature(address, concatBytes(Uint8Array.of((sig[64] ?? 0) + 27), sig.subarray(0, 64))));
+  }
+
+  private async bitcoinPsbtReply(path: string, psbt: Uint8Array): Promise<EncodedMessage> {
+    let parsed;
+    try {
+      parsed = parsePsbt(psbt);
+    } catch {
+      return this.message(MessageType.Failure, encodeFailure(FailureType.DataError, 'Invalid PSBT'));
+    }
+    const first = parsed.inputs[0];
+    if (!first) {
+      return this.message(MessageType.Failure, encodeFailure(FailureType.DataError, 'PSBT has no inputs'));
+    }
+    const passphrase = await this.confirmation.getPassphrase(this.slotId);
+    const privateKey = derivePrivateKey(this.entropy, path, passphrase, this.backup);
+    const pub = publicKeyCompressed(privateKey);
+    const amount = parsed.inputMaps[0]?.witnessUtxo?.amount ?? 0n;
+    const hash = bip143Sighash({
+      version: parsed.version,
+      prevout: first.prevout,
+      amount,
+      sequence: first.sequence,
+      scriptCode: p2wpkhScriptCode(ripemd160(sha256(pub))),
+      outputs: concatBytes(
+        ...parsed.outputs.map((output) => {
+          const amountBytes = new Uint8Array(8);
+          let n = output.amount;
+          for (let i = 0; i < 8; i++) {
+            amountBytes[i] = Number(n & 0xffn);
+            n >>= 8n;
+          }
+          return concatBytes(amountBytes, Uint8Array.of(output.script.length), output.script);
+        }),
+      ),
+      locktime: parsed.locktime,
+    });
+    const compact = signSecp256k1Recoverable(privateKey, hash).subarray(0, 64);
+    const signed = attachPartialSig(psbt, pub, concatBytes(encodeDerSignature(compact), Uint8Array.of(0x01)));
+    return this.message(MessageType.SignedPsbt, encodeBytesSignature(signed));
+  }
+
+  private async ethTx1559Reply(path: string, tx: EthereumSignTxEip1559Msg): Promise<EncodedMessage> {
+    const passphrase = await this.confirmation.getPassphrase(this.slotId);
+    const privateKey = derivePrivateKey(this.entropy, path, passphrase, this.backup);
+    const signature = signEip1559Tx(privateKey, tx);
+    return this.message(MessageType.EthereumTxRequest, encodeEthereumTxRequest(signature));
+  }
+
+  private async eth712Reply(
+    path: string,
+    domain: Uint8Array,
+    structHash: Uint8Array,
+    replyType: number,
+  ): Promise<EncodedMessage> {
+    const passphrase = await this.confirmation.getPassphrase(this.slotId);
+    const privateKey = derivePrivateKey(this.entropy, path, passphrase, this.backup);
+    const address = ethereumAddressFromPrivateKey(privateKey);
+    const signature = signTypedHash(privateKey, domain, structHash);
+    return this.message(replyType, encodeTypedDataSignature(signature, address));
+  }
+
+  private async coinReply(op: CoinOp, path: string, payload: Uint8Array): Promise<EncodedMessage> {
+    const passphrase = await this.confirmation.getPassphrase(this.slotId);
+    if (op.kind === 'address') {
+      if (op.curve === 'icarus') {
+        return this.message(op.reply, encodeStringAddress(icarusAddress(this.entropy, path, passphrase, this.backup)));
+      }
+      if (op.curve === 'ed25519') {
+        const pub = ed25519PublicKey(deriveEd25519PrivateKey(this.entropy, path, passphrase, this.backup));
+        return this.message(op.reply, encodeStringAddress(op.addressOf?.(pub) ?? bytesToHex(pub)));
+      }
+      const pub = publicKeyCompressed(derivePrivateKey(this.entropy, path, passphrase, this.backup));
+      return this.message(op.reply, encodeStringAddress(op.addressOf?.(pub) ?? bytesToHex(pub)));
+    }
+    if (op.curve === 'ed25519') {
+      const sig = signEd25519(deriveEd25519PrivateKey(this.entropy, path, passphrase, this.backup), payload);
+      return this.message(op.reply, encodeBytesSignature(sig));
+    }
+    if (op.curve === 'icarus') {
+      const sig = signIcarus(deriveIcarus(this.entropy, path, passphrase, this.backup), payload);
+      return this.message(op.reply, encodeBytesSignature(sig));
+    }
+    const hash = payload.length === 32 ? payload : sha256(payload);
+    const sig = signSecp256k1Recoverable(derivePrivateKey(this.entropy, path, passphrase, this.backup), hash);
+    return this.message(op.reply, encodeBytesSignature(sig));
   }
 
   private featuresInput(): FeaturesInput {
@@ -626,7 +1047,15 @@ export class OneKeyV1ProtocolHandler implements ProtocolHandler {
 }
 
 function pendingKind(pending: PendingAction): SigningRequest['kind'] {
-  if (pending.kind === 'eth-sign' || pending.kind === 'eth-tx') {
+  if (
+    pending.kind === 'eth-sign' ||
+    pending.kind === 'eth-tx' ||
+    pending.kind === 'eth-tx-1559' ||
+    pending.kind === 'eth-712' ||
+    pending.kind === 'btc-sign-msg' ||
+    pending.kind === 'btc-psbt' ||
+    (pending.kind === 'coin' && pending.op.kind === 'sign')
+  ) {
     return 'sign';
   }
   if (pending.kind === 'verify') {
@@ -636,24 +1065,62 @@ function pendingKind(pending: PendingAction): SigningRequest['kind'] {
 }
 
 function pendingTitle(pending: PendingAction): string {
-  if (pending.kind === 'eth-sign') {
+  if (pending.kind === 'eth-sign' || pending.kind === 'eth-712' || pending.kind === 'btc-sign-msg') {
     return 'Sign message';
   }
-  if (pending.kind === 'eth-tx') {
+  if (pending.kind === 'eth-tx' || pending.kind === 'eth-tx-1559' || pending.kind === 'btc-psbt') {
     return 'Sign transaction';
+  }
+  if (pending.kind === 'coin') {
+    return pending.op.title;
+  }
+  if (pending.kind === 'btc-pubkey') {
+    return 'Export Bitcoin public key';
   }
   if (pending.kind === 'btc-address') {
     return 'Export Bitcoin address';
   }
+  if (pending.kind === 'eth-pubkey') {
+    return 'Export Ethereum public key';
+  }
   return 'Export Ethereum address';
+}
+
+function pendingDetail(pending: PendingAction): SigningDetail | undefined {
+  if (pending.kind === 'eth-tx') {
+    return describeEthTransaction({
+      path: pending.path,
+      type: 'legacy',
+      chainId: pending.tx.chainId,
+      nonce: pending.tx.nonce,
+      gasPrice: pending.tx.gasPrice,
+      gasLimit: pending.tx.gasLimit,
+      to: pending.tx.to,
+      value: pending.tx.value,
+      data: pending.tx.data,
+    });
+  }
+  if (pending.kind === 'eth-sign') {
+    return describeEthMessage(pending.path, pending.message);
+  }
+  return undefined;
 }
 
 function previewPending(pending: PendingAction): string {
   if (pending.kind === 'eth-sign') {
     return `Sign personal message\n${pending.path}\n${previewMessage(pending.message)}`;
   }
-  if (pending.kind === 'eth-tx') {
+  if (pending.kind === 'eth-tx' || pending.kind === 'eth-tx-1559') {
     return `Sign Ethereum transaction\n${pending.path}`;
+  }
+  if (pending.kind === 'eth-712') {
+    return `Sign EIP-712 hashed message\n${pending.path}`;
+  }
+  if (pending.kind === 'coin') {
+    return `${pending.op.title}\n${pending.path}`;
+  }
+  if (pending.kind === 'btc-sign-msg' || pending.kind === 'btc-psbt' || pending.kind === 'btc-pubkey') {
+    return `${pendingTitle(pending)}\n${pending.path}`;
   }
   if (pending.kind === 'btc-address') {
     return `Export Bitcoin address\n${pending.path}`;
@@ -661,7 +1128,29 @@ function previewPending(pending: PendingAction): string {
   if (pending.kind === 'verify') {
     return 'Confirm this device is genuine';
   }
+  if (pending.kind === 'eth-pubkey') {
+    return `Export Ethereum public key\n${pending.path}`;
+  }
   return `Export Ethereum address\n${pending.path}`;
+}
+
+function looksLikePsbt(bytes: Uint8Array): boolean {
+  return (
+    bytes.length >= 5 &&
+    bytes[0] === 0x70 &&
+    bytes[1] === 0x73 &&
+    bytes[2] === 0x62 &&
+    bytes[3] === 0x74 &&
+    bytes[4] === 0xff
+  );
+}
+
+function overlayPath(
+  confirmation: ConfirmationPort,
+  path: string,
+  chains: readonly ChainPathId[],
+): string {
+  return confirmation.resolvePath?.(path, chains) ?? path;
 }
 
 function previewMessage(message: Uint8Array): string {

@@ -208,7 +208,11 @@ export class V2FrameAssembler {
       return undefined;
     }
     if (this.buffer[0] !== PROTO_HEAD_SOF) {
+      const padding = this.buffer.every((byte) => byte === 0);
       this.reset();
+      if (padding) {
+        return undefined;
+      }
       throw new Error('Invalid Protocol V2 SOF');
     }
     const expectedLen = this.buffer[1] + this.buffer[2] * 256;

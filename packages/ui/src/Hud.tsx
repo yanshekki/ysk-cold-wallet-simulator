@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, fonts, motion, space } from './theme';
+import { colors, fonts, hairline, motion, space } from './theme';
 
 export type RadioMode = 'IDLE' | 'ADV' | 'GATT';
 
@@ -9,7 +9,10 @@ type Props = {
   radio: RadioMode;
   host?: string;
   appChip?: string;
+  seedLabel?: string;
   onLock?: () => void;
+  lockLabel?: string;
+  noHostLabel?: string;
 };
 
 export function formatSessionRemaining(unlockedUntil: number | null, now = Date.now()): string {
@@ -32,14 +35,26 @@ export function radioMode(advertising: boolean, connected: boolean): RadioMode {
   return 'IDLE';
 }
 
-export function Hud({ sessionLabel, radio, host, appChip, onLock }: Props) {
+export function Hud({
+  sessionLabel,
+  radio,
+  host,
+  appChip,
+  seedLabel,
+  onLock,
+  lockLabel = 'LOCK',
+  noHostLabel = 'NO HOST',
+}: Props) {
   const locked = sessionLabel === 'LOCKED';
   const live = radio !== 'IDLE';
+  const clock = locked ? 'LOCKED' : seedLabel ? `${seedLabel} · ${sessionLabel}` : sessionLabel;
 
   return (
     <View style={styles.bar}>
       <View style={styles.cluster}>
-        <Text style={[styles.kicker, locked && styles.locked]}>{locked ? 'LOCKED' : sessionLabel}</Text>
+        <Text style={[styles.kicker, locked && styles.locked]} numberOfLines={1}>
+          {clock}
+        </Text>
       </View>
       <View style={styles.cluster}>
         <RadioPip active={live} />
@@ -52,11 +67,11 @@ export function Hud({ sessionLabel, radio, host, appChip, onLock }: Props) {
       ) : null}
       <View style={[styles.cluster, styles.hostCluster]}>
         <Text style={styles.host} numberOfLines={1}>
-          {host ? host : 'NO HOST'}
+          {host ? host : noHostLabel}
         </Text>
         {onLock ? (
-          <Pressable accessibilityRole="button" accessibilityLabel="Lock session" onPress={onLock} hitSlop={8}>
-            <Text style={styles.lock}>LOCK</Text>
+          <Pressable accessibilityRole="button" accessibilityLabel={lockLabel} onPress={onLock} hitSlop={8}>
+            <Text style={styles.lock}>{lockLabel}</Text>
           </Pressable>
         ) : null}
       </View>
@@ -102,9 +117,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: space.sm,
     paddingHorizontal: space.md,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    paddingVertical: 8,
+    borderTopWidth: hairline,
+    borderBottomWidth: hairline,
+    borderColor: colors.border,
     backgroundColor: colors.bgElevated,
   },
   cluster: {
@@ -118,18 +134,17 @@ const styles = StyleSheet.create({
   },
   kicker: {
     color: colors.ok,
-    fontFamily: fonts.mono,
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 1,
+    fontFamily: fonts.monoBold,
+    fontSize: 11,
+    letterSpacing: 0.8,
   },
   locked: {
     color: colors.danger,
   },
   pip: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 1,
     backgroundColor: colors.muted,
   },
   pipOn: {
@@ -137,26 +152,24 @@ const styles = StyleSheet.create({
   },
   radio: {
     color: colors.muted,
-    fontFamily: fonts.mono,
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 1,
+    fontFamily: fonts.monoBold,
+    fontSize: 11,
+    letterSpacing: 0.8,
   },
   radioOn: {
     color: colors.ok,
   },
   chip: {
     color: colors.muted,
-    fontFamily: fonts.mono,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.8,
-    borderWidth: 1,
+    fontFamily: fonts.monoMedium,
+    fontSize: 10,
+    letterSpacing: 0.6,
+    borderWidth: hairline,
     borderColor: colors.border,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
     overflow: 'hidden',
-    borderRadius: 4,
+    borderRadius: 2,
   },
   chipOn: {
     color: colors.ok,
@@ -170,8 +183,8 @@ const styles = StyleSheet.create({
   },
   lock: {
     color: colors.danger,
+    fontFamily: fonts.monoBold,
     fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1,
+    letterSpacing: 0.8,
   },
 });

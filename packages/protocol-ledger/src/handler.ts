@@ -6,7 +6,7 @@ import type {
   LedgerApp,
   ProtocolHandler,
 } from '@cws/contracts';
-import { ledgerAppLabel, matchLedgerApp } from '@cws/contracts';
+import { ledgerAppFamily, ledgerAppLabel, matchLedgerApp } from '@cws/contracts';
 import {
   BleReassembler,
   clampMtu,
@@ -34,9 +34,22 @@ import {
   getFirmwareVersion,
   MANAGER_INS,
   openAppName,
+  targetIdFor,
 } from './apps/dashboard';
-import { handleBitcoinApdu } from './apps/bitcoin';
+import { handleAvalancheApdu, type AvaxSession } from './apps/avalanche';
+import { coinFromAppId, handleBitcoinApdu, type BtcSession } from './apps/bitcoin';
 import { handleEthereumApdu, type EthSession } from './apps/ethereum';
+import { handleNearApdu, type NearSession } from './apps/near';
+import { handleSolanaApdu } from './apps/solana';
+import { handleXrpApdu } from './apps/xrp';
+import { handleCardanoApdu } from './apps/cardano';
+import { handlePolkadotApdu } from './apps/polkadot';
+import { handleTronApdu } from './apps/tron';
+import { handleCosmosApdu } from './apps/cosmos';
+import { handleTonApdu } from './apps/ton';
+import { handleAptosApdu } from './apps/aptos';
+import { handleSuiApdu } from './apps/sui';
+import type { FamilySession } from './apps/generic';
 
 export type LedgerHandlerOptions = {
   model: DeviceModel;
@@ -60,6 +73,10 @@ export class LedgerProtocolHandler implements ProtocolHandler {
   private readonly onAppChange?: (app: LedgerApp) => void;
   private readonly assembler = new BleReassembler();
   private readonly ethSession: EthSession = {};
+  private readonly nearSession: NearSession = {};
+  private readonly avaxSession: AvaxSession = {};
+  private readonly familySession: FamilySession = {};
+  private readonly btcSession: BtcSession = {};
   private mtu: number;
   private app: LedgerApp = 'dashboard';
   private managerAllowed = false;
@@ -90,6 +107,12 @@ export class LedgerProtocolHandler implements ProtocolHandler {
   setApp(app: LedgerApp): void {
     this.app = app;
     this.ethSession.pendingPersonal = undefined;
+    this.ethSession.pendingTx = undefined;
+    this.nearSession.pendingSign = undefined;
+    this.avaxSession.pendingHash = undefined;
+    this.avaxSession.rootPath = undefined;
+    this.avaxSession.signChunks = undefined;
+    this.familySession.pendingSign = undefined;
     this.onAppChange?.(app);
   }
 
@@ -127,6 +150,12 @@ export class LedgerProtocolHandler implements ProtocolHandler {
       case TAG_INIT:
         this.assembler.reset();
         this.ethSession.pendingPersonal = undefined;
+        this.ethSession.pendingTx = undefined;
+        this.nearSession.pendingSign = undefined;
+        this.avaxSession.pendingHash = undefined;
+        this.avaxSession.rootPath = undefined;
+        this.avaxSession.signChunks = undefined;
+        this.familySession.pendingSign = undefined;
         return framePayload(TAG_INIT, new Uint8Array(), this.mtu);
       case TAG_APDU: {
         const response = await this.handleApdu(payload);
@@ -180,23 +209,114 @@ export class LedgerProtocolHandler implements ProtocolHandler {
       return this.allowManager();
     }
 
-    if (this.app === 'ethereum' && apdu.cla === 0xe0) {
-      return handleEthereumApdu(apdu, {
-        confirmation: this.confirmation,
-        slotId: this.slotId,
-        entropy: this.entropy,
-        backup: this.backup,
-        session: this.ethSession,
+    return this.handleFamilyApdu(apdu);
+  }
+
+  private async handleFamilyApdu(apdu: ReturnType<typeof parseApdu>): Promise<Uint8Array | null> {
+    const family = ledgerAppFamily(this.app);
+    const ctx = {
+      confirmation: this.confirmation,
+      slotId: this.slotId,
+      entropy: this.entropy,
+      backup: this.backup,
+    };
+
+    if (family === 'ethereum' || (family === 'avalanche' && apdu.cla === 0xe0)) {
+      if (apdu.cla !== 0xe0) {
+        if (family === 'avalanche' && apdu.cla === 0x80) {
+          return handleAvalancheApdu(apdu, {
+            ...ctx,
+            session: this.avaxSession,
+            targetId: targetIdFor(this.model.id),
+          });
+        }
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleEthereumApdu(apdu, { ...ctx, session: this.ethSession });
+    }
+
+    if (family === 'avalanche') {
+      if (apdu.cla === 0x80) {
+        return handleAvalancheApdu(apdu, {
+          ...ctx,
+          session: this.avaxSession,
+          targetId: targetIdFor(this.model.id),
+        });
+      }
+      return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+    }
+
+    if (family === 'bitcoin') {
+      if (apdu.cla !== 0xe0) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleBitcoinApdu(apdu, {
+        ...ctx,
+        coin: coinFromAppId(this.app),
+        session: this.btcSession,
       });
     }
 
-    if (this.app === 'bitcoin' && apdu.cla === 0xe0) {
-      return handleBitcoinApdu(apdu, {
-        confirmation: this.confirmation,
-        slotId: this.slotId,
-        entropy: this.entropy,
-        backup: this.backup,
-      });
+    if (family === 'near') {
+      if (apdu.cla !== 0x80) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleNearApdu(apdu, { ...ctx, session: this.nearSession });
+    }
+
+    if (family === 'solana') {
+      if (apdu.cla !== 0xe0) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleSolanaApdu(apdu, ctx, this.familySession);
+    }
+    if (family === 'xrp') {
+      if (apdu.cla !== 0xe0) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleXrpApdu(apdu, ctx, this.familySession);
+    }
+    if (family === 'cardano') {
+      if (apdu.cla !== 0xd7 && apdu.cla !== 0xe0) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleCardanoApdu(apdu, ctx, this.familySession);
+    }
+    if (family === 'polkadot') {
+      if (apdu.cla !== 0xf9 && apdu.cla !== 0x90) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handlePolkadotApdu(apdu, ctx, this.familySession);
+    }
+    if (family === 'tron') {
+      if (apdu.cla !== 0xe0) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleTronApdu(apdu, ctx, this.familySession);
+    }
+    if (family === 'cosmos') {
+      if (apdu.cla !== 0x55) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleCosmosApdu(apdu, ctx, this.familySession);
+    }
+    if (family === 'ton') {
+      if (apdu.cla !== 0xe0) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleTonApdu(apdu, ctx, this.familySession);
+    }
+    if (family === 'aptos') {
+      if (apdu.cla !== 0x5b) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleAptosApdu(apdu, ctx, this.familySession);
+    }
+    if (family === 'sui') {
+      if (apdu.cla !== 0x00) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleSuiApdu(apdu, ctx, this.familySession);
     }
 
     if (apdu.cla !== 0xe0 && apdu.cla !== 0xb0) {

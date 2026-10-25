@@ -2,7 +2,7 @@ import { gcm } from '@noble/ciphers/aes';
 import { x25519 } from '@noble/curves/ed25519';
 import { hmac } from '@noble/hashes/hmac';
 import { sha256 } from '@noble/hashes/sha2';
-import { asBytes, concatBytes, encodeUtf8, equalBytes } from './bytes';
+import { asBytes, concatBytes, encodeUtf8, equalBytes, randomBytes } from './bytes';
 import {
   decodeHandshakeCompletionPayload,
   decodePairingCredential,
@@ -27,7 +27,7 @@ export type X25519KeyPair = {
 };
 
 export function generateX25519KeyPair(): X25519KeyPair {
-  const privateKey = asBytes(x25519.utils.randomPrivateKey());
+  const privateKey = randomBytes(32);
   return { privateKey, publicKey: asBytes(x25519.getPublicKey(privateKey)) };
 }
 

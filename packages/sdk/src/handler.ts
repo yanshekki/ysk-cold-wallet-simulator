@@ -26,6 +26,8 @@ export type CreateHandlerOptions = {
   backup?: BackupKind;
   mtu?: number;
   onAppChange?: (app: LedgerApp) => void;
+  rng?: (length: number) => Uint8Array;
+  onTrace?: (note: string) => void;
 };
 
 export function createHandler(options: CreateHandlerOptions): ProtocolHandler {
@@ -36,7 +38,16 @@ export function createHandler(options: CreateHandlerOptions): ProtocolHandler {
     case 'onekey-v2':
       return new OneKeyV1ProtocolHandler(options);
     case 'thp':
-      return new TrezorThpProtocolHandler(options);
+      return new TrezorThpProtocolHandler({
+        model: options.model,
+        confirmation: options.confirmation,
+        slotId: options.slotId,
+        entropy: options.entropy,
+        backup: options.backup,
+        mtu: options.mtu,
+        rng: options.rng,
+        onTrace: options.onTrace,
+      });
     default:
       throw new Error(`protocol ${options.model.protocol} is not implemented yet`);
   }

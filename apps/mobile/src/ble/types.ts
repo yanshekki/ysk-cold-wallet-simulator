@@ -15,4 +15,5 @@ export type StartAdvertising = (
   model: DeviceModel,
   handler: ProtocolHandler,
   callbacks: PeripheralCallbacks,
+  options?: { nameSuffix?: string },
 ) => Promise<PeripheralHandle>;

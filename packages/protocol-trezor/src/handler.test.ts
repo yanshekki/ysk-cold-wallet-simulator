@@ -283,7 +283,24 @@ describe('TrezorThpProtocolHandler', () => {
     expect(confirmation.pairingCode).toBeNull();
   });
 
-  it('returns Failure for EthereumSignTx and unknown types', async () => {
+  it('signs a legacy Ethereum transaction after ButtonAck', async () => {
+    const host = new ThpHost();
+    await host.allocate();
+    await host.handshake();
+    await host.pair();
+    await host.app(MessageType.ThpEndRequest, new Uint8Array());
+    const payload = concatBytes(
+      encodeRepeatedUint32(1, [0x8000002c, 0x8000003c, 0x80000000, 0, 0]),
+      encodeBytes(5, Uint8Array.from({ length: 20 }, () => 0x11)),
+      encodeUint32(11, 1),
+    );
+    const button = await host.app(MessageType.EthereumSignTx, payload);
+    expect(button.type).toBe(MessageType.ButtonRequest);
+    const reply = await host.app(MessageType.ButtonAck, new Uint8Array());
+    expect(reply.type).toBe(MessageType.EthereumTxRequest);
+  });
+
+  it('returns Failure for empty EthereumSignTx and unknown types', async () => {
     const host = new ThpHost();
     await host.allocate();
     await host.handshake();
@@ -313,5 +330,29 @@ describe('ETH derivation', () => {
   it('derives the foundry default address', () => {
     const key = derivePrivateKey(entropyFromMnemonic(FOUNDATION), PATH);
     expect(ethereumAddressFromPrivateKey(key).toLowerCase()).toBe(EXPECTED_ADDRESS.toLowerCase());
+  });
+});
+
+describe('injected rng', () => {
+  it('constructs when WebCrypto is missing if rng is injected', () => {
+    const original = globalThis.crypto;
+    Object.defineProperty(globalThis, 'crypto', { configurable: true, value: undefined });
+    let n = 1;
+    const rng = (length: number) => {
+      const out = new Uint8Array(length);
+      out.fill(n++ & 0xff);
+      return out;
+    };
+    expect(
+      () =>
+        new TrezorThpProtocolHandler({
+          model: safe7,
+          confirmation: autoConfirm(),
+          slotId: 'slot',
+          entropy: entropyFromMnemonic(FOUNDATION),
+          rng,
+        }),
+    ).not.toThrow();
+    Object.defineProperty(globalThis, 'crypto', { configurable: true, value: original });
   });
 });

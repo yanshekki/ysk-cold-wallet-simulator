@@ -41,6 +41,15 @@ export function mnemonicFromEntropy(entropy: Uint8Array): string {
   return entropyToMnemonic(entropy, wordlist);
 }
 
+export function isValidBip39Mnemonic(mnemonic: string): boolean {
+  const normalized = normalizeWords(mnemonic);
+  const count = wordCountOf(normalized);
+  if (count !== 12 && count !== 15 && count !== 18 && count !== 21 && count !== 24) {
+    return false;
+  }
+  return validateMnemonic(normalized, wordlist);
+}
+
 export function entropyFromMnemonic(mnemonic: string): Uint8Array {
   const normalized = normalizeWords(mnemonic);
   if (!validateMnemonic(normalized, wordlist)) {

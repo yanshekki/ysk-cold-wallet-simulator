@@ -1,21 +1,36 @@
-import { useState } from 'react';
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { Brand, DeviceModel, LedgerApp } from '@cws/contracts';
 import {
   ALL_MODELS,
-  LEDGER_APPS,
   bleAdvertiseName,
   ledgerAppChip,
   ledgerAppLabel,
+  ledgerPickerApps,
 } from '@cws/contracts';
 import { isSimulatable } from '@cws/sdk';
-import { BRAND_LABEL, Button, DeviceCard, Screen, SelectSheet, colors, space } from '@cws/ui';
+import {
+  BRAND_LABEL,
+  Button,
+  DeviceCard,
+  Screen,
+  SelectSheet,
+  Sheet,
+  colors,
+  fonts,
+  hairline,
+  radius,
+  space,
+} from '@cws/ui';
 import { copyText } from '../../src/lab/copy';
+import { useT } from '../../src/i18n';
 import { useAppState } from '../../src/state/AppState';
 
 const BRANDS: Brand[] = ['ledger', 'trezor', 'onekey'];
 
 export default function DeviceScreen() {
+  const t = useT();
   const {
     model,
     seed,
@@ -23,18 +38,36 @@ export default function DeviceScreen() {
     connected,
     currentApp,
     error,
+    catalog,
     selectModel,
     startSimulation,
     stopSimulation,
     setApp,
+    showToast,
+    hydrated,
+    sessionPassphraseApplied,
+    applySessionPassphrase,
+    clearSessionPassphrase,
   } = useAppState();
   const [busy, setBusy] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
-  const [copied, setCopied] = useState<string | null>(null);
   const [appSheet, setAppSheet] = useState(false);
+  const [appPicked, setAppPicked] = useState(false);
+  const [passSheet, setPassSheet] = useState(false);
+  const [passDraft, setPassDraft] = useState('');
+
+  useEffect(() => {
+    if (!advertising) {
+      setPassSheet(false);
+      setPassDraft('');
+      setAppSheet(false);
+      setAppPicked(false);
+    }
+  }, [advertising]);
 
   const isLedger = model?.protocol === 'ledger-apdu';
   const canStart = !!seed && !!model && isSimulatable(model) && !advertising;
+  const pickerApps = catalog.length ? ['dashboard', ...catalog.map((app) => app.id)] : ledgerPickerApps();
 
   const onSelect = (next: DeviceModel) => {
     if (!isSimulatable(next)) {
@@ -49,8 +82,8 @@ export default function DeviceScreen() {
 
   const onCopy = async (label: string, value: string) => {
     await copyText(value);
-    setCopied(label);
-    setTimeout(() => setCopied(null), 1400);
+    showToast(t('common.copied'));
+    void label;
   };
 
   const onStart = async () => {
@@ -65,13 +98,45 @@ export default function DeviceScreen() {
     }
   };
 
+  if (!hydrated) {
+    return (
+      <Screen kicker={t('device.kicker')} title={model?.name ?? 'CWS'} subtitle={t('device.subtitle')} edges={[]}>
+        <View style={styles.loading}>
+          <ActivityIndicator color={colors.ok} />
+          <Text style={styles.hint}>{t('common.loading')}</Text>
+        </View>
+        {Array.from({ length: 4 }).map((_, index) => (
+          <View key={index} style={styles.skeleton} />
+        ))}
+      </Screen>
+    );
+  }
+
+  const closePassSheet = () => {
+    setPassDraft('');
+    setPassSheet(false);
+  };
+
+  const onApplyPassphrase = () => {
+    applySessionPassphrase(passDraft);
+    setPassDraft('');
+    setPassSheet(false);
+  };
+
+  const onClearPassphrase = () => {
+    Alert.alert(t('device.passphraseClearTitle'), t('device.passphraseClearBody'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('device.passphraseClear'),
+        style: 'destructive',
+        onPress: clearSessionPassphrase,
+      },
+    ]);
+  };
+
   return (
-    <Screen
-      kicker="Device"
-      title={model?.name ?? 'Select a model'}
-      subtitle="The phone is the hardware wallet. Hosts scan this Service UUID and local name."
-      edges={[]}
-    >
+    <>
+    <Screen kicker={t('device.kicker')} title={model?.name ?? 'CWS'} subtitle={t('device.subtitle')} edges={[]}>
       {BRANDS.map((brand) => (
         <View key={brand} style={styles.group}>
           <Text style={styles.groupLabel}>{BRAND_LABEL[brand]}</Text>
@@ -83,60 +148,79 @@ export default function DeviceScreen() {
                 model={item}
                 selected={model?.id === item.id}
                 enabled={ready}
-                badge={ready ? undefined : 'Not implemented'}
+                badge={ready ? undefined : t('device.notImplemented')}
                 onSelect={() => onSelect(item)}
                 onCopyName={() => void onCopy('name', bleAdvertiseName(item))}
                 onCopyUuid={() => void onCopy('uuid', item.serviceUUID)}
               >
                 {model?.id === item.id ? (
                   <View style={styles.bezelActions}>
-                    {copied ? <Text style={styles.copied}>Copied {copied}</Text> : null}
-                    {!seed ? (
-                      <Text style={styles.hint}>Select a seed in Vault before starting the radio.</Text>
-                    ) : null}
+                    {!seed ? <Text style={styles.hint}>{t('device.selectSeed')}</Text> : null}
                     {seed?.backup === 'slip39' && item.brand === 'ledger' ? (
-                      <Text style={styles.hint}>
-                        Ledger Live expects BIP39. This SLIP-39 slot will not match a Ledger-restored seed.
-                      </Text>
+                      <Text style={styles.hint}>{t('device.slip39Ledger')}</Text>
                     ) : null}
                     {advertising ? (
                       <>
                         <Text style={styles.live}>
-                          {connected ? 'Host on GATT' : `Advertising as ${bleAdvertiseName(item)}`}
+                          {connected
+                            ? t('device.hostGatt')
+                            : t('device.advertising', { name: bleAdvertiseName(item) })}
                         </Text>
                         {isLedger ? (
                           <>
-                            <Text style={styles.appNow}>{ledgerAppLabel(currentApp)}</Text>
                             <Button
-                              label="Select app"
+                              testID="device-select-app"
+                              label={
+                                appPicked || currentApp !== 'dashboard'
+                                  ? t('device.appSelected', { app: ledgerAppLabel(currentApp) })
+                                  : t('device.selectApp')
+                              }
                               variant="ghost"
                               onPress={() => setAppSheet(true)}
                             />
                             <SelectSheet
                               visible={appSheet}
-                              title="Open Ledger app"
+                              title={t('device.openApp')}
                               selectedId={currentApp}
-                              options={LEDGER_APPS.map((app) => ({
+                              options={pickerApps.map((app) => ({
                                 id: app,
                                 label: ledgerAppLabel(app),
                                 chip: ledgerAppChip(app),
                               }))}
                               onSelect={(id) => {
                                 setApp(id as LedgerApp);
+                                setAppPicked(true);
                                 setAppSheet(false);
                               }}
                               onClose={() => setAppSheet(false)}
+                              cancelLabel={t('common.cancel')}
+                              searchPlaceholder={t('common.search')}
                             />
-                            <Text style={styles.hint}>
-                              Host can OPEN_APP from Ledger Wallet. This picker is the device screen.
-                            </Text>
                           </>
                         ) : null}
-                        <Button label="Stop radio" variant="danger" onPress={() => void stopSimulation()} />
+                        {seed?.backup !== 'slip39' ? (
+                          sessionPassphraseApplied ? (
+                            <Button
+                              testID="device-passphrase-applied"
+                              label={t('device.passphraseApplied')}
+                              variant="ghost"
+                              onPress={onClearPassphrase}
+                            />
+                          ) : (
+                            <Button
+                              testID="device-passphrase"
+                              label={t('device.passphrase')}
+                              variant="ghost"
+                              onPress={() => setPassSheet(true)}
+                            />
+                          )
+                        ) : null}
+                        <Button label={t('device.stop')} variant="danger" onPress={() => void stopSimulation()} />
                       </>
                     ) : (
                       <Button
-                        label={busy ? 'Starting…' : 'Start radio'}
+                        testID="device-start"
+                        label={busy ? '…' : t('device.start')}
                         disabled={!canStart || busy}
                         onPress={() => void onStart()}
                       />
@@ -148,9 +232,7 @@ export default function DeviceScreen() {
                           ? 'Android keeps advertising with a persistent notification.'
                           : 'BLE advertising needs a physical Android or iOS device.'}
                     </Text>
-                    {error || localError ? (
-                      <Text style={styles.error}>{localError ?? error}</Text>
-                    ) : null}
+                    {error || localError ? <Text style={styles.error}>{localError ?? error}</Text> : null}
                   </View>
                 ) : null}
               </DeviceCard>
@@ -159,17 +241,57 @@ export default function DeviceScreen() {
         </View>
       ))}
     </Screen>
+    <Sheet
+      visible={passSheet}
+      title={t('device.passphrase')}
+      onClose={closePassSheet}
+      closeLabel={t('common.close')}
+      closeIcon={<Ionicons name="close" size={22} color={colors.text} />}
+      testID="device-passphrase-sheet"
+      footer={
+        <Button testID="device-passphrase-apply" label={t('device.passphraseApply')} onPress={onApplyPassphrase} />
+      }
+    >
+      <Text style={styles.hint}>{t('device.passphraseHint')}</Text>
+      <TextInput
+        value={passDraft}
+        onChangeText={setPassDraft}
+        placeholder={t('device.passphrase')}
+        placeholderTextColor={colors.muted}
+        secureTextEntry
+        autoCapitalize="none"
+        autoCorrect={false}
+        autoComplete="off"
+        textContentType="oneTimeCode"
+        importantForAutofill="no"
+        spellCheck={false}
+        style={styles.input}
+      />
+    </Sheet>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
+  loading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.md,
+  },
+  skeleton: {
+    minHeight: 72,
+    borderRadius: radius.sm,
+    borderWidth: hairline,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+  },
   group: {
     gap: space.sm,
   },
   groupLabel: {
     color: colors.muted,
-    fontSize: 11,
-    fontWeight: '700',
+    fontFamily: fonts.monoMedium,
+    fontSize: 10,
     letterSpacing: 1.4,
     textTransform: 'uppercase',
   },
@@ -177,31 +299,33 @@ const styles = StyleSheet.create({
     marginTop: space.sm,
     gap: space.sm,
   },
-  copied: {
-    color: colors.ok,
-    fontSize: 12,
-  },
   hint: {
     color: colors.muted,
+    fontFamily: fonts.sans,
     fontSize: 13,
     lineHeight: 18,
   },
   live: {
     color: colors.ok,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  appNow: {
-    color: colors.text,
-    fontSize: 20,
-    fontWeight: '700',
+    fontFamily: fonts.monoMedium,
+    fontSize: 12,
   },
   radioHint: {
     color: colors.muted,
+    fontFamily: fonts.sans,
     fontSize: 12,
     lineHeight: 18,
   },
   error: {
     color: colors.danger,
+  },
+  input: {
+    borderWidth: hairline,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    color: colors.text,
+    fontFamily: fonts.mono,
+    paddingHorizontal: space.md,
+    minHeight: 40,
   },
 });

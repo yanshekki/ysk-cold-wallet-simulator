@@ -23,7 +23,7 @@ import {
   isAckFrame,
 } from './index';
 import { decodeFields, encodeBytes, encodeString, readOptionalString } from './proto';
-import { concatBytes } from './bytes';
+import { concatBytes, hexToBytes } from './bytes';
 import { encodeSuccess } from './messages';
 
 const FOUNDATION = 'test test test test test test test test test test test junk';
@@ -102,6 +102,58 @@ describe('OneKeyV1ProtocolHandler', () => {
     const reply = await exchange(handler, frameV1(MessageType.GetFeatures, new Uint8Array()), 20);
     expect(reply.type).toBe(MessageType.Features);
     expect(decodeFeatures(reply.payload).vendor).toBe('onekey.so');
+  });
+
+  it('answers GetPassphraseState with an empty standard-wallet state', async () => {
+    const handler = new OneKeyV1ProtocolHandler({
+      model: classic,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy,
+    });
+    const reply = await exchange(handler, frameV1(MessageType.GetPassphraseState, new Uint8Array()));
+    expect(reply.type).toBe(MessageType.PassphraseState);
+    const fields = decodeFields(reply.payload);
+    expect(readOptionalString(fields, 1)).toBe('');
+    expect(fields.find((field) => field.field === 2)?.bytes.length).toBe(32);
+    expect(fields.find((field) => field.field === 3)?.varint).toBe(0);
+  });
+
+  it('answers UnLockDevice as already unlocked without PIN', async () => {
+    const handler = new OneKeyV1ProtocolHandler({
+      model: classic,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy,
+    });
+    const reply = await exchange(handler, frameV1(MessageType.UnLockDevice, new Uint8Array()));
+    expect(reply.type).toBe(MessageType.UnLockDeviceResponse);
+    const fields = decodeFields(reply.payload);
+    expect(fields.find((field) => field.field === 1)?.varint).toBe(1);
+    expect(fields.find((field) => field.field === 2)?.varint).toBe(0);
+    expect(fields.find((field) => field.field === 3)?.varint).toBe(0);
+  });
+
+  it('answers EthereumGetPublicKeyOneKey with an xpub without a confirm', async () => {
+    const handler = new OneKeyV1ProtocolHandler({
+      model: classic,
+      confirmation: autoConfirm(false),
+      slotId: 'slot',
+      entropy,
+    });
+    const payload = concatBytes(
+      encodeRepeatedUint32(1, [0x8000002c, 0x8000003c, 0x80000000, 0]),
+      encodeUint32(2, 0),
+    );
+    const reply = await exchange(
+      handler,
+      frameV1(MessageType.EthereumGetPublicKeyOneKey, payload),
+    );
+    expect(reply.type).toBe(MessageType.EthereumPublicKeyOneKey);
+    const fields = decodeFields(reply.payload);
+    expect(readOptionalString(fields, 2)?.startsWith('xpub')).toBe(true);
+    const node = decodeFields(fields.find((field) => field.field === 1)!.bytes);
+    expect(node.find((field) => field.field === 6)?.bytes.length).toBe(33);
   });
 
   it('returns Failure for an unknown message type', async () => {
@@ -238,6 +290,56 @@ describe('OneKeyV1ProtocolHandler', () => {
   it('derives the foundry default address', () => {
     const key = derivePrivateKey(entropy, PATH);
     expect(ethereumAddressFromPrivateKey(key).toLowerCase()).toBe(EXPECTED_ADDRESS.toLowerCase());
+  });
+
+  it('exports a Solana address without display', async () => {
+    const handler = new OneKeyV1ProtocolHandler({
+      model: classic,
+      confirmation: autoConfirm(false),
+      slotId: 'slot',
+      entropy,
+    });
+    const payload = concatBytes(encodeRepeatedUint32(1, [0x8000002c, 0x800001f5, 0x80000000]));
+    const reply = await exchange(handler, frameV1(MessageType.SolanaGetAddress, payload));
+    expect(reply.type).toBe(MessageType.SolanaAddress);
+    expect(decodeFields(reply.payload).find((field) => field.field === 1)?.bytes.length).toBeGreaterThan(0);
+  });
+
+  it('signs an EIP-1559 transaction after ButtonAck', async () => {
+    const handler = new OneKeyV1ProtocolHandler({
+      model: classic,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy,
+    });
+    const payload = concatBytes(
+      encodeRepeatedUint32(1, [0x8000002c, 0x8000003c, 0x80000000, 0, 0]),
+      encodeBytes(5, hexToBytes('0x5208')),
+      encodeString(6, '0x1111111111111111111111111111111111111111'),
+      encodeUint32(10, 11155111),
+    );
+    const button = await exchange(handler, frameV1(MessageType.EthereumSignTxEIP1559, payload));
+    expect(button.type).toBe(MessageType.ButtonRequest);
+    const reply = await exchange(handler, frameV1(MessageType.ButtonAck, new Uint8Array()));
+    expect(reply.type).toBe(MessageType.EthereumTxRequest);
+  });
+
+  it('signs hashed EIP-712 after ButtonAck', async () => {
+    const handler = new OneKeyV1ProtocolHandler({
+      model: classic,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy,
+    });
+    const payload = concatBytes(
+      encodeRepeatedUint32(1, [0x8000002c, 0x8000003c, 0x80000000, 0, 0]),
+      encodeBytes(2, new Uint8Array(32).fill(0x11)),
+      encodeBytes(3, new Uint8Array(32).fill(0x22)),
+    );
+    const button = await exchange(handler, frameV1(MessageType.EthereumSignTypedHash, payload));
+    expect(button.type).toBe(MessageType.ButtonRequest);
+    const signed = await exchange(handler, frameV1(MessageType.ButtonAck, new Uint8Array()));
+    expect(signed.type).toBe(MessageType.EthereumTypedDataSignature);
   });
 });
 

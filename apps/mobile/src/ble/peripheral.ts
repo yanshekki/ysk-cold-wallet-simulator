@@ -134,6 +134,7 @@ export async function startAdvertising(
   model: DeviceModel,
   handler: ProtocolHandler,
   callbacks: PeripheralCallbacks,
+  options?: { nameSuffix?: string },
 ): Promise<PeripheralHandle> {
   const ble = await import('munim-bluetooth');
   const allowed = await ble.requestBluetoothPermission(['advertise', 'connect']);
@@ -141,7 +142,9 @@ export async function startAdvertising(
     throw new Error('Bluetooth advertising permission was not granted');
   }
 
-  const localName = bleAdvertiseName(model);
+  const suffix = options?.nameSuffix?.replace(/[^A-Za-z0-9]/g, '').slice(0, 3);
+  const baseName = bleAdvertiseName(model);
+  const localName = suffix && model.brand !== 'ledger' ? `${baseName} ${suffix}`.trim() : baseName;
 
   try {
     configureServices(ble, model);

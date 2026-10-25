@@ -1,0 +1,57 @@
+appId: hk.ysk.coldwalletsimulator
+---
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: "tab-device"
+    timeout: 45000
+- tapOn:
+    id: "tab-vault"
+- tapOn:
+    id: "tab-settings"
+- tapOn:
+    id: "settings-link-language"
+- assertVisible:
+    id: "screen-back"
+- tapOn:
+    id: "screen-back"
+- tapOn:
+    id: "settings-link-security"
+- tapOn:
+    id: "screen-back"
+- tapOn:
+    id: "settings-link-accounts"
+- assertVisible:
+    id: "activation-near"
+- assertVisible:
+    id: "activation-ton"
+- assertVisible:
+    id: "activation-xrp"
+- tapOn:
+    id: "screen-back"
+- tapOn:
+    id: "settings-link-catalog"
+- assertVisible:
+    id: "catalog-table"
+- tapOn:
+    id: "screen-back"
+- tapOn:
+    id: "settings-link-paths"
+- tapOn:
+    id: "screen-back"
+- tapOn:
+    id: "settings-link-data"
+- assertVisible:
+    id: "data-logs"
+- assertVisible:
+    id: "data-ble"
+- assertVisible:
+    id: "data-about"
+- assertVisible:
+    id: "data-danger"
+- tapOn:
+    id: "log-cap-500"
+- tapOn:
+    id: "screen-back"
+- assertVisible:
+    id: "settings-link-language"

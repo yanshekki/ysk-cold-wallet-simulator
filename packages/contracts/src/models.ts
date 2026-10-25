@@ -1,4 +1,16 @@
 import type { DeviceModel } from './index';
+import {
+  ledgerUsbIdentity,
+  ONEKEY_USB_VID,
+  onekeyUsbProductId,
+  TREZOR_HID_PID,
+  TREZOR_USB_VID,
+  vendorUsbIdentity,
+} from './usb';
+
+function onekeyUsb(modelId: string) {
+  return vendorUsbIdentity(ONEKEY_USB_VID, onekeyUsbProductId(modelId));
+}
 
 export const LEDGER_MODELS: DeviceModel[] = [
   {
@@ -10,6 +22,7 @@ export const LEDGER_MODELS: DeviceModel[] = [
     notifyCharUUID: '13d63400-2c97-0004-0001-4c6564676572',
     writeCmdCharUUID: '13d63400-2c97-0004-0003-4c6564676572',
     protocol: 'ledger-apdu',
+    usb: ledgerUsbIdentity('nano-x'),
   },
   {
     id: 'flex',
@@ -20,6 +33,7 @@ export const LEDGER_MODELS: DeviceModel[] = [
     notifyCharUUID: '13d63400-2c97-3004-0001-4c6564676572',
     writeCmdCharUUID: '13d63400-2c97-3004-0003-4c6564676572',
     protocol: 'ledger-apdu',
+    usb: ledgerUsbIdentity('flex'),
   },
   {
     id: 'stax',
@@ -30,6 +44,7 @@ export const LEDGER_MODELS: DeviceModel[] = [
     notifyCharUUID: '13d63400-2c97-6004-0001-4c6564676572',
     writeCmdCharUUID: '13d63400-2c97-6004-0003-4c6564676572',
     protocol: 'ledger-apdu',
+    usb: ledgerUsbIdentity('stax'),
   },
   {
     id: 'gen5',
@@ -40,6 +55,7 @@ export const LEDGER_MODELS: DeviceModel[] = [
     notifyCharUUID: '13d63400-2c97-8004-0001-4c6564676572',
     writeCmdCharUUID: '13d63400-2c97-8004-0003-4c6564676572',
     protocol: 'ledger-apdu',
+    usb: ledgerUsbIdentity('gen5'),
   },
 ];
 
@@ -52,6 +68,7 @@ export const TREZOR_MODELS: DeviceModel[] = [
     writeCharUUID: '8c000002-a59b-4d58-a9ad-073df69fa1b1',
     notifyCharUUID: '8c000003-a59b-4d58-a9ad-073df69fa1b1',
     protocol: 'thp',
+    usb: vendorUsbIdentity(TREZOR_USB_VID, TREZOR_HID_PID),
   },
 ];
 
@@ -64,6 +81,7 @@ export const ONEKEY_MODELS: DeviceModel[] = [
     writeCharUUID: '00000002-0000-1000-8000-00805f9b34fb',
     notifyCharUUID: '00000003-0000-1000-8000-00805f9b34fb',
     protocol: 'onekey-v1',
+    usb: onekeyUsb('classic'),
   },
   {
     id: 'classic1s',
@@ -73,6 +91,7 @@ export const ONEKEY_MODELS: DeviceModel[] = [
     writeCharUUID: '00000002-0000-1000-8000-00805f9b34fb',
     notifyCharUUID: '00000003-0000-1000-8000-00805f9b34fb',
     protocol: 'onekey-v1',
+    usb: onekeyUsb('classic1s'),
   },
   {
     id: 'pure',
@@ -82,6 +101,7 @@ export const ONEKEY_MODELS: DeviceModel[] = [
     writeCharUUID: '00000002-0000-1000-8000-00805f9b34fb',
     notifyCharUUID: '00000003-0000-1000-8000-00805f9b34fb',
     protocol: 'onekey-v1',
+    usb: onekeyUsb('pure'),
   },
   {
     id: 'touch',
@@ -91,6 +111,7 @@ export const ONEKEY_MODELS: DeviceModel[] = [
     writeCharUUID: '00000002-0000-1000-8000-00805f9b34fb',
     notifyCharUUID: '00000003-0000-1000-8000-00805f9b34fb',
     protocol: 'onekey-v1',
+    usb: onekeyUsb('touch'),
   },
   {
     id: 'pro',
@@ -100,6 +121,7 @@ export const ONEKEY_MODELS: DeviceModel[] = [
     writeCharUUID: '00000002-0000-1000-8000-00805f9b34fb',
     notifyCharUUID: '00000003-0000-1000-8000-00805f9b34fb',
     protocol: 'onekey-v1',
+    usb: onekeyUsb('pro'),
   },
   {
     id: 'pro2',
@@ -109,6 +131,7 @@ export const ONEKEY_MODELS: DeviceModel[] = [
     writeCharUUID: '00000002-0000-1000-8000-00805f9b34fb',
     notifyCharUUID: '00000003-0000-1000-8000-00805f9b34fb',
     protocol: 'onekey-v2',
+    usb: onekeyUsb('pro2'),
   },
   {
     id: 'neo',
@@ -118,6 +141,7 @@ export const ONEKEY_MODELS: DeviceModel[] = [
     writeCharUUID: '00000002-0000-1000-8000-00805f9b34fb',
     notifyCharUUID: '00000003-0000-1000-8000-00805f9b34fb',
     protocol: 'onekey-v2',
+    usb: onekeyUsb('neo'),
   },
 ];
 

@@ -8,10 +8,10 @@ import {
 } from './signing';
 
 describe('slide-to-confirm math', () => {
-  it('commits only at 85% of travel', () => {
-    expect(SLIDE_COMMIT_RATIO).toBe(0.85);
-    expect(shouldCommitSlide(0.84)).toBe(false);
-    expect(shouldCommitSlide(0.85)).toBe(true);
+  it('commits once the thumb is past 50% of travel', () => {
+    expect(SLIDE_COMMIT_RATIO).toBe(0.5);
+    expect(shouldCommitSlide(0.49)).toBe(false);
+    expect(shouldCommitSlide(0.5)).toBe(true);
     expect(shouldCommitSlide(1)).toBe(true);
   });
 

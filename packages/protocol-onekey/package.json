@@ -10,8 +10,10 @@
   },
   "dependencies": {
     "@cws/contracts": "*",
+    "@cws/protocol-ledger": "*",
     "@noble/curves": "^1.9.7",
     "@noble/hashes": "^1.8.0",
+    "@scure/base": "^2.4.0",
     "@scure/bip32": "^1.7.0",
     "@scure/bip39": "^1.6.0"
   },

@@ -1,31 +1,39 @@
 import { Redirect, Tabs } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ledgerAppChip } from '@cws/contracts';
 import {
   Hud,
   PairingTakeover,
   SigningModal,
+  Toast,
   colors,
+  fonts,
   formatSessionRemaining,
+  hairline,
   radioMode,
 } from '@cws/ui';
+import { useT } from '../../src/i18n';
 import { useAppState } from '../../src/state/AppState';
 
 export default function AppShell() {
+  const t = useT();
+  const insets = useSafeAreaInsets();
   const {
     unlockedUntil,
     advertising,
     connected,
     connectedLabel,
     model,
+    seed,
     currentApp,
     pending,
     pairingCode,
-    passphrase,
+    sessionPassphraseApplied,
+    toast,
     lock,
-    setPassphrase,
     resolveSigning,
   } = useAppState();
   const [now, setNow] = useState(() => Date.now());
@@ -41,9 +49,10 @@ export default function AppShell() {
 
   return (
     <View style={styles.root}>
-      <SafeAreaView edges={['top']} style={styles.top}>
+      <View style={{ paddingTop: insets.top, backgroundColor: colors.bgElevated }}>
         <Hud
           sessionLabel={formatSessionRemaining(unlockedUntil, now)}
+          seedLabel={seed?.label ? seed.label.slice(0, 12) : undefined}
           radio={radioMode(advertising, connected)}
           host={connected ? connectedLabel : undefined}
           appChip={
@@ -52,32 +61,60 @@ export default function AppShell() {
               : undefined
           }
           onLock={lock}
+          lockLabel={t('hud.lock')}
+          noHostLabel={t('hud.noHost')}
         />
-      </SafeAreaView>
+      </View>
       <Tabs
-        screenOptions={{
+        screenOptions={({ route }) => ({
           headerShown: false,
-          tabBarStyle: styles.tabBar,
-          tabBarActiveTintColor: colors.accent,
+          tabBarStyle: [
+            styles.tabBar,
+            { paddingBottom: Math.max(insets.bottom, 6), height: 48 + Math.max(insets.bottom, 6) },
+          ],
+          tabBarActiveTintColor: colors.ok,
           tabBarInactiveTintColor: colors.muted,
           tabBarLabelStyle: styles.tabLabel,
-          tabBarIcon: ({ color }) => <View style={[styles.pip, { backgroundColor: color }]} />,
+          tabBarIcon: ({ focused, color }) => {
+            const names = {
+              index: focused ? 'hardware-chip' : 'hardware-chip-outline',
+              vault: focused ? 'shield-checkmark' : 'shield-checkmark-outline',
+              console: focused ? 'terminal' : 'terminal-outline',
+              settings: focused ? 'settings' : 'settings-outline',
+            } as const;
+            const name = names[route.name as keyof typeof names] ?? 'ellipse-outline';
+            return <Ionicons name={name} size={20} color={color} />;
+          },
           sceneStyle: { backgroundColor: colors.bg },
-        }}
+        })}
       >
-        <Tabs.Screen name="index" options={{ title: 'Device' }} />
-        <Tabs.Screen name="vault" options={{ title: 'Vault' }} />
-        <Tabs.Screen name="console" options={{ title: 'Console' }} />
+        <Tabs.Screen name="index" options={{ title: t('tabs.device'), tabBarButtonTestID: 'tab-device' }} />
+        <Tabs.Screen name="vault" options={{ title: t('tabs.vault'), tabBarButtonTestID: 'tab-vault' }} />
+        <Tabs.Screen name="console" options={{ title: t('tabs.console'), tabBarButtonTestID: 'tab-console' }} />
+        <Tabs.Screen name="settings" options={{ title: t('tabs.settings'), tabBarButtonTestID: 'tab-settings' }} />
       </Tabs>
       <PairingTakeover code={pairingCode} />
       <SigningModal
         visible={!!pending}
         request={pending}
-        passphrase={passphrase}
-        onChangePassphrase={setPassphrase}
         onConfirm={() => resolveSigning(true)}
         onReject={() => resolveSigning(false)}
+        rejectLabel={t('signing.reject')}
+        confirmTitle={t('signing.title')}
+        sessionPassphraseApplied={sessionPassphraseApplied}
+        passphraseAppliedLabel={t('signing.applied')}
+        passphraseIdleLabel={t('signing.idle')}
+        copy={{
+          decodeFailed: t('signing.decodeFailed'),
+          personalMessage: t('signing.personalMessage'),
+          rawMessage: t('signing.rawMessage'),
+          noticeOpenApp: t('signing.noticeOpenApp'),
+          noticeManager: t('signing.noticeManager'),
+          noticePairing: t('signing.noticePairing'),
+          noticeVerify: t('signing.noticeVerify'),
+        }}
       />
+      <Toast message={toast} />
     </View>
   );
 }
@@ -87,23 +124,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.bg,
   },
-  top: {
-    backgroundColor: colors.bgElevated,
-  },
   tabBar: {
     backgroundColor: colors.bgElevated,
     borderTopColor: colors.border,
-    borderTopWidth: 1,
+    borderTopWidth: hairline,
+    minHeight: 48,
   },
   tabLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-  },
-  pip: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    fontFamily: fonts.monoMedium,
+    fontSize: 10,
+    letterSpacing: 0.6,
   },
 });

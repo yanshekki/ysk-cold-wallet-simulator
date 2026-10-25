@@ -81,8 +81,27 @@ export function equalBytes(a: Uint8Array, b: Uint8Array): boolean {
   return diff === 0;
 }
 
+export type ByteRng = (length: number) => Uint8Array;
+
+let installedRng: ByteRng | undefined;
+
+export function setRandomBytesImpl(rng: ByteRng | undefined): void {
+  installedRng = rng;
+}
+
 export function randomBytes(length: number): Uint8Array {
-  const out = new Uint8Array(length);
-  crypto.getRandomValues(out);
-  return out;
+  if (installedRng) {
+    const out = installedRng(length);
+    if (out.length !== length) {
+      throw new Error(`rng returned ${out.length} bytes, expected ${length}`);
+    }
+    return out;
+  }
+  const webCrypto = globalThis.crypto;
+  if (webCrypto && typeof webCrypto.getRandomValues === 'function') {
+    const out = new Uint8Array(length);
+    webCrypto.getRandomValues(out);
+    return out;
+  }
+  throw new Error('crypto.getRandomValues must be defined');
 }

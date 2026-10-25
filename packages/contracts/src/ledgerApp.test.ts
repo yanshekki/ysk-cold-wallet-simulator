@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
   LEDGER_APPS,
   LEDGER_INSTALLED_APPS,
+  inferLedgerFamily,
   ledgerAppChip,
   ledgerAppLabel,
   matchLedgerApp,
+  slugLedgerApp,
 } from './index';
 
 describe('ledger app labels', () => {
@@ -15,6 +17,7 @@ describe('ledger app labels', () => {
     expect(ledgerAppChip('dashboard')).toBe('BOLOS');
     expect(ledgerAppChip('bitcoin')).toBe('BTC');
     expect(ledgerAppChip('ethereum')).toBe('ETH');
+    expect(ledgerAppChip('avalanche')).toBe('AVAX');
     expect(ledgerAppChip('solana')).toBe('SOL');
   });
 
@@ -28,6 +31,14 @@ describe('ledger app labels', () => {
     expect(matchLedgerApp('Ethereum')).toBe('ethereum');
     expect(matchLedgerApp('Bitcoin')).toBe('bitcoin');
     expect(matchLedgerApp('Solana')).toBe('solana');
+    expect(matchLedgerApp('Avalanche')).toBe('avalanche');
     expect(matchLedgerApp('unknown-chain')).toBeUndefined();
+  });
+
+  it('maps overlay names onto APDU families', () => {
+    expect(inferLedgerFamily('Cardano ADA')).toBe('cardano');
+    expect(inferLedgerFamily('Bitcoin Test')).toBe('bitcoin');
+    expect(inferLedgerFamily('Helium-Solana')).toBe('solana');
+    expect(slugLedgerApp('Cardano ADA')).toBe('cardano');
   });
 });

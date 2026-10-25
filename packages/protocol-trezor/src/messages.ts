@@ -1,4 +1,4 @@
-import { concatBytes } from './bytes';
+import { concatBytes, hexToBytes } from './bytes';
 import {
   decodeFields,
   encodeBool,
@@ -27,9 +27,35 @@ export const MessageType = {
   EthereumGetAddress: 56,
   EthereumAddress: 57,
   EthereumSignTx: 58,
+  EthereumTxRequest: 59,
   EthereumSignMessage: 64,
   EthereumMessageSignature: 66,
+  EthereumGetPublicKey: 450,
+  EthereumPublicKey: 451,
   EthereumSignTxEIP1559: 452,
+  EthereumSignTypedHash: 470,
+  EthereumTypedDataSignature: 469,
+  GetPublicKey: 11,
+  PublicKey: 12,
+  SignTx: 15,
+  TxRequest: 21,
+  TxAck: 22,
+  GetAddress: 29,
+  Address: 30,
+  SignMessage: 38,
+  MessageSignature: 40,
+  CardanoGetAddress: 307,
+  CardanoAddress: 308,
+  RippleGetAddress: 400,
+  RippleAddress: 401,
+  RippleSignTx: 402,
+  RippleSignedTx: 403,
+  SolanaGetPublicKey: 900,
+  SolanaPublicKey: 901,
+  SolanaGetAddress: 902,
+  SolanaAddress: 903,
+  SolanaSignTx: 904,
+  SolanaTxSignature: 905,
   ThpCreateNewSession: 1000,
   ThpPairingRequest: 1008,
   ThpPairingRequestApproved: 1009,
@@ -419,5 +445,160 @@ export function decodeButtonRequest(payload: Uint8Array): number {
 }
 
 export function isEthSignTx(type: number): boolean {
-  return type === MessageType.EthereumSignTx || type === MessageType.EthereumSignTxEIP1559;
+  return type === MessageType.EthereumSignTx;
+}
+
+export function isEthSignTxEip1559(type: number): boolean {
+  return type === MessageType.EthereumSignTxEIP1559;
+}
+
+export const TxRequestType = {
+  TXINPUT: 0,
+  TXOUTPUT: 1,
+  TXFINISHED: 3,
+} as const;
+
+export function encodeTxRequest(requestType: number, index = 0, signature?: Uint8Array): Uint8Array {
+  const details = encodeUint32(1, index);
+  const parts = [encodeUint32(1, requestType), encodeBytes(2, details)];
+  if (signature) {
+    parts.push(encodeBytes(3, concatBytes(encodeUint32(1, 0), encodeBytes(2, signature))));
+  }
+  return concatBytes(...parts);
+}
+
+export function encodeStringAddress(address: string): Uint8Array {
+  return encodeString(1, address);
+}
+
+export function encodeBytesSignature(signature: Uint8Array): Uint8Array {
+  return encodeBytes(1, signature);
+}
+
+export function encodeTypedDataSignature(signature: Uint8Array, address: string): Uint8Array {
+  return concatBytes(encodeBytes(1, signature), encodeString(2, address));
+}
+
+export function encodeMessageSignature(address: string, signature: Uint8Array): Uint8Array {
+  return concatBytes(encodeString(1, address), encodeBytes(2, signature));
+}
+
+export function encodeEthereumTxRequest(signature: { v: number; r: Uint8Array; s: Uint8Array }): Uint8Array {
+  return concatBytes(encodeUint32(2, signature.v), encodeBytes(3, signature.r), encodeBytes(4, signature.s));
+}
+
+export function decodePathBytes(payload: Uint8Array, bytesField = 2): {
+  addressN: number[];
+  payload: Uint8Array;
+  showDisplay: boolean;
+} {
+  const fields = decodeFields(payload);
+  return {
+    addressN: readPackedOrRepeatedUint32(fields, 1),
+    payload: readOptionalBytes(fields, bytesField) ?? new Uint8Array(),
+    showDisplay: readOptionalBool(fields, 2) === true || readOptionalBool(fields, 3) === true,
+  };
+}
+
+export function decodeEthereumSignTx(payload: Uint8Array): {
+  addressN: number[];
+  nonce: Uint8Array;
+  gasPrice: Uint8Array;
+  gasLimit: Uint8Array;
+  to: Uint8Array;
+  value: Uint8Array;
+  data: Uint8Array;
+  chainId: number;
+} {
+  const fields = decodeFields(payload);
+  const toBytes = readOptionalBytes(fields, 5);
+  const toString = readOptionalString(fields, 9);
+  let to = toBytes && toBytes.length > 0 ? toBytes : new Uint8Array();
+  if (to.length === 0 && toString) {
+    const hex = toString.startsWith('0x') || toString.startsWith('0X') ? toString.slice(2) : toString;
+    if (hex.length % 2 === 0 && hex.length > 0) {
+      to = hexToBytes(hex);
+    }
+  }
+  return {
+    addressN: readPackedOrRepeatedUint32(fields, 1),
+    nonce: readOptionalBytes(fields, 2) ?? new Uint8Array(),
+    gasPrice: readOptionalBytes(fields, 3) ?? new Uint8Array(),
+    gasLimit: readOptionalBytes(fields, 4) ?? new Uint8Array(),
+    to,
+    value: readOptionalBytes(fields, 6) ?? new Uint8Array(),
+    data: readOptionalBytes(fields, 7) ?? new Uint8Array(),
+    chainId: fields.find((field) => field.field === 11)?.varint ?? 1,
+  };
+}
+
+export function decodeEthereumSignTxEip1559(payload: Uint8Array): {
+  addressN: number[];
+  nonce: Uint8Array;
+  maxPriorityFee: Uint8Array;
+  maxFee: Uint8Array;
+  gasLimit: Uint8Array;
+  to: Uint8Array;
+  value: Uint8Array;
+  data: Uint8Array;
+  chainId: number;
+} {
+  const fields = decodeFields(payload);
+  const toString = readOptionalString(fields, 6);
+  let to: Uint8Array = new Uint8Array();
+  if (toString) {
+    const hex = toString.startsWith('0x') || toString.startsWith('0X') ? toString.slice(2) : toString;
+    if (hex.length % 2 === 0 && hex.length > 0) {
+      to = hexToBytes(hex);
+    }
+  }
+  return {
+    addressN: readPackedOrRepeatedUint32(fields, 1),
+    nonce: readOptionalBytes(fields, 2) ?? new Uint8Array(),
+    maxPriorityFee: readOptionalBytes(fields, 3) ?? new Uint8Array(),
+    maxFee: readOptionalBytes(fields, 4) ?? new Uint8Array(),
+    gasLimit: readOptionalBytes(fields, 5) ?? new Uint8Array(),
+    to,
+    value: readOptionalBytes(fields, 7) ?? new Uint8Array(),
+    data: readOptionalBytes(fields, 8) ?? new Uint8Array(),
+    chainId: fields.find((field) => field.field === 10)?.varint ?? 1,
+  };
+}
+
+export function decodeEthereumSignTypedHash(payload: Uint8Array): {
+  addressN: number[];
+  domain: Uint8Array;
+  structHash: Uint8Array;
+} {
+  const fields = decodeFields(payload);
+  return {
+    addressN: readPackedOrRepeatedUint32(fields, 1),
+    domain: readOptionalBytes(fields, 2) ?? new Uint8Array(),
+    structHash: readOptionalBytes(fields, 3) ?? new Uint8Array(),
+  };
+}
+
+export function decodeTxAck(payload: Uint8Array): {
+  addressN: number[];
+  prevHash: Uint8Array;
+  prevIndex: number;
+  amount: bigint;
+  address: string;
+  outputAmount: bigint;
+} {
+  const fields = decodeFields(payload);
+  const tx = readOptionalBytes(fields, 1) ?? payload;
+  const inner = decodeFields(tx);
+  const inputBytes = inner.find((field) => field.field === 2)?.bytes;
+  const outputBytes = inner.find((field) => field.field === 5)?.bytes;
+  const input = decodeFields(inputBytes ?? new Uint8Array());
+  const output = decodeFields(outputBytes ?? new Uint8Array());
+  return {
+    addressN: readPackedOrRepeatedUint32(input, 1),
+    prevHash: readOptionalBytes(input, 2) ?? new Uint8Array(),
+    prevIndex: input.find((field) => field.field === 3)?.varint ?? 0,
+    amount: BigInt(input.find((field) => field.field === 8)?.varint ?? 0),
+    address: readOptionalString(output, 1) ?? '',
+    outputAmount: BigInt(output.find((field) => field.field === 2)?.varint ?? 0),
+  };
 }

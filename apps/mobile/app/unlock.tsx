@@ -1,12 +1,14 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Screen, colors, space } from '@cws/ui';
+import { Screen, colors, fonts, hairline, space } from '@cws/ui';
+import { useT } from '../src/i18n';
 import { ScanButton } from '../src/lab/ScanButton';
 import { describeUnlock, type UnlockStatus } from '../src/passkeys';
 import { useAppState } from '../src/state/AppState';
 
 export default function UnlockScreen() {
+  const t = useT();
   const { unlock, error } = useAppState();
   const [status, setStatus] = useState<UnlockStatus | null>(null);
   const [busy, setBusy] = useState(false);
@@ -50,21 +52,21 @@ export default function UnlockScreen() {
   return (
     <Screen
       kicker={null}
-      title="YSK"
-      subtitle={status?.message ?? 'Unlocking requires the platform authenticator.'}
+      title={t('unlock.title')}
+      subtitle={status?.message ?? t('unlock.fallback')}
     >
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <ScanButton
-        label="Unlock"
+        label={t('unlock.button')}
         disabled={unlockDisabled}
         busy={busy}
         onPress={() => void onUnlock()}
       />
       {unlockDisabled ? (
-        <Text style={styles.hint}>Enroll a lock screen PIN or biometric in system settings, then return here.</Text>
+        <Text style={styles.hint}>{t('unlock.enroll')}</Text>
       ) : null}
       <View style={styles.rule} />
-      <Text style={styles.meta}>Lab console · 15-minute session · never auto-sign</Text>
+      <Text style={styles.meta}>{t('unlock.meta')}</Text>
     </Screen>
   );
 }
@@ -72,19 +74,22 @@ export default function UnlockScreen() {
 const styles = StyleSheet.create({
   error: {
     color: colors.danger,
+    fontFamily: fonts.sans,
   },
   hint: {
     color: colors.muted,
+    fontFamily: fonts.sans,
     lineHeight: 20,
   },
   rule: {
-    height: 1,
+    height: hairline,
     backgroundColor: colors.border,
     marginTop: space.sm,
   },
   meta: {
     color: colors.muted,
-    fontSize: 12,
-    letterSpacing: 0.4,
+    fontFamily: fonts.mono,
+    fontSize: 11,
+    letterSpacing: 0.6,
   },
 });

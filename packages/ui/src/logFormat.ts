@@ -14,17 +14,18 @@ export function formatHex(hex: string): string {
   return clean.replace(/(.{2})/g, '$1 ').trim();
 }
 
-export function formatLogText(entries: ApduLogEntry[]): string {
+export function formatLogText(entries: readonly ApduLogEntry[]): string {
   return entries
     .map((entry) => {
       const dir = entry.direction === 'in' ? 'RX' : 'TX';
       const note = entry.note ? ` ${entry.note}` : '';
-      return `${formatTime(entry.at)} ${dir}${note}\n${formatHex(entry.hex)}`;
+      const channel = entry.channel ? ` [${entry.channel}]` : '';
+      return `${formatTime(entry.at)} ${dir}${channel}${note}\n${formatHex(entry.hex)}`;
     })
     .join('\n\n');
 }
 
 export function entryHaystack(entry: ApduLogEntry): string {
   const dir = entry.direction === 'in' ? 'RX' : 'TX';
-  return `${formatTime(entry.at)} ${dir} ${entry.note ?? ''} ${formatHex(entry.hex)} ${entry.hex}`;
+  return `${formatTime(entry.at)} ${dir} ${entry.channel ?? ''} ${entry.note ?? ''} ${formatHex(entry.hex)} ${entry.hex}`;
 }

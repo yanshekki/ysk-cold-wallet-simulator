@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
-import { colors, space } from './theme';
+import { KeyboardAwareScrollView } from './keyboard';
+import { colors, fonts, hairline, space, typography } from './theme';
 
 type Props = {
   title: string;
@@ -11,6 +12,9 @@ type Props = {
   footer?: ReactNode;
   scroll?: boolean;
   edges?: Edge[];
+  onBack?: () => void;
+  backLabel?: string;
+  backIcon?: ReactNode;
 };
 
 export function Screen({
@@ -21,11 +25,33 @@ export function Screen({
   footer,
   scroll = true,
   edges = ['top', 'bottom'],
+  onBack,
+  backLabel = 'Back',
+  backIcon,
 }: Props) {
   const body = (
     <View style={[styles.body, !scroll && styles.bodyFill]}>
-      {kicker ? <Text style={styles.kicker}>{kicker}</Text> : null}
-      <Text style={[styles.title, !kicker && styles.titleHero]}>{title}</Text>
+      {kicker && !onBack ? <Text style={styles.kicker}>{`/ ${kicker}`}</Text> : null}
+      <View style={styles.titleRow}>
+        {onBack ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={backLabel}
+            testID="screen-back"
+            onPress={onBack}
+            hitSlop={8}
+            style={styles.back}
+          >
+            {backIcon ?? <Text style={styles.backGlyph}>{'\u2039'}</Text>}
+          </Pressable>
+        ) : null}
+        <Text
+          style={[styles.title, !kicker && !onBack && styles.titleHero, onBack && styles.titleWithBack]}
+          numberOfLines={1}
+        >
+          {title}
+        </Text>
+      </View>
       {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
       <View style={[styles.content, !scroll && styles.contentFill]}>{children}</View>
     </View>
@@ -34,9 +60,14 @@ export function Screen({
   return (
     <SafeAreaView style={styles.safe} edges={edges}>
       {scroll ? (
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+        <KeyboardAwareScrollView
+          style={styles.fill}
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+          bottomOffset={24}
+        >
           {body}
-        </ScrollView>
+        </KeyboardAwareScrollView>
       ) : (
         body
       )}
@@ -50,6 +81,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.bg,
   },
+  fill: {
+    flex: 1,
+  },
   scroll: {
     paddingBottom: 48,
   },
@@ -62,29 +96,47 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   kicker: {
-    color: colors.accent,
-    fontSize: 12,
-    letterSpacing: 1.4,
-    textTransform: 'uppercase',
-    marginBottom: space.sm,
+    ...typography.kicker,
+    marginBottom: space.xs,
   },
-  title: {
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    minHeight: 36,
+  },
+  back: {
+    width: 32,
+    height: 36,
+    marginLeft: -8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backGlyph: {
     color: colors.text,
     fontSize: 28,
-    fontWeight: '700',
+    lineHeight: 32,
+    fontWeight: '300',
+  },
+  title: {
+    ...typography.title,
+    flex: 1,
+  },
+  titleWithBack: {
+    fontSize: 18,
   },
   titleHero: {
-    fontSize: 56,
-    letterSpacing: 2,
+    fontFamily: fonts.sansSemi,
+    fontSize: 28,
+    letterSpacing: 1,
+    color: colors.text,
   },
   subtitle: {
-    color: colors.muted,
-    fontSize: 15,
-    lineHeight: 22,
-    marginTop: space.sm,
+    ...typography.meta,
+    marginTop: space.xs,
   },
   content: {
-    marginTop: space.lg,
+    marginTop: space.md,
     gap: space.md,
   },
   contentFill: {
@@ -94,7 +146,7 @@ const styles = StyleSheet.create({
   footer: {
     padding: space.md,
     paddingBottom: space.lg,
-    borderTopWidth: 1,
+    borderTopWidth: hairline,
     borderTopColor: colors.border,
     backgroundColor: colors.bgElevated,
   },

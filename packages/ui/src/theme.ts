@@ -1,13 +1,13 @@
-import { Platform } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 import type { Brand } from '@cws/contracts';
 
 export const colors = {
-  bg: '#0B0C0F',
-  bgElevated: '#14161C',
-  card: '#1B1E26',
-  border: '#2C3140',
-  text: '#F4F1EA',
-  muted: '#9A9488',
+  bg: '#07080A',
+  bgElevated: '#0E1014',
+  card: '#0A0C10',
+  border: '#2A3038',
+  text: '#E6E8EC',
+  muted: '#7C8491',
   accent: '#FF5A1F',
   accentDim: '#3A1C12',
   ok: '#C8F542',
@@ -18,25 +18,67 @@ export const colors = {
 };
 
 export const space = {
-  xs: 6,
-  sm: 10,
-  md: 16,
-  lg: 24,
-  xl: 32,
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 20,
+  xl: 28,
 };
 
 export const radius = {
-  sm: 8,
-  md: 14,
-  lg: 20,
+  sm: 2,
+  md: 4,
+  lg: 6,
 };
 
+export const hairline = StyleSheet.hairlineWidth;
+
 export const fonts = {
-  mono: Platform.select({
+  sans: 'IBMPlexSans_400Regular',
+  sansMedium: 'IBMPlexSans_500Medium',
+  sansSemi: 'IBMPlexSans_600SemiBold',
+  sansBold: 'IBMPlexSans_700Bold',
+  mono: 'IBMPlexMono_400Regular',
+  monoMedium: 'IBMPlexMono_500Medium',
+  monoBold: 'IBMPlexMono_700Bold',
+  systemMono: Platform.select({
     ios: 'Menlo',
     android: 'monospace',
     default: 'ui-monospace, Menlo, Courier, monospace',
   }) as string,
+};
+
+export const typography = {
+  kicker: {
+    fontFamily: fonts.monoMedium,
+    fontSize: 10,
+    letterSpacing: 1.6,
+    color: colors.muted,
+    textTransform: 'uppercase' as const,
+  },
+  title: {
+    fontFamily: fonts.sansSemi,
+    fontSize: 20,
+    letterSpacing: 0.2,
+    color: colors.text,
+  },
+  body: {
+    fontFamily: fonts.sans,
+    fontSize: 14,
+    lineHeight: 20,
+    color: colors.text,
+  },
+  meta: {
+    fontFamily: fonts.sans,
+    fontSize: 12,
+    lineHeight: 18,
+    color: colors.muted,
+  },
+  data: {
+    fontFamily: fonts.mono,
+    fontSize: 12,
+    color: colors.text,
+  },
 };
 
 export const BRAND_LABEL: Record<Brand, string> = {

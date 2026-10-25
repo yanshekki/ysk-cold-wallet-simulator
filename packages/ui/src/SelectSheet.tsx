@@ -1,6 +1,7 @@
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Button } from './Button';
-import { colors, radius, space } from './theme';
+import { colors, fonts, hairline, radius, space } from './theme';
 
 export type SelectSheetOption = {
   id: string;
@@ -15,16 +16,69 @@ type Props = {
   options: SelectSheetOption[];
   onSelect: (id: string) => void;
   onClose: () => void;
+  cancelLabel?: string;
+  searchPlaceholder?: string;
 };
 
-export function SelectSheet({ visible, title, selectedId, options, onSelect, onClose }: Props) {
+export function SelectSheet({
+  visible,
+  title,
+  selectedId,
+  options,
+  onSelect,
+  onClose,
+  cancelLabel = 'Cancel',
+  searchPlaceholder = 'Search',
+}: Props) {
+  const [query, setQuery] = useState('');
+  useEffect(() => {
+    if (!visible) {
+      setQuery('');
+    }
+  }, [visible]);
+  const visibleOptions = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) {
+      return options;
+    }
+    return options.filter(
+      (option) =>
+        option.label.toLowerCase().includes(needle) ||
+        option.id.toLowerCase().includes(needle) ||
+        (option.chip ?? '').toLowerCase().includes(needle),
+    );
+  }, [options, query]);
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.backdrop}>
-        <View style={styles.sheet}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+      <View style={styles.frame}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={cancelLabel}
+          onPress={onClose}
+          style={[StyleSheet.absoluteFill, styles.backdrop]}
+        />
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.sheet}
+        >
           <Text style={styles.kicker}>{title}</Text>
-          <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
-            {options.map((option) => {
+          {options.length > 12 ? (
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder={searchPlaceholder}
+              placeholderTextColor={colors.muted}
+              autoCapitalize="none"
+              autoCorrect={false}
+              style={styles.search}
+            />
+          ) : null}
+          <ScrollView
+            style={styles.list}
+            contentContainerStyle={styles.listContent}
+            keyboardShouldPersistTaps="handled"
+          >
+            {visibleOptions.map((option) => {
               const active = option.id === selectedId;
               return (
                 <Pressable
@@ -42,35 +96,46 @@ export function SelectSheet({ visible, title, selectedId, options, onSelect, onC
               );
             })}
           </ScrollView>
-          <Button label="Cancel" variant="ghost" onPress={onClose} />
-        </View>
+          <Button label={cancelLabel} variant="ghost" onPress={onClose} />
+        </KeyboardAvoidingView>
       </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
+  frame: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.72)',
     justifyContent: 'flex-end',
     padding: space.lg,
   },
+  backdrop: {
+    backgroundColor: 'rgba(0,0,0,0.72)',
+  },
   sheet: {
     backgroundColor: colors.bgElevated,
-    borderRadius: radius.lg,
-    borderWidth: 1,
+    borderRadius: radius.md,
+    borderWidth: hairline,
     borderColor: colors.border,
     padding: space.lg,
     gap: space.sm,
     maxHeight: '72%',
   },
   kicker: {
-    color: colors.accent,
+    color: colors.muted,
+    fontFamily: fonts.monoMedium,
     textTransform: 'uppercase',
-    letterSpacing: 1.2,
-    fontSize: 12,
-    fontWeight: '700',
+    letterSpacing: 1.4,
+    fontSize: 10,
+  },
+  search: {
+    borderWidth: hairline,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    color: colors.text,
+    fontFamily: fonts.mono,
+    paddingHorizontal: space.md,
+    minHeight: 40,
   },
   list: {
     flexGrow: 0,
@@ -80,9 +145,9 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   row: {
-    minHeight: 48,
-    borderRadius: radius.md,
-    borderWidth: 1,
+    minHeight: 44,
+    borderRadius: radius.sm,
+    borderWidth: hairline,
     borderColor: colors.border,
     paddingHorizontal: space.md,
     flexDirection: 'row',
@@ -90,24 +155,24 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   rowOn: {
-    backgroundColor: colors.accent,
-    borderColor: colors.accent,
+    borderColor: colors.ok,
+    backgroundColor: colors.bg,
   },
   label: {
     color: colors.text,
-    fontSize: 16,
-    fontWeight: '600',
+    fontFamily: fonts.sansSemi,
+    fontSize: 15,
   },
   labelOn: {
-    color: colors.bg,
+    color: colors.ok,
   },
   chip: {
     color: colors.muted,
-    fontSize: 12,
-    fontWeight: '700',
+    fontFamily: fonts.mono,
+    fontSize: 11,
     letterSpacing: 0.8,
   },
   chipOn: {
-    color: colors.bg,
+    color: colors.ok,
   },
 });

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { ApduLogEntry } from '@cws/contracts';
-import { colors, fonts, motion, radius, space } from './theme';
+import { colors, fonts, hairline, motion, radius, space } from './theme';
 
 type Filter = 'all' | 'in' | 'out';
 
@@ -116,11 +116,11 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   chip: {
-    borderWidth: 1,
+    borderWidth: hairline,
     borderColor: colors.border,
     borderRadius: radius.sm,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
   },
   chipOn: {
     borderColor: colors.ok,
@@ -128,26 +128,25 @@ const styles = StyleSheet.create({
   },
   chipLabel: {
     color: colors.muted,
-    fontFamily: fonts.mono,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1,
+    fontFamily: fonts.monoMedium,
+    fontSize: 10,
+    letterSpacing: 0.8,
   },
   chipLabelOn: {
     color: colors.ok,
   },
   copy: {
     color: colors.ok,
-    fontSize: 12,
-    fontWeight: '700',
+    fontFamily: fonts.monoMedium,
+    fontSize: 11,
   },
   box: {
     minHeight: 180,
     maxHeight: 320,
     backgroundColor: colors.bg,
     borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radius.md,
+    borderWidth: hairline,
+    borderRadius: radius.sm,
   },
   boxFill: {
     flex: 1,
@@ -160,6 +159,7 @@ const styles = StyleSheet.create({
   },
   empty: {
     color: colors.muted,
+    fontFamily: fonts.sans,
     fontSize: 13,
     lineHeight: 20,
   },
@@ -168,9 +168,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   dir: {
-    fontFamily: fonts.mono,
+    fontFamily: fonts.monoBold,
     fontSize: 11,
-    fontWeight: '700',
     width: 24,
     marginTop: 2,
   },

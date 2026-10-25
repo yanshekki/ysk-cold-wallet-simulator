@@ -1,0 +1,2 @@
+# Allow the plugdev group to create virtual HID gadgets for cws-proxy.
+KERNEL=="uhid", GROUP="plugdev", MODE="0660"

@@ -1,14 +1,18 @@
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { SeedSlot } from '@cws/contracts';
-import { colors, radius, space } from './theme';
+import { colors, fonts, hairline, radius, space } from './theme';
 
 type Props = {
   slot: SeedSlot;
   selected?: boolean;
+  isDefault?: boolean;
   badge?: string;
   onPress?: () => void;
   onDelete?: () => void;
+  onDefault?: () => void;
+  defaultLabel?: string;
+  deleteIcon?: ReactNode;
   children?: ReactNode;
 };
 
@@ -20,22 +24,51 @@ export function backupBadge(slot: SeedSlot): string {
   return `${kind} ${slot.wordCount}`;
 }
 
-export function SeedCard({ slot, selected, badge, onPress, onDelete, children }: Props) {
+export function SeedCard({
+  slot,
+  selected,
+  isDefault,
+  badge,
+  onPress,
+  onDelete,
+  onDefault,
+  defaultLabel = 'Default',
+  deleteIcon,
+  children,
+}: Props) {
+  const meta = badge ?? backupBadge(slot);
   return (
     <View style={[styles.card, selected && styles.selected]}>
       <View style={styles.row}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={slot.label}
+          accessibilityLabel={`${slot.label}, ${meta}`}
           accessibilityState={{ selected: !!selected }}
           onPress={onPress}
           style={styles.copy}
         >
-          <Text style={styles.label}>{slot.label}</Text>
+          <View style={styles.labelRow}>
+            {slot.color?.startsWith('#') ? <View style={[styles.swatch, { backgroundColor: slot.color }]} /> : null}
+            {slot.color && !slot.color.startsWith('#') ? <Text style={styles.emoji}>{slot.color}</Text> : null}
+            <Text style={styles.label}>
+              {slot.label}
+              {isDefault ? ` · ${defaultLabel}` : ''}
+            </Text>
+          </View>
           <Text style={styles.meta}>
-            {badge ?? backupBadge(slot)} · {slot.brand} · {slot.modelId}
+            {meta} · {slot.brand} · {slot.modelId}
           </Text>
         </Pressable>
+        {onDefault ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={defaultLabel}
+            onPress={onDefault}
+            hitSlop={8}
+          >
+            <Text style={[styles.star, isDefault && styles.starOn]}>{isDefault ? '★' : '☆'}</Text>
+          </Pressable>
+        ) : null}
         {onDelete ? (
           <Pressable
             accessibilityRole="button"
@@ -43,7 +76,7 @@ export function SeedCard({ slot, selected, badge, onPress, onDelete, children }:
             onPress={onDelete}
             hitSlop={8}
           >
-            <Text style={styles.delete}>Delete</Text>
+            {deleteIcon ?? <Text style={styles.delete}>Delete</Text>}
           </Pressable>
         ) : null}
       </View>
@@ -56,8 +89,8 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.card,
     borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radius.md,
+    borderWidth: hairline,
+    borderRadius: radius.sm,
     padding: space.md,
   },
   selected: {
@@ -72,24 +105,47 @@ const styles = StyleSheet.create({
   copy: {
     flex: 1,
   },
+  labelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  swatch: {
+    width: 8,
+    height: 8,
+    borderRadius: 1,
+    backgroundColor: colors.ok,
+  },
+  emoji: {
+    fontSize: 14,
+  },
   label: {
     color: colors.text,
-    fontSize: 17,
-    fontWeight: '600',
+    fontFamily: fonts.sansSemi,
+    fontSize: 15,
   },
   meta: {
     color: colors.muted,
     marginTop: 4,
-    fontSize: 13,
+    fontFamily: fonts.mono,
+    fontSize: 11,
   },
   delete: {
     color: colors.danger,
-    fontWeight: '600',
+    fontFamily: fonts.monoMedium,
+    fontSize: 11,
+  },
+  star: {
+    color: colors.muted,
+    fontSize: 16,
+  },
+  starOn: {
+    color: colors.ok,
   },
   inspector: {
     marginTop: space.md,
     paddingTop: space.md,
-    borderTopWidth: 1,
+    borderTopWidth: hairline,
     borderTopColor: colors.border,
   },
 });

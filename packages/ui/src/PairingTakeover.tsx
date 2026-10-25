@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Animated, Modal, StyleSheet, Text, View } from 'react-native';
-import { colors, fonts, motion, space } from './theme';
+import { colors, fonts, hairline, motion, radius, space } from './theme';
 
 type Props = {
   code: string | null;
@@ -36,9 +36,11 @@ export function PairingTakeover({ code }: Props) {
     <Modal visible={!!code} transparent animationType="fade" statusBarTranslucent>
       <View style={styles.backdrop} accessibilityViewIsModal>
         <Animated.View style={[styles.panel, { opacity, transform: [{ scale }] }]}>
-          <Text style={styles.kicker}>Type this on the host</Text>
+          <Text style={styles.kicker}>/ Pairing</Text>
           <Text style={styles.code}>{code ?? ''}</Text>
-          <Text style={styles.hint}>Pairing holds until the host confirms. This screen does not loop the digits.</Text>
+          <Text style={styles.hint}>
+            Type this on the host. Pairing holds until the host confirms. This screen does not loop the digits.
+          </Text>
         </Animated.View>
       </View>
     </Modal>
@@ -56,23 +58,29 @@ const styles = StyleSheet.create({
   panel: {
     alignItems: 'center',
     gap: space.md,
+    borderWidth: hairline,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    backgroundColor: colors.bgElevated,
+    paddingHorizontal: space.xl,
+    paddingVertical: space.lg,
   },
   kicker: {
-    color: colors.accent,
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 2,
+    color: colors.muted,
+    fontFamily: fonts.monoMedium,
+    fontSize: 10,
+    letterSpacing: 1.6,
     textTransform: 'uppercase',
   },
   code: {
-    color: colors.text,
-    fontFamily: fonts.mono,
-    fontSize: 48,
-    fontWeight: '700',
-    letterSpacing: 10,
+    color: colors.ok,
+    fontFamily: fonts.monoBold,
+    fontSize: 40,
+    letterSpacing: 8,
   },
   hint: {
     color: colors.muted,
+    fontFamily: fonts.sans,
     fontSize: 13,
     textAlign: 'center',
     maxWidth: 280,

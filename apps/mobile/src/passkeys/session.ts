@@ -56,8 +56,14 @@ export async function describeUnlock(): Promise<UnlockStatus> {
   return { kind: 'enrolled', message: ENROLLED_MESSAGE };
 }
 
+let faceIdEnabled = true;
+
+export function setFaceIdEnabled(value: boolean): void {
+  faceIdEnabled = value;
+}
+
 export async function unlock(): Promise<boolean> {
-  if (Platform.OS === 'web' || isDevBuild()) {
+  if (Platform.OS === 'web' || isDevBuild() || !faceIdEnabled) {
     return true;
   }
   const level = await LocalAuthentication.getEnrolledLevelAsync();

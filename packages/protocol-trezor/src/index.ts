@@ -18,6 +18,10 @@ export {
   encodeAck,
   encodeTransport,
   isAck,
+  isAllocResponse,
+  isEncrypted,
+  isHandshakeCompleteResponse,
+  isHandshakeInitResponse,
   seqBit,
   splitThpPackets,
   withSeq,
@@ -31,16 +35,28 @@ export {
   MessageType,
   ThpPairingMethod,
   TREZOR_STATE_UNPAIRED,
+  decodeButtonRequest,
+  decodeCodeEntryCpaceTrezor,
   decodeEthereumAddress,
   decodeEthereumMessageSignature,
   decodeFailure,
   decodeFeatures,
+  encodeBytesSignature,
+  encodeStringAddress,
+  encodeTxRequest,
+  TxRequestType,
+  encodeCodeEntryChallenge,
+  encodeCodeEntryCpaceHostTag,
+  encodeCredentialRequest,
   encodeDeviceProperties,
   encodeEthereumAddress,
   encodeFailure,
   encodeFeatures,
+  encodePairingRequest,
+  encodeSelectMethod,
 } from './messages';
 export { ThpNoiseInitiator, ThpNoiseResponder } from './noise';
+export { encodeBytes, encodeMessage, encodeRepeatedUint32, encodeString, encodeUint32 } from './proto';
 export { Cpace, codeEntryCode, formatPairingCode } from './pairing';
 export {
   derivePrivateKey,
@@ -49,4 +65,14 @@ export {
   pathToString,
   signPersonalMessage,
 } from './crypto';
-export { bytesToHex, hexToBytes } from './bytes';
+export { bytesToHex, hexToBytes, randomBytes, setRandomBytesImpl, type ByteRng } from './bytes';
+export {
+  USB_HEADER_LENGTH,
+  USB_MAGIC,
+  UsbHidReassembler,
+  decodeUsbProtobuf,
+  encodeUsbProtobuf,
+  unwrapUsbHidReports,
+  wrapUsbHid,
+  type UsbProtobuf,
+} from './usb';

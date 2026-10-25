@@ -8,7 +8,7 @@ import Animated, {
   withRepeat,
   withTiming,
 } from 'react-native-reanimated';
-import { colors, radius, space } from '@cws/ui';
+import { colors, fonts, radius, space } from '@cws/ui';
 
 type Props = {
   label: string;
@@ -56,8 +56,8 @@ export function ScanButton({ label, onPress, disabled, busy }: Props) {
 
 const styles = StyleSheet.create({
   base: {
-    minHeight: 56,
-    borderRadius: radius.md,
+    minHeight: 48,
+    borderRadius: radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: space.lg,
@@ -79,7 +79,8 @@ const styles = StyleSheet.create({
   },
   label: {
     color: colors.bg,
-    fontSize: 17,
-    fontWeight: '700',
+    fontFamily: fonts.sansSemi,
+    fontSize: 15,
+    letterSpacing: 0.4,
   },
 });

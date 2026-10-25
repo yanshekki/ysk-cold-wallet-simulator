@@ -6,6 +6,8 @@
     "packages/*"
   ],
   "scripts": {
+    "lab": "yarn workspace @cws/lab dev",
+    "proxy": "yarn workspace @cws/proxy start",
     "mobile": "yarn workspace @cws/mobile start",
     "mobile:android": "yarn workspace @cws/mobile android",
     "mobile:ios": "yarn workspace @cws/mobile ios",

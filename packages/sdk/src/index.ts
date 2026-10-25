@@ -5,6 +5,7 @@ export {
   entropyFromMnemonic,
   generateEntropy,
   isBip39WordCount,
+  isValidBip39Mnemonic,
   mnemonicFromEntropy,
   normalizeWords,
   wordCountFromEntropy,
@@ -17,7 +18,26 @@ export { combineSlip39, generateSlip39, isSlip39Mnemonic, type Slip39Backup, typ
 
 export { toBip32Seed } from './seed';
 
-export { inspectAddresses, type InspectRow } from './derive';
+export {
+  inspectAddresses,
+  inspectAddressesChunked,
+  FAST_INSPECT_IDS,
+  SLOW_INSPECT_IDS,
+  PREVIEW_INSPECT_IDS,
+  INSPECT_CHUNK_SIZE,
+  type InspectRow,
+} from './derive';
+export { isKnownUnsafeMnemonic, KNOWN_UNSAFE_MNEMONICS } from './knownMnemonics';
+export { mixExtraEntropy } from './mixEntropy';
+export {
+  bytesToEntropyHex,
+  entropyBitsForWordCount,
+  minDiceRolls,
+  minHexChars,
+  parseCustomEntropy,
+  type CustomEntropyKind,
+} from './customEntropy';
+export { fetchManagerCatalog, managerCatalogUrl, parseManagerApps } from './ledgerManager';
 
 export {
   createHandler,

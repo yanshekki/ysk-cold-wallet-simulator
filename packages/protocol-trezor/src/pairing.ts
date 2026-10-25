@@ -119,7 +119,7 @@ export class Cpace {
 
   generateKeys(code: string, privateKey?: Uint8Array): void {
     const generator = elligator2(cpacePregenerator(this.handshakeHash, code));
-    this.privateKey = privateKey ?? asBytes(x25519.utils.randomPrivateKey());
+    this.privateKey = privateKey ?? randomBytes(32);
     this.publicKey = asBytes(x25519.scalarMult(this.privateKey, generator));
   }
 

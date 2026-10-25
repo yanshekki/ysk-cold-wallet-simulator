@@ -14,17 +14,26 @@ export function mnemonicFromEntropy(entropy: Uint8Array): string {
   return entropyToMnemonic(entropy, wordlist);
 }
 
+export function deriveHdKey(
+  entropy: Uint8Array,
+  path: string,
+  passphrase?: string,
+  backup: BackupKind = 'bip39',
+): HDKey {
+  const seed =
+    backup === 'slip39'
+      ? entropy
+      : mnemonicToSeedSync(mnemonicFromEntropy(entropy), passphrase ?? '');
+  return HDKey.fromMasterSeed(seed).derive(path);
+}
+
 export function derivePrivateKey(
   entropy: Uint8Array,
   path: string,
   passphrase?: string,
   backup: BackupKind = 'bip39',
 ): Uint8Array {
-  const seed =
-    backup === 'slip39'
-      ? entropy
-      : mnemonicToSeedSync(mnemonicFromEntropy(entropy), passphrase ?? '');
-  const child = HDKey.fromMasterSeed(seed).derive(path);
+  const child = deriveHdKey(entropy, path, passphrase, backup);
   if (!child.privateKey) {
     throw new Error('derived key has no private key');
   }
@@ -117,11 +126,59 @@ export function signLegacyTx(
     new Uint8Array(),
     new Uint8Array(),
   ]);
-  const hash = keccak_256(unsigned);
+  return signHash(privateKey, keccak_256(unsigned), (recovery) => recovery + tx.chainId * 2 + 35);
+}
+
+export function signEip1559Tx(
+  privateKey: Uint8Array,
+  tx: {
+    nonce: Uint8Array;
+    maxPriorityFee: Uint8Array;
+    maxFee: Uint8Array;
+    gasLimit: Uint8Array;
+    to: Uint8Array;
+    value: Uint8Array;
+    data: Uint8Array;
+    chainId: number;
+  },
+): { v: number; r: Uint8Array; s: Uint8Array } {
+  const items = [
+    rlpEncodeBytes(rlpInteger(tx.chainId)),
+    rlpEncodeBytes(tx.nonce),
+    rlpEncodeBytes(tx.maxPriorityFee),
+    rlpEncodeBytes(tx.maxFee),
+    rlpEncodeBytes(tx.gasLimit),
+    rlpEncodeBytes(tx.to),
+    rlpEncodeBytes(tx.value),
+    rlpEncodeBytes(tx.data),
+    Uint8Array.of(0xc0),
+  ];
+  const body = concatBytes(...items);
+  const encoded = concatBytes(rlpHeader(body.length, 0xc0), body);
+  const hash = keccak_256(concatBytes(Uint8Array.of(0x02), encoded));
+  return signHash(privateKey, hash, (recovery) => recovery);
+}
+
+export function signTypedHash(
+  privateKey: Uint8Array,
+  domain: Uint8Array,
+  structHash: Uint8Array,
+): Uint8Array {
+  const digest = keccak_256(concatBytes(Uint8Array.of(0x19, 0x01), domain, structHash));
+  const sig = secp256k1.sign(digest, privateKey);
+  const compact = sig.toCompactRawBytes();
+  return concatBytes(compact, Uint8Array.of((sig.recovery ?? 0) + 27));
+}
+
+function signHash(
+  privateKey: Uint8Array,
+  hash: Uint8Array,
+  vOf: (recovery: number) => number,
+): { v: number; r: Uint8Array; s: Uint8Array } {
   const sig = secp256k1.sign(hash, privateKey);
   const compact = sig.toCompactRawBytes();
   return {
-    v: (sig.recovery ?? 0) + tx.chainId * 2 + 35,
+    v: vOf(sig.recovery ?? 0),
     r: compact.subarray(0, 32),
     s: compact.subarray(32),
   };

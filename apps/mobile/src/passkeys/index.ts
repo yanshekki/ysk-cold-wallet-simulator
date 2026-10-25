@@ -6,6 +6,7 @@ export {
   WEB_DEV_MESSAGE,
   describeUnlock,
   sessionRedirect,
+  setFaceIdEnabled,
   unlock,
   type SessionHref,
   type UnlockKind,

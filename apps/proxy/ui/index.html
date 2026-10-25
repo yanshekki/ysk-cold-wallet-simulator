@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CWS Proxy</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="stage">
+      <div class="phone">
+        <header class="hud">
+          <span id="clock" class="clock">IDLE</span>
+          <span class="radio">
+            <span id="pip" class="pip"></span>
+            <span id="radio">IDLE</span>
+          </span>
+          <span id="chip" class="chip hidden"></span>
+          <span id="host" class="host">NO PHONE</span>
+        </header>
+        <main class="screen">
+          <div class="top">
+            <div>
+              <p class="kicker" id="kicker">/ PROXY</p>
+              <h1 id="title">CWS</h1>
+            </div>
+            <div class="langs" role="group" aria-label="Language">
+              <button type="button" id="lang-en" class="lang on" data-lang="en">EN</button>
+              <button type="button" id="lang-zh" class="lang" data-lang="zh-HK">繁</button>
+            </div>
+          </div>
+          <p class="subtitle" id="subtitle"></p>
+          <p id="phase" class="status"></p>
+          <section id="card" class="card">
+            <div class="card-head">
+              <span id="brand" class="brand">—</span>
+              <span id="protocol" class="protocol"></span>
+            </div>
+            <h2 id="model">—</h2>
+            <dl>
+              <div>
+                <dt id="label-phone">GAP name</dt>
+                <dd id="phone">—</dd>
+              </div>
+              <div>
+                <dt id="label-uuid">Service UUID</dt>
+                <dd id="uuid" class="break">—</dd>
+              </div>
+              <div>
+                <dt id="label-vid">VID / PID</dt>
+                <dd id="vidpid">—</dd>
+              </div>
+              <div>
+                <dt id="label-mtu">MTU</dt>
+                <dd id="mtu">—</dd>
+              </div>
+              <div>
+                <dt id="label-hid">HID</dt>
+                <dd id="hid">idle</dd>
+              </div>
+              <div id="trezord-row" class="hidden">
+                <dt id="label-trezord">trezord</dt>
+                <dd id="trezord">—</dd>
+              </div>
+            </dl>
+            <p id="hid-error" class="hid-error hidden"></p>
+          </section>
+          <section id="pairing" class="pairing hidden" hidden>
+            <label for="code" id="pairing-label"></label>
+            <div class="pair-row">
+              <input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" />
+              <button type="button" id="pair" class="ghost"></button>
+            </div>
+          </section>
+          <section class="console">
+            <div class="console-head">
+              <h2 id="logs-label">Console</h2>
+            </div>
+            <ol id="logs" class="logs"></ol>
+          </section>
+        </main>
+        <footer class="dock">
+          <button type="button" id="start" class="primary"></button>
+          <button type="button" id="stop" class="danger" disabled></button>
+        </footer>
+      </div>
+    </div>
+    <script src="/app.js"></script>
+  </body>
+</html>
