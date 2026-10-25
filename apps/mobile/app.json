@@ -46,7 +46,7 @@
     ],
     "android": {
       "package": "hk.ysk.cws",
-      "versionCode": 2,
+      "versionCode": 1,
       "label": "CWS",
       "softwareKeyboardLayoutMode": "resize",
       "navigationBar": {
@@ -80,7 +80,7 @@
     },
     "ios": {
       "bundleIdentifier": "hk.ysk.cws",
-      "buildNumber": "2",
+      "buildNumber": "1",
       "appleTeamId": "K897VVZW77",
       "infoPlist": {
         "CFBundleDisplayName": "CWS",
