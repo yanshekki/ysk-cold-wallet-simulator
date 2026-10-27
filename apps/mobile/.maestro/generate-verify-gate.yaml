@@ -4,9 +4,10 @@ tags:
   - generate
   - security
 ---
-# Given a fresh BIP39 reveal
-# When the operator has not typed the quiz words
-# Then Confirm stays disabled so an unread phrase cannot be saved
+# Given a debug BIP39 reveal (Maestro runs Debug, where isDevBuild() is true)
+# When the operator has not typed quiz words
+# Then Confirm is enabled: debug skips the word quiz so screenshot-gated QA can finish
+# Release still quizzes three words (apps/mobile/src/seeds/pickVerify.test.ts)
 - runFlow: onboarding.yaml
 - tapOn:
     id: "tab-vault"
@@ -22,11 +23,6 @@ tags:
     timeout: 30000
 - assertVisible:
     id: "generate-confirm"
-    enabled: false
-- tapOn:
-    id: "generate-confirm"
-    optional: true
-- assertVisible:
-    id: "generate-reveal"
+    enabled: true
 - tapOn:
     id: "screen-back"

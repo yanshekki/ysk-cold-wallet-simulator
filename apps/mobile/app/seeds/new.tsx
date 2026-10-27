@@ -22,6 +22,7 @@ import { useT } from '../../src/i18n';
 import { unlock as requestUnlock } from '../../src/passkeys';
 import { generateSecureEntropy, generateSecureSecret, newSlotId } from '../../src/seeds/generate';
 import { collectMotionMix } from '../../src/seeds/motion';
+import { pickVerify, type VerifyPick } from '../../src/seeds/pickVerify';
 import { useSecretScreen } from '../../src/seeds/screenGuard';
 import { saveSlot } from '../../src/seeds/vault';
 import { useAppState } from '../../src/state/AppState';
@@ -51,7 +52,7 @@ export default function NewSeedScreen() {
   const [secret, setSecret] = useState<Uint8Array | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [verify, setVerify] = useState<{ index: number; word: string }[]>([]);
+  const [verify, setVerify] = useState<VerifyPick[]>([]);
   const [guess, setGuess] = useState<Record<number, string>>({});
   const [customOpen, setCustomOpen] = useState(false);
   const [customKind, setCustomKind] = useState<CustomEntropyKind>('hex');
@@ -332,20 +333,26 @@ export default function NewSeedScreen() {
               cancel: t('common.cancel'),
             }}
           />
-          <Text style={styles.warn}>{t('generate.verify')}</Text>
-          {verify.map((item) => (
-            <TextInput
-              key={item.index}
-              testID={`generate-verify-${item.index}`}
-              value={guess[item.index] ?? ''}
-              onChangeText={(value) => setGuess((current) => ({ ...current, [item.index]: value }))}
-              placeholder={`#${item.index + 1}`}
-              placeholderTextColor={colors.muted}
-              autoCapitalize="none"
-              autoCorrect={false}
-              style={styles.input}
-            />
-          ))}
+          {verify.length > 0 ? (
+            <>
+              <Text style={styles.warn} testID="generate-verify">
+                {t('generate.verify')}
+              </Text>
+              {verify.map((item) => (
+                <TextInput
+                  key={item.index}
+                  testID={`generate-verify-${item.index}`}
+                  value={guess[item.index] ?? ''}
+                  onChangeText={(value) => setGuess((current) => ({ ...current, [item.index]: value }))}
+                  placeholder={`#${item.index + 1}`}
+                  placeholderTextColor={colors.muted}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  style={styles.input}
+                />
+              ))}
+            </>
+          ) : null}
           <Button testID="generate-confirm" label={t('generate.confirm')} disabled={!verified} onPress={() => void confirm()} />
         </View>
       ) : null}
@@ -367,11 +374,6 @@ export default function NewSeedScreen() {
       ) : null}
     </Screen>
   );
-}
-
-function pickVerify(words: string[]): { index: number; word: string }[] {
-  const indexes = [...words.keys()].sort(() => 0.5 - Math.random()).slice(0, 3);
-  return indexes.map((index) => ({ index, word: words[index] ?? '' }));
 }
 
 const styles = StyleSheet.create({

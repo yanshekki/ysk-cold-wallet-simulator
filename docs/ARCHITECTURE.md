@@ -185,7 +185,7 @@ This repo has **no associated domain**, so full WebAuthn passkeys are not used. 
 
 1. Disclaimer, then Unlock.
 2. Release: OS biometric / passcode. Success unlocks a session (`autoLockMinutes`, default 15).
-3. Debug: skip the OS prompt so USB/lab tests can proceed (annotated in code).
+3. Debug: skip the OS prompt, Android FLAG_SECURE, and the new-seed verify quiz so USB / screenshot-gated lab tests can proceed (annotated in code). Release keeps all three.
 4. Session expiry returns to `/unlock`. Passphrase overlay is wiped with `SecretSession`.
 
 Do not document this as a resident passkey. A future associated-domain passkey can sit in front of the same session gate.
@@ -280,9 +280,9 @@ export interface ProtocolHandler {
 - **BLE link is not LE Secure Connections.** Hosts still talk the vendor protocol once GATT is up.
 - **Real devices have Secure Elements.** This is a software simulator. Treat it as a development/testing tool, not a replacement for a hardware wallet for large amounts.
 - Host apps may perform extra checks (Genuine, certificates). Do not expect Ledger Live Genuine to pass.
-- iOS has no `preventScreenCapture` equivalent to Android `FLAG_SECURE`.
+- iOS has no `preventScreenCapture` equivalent to Android `FLAG_SECURE`. Release Android still sets FLAG_SECURE on Vault / secret screens; debug skips it so `adb screencap` QA can see the UI.
 
 ---
 
-**Document version:** 1.2  
+**Document version:** 1.3  
 **Date:** 2026-10-27
