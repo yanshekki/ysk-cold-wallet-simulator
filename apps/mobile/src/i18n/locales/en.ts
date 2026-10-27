@@ -189,9 +189,17 @@ export const en = {
     colVersion: 'Version',
     bundled: 'bundled',
     session: 'Session',
-    faceId: 'Face ID',
+    faceId: {
+      ios: 'Face ID / Touch ID',
+      android: 'Biometrics',
+      default: 'Biometrics',
+    },
     signReauth: 'Re-authenticate to sign',
-    signReauthHelp: 'Confirm with Face ID after you slide, before the signature is released.',
+    signReauthHelp: {
+      ios: 'Confirm with Face ID or Touch ID after you slide, before the signature is released.',
+      android: 'Confirm with fingerprint or device passcode after you slide, before the signature is released.',
+      default: 'Confirm with biometrics or device passcode after you slide, before the signature is released.',
+    },
     autoLock: 'Auto-lock (minutes)',
     bleSuffix: 'BLE name suffix',
     blePreview: '{{name}}',
@@ -278,10 +286,18 @@ export const en = {
     title: 'YSK',
     button: 'Unlock',
     enroll: 'Set a lock-screen PIN or biometric.',
-    fallback: 'Use Face ID or device passcode.',
+    fallback: {
+      ios: 'Use Face ID, Touch ID, or device passcode.',
+      android: 'Use fingerprint or device passcode.',
+      default: 'Use biometrics or device passcode.',
+    },
     webDev: 'Use a physical device.',
     devSkip: 'Unlock is not available on this device.',
-    enrolled: 'Face ID or device passcode.',
+    enrolled: {
+      ios: 'Face ID, Touch ID, or device passcode.',
+      android: 'Fingerprint or device passcode.',
+      default: 'Biometrics or device passcode.',
+    },
     notEnrolled: 'Set a lock-screen PIN or biometric.',
     prompt: 'Unlock',
     failed: 'Unlock failed',
@@ -355,8 +371,14 @@ export const en = {
     noSecretsBody:
       'YSK does not operate a CWS account or backend that receives Secrets. Secrets remain on your device (including OS secure storage and in-memory session) unless you copy, export, or transmit them yourself (including to a Host over Bluetooth).',
     onDeviceTitle: 'Information on this device',
-    onDeviceBody:
-      'The Software stores on the device: settings, language, seeds you generate or import, APDU logs, BLE name suffix, and related local state. Face ID and device passcode are processed by the operating system. YSK cannot retrieve, reset, or recover Secrets from your device.',
+    onDeviceBody: {
+      ios:
+        'The Software stores on the device: settings, language, seeds you generate or import, APDU logs, BLE name suffix, and related local state. Face ID, Touch ID, and device passcode are processed by the operating system. YSK cannot retrieve, reset, or recover Secrets from your device.',
+      android:
+        'The Software stores on the device: settings, language, seeds you generate or import, APDU logs, BLE name suffix, and related local state. Biometrics and device passcode are processed by the operating system. YSK cannot retrieve, reset, or recover Secrets from your device.',
+      default:
+        'The Software stores on the device: settings, language, seeds you generate or import, APDU logs, BLE name suffix, and related local state. Biometrics and device passcode are processed by the operating system. YSK cannot retrieve, reset, or recover Secrets from your device.',
+    },
     transfersTitle: 'When information leaves the device',
     transfersBody:
       'Only if you use the feature: (a) Bluetooth APDU to a Host you connect (local radio, not YSK servers) may include commands, public keys, and transaction payloads you approve; (b) Apple or Google, as operating-system and store operator, may process install, crash, and device identifiers under their terms; (c) opening ysk.hk uses the system browser, not a CWS network client; (d) if you tap Update Ledger apps, CWS requests the public Ledger Manager catalog for the selected device. That request does not include Secrets. YSK does not include a third-party advertising or product-analytics SDK.',

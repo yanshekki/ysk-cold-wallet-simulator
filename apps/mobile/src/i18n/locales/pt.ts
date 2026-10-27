@@ -191,9 +191,17 @@ export const pt: MessageTree = {
     colVersion: 'Versão',
     bundled: 'incluída',
     session: 'Sessão',
-    faceId: 'Face ID',
+    faceId: {
+      ios: 'Face ID / Touch ID',
+      android: 'Biometria',
+      default: 'Biometria',
+    },
     signReauth: 'Reautenticar para assinar',
-    signReauthHelp: 'Face ID após o deslize, antes da assinatura.',
+    signReauthHelp: {
+      ios: 'Confirme com Face ID ou Touch ID após o deslize, antes de a assinatura ser libertada.',
+      android: 'Confirme com impressão digital ou a senha do dispositivo após o deslize, antes de a assinatura ser libertada.',
+      default: 'Confirme com biometria ou a senha do dispositivo após o deslize, antes de a assinatura ser libertada.',
+    },
     autoLock: 'Bloqueio automático (minutos)',
     bleSuffix: 'Sufixo BLE',
     blePreview: '{{name}}',
@@ -280,10 +288,18 @@ export const pt: MessageTree = {
     title: 'YSK',
     button: 'Desbloquear',
     enroll: 'Defina um PIN ou biometria no ecrã de bloqueio.',
-    fallback: 'Use Face ID ou a senha do dispositivo.',
+    fallback: {
+      ios: 'Use Face ID, Touch ID ou a senha do dispositivo.',
+      android: 'Use a impressão digital ou a senha do dispositivo.',
+      default: 'Use a biometria ou a senha do dispositivo.',
+    },
     webDev: 'Use um dispositivo físico.',
     devSkip: 'O desbloqueio não está disponível neste dispositivo.',
-    enrolled: 'Face ID ou senha do dispositivo.',
+    enrolled: {
+      ios: 'Face ID, Touch ID ou senha do dispositivo.',
+      android: 'Impressão digital ou senha do dispositivo.',
+      default: 'Biometria ou senha do dispositivo.',
+    },
     notEnrolled: 'Defina um PIN ou biometria no ecrã de bloqueio.',
     prompt: 'Desbloquear',
     failed: 'Falha ao desbloquear',
@@ -357,8 +373,14 @@ export const pt: MessageTree = {
     noSecretsBody:
       'A YSK não opera uma conta nem um backend CWS que receba Segredos. Os Segredos permanecem no seu dispositivo (incluindo o armazenamento seguro do sistema e a sessão em memória), salvo se os copiar, exportar ou transmitir (incluindo a um Anfitrião por Bluetooth).',
     onDeviceTitle: 'Informação neste dispositivo',
-    onDeviceBody:
-      'O Software armazena no dispositivo: definições, idioma, sementes que gere ou importe, registos APDU, sufixo BLE e o estado local relacionado. O Face ID e a senha do dispositivo são processados pelo sistema operativo. A YSK não pode recuperar, repor nem restaurar Segredos a partir do seu dispositivo.',
+    onDeviceBody: {
+      ios:
+        'O Software armazena no dispositivo: definições, idioma, sementes que gere ou importe, registos APDU, sufixo BLE e o estado local relacionado. O Face ID, o Touch ID e a senha do dispositivo são processados pelo sistema operativo. A YSK não pode recuperar, repor nem restaurar Segredos a partir do seu dispositivo.',
+      android:
+        'O Software armazena no dispositivo: definições, idioma, sementes que gere ou importe, registos APDU, sufixo BLE e o estado local relacionado. A biometria e a senha do dispositivo são processadas pelo sistema operativo. A YSK não pode recuperar, repor nem restaurar Segredos a partir do seu dispositivo.',
+      default:
+        'O Software armazena no dispositivo: definições, idioma, sementes que gere ou importe, registos APDU, sufixo BLE e o estado local relacionado. A biometria e a senha do dispositivo são processadas pelo sistema operativo. A YSK não pode recuperar, repor nem restaurar Segredos a partir do seu dispositivo.',
+    },
     transfersTitle: 'Quando a informação sai do dispositivo',
     transfersBody:
       'Apenas se usar a função: (a) APDU Bluetooth a um Anfitrião que ligue (rádio local, não servidores da YSK) pode incluir comandos, chaves públicas e cargas de transação que aprove; (b) Apple ou Google, como operador do sistema e da loja, podem tratar identificadores de instalação, falhas e dispositivo nos seus termos; (c) abrir ysk.hk usa o navegador do sistema, não um cliente de rede do CWS; (d) se atualizar as apps Ledger, o CWS pede o catálogo público do Ledger Manager do dispositivo selecionado. Esse pedido não inclui Segredos. A YSK não inclui um SDK de publicidade ou de analítica de produto de terceiros.',
