@@ -1,15 +1,13 @@
 export { colors, radius, space, fonts, typography, hairline, motion, BRAND_LABEL, brandColor } from './theme';
 export { Screen } from './Screen';
 export { Button } from './Button';
-export { BrandGrid } from './BrandGrid';
-export { SeedCard, backupBadge } from './SeedCard';
+export { SeedCard } from './SeedCard';
 export { AddressInspector } from './AddressInspector';
 export { SigningModal } from './SigningModal';
 export { SigningDetailView, type SigningCopy } from './SigningDetail';
 export { SelectSheet, type SelectSheetOption } from './SelectSheet';
 export { Sheet } from './Sheet';
 export { SlideToConfirm } from './SlideToConfirm';
-export { ApduLog } from './ApduLog';
 export { LogEditor, type LogEditorLabels } from './LogEditor';
 export { formatHex, formatLogText } from './logFormat';
 export {

@@ -176,6 +176,7 @@ export default function NewSeedScreen() {
       {!revealing ? (
         <>
           <TextInput
+            testID="generate-label"
             value={label}
             onChangeText={setLabel}
             placeholder={t('generate.name')}
@@ -184,8 +185,18 @@ export default function NewSeedScreen() {
             style={styles.input}
           />
           <View style={styles.row}>
-            <Button label="BIP39" variant={backup === 'bip39' ? 'primary' : 'ghost'} onPress={() => setBackup('bip39')} />
-            <Button label="SLIP-39" variant={backup === 'slip39' ? 'primary' : 'ghost'} onPress={() => setBackup('slip39')} />
+            <Button
+              testID="generate-bip39"
+              label="BIP39"
+              variant={backup === 'bip39' ? 'primary' : 'ghost'}
+              onPress={() => setBackup('bip39')}
+            />
+            <Button
+              testID="generate-slip39"
+              label="SLIP-39"
+              variant={backup === 'slip39' ? 'primary' : 'ghost'}
+              onPress={() => setBackup('slip39')}
+            />
           </View>
           {backup === 'bip39' ? (
             <View style={styles.row}>
@@ -193,6 +204,7 @@ export default function NewSeedScreen() {
                 <Button
                   key={count}
                   label={`${count}`}
+                  testID={`generate-words-${count}`}
                   variant={wordCount === count ? 'primary' : 'ghost'}
                   onPress={() => setWordCount(count)}
                 />
@@ -201,6 +213,7 @@ export default function NewSeedScreen() {
           ) : (
             <View style={styles.row}>
               <Button
+                testID="generate-2of3"
                 label="2-of-3"
                 variant={shareCount === 3 ? 'primary' : 'ghost'}
                 onPress={() => {
@@ -209,6 +222,7 @@ export default function NewSeedScreen() {
                 }}
               />
               <Button
+                testID="generate-3of5"
                 label="3-of-5"
                 variant={shareCount === 5 ? 'primary' : 'ghost'}
                 onPress={() => {
@@ -221,6 +235,7 @@ export default function NewSeedScreen() {
           {backup === 'bip39' ? (
             <>
               <Button
+                testID="generate-custom"
                 label={t('generate.custom')}
                 variant={customOpen ? 'primary' : 'ghost'}
                 onPress={() => setCustomOpen((value) => !value)}
@@ -229,17 +244,20 @@ export default function NewSeedScreen() {
                 <>
                   <View style={styles.row}>
                     <Button
+                      testID="generate-custom-hex"
                       label={t('generate.customHex')}
                       variant={customKind === 'hex' ? 'primary' : 'ghost'}
                       onPress={() => setCustomKind('hex')}
                     />
                     <Button
+                      testID="generate-custom-dice"
                       label={t('generate.customDice')}
                       variant={customKind === 'dice' ? 'primary' : 'ghost'}
                       onPress={() => setCustomKind('dice')}
                     />
                   </View>
                   <TextInput
+                    testID="generate-custom-draft"
                     value={customDraft}
                     onChangeText={setCustomDraft}
                     placeholder={
@@ -260,15 +278,21 @@ export default function NewSeedScreen() {
             </>
           ) : null}
           <Button
+            testID="generate-shake"
             label={busy && shake ? t('generate.shaking') : t('generate.extraShake')}
             variant={shake ? 'primary' : 'ghost'}
             onPress={() => setShake((value) => !value)}
           />
-          <Button label={busy ? '…' : t('vault.generate')} disabled={busy} onPress={() => void generate()} />
+          <Button
+            testID="generate-run"
+            label={busy ? '…' : t('vault.generate')}
+            disabled={busy}
+            onPress={() => void generate()}
+          />
         </>
       ) : null}
       {mnemonic && revealing ? (
-        <View style={styles.words}>
+        <View style={styles.words} testID="generate-reveal">
           <Text style={styles.warn}>{t('generate.reveal')}</Text>
           {revealMeta ? (
             <View style={styles.proof}>
@@ -312,6 +336,7 @@ export default function NewSeedScreen() {
           {verify.map((item) => (
             <TextInput
               key={item.index}
+              testID={`generate-verify-${item.index}`}
               value={guess[item.index] ?? ''}
               onChangeText={(value) => setGuess((current) => ({ ...current, [item.index]: value }))}
               placeholder={`#${item.index + 1}`}
@@ -321,21 +346,25 @@ export default function NewSeedScreen() {
               style={styles.input}
             />
           ))}
-          <Button label={t('generate.confirm')} disabled={!verified} onPress={() => void confirm()} />
+          <Button testID="generate-confirm" label={t('generate.confirm')} disabled={!verified} onPress={() => void confirm()} />
         </View>
       ) : null}
       {shares.length > 0 ? (
-        <View style={styles.words}>
+        <View style={styles.words} testID="generate-shares">
           <Text style={styles.warn}>{t('generate.revealShares')}</Text>
           {shares.map((share, index) => (
             <Text key={index} style={styles.mnemonic}>
               {index + 1}. {share}
             </Text>
           ))}
-          <Button label={t('generate.confirm')} onPress={() => void confirm()} />
+          <Button testID="generate-confirm-shares" label={t('generate.confirm')} onPress={() => void confirm()} />
         </View>
       ) : null}
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? (
+        <Text style={styles.error} testID="generate-error">
+          {error}
+        </Text>
+      ) : null}
     </Screen>
   );
 }

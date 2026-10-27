@@ -273,6 +273,8 @@ export const ja: MessageTree = {
     slideAllow: 'スライドして許可',
     slidePair: 'スライドしてペアリング',
     slideOpen: 'スライドして開く',
+    slideExportSeed: 'スライドしてシードを書き出す',
+    hostPassphrase: 'ホストのパスフレーズ',
   },
   unlock: {
     title: 'YSK',

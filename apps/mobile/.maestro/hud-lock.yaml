@@ -1,0 +1,23 @@
+appId: hk.ysk.cws
+tags:
+  - shell
+  - security
+---
+# Given an unlocked session
+# When LOCK is tapped
+# Then either Unlock is shown or debug skip returns to Device
+- runFlow: onboarding.yaml
+- tapOn:
+    id: "hud-lock"
+- extendedWaitUntil:
+    visible:
+      id: "unlock-scan"
+    timeout: 8000
+    optional: true
+- tapOn:
+    id: "unlock-scan"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "tab-device"
+    timeout: 45000

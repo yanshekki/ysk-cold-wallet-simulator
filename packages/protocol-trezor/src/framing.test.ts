@@ -55,4 +55,11 @@ describe('THP L2 framing', () => {
     expect((assembler.push(packets[0])?.ctrl ?? 0) & 0xf7).toBe(0x20);
     expect(assembler.push(packets[1])?.payload[0]).toBe(0xaa);
   });
+
+  it('rejects a THP length smaller than CRC', () => {
+    const assembler = new ThpReassembler();
+    expect(() => assembler.push(Uint8Array.of(0x00, 0x00, 0x01, 0x00, 0x03, 0x00, 0x00, 0x00))).toThrow(
+      /too small/,
+    );
+  });
 });

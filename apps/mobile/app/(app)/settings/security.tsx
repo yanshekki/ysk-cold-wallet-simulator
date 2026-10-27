@@ -15,6 +15,7 @@ export default function SecuritySettingsScreen() {
         <View style={styles.switchRow}>
           <Text style={styles.label}>{t('settings.faceId')}</Text>
           <Switch
+            testID="security-faceid"
             value={settings.faceIdEnabled}
             onValueChange={(value) => void patchSettings({ faceIdEnabled: value })}
           />
@@ -22,6 +23,7 @@ export default function SecuritySettingsScreen() {
         <View style={styles.switchRow}>
           <Text style={styles.label}>{t('settings.signReauth')}</Text>
           <Switch
+            testID="security-sign-reauth"
             value={settings.signReauth}
             onValueChange={(value) => void patchSettings({ signReauth: value })}
           />
@@ -29,6 +31,7 @@ export default function SecuritySettingsScreen() {
         <Text style={styles.meta}>{t('settings.signReauthHelp')}</Text>
         <Text style={styles.label}>{t('settings.autoLock')}</Text>
         <TextInput
+          testID="security-autolock"
           value={String(settings.autoLockMinutes)}
           onChangeText={(value) => {
             const parsed = Number.parseInt(value, 10);

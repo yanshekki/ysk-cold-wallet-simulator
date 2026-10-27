@@ -273,6 +273,8 @@ export const zhHK: MessageTree = {
     slideAllow: '滑動以允許',
     slidePair: '滑動以配對',
     slideOpen: '滑動以開啟',
+    slideExportSeed: '滑動以匯出種子',
+    hostPassphrase: '主機密語',
   },
   unlock: {
     title: 'YSK',

@@ -58,6 +58,7 @@ function PathField({
       <View style={styles.pathHead}>
         <Text style={styles.pathLabel}>{CHAIN_PATH_LABELS[id]}</Text>
         <Button
+          testID={`path-reset-${id}`}
           label={resetLabel}
           variant="ghost"
           onPress={() => {
@@ -68,6 +69,7 @@ function PathField({
         />
       </View>
       <TextInput
+        testID={`path-${id}`}
         value={draft}
         onChangeText={(value) => {
           setDraft(value);

@@ -1,4 +1,7 @@
-appId: hk.ysk.coldwalletsimulator
+appId: hk.ysk.cws
+tags:
+  - settings
+  - smoke
 ---
 - launchApp
 - extendedWaitUntil:

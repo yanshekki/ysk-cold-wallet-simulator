@@ -1,0 +1,23 @@
+url: http://127.0.0.1:8788
+tags:
+  - proxy
+  - lab
+---
+# Given CWS Proxy UI
+# When the Testnet host tab is opened
+# Then brand catalogs are visible (cases stay disabled until GATT)
+- launchApp
+- tapOn:
+    id: "tab-lab"
+- assertVisible:
+    id: "lab-brand-ledger"
+- tapOn:
+    id: "lab-brand-onekey"
+- assertVisible:
+    id: "lab-action-ok-features"
+- tapOn:
+    id: "lab-brand-ledger"
+- tapOn:
+    id: "lab-section-ethereum"
+- assertVisible:
+    id: "lab-action-eth-garbage"

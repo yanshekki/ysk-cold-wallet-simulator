@@ -6,6 +6,7 @@ import {
   SW_INS_NOT_SUPPORTED,
   SW_OK,
   SW_WRONG_LENGTH,
+  SW_WRONG_P1P2,
   type Apdu,
 } from '../apdu';
 import {
@@ -24,9 +25,11 @@ import {
   describeEthTransaction,
   describeEthTypedData,
   describeSigning,
+  hashTypedData,
+  parseEip712,
   parseEthTx,
+  type Eip712TypedData,
 } from '@cws/contracts';
-import { hashTypedData, parseEip712, type Eip712TypedData } from '@cws/protocol-qr';
 import { keccak_256 } from '@noble/hashes/sha3';
 
 function ethAppVersionBytes(): Uint8Array {
@@ -36,6 +39,7 @@ function ethAppVersionBytes(): Uint8Array {
 }
 
 export const ETH_APP_VERSION = ethAppVersionBytes();
+export const MAX_PERSONAL_SIGN_BYTES = 16_384;
 
 type TypedField = { name: string; type: string };
 
@@ -118,7 +122,12 @@ function ethPath(ctx: EthContext, path: string): string {
 }
 
 async function handleGetAddress(apdu: Apdu, ctx: EthContext): Promise<Uint8Array> {
-  const { path: apduPath } = parseBip32Path(apdu.data);
+  let apduPath: string;
+  try {
+    apduPath = parseBip32Path(apdu.data).path;
+  } catch {
+    return encodeResponse(new Uint8Array(), SW_WRONG_P1P2);
+  }
   const path = ethPath(ctx, apduPath);
   if (apdu.p1 === 0x01) {
     const request: SigningRequest = {
@@ -151,11 +160,22 @@ async function handleGetAddress(apdu: Apdu, ctx: EthContext): Promise<Uint8Array
 
 async function handlePersonalSign(apdu: Apdu, ctx: EthContext): Promise<Uint8Array | null> {
   if (apdu.p1 === 0x00) {
-    const { path: apduPath, rest } = parseBip32Path(apdu.data);
+    let apduPath: string;
+    let rest: Uint8Array;
+    try {
+      const parsed = parseBip32Path(apdu.data);
+      apduPath = parsed.path;
+      rest = parsed.rest;
+    } catch {
+      return encodeResponse(new Uint8Array(), SW_WRONG_P1P2);
+    }
     if (rest.length < 4) {
       return encodeResponse(new Uint8Array(), SW_WRONG_LENGTH);
     }
     const expected = readU32BE(rest, 0);
+    if (expected > MAX_PERSONAL_SIGN_BYTES) {
+      return encodeResponse(new Uint8Array(), SW_WRONG_LENGTH);
+    }
     ctx.session.pendingPersonal = {
       path: ethPath(ctx, apduPath),
       expected,
@@ -226,11 +246,14 @@ async function handleSignTx(apdu: Apdu, ctx: EthContext): Promise<Uint8Array | n
     return encodeResponse(new Uint8Array(), SW_WRONG_LENGTH);
   }
   const needed = rlpFullLength(pending.payload);
-  if (needed == null || pending.payload.length < needed) {
+  const waiting = needed == null || pending.payload.length < needed;
+  const shortGarbage =
+    waiting && needed == null && (apdu.p1 === 0x80 || (apdu.p1 === 0x00 && apdu.data.length < 255));
+  if (waiting && !shortGarbage) {
     return null;
   }
 
-  const raw = pending.payload.slice(0, needed);
+  const raw = needed != null ? pending.payload.slice(0, needed) : pending.payload;
   ctx.session.pendingTx = undefined;
   const parsed = parseEthTx(raw);
   const request: SigningRequest = {

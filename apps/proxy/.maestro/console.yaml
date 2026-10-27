@@ -1,0 +1,33 @@
+url: http://127.0.0.1:8788
+tags:
+  - proxy
+  - console
+---
+# Given CWS Proxy Console
+# When filter chips and search are tapped
+# Then the log editor remains on screen
+- launchApp
+- tapOn:
+    id: "tab-console"
+- tapOn:
+    id: "log-filter-all"
+- tapOn:
+    id: "log-filter-ble"
+- tapOn:
+    id: "log-filter-hid"
+- tapOn:
+    id: "log-filter-gatt"
+- tapOn:
+    id: "log-filter-error"
+- tapOn:
+    id: "log-filter-all"
+- tapOn:
+    id: "log-wrap"
+- tapOn:
+    id: "log-follow"
+- tapOn:
+    id: "log-search"
+- inputText: "ble"
+- tapOn:
+    id: "log-clear"
+    optional: true

@@ -1,0 +1,29 @@
+appId: hk.ysk.cws
+tags:
+  - vault
+  - empty
+---
+# Given Device is unlocked
+# When Vault is opened with no slots
+# Then the empty copy is shown (skipped once a seed exists)
+- runFlow: onboarding.yaml
+- tapOn:
+    id: "tab-vault"
+- extendedWaitUntil:
+    visible:
+      id: "vault-generate"
+    timeout: 15000
+- runFlow:
+    when:
+      visible:
+        id: "vault-empty"
+    commands:
+      - assertVisible:
+          id: "vault-import"
+      - tapOn:
+          id: "tab-device"
+      - assertVisible:
+          id: "device-need-seed"
+      - assertVisible:
+          id: "device-start"
+          enabled: false

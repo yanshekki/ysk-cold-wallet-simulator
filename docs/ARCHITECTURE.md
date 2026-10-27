@@ -3,7 +3,7 @@
 **Project Name:** `ysk-cold-wallet-simulator`  
 **Display Name:** YSK Cold Wallet Simulator  
 **Style:** ysk-kit (Expo TypeScript monorepo)  
-**Scope:** BLE-only peripheral mode that mimics real Ledger / Trezor / OneKey hardware wallets.  
+**Scope:** Phone-as-device simulator for Ledger / Trezor / OneKey. Primary transport is BLE GATT peripheral. USB HID is bridged through `apps/proxy` + `packages/native-proxy`. Air-gap QR lives in `packages/protocol-qr`.  
 **Platform Priority:** Android first. iOS if feasible (with known background limitations).  
 **No mocks.** Real protocol implementations for every supported product.
 
@@ -79,30 +79,27 @@ Only Safe 7 has BLE. Older models are USB-only.
 ```
 ysk-cold-wallet-simulator/
 ├── apps/
-│   └── mobile/                 # Expo app (Android + iOS)
-│       ├── app/                # Expo Router screens
-│       ├── src/
-│       │   ├── ble/            # Peripheral advertising + GATT server
-│       │   ├── seeds/          # Secure seed vault
-│       │   ├── passkeys/       # App unlock
-│       │   └── protocols/      # Brand handlers (delegates to packages)
-│       └── app.json
+│   ├── mobile/                 # Expo app (BLE peripheral + vault + QR)
+│   └── proxy/                  # Local HID/BLE daemon + macOS CWS Proxy + testnet host catalog
 ├── packages/
-│   ├── contracts/              # Shared types (Brand, Model, SeedSlot, APDU, etc.)
-│   ├── sdk/                    # High-level API used by the app
-│   ├── ui/                     # Beautiful reusable components (seed cards, brand picker)
-│   ├── protocol-ledger/        # Real Ledger APDU + BLE framing
-│   ├── protocol-trezor/        # Real THP (Noise XX + framing)
-│   └── protocol-onekey/        # Real V1 + V2
+│   ├── contracts/              # Shared types plus derivation/preview/EIP-712 helpers
+│   ├── sdk/                    # createHandler, entropy, QR air-gap policy
+│   ├── ui/                     # Presentation (SigningModal, DeviceCard, LogEditor)
+│   ├── protocol-ledger/        # Ledger APDU + BLE framing
+│   ├── protocol-trezor/        # THP (Noise XX + protobuf)
+│   ├── protocol-onekey/        # OneKey V1 + V2
+│   ├── protocol-qr/            # UR / BBQR / PSBT air-gap codecs
+│   └── native-proxy/           # Rust HID gadget used by apps/proxy
 └── docs/
-    └── ARCHITECTURE.md         # This file
+    └── ARCHITECTURE.md
 ```
 
 **Principles:**
-- Contracts first (types only)
 - Protocol packages contain real protocol logic (no mocks)
-- App owns BLE peripheral lifecycle + secure storage
-- UI is presentation only
+- `createHandler` in `@cws/sdk` is the BLE factory; QR export/scan is `exportQrAccountWithPolicy` / `QrAirgapSession`
+- App owns BLE lifecycle, SecureStore vault, and session passphrase (RAM only)
+- UI is mostly presentation; signing always goes through `ConfirmationPort` → `SigningModal`
+- `contracts` is the shared type + preview layer, not types-only (RLP/ERC-20/EIP-712 live there so protocol-ledger does not import protocol-qr for hashing)
 
 ---
 
@@ -153,19 +150,20 @@ Store only the 64-byte BIP39 seed (or 32-byte entropy) encrypted.
 
 ### Storage
 
-Use `expo-secure-store` with:
+Use `expo-secure-store` with `WHEN_UNLOCKED_THIS_DEVICE_ONLY`. Entropy is **not** written on web (`saveSlot` throws rather than using `localStorage`).
 
 ```ts
 await SecureStore.setItemAsync(key, base64Seed, {
   keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
-  requireAuthentication: true,          // biometric gate on every read
-  authenticationPrompt: 'Unlock seed',
 });
 ```
 
+**Tradeoff:** `requireAuthentication: true` is **not** set. Extra biometric prompts on every SecureStore read fail under iPhone Mirroring (“continue on iPhone”). The 15-minute app session already required the platform authenticator. Release builds should keep Settings Face ID on; turning it off still allows Start in the current code.
+
 - Android: Hardware-backed Keystore when available
-- iOS: Keychain with biometric
-- Passphrase is **never** persisted. User must enter it every time a seed is used for signing. Derive the final seed in memory only.
+- iOS: Keychain, device-unlocked
+- Passphrase is **never** persisted. `SecretSession` keeps the derived seed in RAM. Host-supplied Trezor passphrases must surface on the signing chip (`passphraseSource: 'host'`) and must not silently override a device-applied seed.
+- `crypto-seed` QR export requires `SigningModal` (`kind: 'export-seed'`). xpub / hdkey export may stay silent, matching GET_ADDRESS P1=0.
 
 ### Multiple Seeds
 
@@ -179,24 +177,18 @@ Each seed is a slot:
 
 ---
 
-## 5. Passkey Support (App Unlock — Most Secure Method)
+## 5. App Unlock (local authentication)
 
-Use platform authenticators via `react-native-passkey` (or `react-native-passkeys`).
+This repo has **no associated domain**, so full WebAuthn passkeys are not used. Unlock is `expo-local-authentication` (Face ID / device PIN) in `apps/mobile/src/passkeys/session.ts`.
 
-**Recommended flow (local-only, no server required for app unlock):**
+**Flow:**
 
-1. On first launch, user creates a passkey with `residentKey: required`, `userVerification: required`, `authenticatorAttachment: platform`.
-2. The passkey private key stays in the platform secure enclave / Credential Manager.
-3. To unlock the app (and thereby allow SecureStore biometric reads), the app performs a WebAuthn assertion against a local challenge.
-4. Success → app is unlocked for a session (e.g. 5–15 minutes). Failure or timeout → re-lock.
-5. Optional: combine with `expo-local-authentication` as a fallback, but prefer passkey as primary.
+1. Disclaimer, then Unlock.
+2. Release: OS biometric / passcode. Success unlocks a session (`autoLockMinutes`, default 15).
+3. Debug: skip the OS prompt so USB/lab tests can proceed (annotated in code).
+4. Session expiry returns to `/unlock`. Passphrase overlay is wiped with `SecretSession`.
 
-**Why this is strongest:**
-- Private key never leaves the secure hardware
-- Biometric / device PIN is enforced by the OS
-- Resistant to app-level compromise better than simple biometric gating alone
-
-**Note:** Full WebAuthn relying-party registration usually needs a domain + AASA / assetlinks. For pure local app unlock, use the library’s platform authenticator path carefully, or fall back to `expo-local-authentication` + SecureStore `requireAuthentication: true` if domain association is impractical. Document both options; implement the strongest that works without external infrastructure first.
+Do not document this as a resident passkey. A future associated-domain passkey can sit in front of the same session gate.
 
 ---
 
@@ -239,13 +231,13 @@ export interface ProtocolHandler {
 
 ## 7. App Flow
 
-1. **Unlock** — Passkey / biometric
-2. **Brand & Model Picker** — Beautiful grid (Ledger / Trezor / OneKey models)
-3. **Seed Vault** — List of seeds, generate new (12/24), import, delete (with confirmation)
-4. **Start Simulation** — Begin advertising the selected model’s Service UUID
-5. **Connected** — Show “Host connected” + live APDU/log view
-6. **Signing Request** — Modal with details + passphrase entry + confirm/reject
-7. **Stop** — Stop advertising, lock seeds
+1. **Unlock** — Face ID / device passcode (debug skip in development)
+2. **Device** — Pick a BLE model (`DeviceCard`), optional session passphrase, Start advertising
+3. **Seed Vault** — Generate / import BIP39 or SLIP-39, HD inspect
+4. **Host** — `yarn proxy` / CWS Proxy. USB HID gadget plus the **Testnet host** tab (Ledger / OneKey / Trezor catalogs over the phone BLE link). Signing still confirms on the phone.
+5. **Signing Request** — `SigningModal` slide-to-confirm. ERC-20 tickers from PROVIDE_ERC20 are labeled host-provided.
+6. **QR air-gap** — Export account UR / scan sign requests via `@cws/sdk` QR helpers
+7. **Stop** — Stop advertising, `resetLink`, wipe session seed
 
 ---
 
@@ -259,8 +251,7 @@ export interface ProtocolHandler {
   "munim-bluetooth": "latest",
   "@scure/bip39": "^1.4.0",
   "@noble/curves": "^1.6.0",
-  "@noble/hashes": "^1.5.0",
-  "react-native-passkey": "latest"
+  "@noble/hashes": "^1.5.0"
 }
 ```
 
@@ -283,13 +274,15 @@ export interface ProtocolHandler {
 
 ## 10. Limitations & Honesty
 
-- **USB simulation is impossible** without root / custom kernel. This project is BLE-only.
-- **iOS background BLE** is restricted. Recommend keeping the app in foreground.
-- **Real devices have Secure Elements.** This is a software simulator. The security of the seed depends entirely on the phone’s Keystore/Keychain + biometric/passkey. Treat it as a convenient development/testing tool, not a replacement for a real hardware wallet for large amounts.
-- Host apps may perform additional checks (firmware version, certificate, etc.). Start with the core transport + common APDUs; extend as needed when testing against real Ledger Live / Trezor Suite / OneKey apps.
+- **BLE peripheral requires a physical phone.** Simulators and Expo Go cannot advertise GATT.
+- **USB** is not emulated inside the phone. Desktop wallets that only speak HID use `apps/proxy` (Linux uhid / macOS CWS Proxy) as a local gadget that forwards to the phone over BLE.
+- **iOS background BLE** is restricted. Keep the app in foreground. Notify MTU stays 20 on iOS.
+- **BLE link is not LE Secure Connections.** Hosts still talk the vendor protocol once GATT is up.
+- **Real devices have Secure Elements.** This is a software simulator. Treat it as a development/testing tool, not a replacement for a hardware wallet for large amounts.
+- Host apps may perform extra checks (Genuine, certificates). Do not expect Ledger Live Genuine to pass.
+- iOS has no `preventScreenCapture` equivalent to Android `FLAG_SECURE`.
 
 ---
 
-**Document version:** 1.0  
-**Date:** 2026-10-23  
-**Ready for Cursor implementation.**
+**Document version:** 1.2  
+**Date:** 2026-10-27

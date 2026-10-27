@@ -205,7 +205,7 @@ export type EthTxInput = {
   accessListCount?: number;
   blobCount?: number;
   authorizationCount?: number;
-  token?: { ticker: string; decimals: number };
+  token?: { ticker: string; decimals: number; contract?: Uint8Array };
   envelopeHex?: string;
 };
 
@@ -265,7 +265,7 @@ export function describeEthTransaction(input: EthTxInput): SigningDetail {
     push('AUTHORIZATIONS', String(input.authorizationCount), false);
   }
   const data = input.data ?? new Uint8Array();
-  const erc20 = describeErc20(data, input.token);
+  const erc20 = describeErc20(data, input.token, input.to);
   if (erc20) {
     for (const field of erc20.fields) {
       fields.push(field);
@@ -279,6 +279,7 @@ export function describeEthTransaction(input: EthTxInput): SigningDetail {
   return {
     style: 'eth-tx',
     headline: erc20?.headline ?? 'Ethereum transaction',
+    warning: erc20?.warning,
     fields,
     hex: input.envelopeHex,
   };
@@ -286,8 +287,9 @@ export function describeEthTransaction(input: EthTxInput): SigningDetail {
 
 function describeErc20(
   data: Uint8Array,
-  token?: { ticker: string; decimals: number },
-): { headline: string; fields: SigningField[] } | null {
+  token?: { ticker: string; decimals: number; contract?: Uint8Array },
+  to?: Uint8Array,
+): { headline: string; warning?: string; fields: SigningField[] } | null {
   if (data.length < 68) {
     return null;
   }
@@ -298,22 +300,39 @@ function describeErc20(
   }
   const target = data.subarray(16, 36);
   const amount = bigintFromBytes(data.subarray(36, 68));
-  const ticker = token?.ticker;
-  const decimals = token?.decimals ?? 18;
-  const unit = 10n ** BigInt(decimals);
-  const whole = amount / unit;
-  const frac = amount % unit;
-  const formatted =
-    frac === 0n
-      ? `${whole}${ticker ? ` ${ticker}` : ''}`
-      : `${whole}.${frac.toString().padStart(decimals, '0').replace(/0+$/, '')}${ticker ? ` ${ticker}` : ''}`;
+  const contract = token?.contract && token.contract.length > 0 ? token.contract : to;
+  const fields: SigningField[] = [
+    { label: 'METHOD', value: method },
+  ];
+  if (contract && contract.length > 0) {
+    fields.push({ label: 'CONTRACT', value: hex0x(contract), mono: true });
+  }
+  fields.push({
+    label: method === 'transfer' ? 'TO' : 'SPENDER',
+    value: hex0x(target),
+    mono: true,
+  });
+  fields.push({ label: 'AMOUNT RAW', value: amount.toString() });
+  if (token) {
+    const decimals = token.decimals ?? 18;
+    const unit = 10n ** BigInt(decimals);
+    const whole = amount / unit;
+    const frac = amount % unit;
+    const formatted =
+      frac === 0n
+        ? whole.toString()
+        : `${whole}.${frac.toString().padStart(decimals, '0').replace(/0+$/, '')}`;
+    fields.push({ label: 'AMOUNT', value: `${formatted} (host decimals)` });
+    if (token.ticker) {
+      fields.push({ label: 'TICKER', value: `${token.ticker} (host-provided)` });
+    }
+  }
   return {
-    headline: method === 'transfer' ? `Token transfer${ticker ? ` (${ticker})` : ''}` : `Token approve${ticker ? ` (${ticker})` : ''}`,
-    fields: [
-      { label: 'METHOD', value: method },
-      { label: method === 'transfer' ? 'TO' : 'SPENDER', value: hex0x(target), mono: true },
-      { label: 'AMOUNT', value: formatted },
-    ],
+    headline: method === 'transfer' ? 'Token transfer' : 'Token approve',
+    warning: token
+      ? 'Token ticker and decimals were provided by the host and are not verified.'
+      : undefined,
+    fields,
   };
 }
 
@@ -615,6 +634,8 @@ export function describeSigning(request: SigningRequest): SigningDetail {
       return notice(request, 'The host is checking that this device is genuine.');
     case 'address':
       return describeAddress(request);
+    case 'export-seed':
+      return notice(request, request.message);
     default:
       return describeSign(request);
   }

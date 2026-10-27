@@ -9,6 +9,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@cws/contracts": "*",
     "@ngraveio/bc-ur": "^1.1.13",
     "@noble/curves": "^1.9.7",
     "@noble/hashes": "^1.8.0",

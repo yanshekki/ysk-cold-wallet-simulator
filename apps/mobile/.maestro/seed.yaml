@@ -1,0 +1,31 @@
+appId: hk.ysk.cws
+tags:
+  - vault
+  - seed
+---
+# Given Device is unlocked
+# When a checksum-valid 12-word mnemonic is imported
+# Then the vault tab is shown again
+- runFlow: onboarding.yaml
+- tapOn:
+    id: "tab-vault"
+- tapOn:
+    id: "vault-import"
+- extendedWaitUntil:
+    visible:
+      id: "import-draft"
+    timeout: 15000
+- tapOn:
+    id: "import-label"
+    optional: true
+- tapOn:
+    id: "import-draft"
+- inputText: "absent much beef salmon theme settle absorb festival fancy dinner tiny flavor"
+- assertVisible:
+    id: "import-status"
+- tapOn:
+    id: "import-submit"
+- extendedWaitUntil:
+    visible:
+      id: "tab-vault"
+    timeout: 25000

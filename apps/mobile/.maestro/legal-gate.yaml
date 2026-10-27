@@ -1,0 +1,38 @@
+appId: hk.ysk.cws
+tags:
+  - legal
+  - smoke
+---
+# Given a first-run disclaimer (skipped if already accepted)
+# When Continue is used before both checkboxes
+# Then the legal screen stays until Disclaimer and Privacy are both agreed
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "disclaimer-agree"
+    commands:
+      - tapOn:
+          id: "disclaimer-continue"
+          optional: true
+      - assertVisible:
+          id: "disclaimer-agree"
+      - tapOn:
+          id: "legal-tab-disclaimer"
+      - tapOn:
+          id: "disclaimer-agree"
+      - tapOn:
+          id: "disclaimer-continue"
+          optional: true
+      - assertVisible:
+          id: "legal-tab-privacy"
+      - tapOn:
+          id: "legal-tab-privacy"
+      - tapOn:
+          id: "privacy-agree"
+      - tapOn:
+          id: "disclaimer-continue"
+- extendedWaitUntil:
+    visible:
+      id: "tab-device"
+    timeout: 45000

@@ -1,0 +1,33 @@
+appId: hk.ysk.cws
+tags:
+  - vault
+  - generate
+  - error
+---
+# Given custom hex entropy
+# When fewer than 32 hex characters are supplied for 12 words
+# Then generate stays on the form with an error
+- runFlow: onboarding.yaml
+- tapOn:
+    id: "tab-vault"
+- tapOn:
+    id: "vault-generate"
+- tapOn:
+    id: "generate-words-12"
+- tapOn:
+    id: "generate-custom"
+- tapOn:
+    id: "generate-custom-hex"
+- tapOn:
+    id: "generate-custom-draft"
+- inputText: "aa"
+- tapOn:
+    id: "generate-run"
+- extendedWaitUntil:
+    visible:
+      id: "generate-error"
+    timeout: 15000
+- assertVisible:
+    id: "generate-run"
+- tapOn:
+    id: "screen-back"

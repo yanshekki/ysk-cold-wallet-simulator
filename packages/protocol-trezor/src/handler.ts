@@ -4,10 +4,11 @@ import type {
   ChainPathId,
   ConfirmationPort,
   DeviceModel,
+  PassphraseSource,
   ProtocolHandler,
   SigningRequest,
 } from '@cws/contracts';
-import { TREZOR_FIRMWARE, describeEthMessage } from '@cws/contracts';
+import { TREZOR_FIRMWARE, applyConfirmationPath, describeEthMessage, hashTypedData, type Eip712TypedData } from '@cws/contracts';
 import {
   bip143Sighash,
   bitcoinP2pkh,
@@ -36,7 +37,7 @@ import { bech32 } from '@scure/base';
 import { sha256 } from '@noble/hashes/sha2';
 import { keccak_256 } from '@noble/hashes/sha3';
 import { schnorr } from '@noble/curves/secp256k1';
-import { bip341Sighash, hashTypedData, taprootOutputKey, type Eip712TypedData, type ParsedPsbt } from '@cws/protocol-qr';
+import { bip341Sighash, taprootOutputKey, type ParsedPsbt } from '@cws/protocol-qr';
 import { COIN_BY_REQUEST, icarusAddress, type CoinOp } from './coins';
 import {
   asBytes,
@@ -354,8 +355,58 @@ export class TrezorThpProtocolHandler implements ProtocolHandler {
     replaceSeedCache(this.seedCache, seed, icarusRoot);
   }
 
+  resetLink(): void {
+    this.assembler.reset();
+    this.pending = undefined;
+    this.phase = 'unallocated';
+    this.cid = 0;
+    this.expectedRecvSeq = 0;
+    this.sendSeq = 0;
+    this.lastData = undefined;
+    this.hostName = '';
+    this.appName = '';
+    this.cpace = undefined;
+    this.nextSessionId = 1;
+    this.sessions.clear();
+    this.sessions.set(0, '');
+    this.setPairingCode(null);
+    this.noise.resetHandshake();
+  }
+
   private port(): ConfirmationPort {
     return wrapSeedPort(this.confirmation, this.seedCache);
+  }
+
+  private async resolveSigningMaterial(sessionId: number): Promise<{
+    seed?: Uint8Array;
+    icarusRoot?: Uint8Array;
+    overlay: string;
+    passphraseSource: PassphraseSource;
+  }> {
+    const devicePass = (await this.confirmation.getPassphrase(this.slotId)) ?? '';
+    const hostPass = this.sessions.get(sessionId) ?? '';
+    const cachedSeed = await this.port().getSeed?.(this.slotId);
+    const cachedIcarus = await this.port().getIcarusRoot?.(this.slotId);
+    if (cachedSeed) {
+      return {
+        seed: cachedSeed,
+        icarusRoot: cachedIcarus,
+        overlay: '',
+        passphraseSource: devicePass.length > 0 ? 'device' : 'none',
+      };
+    }
+    if (devicePass.length > 0) {
+      return { overlay: devicePass, passphraseSource: 'device' };
+    }
+    if (hostPass.length > 0) {
+      return { overlay: hostPass, passphraseSource: 'host' };
+    }
+    return {
+      seed: await seedFor(this.port(), this.slotId, this.entropy, this.backup),
+      icarusRoot: await icarusRootFor(this.port(), this.slotId, this.entropy, this.backup),
+      overlay: '',
+      passphraseSource: 'none',
+    };
   }
 
   observeIncomingSize(size: number): void {
@@ -1078,6 +1129,7 @@ export class TrezorThpProtocolHandler implements ProtocolHandler {
       return encodeL4(pending.sessionId, MessageType.CardanoSignTxFinished, new Uint8Array());
     }
     const signing = isSignPending(pending);
+    const material = await this.resolveSigningMaterial(pending.sessionId);
     const request: SigningRequest = {
       brand: 'trezor',
       kind: signing ? 'sign' : 'address',
@@ -1086,6 +1138,7 @@ export class TrezorThpProtocolHandler implements ProtocolHandler {
       message: pendingMessage(pending),
       rawPayload: pending.rawPayload,
       detail: pending.kind === 'eth-sign' ? describeEthMessage(pending.path, pending.message) : undefined,
+      passphraseSource: material.passphraseSource === 'none' ? undefined : material.passphraseSource,
     };
     const ok = await this.confirmation.confirm(request);
     if (!ok) {
@@ -1095,12 +1148,9 @@ export class TrezorThpProtocolHandler implements ProtocolHandler {
         encodeFailure(FailureType.ActionCancelled, 'Cancelled'),
       );
     }
-    const overlay =
-      (await this.confirmation.getPassphrase(this.slotId)) ?? this.sessions.get(pending.sessionId) ?? '';
-    const seed = overlay ? undefined : await seedFor(this.port(), this.slotId, this.entropy, this.backup);
-    const icarusRoot = overlay
-      ? undefined
-      : await icarusRootFor(this.port(), this.slotId, this.entropy, this.backup);
+    const overlay = material.overlay;
+    const seed = material.seed;
+    const icarusRoot = material.icarusRoot;
     const secp = (path: string) =>
       seed ? derivePrivateKeyFromSeed(seed, path) : derivePrivateKey(this.entropy, path, overlay, this.backup);
     const hd = (path: string) =>
@@ -1292,7 +1342,7 @@ function overlayPath(
   path: string,
   chains: readonly ChainPathId[],
 ): string {
-  return confirmation.resolvePath?.(path, chains) ?? path;
+  return applyConfirmationPath(confirmation.resolvePath, path, chains);
 }
 
 function isSignPending(pending: PendingAction): boolean {

@@ -1,0 +1,27 @@
+appId: hk.ysk.cws
+tags:
+  - settings
+  - security
+---
+# Given Settings → Security
+# When Face ID, sign re-auth, and auto-lock are shown
+# Then the controls are tappable without leaving the screen
+- runFlow: onboarding.yaml
+- tapOn:
+    id: "tab-settings"
+- tapOn:
+    id: "settings-link-security"
+- assertVisible:
+    id: "security-faceid"
+- tapOn:
+    id: "security-faceid"
+- tapOn:
+    id: "security-faceid"
+- assertVisible:
+    id: "security-sign-reauth"
+- assertVisible:
+    id: "security-autolock"
+- tapOn:
+    id: "screen-back"
+- assertVisible:
+    id: "settings-link-security"

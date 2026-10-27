@@ -29,6 +29,7 @@ describe('slide-to-confirm math', () => {
     expect(signingNeedsPassphrase('allow-manager')).toBe(false);
     expect(signingNeedsPassphrase('pairing')).toBe(false);
     expect(signingNeedsPassphrase('open-app')).toBe(false);
+    expect(signingNeedsPassphrase('export-seed')).toBe(true);
   });
 
   it('labels the bar from kind', () => {
@@ -38,5 +39,6 @@ describe('slide-to-confirm math', () => {
     expect(signingSlideLabel('allow-manager')).toBe('signing.slideAllow');
     expect(signingSlideLabel('open-app')).toBe('signing.slideOpen');
     expect(signingSlideLabel('pairing')).toBe('signing.slidePair');
+    expect(signingSlideLabel('export-seed')).toBe('signing.slideExportSeed');
   });
 });

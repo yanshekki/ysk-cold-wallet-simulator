@@ -82,8 +82,7 @@ async function writeSlots(slots: SeedSlot[]): Promise<void> {
 
 async function writeSecret(key: string, value: string): Promise<void> {
   if (Platform.OS === 'web') {
-    webSet(key, value);
-    return;
+    throw new Error('web vault refuses to store entropy');
   }
   // WHEN_UNLOCKED_THIS_DEVICE_ONLY is the device-side gate. The 15-minute
   // session already required the platform authenticator. Extra
@@ -119,6 +118,9 @@ export async function saveSlot(
   entropy: Uint8Array,
   shares?: readonly string[],
 ): Promise<SeedSlot> {
+  if (Platform.OS === 'web') {
+    throw new Error('web vault refuses to store entropy');
+  }
   if ((slot.backup ?? 'bip39') === 'bip39') {
     wordCountFromEntropy(entropy);
   }

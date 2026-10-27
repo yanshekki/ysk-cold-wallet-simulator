@@ -19,20 +19,20 @@
     <div class="stage">
       <div class="phone">
         <header class="hud">
-          <span id="clock" class="clock">IDLE</span>
+          <span id="clock" class="clock" data-testid="proxy-clock">IDLE</span>
           <span class="radio">
             <span id="pip" class="pip"></span>
-            <span id="radio">IDLE</span>
+            <span id="radio" data-testid="proxy-radio">IDLE</span>
           </span>
-          <span id="chip" class="chip hidden"></span>
-          <span id="host" class="host">NO PHONE</span>
+          <span id="chip" class="chip hidden" data-testid="proxy-chip"></span>
+          <span id="host" class="host" data-testid="proxy-host">NO PHONE</span>
         </header>
         <nav class="tabs" role="tablist">
-          <button type="button" id="tab-proxy" class="tab on" role="tab" aria-selected="true" data-tab="proxy"></button>
-          <button type="button" id="tab-lab" class="tab" role="tab" aria-selected="false" data-tab="lab"></button>
-          <button type="button" id="tab-console" class="tab" role="tab" aria-selected="false" data-tab="console">
+          <button type="button" id="tab-proxy" class="tab on" role="tab" aria-selected="true" data-tab="proxy" data-testid="tab-proxy"></button>
+          <button type="button" id="tab-lab" class="tab" role="tab" aria-selected="false" data-tab="lab" data-testid="tab-lab"></button>
+          <button type="button" id="tab-console" class="tab" role="tab" aria-selected="false" data-tab="console" data-testid="tab-console">
             <span id="tab-console-label"></span>
-            <span id="log-badge" class="badge hidden">0</span>
+            <span id="log-badge" class="badge hidden" data-testid="log-badge">0</span>
           </button>
         </nav>
         <main id="pane-proxy" class="screen">
@@ -42,18 +42,18 @@
               <h1 id="title">CWS</h1>
             </div>
             <div class="langs" role="group" aria-label="Language">
-              <button type="button" id="lang-en" class="lang on" data-lang="en">EN</button>
-              <button type="button" id="lang-zh" class="lang" data-lang="zh-HK">繁</button>
+              <button type="button" id="lang-en" class="lang on" data-lang="en" data-testid="lang-en">EN</button>
+              <button type="button" id="lang-zh" class="lang" data-lang="zh-HK" data-testid="lang-zh">繁</button>
             </div>
           </div>
           <p class="subtitle" id="subtitle"></p>
-          <p id="phase" class="status"></p>
-          <section id="card" class="card">
+          <p id="phase" class="status" data-testid="proxy-phase"></p>
+          <section id="card" class="card" data-testid="proxy-card">
             <div class="card-head">
               <span id="brand" class="brand">—</span>
               <span id="protocol" class="protocol"></span>
             </div>
-            <h2 id="model">—</h2>
+              <h2 id="model" data-testid="proxy-model">—</h2>
             <dl>
               <div>
                 <dt id="label-phone">GAP name</dt>
@@ -73,86 +73,90 @@
               </div>
               <div>
                 <dt id="label-hid">HID</dt>
-                <dd id="hid">idle</dd>
+                <dd id="hid" data-testid="proxy-hid">idle</dd>
               </div>
-              <div id="trezord-row" class="hidden">
+              <div id="trezord-row" class="hidden" data-testid="proxy-trezord-row">
                 <dt id="label-trezord">trezord</dt>
                 <dd id="trezord">—</dd>
               </div>
             </dl>
-            <p id="hid-error" class="hid-error hidden"></p>
+            <p id="hid-error" class="hid-error hidden" data-testid="proxy-hid-error"></p>
           </section>
-          <section id="pairing" class="pairing hidden" hidden>
+          <section id="pairing" class="pairing hidden" hidden data-testid="proxy-pairing">
             <label for="code" id="pairing-label"></label>
             <div class="pair-row">
-              <input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" />
-              <button type="button" id="pair" class="ghost"></button>
+              <input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" data-testid="pairing-code" />
+              <button type="button" id="pair" class="ghost" data-testid="pairing-submit"></button>
             </div>
           </section>
         </main>
         <main id="pane-lab" class="screen hidden">
-          <p class="kicker" id="lab-kicker">/ LAB</p>
-          <p id="lab-status" class="status"></p>
+          <p class="kicker" id="lab-kicker">/ TESTNET</p>
+          <div id="lab-brands" class="lab-brands"></div>
+          <p id="lab-status" class="status" data-testid="lab-status"></p>
           <div id="lab-sections" class="lab-sections"></div>
           <h2 id="lab-section-title" class="lab-heading"></h2>
+          <div id="lab-net" class="lab-net hidden">
+            <a id="lab-faucet" data-testid="lab-faucet" href="https://testnet.help/en/nearfaucet/testnet" target="_blank" rel="noreferrer"></a>
+          </div>
           <div id="lab-grid" class="lab-grid"></div>
-          <pre id="lab-result" class="lab-result hidden"></pre>
+          <pre id="lab-result" class="lab-result hidden" data-testid="lab-result"></pre>
         </main>
-        <div id="lab-modal" class="modal hidden" hidden>
+        <div id="lab-modal" class="modal hidden" hidden data-testid="lab-modal">
           <div class="modal-card">
             <h2 id="lab-modal-title"></h2>
             <label id="lab-field-path" class="field hidden">
               <span id="lab-label-path">Path</span>
-              <input id="lab-input-path" />
+              <input id="lab-input-path" data-testid="lab-field-path" />
             </label>
             <label id="lab-field-utf8" class="field hidden">
               <span id="lab-label-utf8">UTF-8</span>
-              <textarea id="lab-input-utf8" rows="4"></textarea>
+              <textarea id="lab-input-utf8" data-testid="lab-field-utf8" rows="4"></textarea>
             </label>
             <label id="lab-field-hex" class="field hidden">
               <span id="lab-label-hex">Hex</span>
-              <textarea id="lab-input-hex" rows="4"></textarea>
+              <textarea id="lab-input-hex" data-testid="lab-field-hex" rows="4"></textarea>
             </label>
             <div class="row">
-              <button type="button" id="lab-run" class="primary"></button>
-              <button type="button" id="lab-close"></button>
+              <button type="button" id="lab-run" class="primary" data-testid="lab-run"></button>
+              <button type="button" id="lab-close" data-testid="lab-close"></button>
             </div>
           </div>
         </div>
         <section id="pane-console" class="console-root hidden">
           <div class="instrument">
             <div class="log-chips">
-              <button type="button" class="log-chip on" data-filter="all" id="filter-all"></button>
-              <button type="button" class="log-chip" data-filter="ble" id="filter-ble">BLE</button>
-              <button type="button" class="log-chip" data-filter="hid" id="filter-hid">HID</button>
-              <button type="button" class="log-chip" data-filter="gatt" id="filter-gatt">GATT</button>
-              <button type="button" class="log-chip" data-filter="error" id="filter-error">ERR</button>
-              <button type="button" class="log-chip on" id="log-wrap"></button>
-              <button type="button" class="log-chip on" id="log-follow"></button>
+              <button type="button" class="log-chip on" data-filter="all" id="filter-all" data-testid="log-filter-all"></button>
+              <button type="button" class="log-chip" data-filter="ble" id="filter-ble" data-testid="log-filter-ble">BLE</button>
+              <button type="button" class="log-chip" data-filter="hid" id="filter-hid" data-testid="log-filter-hid">HID</button>
+              <button type="button" class="log-chip" data-filter="gatt" id="filter-gatt" data-testid="log-filter-gatt">GATT</button>
+              <button type="button" class="log-chip" data-filter="error" id="filter-error" data-testid="log-filter-error">ERR</button>
+              <button type="button" class="log-chip on" id="log-wrap" data-testid="log-wrap"></button>
+              <button type="button" class="log-chip on" id="log-follow" data-testid="log-follow"></button>
             </div>
             <div class="search-row">
-              <input id="log-search" type="search" spellcheck="false" autocomplete="off" />
-              <span id="log-count">0/0</span>
-              <button type="button" class="log-chip" id="log-case">Aa</button>
-              <button type="button" class="log-chip" id="log-regex">.*</button>
+              <input id="log-search" type="search" spellcheck="false" autocomplete="off" data-testid="log-search" />
+              <span id="log-count" data-testid="log-count">0/0</span>
+              <button type="button" class="log-chip" id="log-case" data-testid="log-case">Aa</button>
+              <button type="button" class="log-chip" id="log-regex" data-testid="log-regex">.*</button>
             </div>
             <div class="log-actions">
-              <button type="button" class="log-action" id="log-prev"></button>
-              <button type="button" class="log-action" id="log-next"></button>
-              <button type="button" class="log-action" id="log-copy-line"></button>
-              <button type="button" class="log-action" id="log-copy-match"></button>
-              <button type="button" class="log-action" id="log-copy-all"></button>
-              <button type="button" class="log-action" id="log-font-up">A+</button>
-              <button type="button" class="log-action" id="log-font-down">A-</button>
-              <button type="button" class="log-action" id="log-export"></button>
-              <button type="button" class="log-action danger" id="log-clear"></button>
-              <button type="button" class="log-action" id="log-latest"></button>
+              <button type="button" class="log-action" id="log-prev" data-testid="log-prev"></button>
+              <button type="button" class="log-action" id="log-next" data-testid="log-next"></button>
+              <button type="button" class="log-action" id="log-copy-line" data-testid="log-copy-line"></button>
+              <button type="button" class="log-action" id="log-copy-match" data-testid="log-copy-match"></button>
+              <button type="button" class="log-action" id="log-copy-all" data-testid="log-copy-all"></button>
+              <button type="button" class="log-action" id="log-font-up" data-testid="log-font-up">A+</button>
+              <button type="button" class="log-action" id="log-font-down" data-testid="log-font-down">A-</button>
+              <button type="button" class="log-action" id="log-export" data-testid="log-export"></button>
+              <button type="button" class="log-action danger" id="log-clear" data-testid="log-clear"></button>
+              <button type="button" class="log-action" id="log-latest" data-testid="log-latest"></button>
             </div>
           </div>
-          <ol id="logs" class="logs"></ol>
+          <ol id="logs" class="logs" data-testid="proxy-logs"></ol>
         </section>
         <footer class="dock">
-          <button type="button" id="power" class="primary"></button>
+          <button type="button" id="power" class="primary" data-testid="proxy-power"></button>
         </footer>
       </div>
     </div>

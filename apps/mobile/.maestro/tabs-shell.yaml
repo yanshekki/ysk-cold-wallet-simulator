@@ -1,0 +1,29 @@
+appId: hk.ysk.cws
+tags:
+  - smoke
+  - shell
+---
+# Given the app is unlocked
+# When each root tab is opened
+# Then Device, Vault, Console, and Settings stay reachable
+- runFlow: onboarding.yaml
+- tapOn:
+    id: "tab-device"
+- assertVisible:
+    id: "device-model-nano-x"
+- tapOn:
+    id: "tab-vault"
+- assertVisible:
+    id: "vault-generate"
+- tapOn:
+    id: "tab-console"
+- assertVisible:
+    id: "log-filter-all"
+- tapOn:
+    id: "tab-settings"
+- assertVisible:
+    id: "settings-link-language"
+- tapOn:
+    id: "tab-device"
+- assertVisible:
+    id: "tab-device"

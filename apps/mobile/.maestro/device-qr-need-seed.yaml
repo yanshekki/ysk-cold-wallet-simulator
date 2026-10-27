@@ -1,0 +1,32 @@
+appId: hk.ysk.cws
+tags:
+  - device
+  - qr
+  - error
+---
+# Given no vault seed
+# When a QR profile or scan is tapped
+# Then the device shows select-a-seed (skipped once a seed exists)
+- runFlow: onboarding.yaml
+- tapOn:
+    id: "tab-vault"
+- runFlow:
+    when:
+      visible:
+        id: "vault-empty"
+    commands:
+      - tapOn:
+          id: "tab-device"
+      - scrollUntilVisible:
+          element:
+            id: "device-qr-keystone"
+          direction: DOWN
+          timeout: 12000
+      - tapOn:
+          id: "device-qr-keystone"
+      - assertVisible:
+          id: "device-qr-error"
+      - tapOn:
+          id: "device-qr-scan"
+      - assertVisible:
+          id: "device-qr-error"

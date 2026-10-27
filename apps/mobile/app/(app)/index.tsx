@@ -298,7 +298,11 @@ export default function DeviceScreen() {
               >
                 {model?.id === item.id ? (
                   <View style={styles.bezelActions}>
-                    {!seed ? <Text style={styles.hint}>{t('device.selectSeed')}</Text> : null}
+                    {!seed ? (
+                      <Text style={styles.hint} testID="device-need-seed">
+                        {t('device.selectSeed')}
+                      </Text>
+                    ) : null}
                     {seed?.backup === 'slip39' && item.brand === 'ledger' ? (
                       <Text style={styles.hint}>{t('device.slip39Ledger')}</Text>
                     ) : null}
@@ -325,6 +329,7 @@ export default function DeviceScreen() {
                               visible={appSheet}
                               title={t('device.openApp')}
                               selectedId={currentApp}
+                              testIDPrefix="device-app-"
                               options={pickerApps.map((app) => ({
                                 id: app,
                                 label: ledgerAppLabel(app),
@@ -362,7 +367,12 @@ export default function DeviceScreen() {
                             />
                           )
                         ) : null}
-                        <Button label={t('device.stop')} variant="danger" onPress={() => void stopSimulation()} />
+                        <Button
+                          testID="device-stop"
+                          label={t('device.stop')}
+                          variant="danger"
+                          onPress={() => void stopSimulation()}
+                        />
                       </>
                     ) : (
                       <Button
@@ -372,7 +382,11 @@ export default function DeviceScreen() {
                         onPress={() => void onStart()}
                       />
                     )}
-                    {error || localError ? <Text style={styles.error}>{localError ?? error}</Text> : null}
+                    {error || localError ? (
+                      <Text style={styles.error} testID="device-error">
+                        {localError ?? error}
+                      </Text>
+                    ) : null}
                   </View>
                 ) : null}
               </DeviceCard>
@@ -409,7 +423,11 @@ export default function DeviceScreen() {
             );
           })}
         </View>
-        {localError ? <Text style={styles.error}>{localError}</Text> : null}
+        {localError ? (
+          <Text style={styles.error} testID="device-qr-error">
+            {localError}
+          </Text>
+        ) : null}
       </View>
     </Screen>
     <Sheet
@@ -425,6 +443,7 @@ export default function DeviceScreen() {
     >
       <Text style={styles.hint}>{t('device.passphraseHint')}</Text>
       <TextInput
+        testID="device-passphrase-input"
         value={passDraft}
         onChangeText={setPassDraft}
         placeholder={t('device.passphrase')}

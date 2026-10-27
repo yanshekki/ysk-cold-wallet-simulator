@@ -70,7 +70,13 @@ export function Hud({
           {host ? host : noHostLabel}
         </Text>
         {onLock ? (
-          <Pressable accessibilityRole="button" accessibilityLabel={lockLabel} onPress={onLock} hitSlop={8}>
+          <Pressable
+            testID="hud-lock"
+            accessibilityRole="button"
+            accessibilityLabel={lockLabel}
+            onPress={onLock}
+            hitSlop={8}
+          >
             <Text style={styles.lock}>{lockLabel}</Text>
           </Pressable>
         ) : null}

@@ -1,0 +1,21 @@
+appId: hk.ysk.cws
+tags:
+  - console
+---
+# Given Console with no host traffic
+# When the log editor loads
+# Then the empty state and filter chips are visible
+- runFlow: onboarding.yaml
+- tapOn:
+    id: "tab-console"
+- assertVisible:
+    id: "log-filter-all"
+- assertVisible:
+    id: "log-empty"
+- assertVisible:
+    id: "log-search"
+- tapOn:
+    id: "log-search"
+- inputText: "no-such-line"
+- assertVisible:
+    id: "log-count"

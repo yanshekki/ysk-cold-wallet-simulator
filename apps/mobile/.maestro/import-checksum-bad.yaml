@@ -1,0 +1,33 @@
+appId: hk.ysk.cws
+tags:
+  - vault
+  - import
+  - error
+---
+# Given twelve BIP39-looking words with a bad checksum
+# When the operator tries to import
+# Then Submit stays disabled on the form
+- runFlow: onboarding.yaml
+- tapOn:
+    id: "tab-vault"
+- tapOn:
+    id: "vault-import"
+- extendedWaitUntil:
+    visible:
+      id: "import-draft"
+    timeout: 15000
+- tapOn:
+    id: "import-draft"
+- inputText: "absent much beef salmon theme settle absorb festival fancy dinner tiny about"
+- assertVisible:
+    id: "import-status"
+- assertVisible:
+    id: "import-submit"
+    enabled: false
+- tapOn:
+    id: "import-submit"
+    optional: true
+- assertVisible:
+    id: "import-draft"
+- tapOn:
+    id: "screen-back"

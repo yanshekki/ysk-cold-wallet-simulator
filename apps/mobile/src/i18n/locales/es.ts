@@ -273,6 +273,8 @@ export const es: MessageTree = {
     slideAllow: 'Deslice para permitir',
     slidePair: 'Deslice para emparejar',
     slideOpen: 'Deslice para abrir',
+    slideExportSeed: 'Deslice para exportar semilla',
+    hostPassphrase: 'Frase del host',
   },
   unlock: {
     title: 'YSK',

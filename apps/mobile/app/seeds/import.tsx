@@ -174,6 +174,7 @@ export default function ImportSeedScreen() {
       backIcon={<Ionicons name="chevron-back" size={22} color={colors.text} />}
     >
           <TextInput
+            testID="import-label"
             value={label}
             onChangeText={setLabel}
             placeholder={t('import.defaultName')}
@@ -235,11 +236,13 @@ export default function ImportSeedScreen() {
           {slipMode ? (
             <>
               <Button
+                testID="import-add-share"
                 label={t('import.addShare')}
                 variant="ghost"
                 onPress={() => setExtraShares((current) => [...current, ''])}
               />
               <TextInput
+                testID="import-slip-pass"
                 value={slipPass}
                 onChangeText={setSlipPass}
                 placeholder={t('import.slip39Passphrase')}
@@ -255,12 +258,19 @@ export default function ImportSeedScreen() {
               />
             </>
           ) : null}
-          <Text style={[styles.status, analysis.ready && styles.statusOk, analysis.checksumOk === false && analysis.have >= analysis.need && styles.statusBad]}>
+          <Text
+            testID="import-status"
+            style={[styles.status, analysis.ready && styles.statusOk, analysis.checksumOk === false && analysis.have >= analysis.need && styles.statusBad]}
+          >
             {analysis.scheme === 'bip39' && analysis.have >= 12
               ? `${t(analysis.checksumOk ? 'import.checksumOk' : 'import.checksumBad')} · ${status}`
               : status}
           </Text>
-          {error ? <Text style={styles.error}>{error}</Text> : null}
+          {error ? (
+            <Text style={styles.error} testID="import-error">
+              {error}
+            </Text>
+          ) : null}
           <Button
             testID="import-submit"
             label={t('vault.import')}

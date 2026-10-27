@@ -1,0 +1,43 @@
+appId: hk.ysk.cws
+tags:
+  - device
+  - ble
+---
+# Given a vault seed exists
+# When Start is tapped on Nano X
+# Then either advertising starts (physical phone) or the simulator BLE error is shown
+- runFlow: onboarding.yaml
+- tapOn:
+    id: "tab-vault"
+- tapOn:
+    id: "vault-import"
+- extendedWaitUntil:
+    visible:
+      id: "import-draft"
+    timeout: 15000
+- tapOn:
+    id: "import-draft"
+- inputText: "absent much beef salmon theme settle absorb festival fancy dinner tiny flavor"
+- tapOn:
+    id: "import-submit"
+- extendedWaitUntil:
+    visible:
+      id: "tab-vault"
+    timeout: 25000
+- tapOn:
+    id: "tab-device"
+- tapOn:
+    id: "device-model-nano-x"
+- tapOn:
+    id: "device-start"
+- extendedWaitUntil:
+    visible:
+      id: "device-stop"
+    timeout: 12000
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "device-passphrase"
+    timeout: 4000
+    optional: true
+- takeScreenshot: device-start-result

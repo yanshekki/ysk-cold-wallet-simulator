@@ -11,7 +11,7 @@ type BleModule = typeof import('munim-bluetooth');
 type Subscription = (() => void) | void;
 
 const ADVERTISE_WAIT_MS = 8000;
-const NOTIFY_GAP_MS = 40;
+const NOTIFY_GAP_MS = Platform.OS === 'android' ? 0 : 10;
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => {

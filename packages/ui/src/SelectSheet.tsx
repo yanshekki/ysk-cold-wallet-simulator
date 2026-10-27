@@ -64,6 +64,7 @@ export function SelectSheet({
           <Text style={styles.kicker}>{title}</Text>
           {options.length > 12 ? (
             <TextInput
+              testID="sheet-search"
               value={query}
               onChangeText={setQuery}
               placeholder={searchPlaceholder}
@@ -97,7 +98,7 @@ export function SelectSheet({
               );
             })}
           </ScrollView>
-          <Button label={cancelLabel} variant="ghost" onPress={onClose} />
+          <Button testID="sheet-cancel" label={cancelLabel} variant="ghost" onPress={onClose} />
         </View>
       </KeyboardAvoidingView>
     </Modal>

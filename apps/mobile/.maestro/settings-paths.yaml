@@ -1,0 +1,36 @@
+appId: hk.ysk.cws
+tags:
+  - settings
+---
+# Given Settings → Derivation paths
+# When the list is scrolled
+# Then ETH / NEAR / TON fields exist and invalid input is not required to save
+- runFlow: onboarding.yaml
+- tapOn:
+    id: "tab-settings"
+- tapOn:
+    id: "settings-link-paths"
+- scrollUntilVisible:
+    element:
+      id: "path-eth"
+    direction: DOWN
+    timeout: 8000
+- assertVisible:
+    id: "path-reset-eth"
+- scrollUntilVisible:
+    element:
+      id: "path-near"
+    direction: DOWN
+    timeout: 8000
+- scrollUntilVisible:
+    element:
+      id: "path-ton"
+    direction: DOWN
+    timeout: 8000
+- tapOn:
+    id: "path-reset-eth"
+    optional: true
+- tapOn:
+    id: "screen-back"
+- assertVisible:
+    id: "settings-link-paths"

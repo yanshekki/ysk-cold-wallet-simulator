@@ -1,0 +1,65 @@
+appId: hk.ysk.cws
+tags:
+  - device
+  - qr
+---
+# Given the Device tab
+# When the QR group is scrolled
+# Then every air-gap profile chip is present
+- runFlow: onboarding.yaml
+- tapOn:
+    id: "tab-device"
+- scrollUntilVisible:
+    element:
+      id: "device-qr-scan"
+    direction: DOWN
+    timeout: 12000
+- assertVisible:
+    id: "device-qr-keystone"
+- assertVisible:
+    id: "device-qr-onekey"
+- scrollUntilVisible:
+    element:
+      id: "device-qr-ngrave-zero"
+    direction: DOWN
+    timeout: 8000
+- scrollUntilVisible:
+    element:
+      id: "device-qr-airgap"
+    direction: DOWN
+    timeout: 8000
+- scrollUntilVisible:
+    element:
+      id: "device-qr-coolwallet"
+    direction: DOWN
+    timeout: 8000
+- scrollUntilVisible:
+    element:
+      id: "device-qr-imtoken"
+    direction: DOWN
+    timeout: 8000
+- scrollUntilVisible:
+    element:
+      id: "device-qr-arculus"
+    direction: DOWN
+    timeout: 8000
+- scrollUntilVisible:
+    element:
+      id: "device-qr-dcent"
+    direction: DOWN
+    timeout: 8000
+- scrollUntilVisible:
+    element:
+      id: "device-qr-keycard-shell"
+    direction: DOWN
+    timeout: 8000
+- scrollUntilVisible:
+    element:
+      id: "device-qr-ellipal"
+    direction: DOWN
+    timeout: 8000
+- scrollUntilVisible:
+    element:
+      id: "device-qr-coldcard"
+    direction: DOWN
+    timeout: 8000

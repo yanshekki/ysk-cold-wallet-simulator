@@ -16,9 +16,17 @@ type Props = {
   onPress: () => void;
   disabled?: boolean;
   busy?: boolean;
+  testID?: string;
 };
 
-export function ScanButton({ label, busyLabel = 'Unlocking…', onPress, disabled, busy }: Props) {
+export function ScanButton({
+  label,
+  busyLabel = 'Unlocking…',
+  onPress,
+  disabled,
+  busy,
+  testID = 'unlock-scan',
+}: Props) {
   const travel = useSharedValue(-1);
 
   useEffect(() => {
@@ -38,6 +46,7 @@ export function ScanButton({ label, busyLabel = 'Unlocking…', onPress, disable
 
   return (
     <Pressable
+      testID={testID}
       accessibilityRole="button"
       disabled={disabled || busy}
       onPress={onPress}

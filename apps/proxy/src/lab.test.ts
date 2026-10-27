@@ -48,9 +48,15 @@ describe('proxy lab', () => {
   it('lists dash-version on the ledger catalog', () => {
     const catalog = labCatalogFor('ledger', true);
     expect(catalog.ready).toBe(true);
+    expect(catalog.brand).toBe('ledger');
+    expect(catalog.connectedBrand).toBe('ledger');
+    expect(catalog.nearFaucet).toContain('near');
     expect(catalog.sections.some((section) => section.actions.some((action) => action.id === 'dash-version'))).toBe(
       true,
     );
+    expect(labCatalogFor('onekey', true, 'ledger').ready).toBe(false);
+    expect(labCatalogFor(null, false, null).brand).toBe('ledger');
+    expect(labCatalogFor(null, false, null).sections.length).toBeGreaterThan(0);
   });
 
   it('runs dash-version over GATT without writing HID', async () => {

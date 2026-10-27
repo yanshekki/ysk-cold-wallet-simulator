@@ -49,7 +49,7 @@ export type LogEditorLabels = {
 };
 
 type Props = {
-  entries: ApduLogEntry[];
+  entries: readonly ApduLogEntry[];
   emptyLabel?: string;
   onCopy: (text: string) => void;
   onClear?: () => void;
@@ -313,7 +313,11 @@ export function LogEditor({
         onScrollToIndexFailed={({ index }) => {
           requestAnimationFrame(() => list.current?.scrollToIndex({ index, animated: false }));
         }}
-        ListEmptyComponent={<Text style={styles.empty}>{emptyLabel}</Text>}
+        ListEmptyComponent={
+          <Text style={styles.empty} testID="log-empty">
+            {emptyLabel}
+          </Text>
+        }
       />
     </KeyboardAvoidingView>
   );

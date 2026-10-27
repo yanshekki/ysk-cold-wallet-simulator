@@ -273,6 +273,8 @@ export const ru: MessageTree = {
     slideAllow: 'Проведите, чтобы разрешить',
     slidePair: 'Проведите, чтобы сопрячь',
     slideOpen: 'Проведите, чтобы открыть',
+    slideExportSeed: 'Проведите, чтобы экспортировать сид',
+    hostPassphrase: 'Парольная фраза хоста',
   },
   unlock: {
     title: 'YSK',

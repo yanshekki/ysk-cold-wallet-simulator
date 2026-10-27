@@ -133,6 +133,14 @@ export function overlayDerivationPath(
   return chains.includes(overlay.id) ? overlay.path : apduPath;
 }
 
+export function applyConfirmationPath(
+  resolvePath: ((apduPath: string, chains: readonly ChainPathId[]) => string) | undefined,
+  path: string,
+  chains: readonly ChainPathId[],
+): string {
+  return resolvePath?.(path, chains) ?? path;
+}
+
 export function pathToComponents(path: string): number[] {
   const trimmed = path.trim();
   if (!trimmed || trimmed === 'm') {

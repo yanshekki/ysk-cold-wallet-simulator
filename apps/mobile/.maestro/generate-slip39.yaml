@@ -1,0 +1,38 @@
+appId: hk.ysk.cws
+tags:
+  - vault
+  - generate
+  - slip39
+---
+# Given Vault generate
+# When SLIP-39 2-of-3 is generated
+# Then shares are revealed and backing out does not require verify words
+- runFlow: onboarding.yaml
+- tapOn:
+    id: "tab-vault"
+- tapOn:
+    id: "vault-generate"
+- extendedWaitUntil:
+    visible:
+      id: "generate-slip39"
+    timeout: 15000
+- tapOn:
+    id: "generate-slip39"
+- tapOn:
+    id: "generate-2of3"
+- tapOn:
+    id: "generate-3of5"
+- tapOn:
+    id: "generate-2of3"
+- tapOn:
+    id: "generate-run"
+- extendedWaitUntil:
+    visible:
+      id: "generate-shares"
+    timeout: 30000
+- assertVisible:
+    id: "generate-confirm-shares"
+- tapOn:
+    id: "screen-back"
+- assertVisible:
+    id: "vault-generate"

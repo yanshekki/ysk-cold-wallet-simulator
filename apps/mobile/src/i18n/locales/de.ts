@@ -273,6 +273,8 @@ export const de: MessageTree = {
     slideAllow: 'Zum Zulassen schieben',
     slidePair: 'Zum Koppeln schieben',
     slideOpen: 'Zum Öffnen schieben',
+    slideExportSeed: 'Zum Seed-Export schieben',
+    hostPassphrase: 'Host-Passphrase',
   },
   unlock: {
     title: 'YSK',

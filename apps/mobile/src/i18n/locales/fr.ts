@@ -273,6 +273,8 @@ export const fr: MessageTree = {
     slideAllow: 'Glisser pour autoriser',
     slidePair: 'Glisser pour apparier',
     slideOpen: 'Glisser pour ouvrir',
+    slideExportSeed: 'Glisser pour exporter la graine',
+    hostPassphrase: 'Phrase secrète de l\'hôte',
   },
   unlock: {
     title: 'YSK',

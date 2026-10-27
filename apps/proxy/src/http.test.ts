@@ -52,10 +52,12 @@ describe('proxy ui http', () => {
           stopped += 1;
           bus.idle();
         },
-        labCatalog() {
+        labCatalog(requested) {
           return {
             ready: false,
-            brand: 'ledger',
+            brand: requested ?? 'ledger',
+            connectedBrand: null,
+            nearFaucet: 'https://testnet.help/en/nearfaucet/testnet',
             sections: [
               {
                 id: 'dashboard',
@@ -81,12 +83,16 @@ describe('proxy ui http', () => {
     expect(html).not.toContain('id="start"');
     expect(html).not.toContain('id="stop"');
     expect(html).toContain('id="tab-lab"');
+    expect(html).toContain('id="lab-brands"');
+    expect(html).toContain('data-testid="lab-faucet"');
     expect(html).toContain('id="tab-console"');
     expect(html).toContain('id="logs"');
 
     const script = await fetch(`${server.url}/app.js`);
     const js = await script.text();
     expect(js).toContain('bindPower');
+    expect(js).toContain('Testnet host');
+    expect(js).toContain('測試網主機');
     expect(js).toContain("post(state.status?.running ? '/stop' : '/start')");
     expect(js).not.toContain("$('clock').textContent = 'IDLE'");
 
@@ -106,8 +112,12 @@ describe('proxy ui http', () => {
     expect(await catalog.json()).toMatchObject({
       ready: false,
       brand: 'ledger',
+      connectedBrand: null,
       sections: [{ id: 'dashboard', actions: [{ id: 'dash-version' }] }],
     });
+
+    const onekeyCatalog = await fetch(`${server.url}/lab/catalog?brand=onekey`);
+    expect(await onekeyCatalog.json()).toMatchObject({ brand: 'onekey' });
 
     const start = await fetch(`${server.url}/start`, { method: 'POST' });
     expect(start.status).toBe(200);

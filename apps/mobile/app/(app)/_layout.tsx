@@ -111,6 +111,7 @@ export default function AppShell() {
             : t('signing.applied')
         }
         passphraseIdleLabel={t('signing.idle')}
+        passphraseHostLabel={t('signing.hostPassphrase')}
         copy={{
           decodeFailed: t('signing.decodeFailed'),
           personalMessage: t('signing.personalMessage'),

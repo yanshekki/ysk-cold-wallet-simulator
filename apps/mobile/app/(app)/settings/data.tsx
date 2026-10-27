@@ -100,12 +100,13 @@ export default function DataSettingsScreen() {
           />
         </View>
         <Text style={styles.meta}>{t('settings.confirmClearHelp')}</Text>
-        <Button label={t('settings.clearConsole')} variant="ghost" onPress={onClearConsole} />
+        <Button testID="data-clear-console" label={t('settings.clearConsole')} variant="ghost" onPress={onClearConsole} />
       </View>
 
       <View style={styles.card} testID="data-ble">
         <Text style={styles.cardTitle}>{t('settings.bleSuffix')}</Text>
         <TextInput
+          testID="data-ble-suffix"
           value={settings.bleNameSuffix}
           onChangeText={(value) => void patchSettings({ bleNameSuffix: value.slice(0, 4) })}
           autoCapitalize="none"
@@ -128,10 +129,11 @@ export default function DataSettingsScreen() {
 
       <View style={styles.card} testID="data-danger">
         <Text style={[styles.cardTitle, styles.dangerTitle]}>{t('settings.danger')}</Text>
-        <Button label={t('settings.reset')} variant="ghost" onPress={onReset} />
+        <Button testID="data-reset" label={t('settings.reset')} variant="ghost" onPress={onReset} />
         <Text style={styles.meta}>{t('settings.resetBody')}</Text>
         <Text style={styles.meta}>{t('settings.wipeHelp')}</Text>
         <TextInput
+          testID="data-wipe-input"
           value={wipe}
           onChangeText={setWipe}
           placeholder={t('settings.wipeTyped')}
@@ -139,7 +141,13 @@ export default function DataSettingsScreen() {
           autoCapitalize="characters"
           style={styles.input}
         />
-        <Button label={t('settings.wipe')} variant="danger" disabled={wipe !== 'WIPE'} onPress={() => void onWipe()} />
+        <Button
+          testID="data-wipe"
+          label={t('settings.wipe')}
+          variant="danger"
+          disabled={wipe !== 'WIPE'}
+          onPress={() => void onWipe()}
+        />
       </View>
     </SettingsScreen>
   );

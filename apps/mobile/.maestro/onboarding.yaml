@@ -1,0 +1,30 @@
+appId: hk.ysk.cws
+tags:
+  - smoke
+  - legal
+---
+# Given the installed CWS IPA
+# When the app launches
+# Then disclaimer (if first run) is accepted and Device tab is visible
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: "disclaimer-agree"
+    timeout: 15000
+    optional: true
+- tapOn:
+    id: "disclaimer-agree"
+    optional: true
+- tapOn:
+    id: "legal-tab-privacy"
+    optional: true
+- tapOn:
+    id: "privacy-agree"
+    optional: true
+- tapOn:
+    id: "disclaimer-continue"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "tab-device"
+    timeout: 45000

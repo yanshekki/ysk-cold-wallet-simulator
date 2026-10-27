@@ -1,0 +1,42 @@
+appId: hk.ysk.cws
+tags:
+  - device
+---
+# Given a seed exists
+# When another BLE model is selected
+# Then Start is shown on that card (selection is exclusive)
+- runFlow: seed.yaml
+- tapOn:
+    id: "tab-device"
+- tapOn:
+    id: "device-model-flex"
+- assertVisible:
+    id: "device-start"
+- tapOn:
+    id: "device-model-safe-7"
+- scrollUntilVisible:
+    element:
+      id: "device-start"
+    direction: DOWN
+    timeout: 8000
+- assertVisible:
+    id: "device-start"
+- scrollUntilVisible:
+    element:
+      id: "device-model-pro2"
+    direction: DOWN
+    timeout: 8000
+- tapOn:
+    id: "device-model-pro2"
+- assertVisible:
+    id: "device-start"
+- scrollUntilVisible:
+    element:
+      id: "device-model-nano-x"
+    direction: UP
+    timeout: 12000
+- tapOn:
+    id: "device-model-nano-x"
+- assertVisible:
+    id: "device-start"
+    enabled: true

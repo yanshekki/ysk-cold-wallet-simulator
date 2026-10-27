@@ -60,7 +60,11 @@ export function CatalogTable({ apps, labels }: Props) {
         <Text style={[styles.cell, styles.family, styles.headText]}>{L.family}</Text>
         <Text style={[styles.cell, styles.version, styles.headText]}>{L.version}</Text>
       </View>
-      {rows.length === 0 ? <Text style={styles.empty}>{L.empty}</Text> : null}
+      {rows.length === 0 ? (
+        <Text style={styles.empty} testID="catalog-empty">
+          {L.empty}
+        </Text>
+      ) : null}
       {rows.map((app, index) => (
         <View
           key={app.id}

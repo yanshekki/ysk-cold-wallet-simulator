@@ -184,12 +184,26 @@ export class V2FrameAssembler {
     return this.buffer.length > 0;
   }
 
+  get bufferedBytes(): number {
+    return this.buffer.length;
+  }
+
   reset(): void {
     this.buffer = new Uint8Array(0);
   }
 
   drain(chunk: Uint8Array = new Uint8Array()): Uint8Array[] {
     if (chunk.length > 0) {
+      if (this.buffer.length === 0 && chunk.length >= 3 && chunk[0] === PROTO_HEAD_SOF) {
+        const declared = chunk[1] + chunk[2] * 256;
+        if (declared > PROTOCOL_V2_FRAME_MAX_BYTES) {
+          throw new Error(`Protocol V2 frame length invalid: ${declared}`);
+        }
+      }
+      if (this.buffer.length + chunk.length > PROTOCOL_V2_FRAME_MAX_BYTES + PROTO_PRE_HEAD_SIZE) {
+        this.reset();
+        throw new Error('Protocol V2 buffer overflow');
+      }
       this.buffer = Uint8Array.from(concatBytes(this.buffer, chunk));
     }
     const frames: Uint8Array[] = [];

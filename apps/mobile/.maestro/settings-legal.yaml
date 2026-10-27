@@ -1,0 +1,30 @@
+appId: hk.ysk.cws
+tags:
+  - settings
+  - legal
+---
+# Given Settings
+# When Privacy and Disclaimer are opened from the signed-in shell
+# Then each document screen can be closed with Back
+- runFlow: onboarding.yaml
+- tapOn:
+    id: "tab-settings"
+- scrollUntilVisible:
+    element:
+      id: "settings-link-privacy"
+    direction: DOWN
+    timeout: 8000
+- tapOn:
+    id: "settings-link-privacy"
+- assertVisible:
+    id: "screen-back"
+- tapOn:
+    id: "screen-back"
+- tapOn:
+    id: "settings-link-disclaimer"
+- assertVisible:
+    id: "screen-back"
+- tapOn:
+    id: "screen-back"
+- assertVisible:
+    id: "settings-link-language"

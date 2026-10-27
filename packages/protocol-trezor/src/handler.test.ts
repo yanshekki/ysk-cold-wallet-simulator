@@ -1,7 +1,7 @@
-import { mnemonicToEntropy } from '@scure/bip39';
+import { mnemonicToEntropy, mnemonicToSeedSync } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
 import { describe, expect, it } from 'vitest';
-import { TREZOR_MODELS, type ConfirmationPort } from '@cws/contracts';
+import { TREZOR_MODELS, type ConfirmationPort, type SigningRequest } from '@cws/contracts';
 import { asBytes, concatBytes, encodeUtf8, equalBytes, randomBytes } from './bytes';
 import { derivePrivateKey, ethereumAddressFromPrivateKey, signPersonalMessage } from './crypto';
 import {
@@ -533,5 +533,75 @@ describe('injected rng', () => {
         }),
     ).not.toThrow();
     Object.defineProperty(globalThis, 'crypto', { configurable: true, value: original });
+  });
+
+  it('uses host passphrase Q and surfaces passphraseSource host when the device has none', async () => {
+    const captured: SigningRequest[] = [];
+    const confirmation = autoConfirm(true);
+    confirmation.confirm = async (request) => {
+      if (request.path === 'pairing') {
+        return true;
+      }
+      captured.push(request);
+      return true;
+    };
+    const host = new ThpHost(true, confirmation);
+    await host.allocate();
+    await host.handshake();
+    await host.pair();
+    await host.app(MessageType.ThpEndRequest, new Uint8Array());
+    const created = await host.app(MessageType.ThpCreateNewSession, encodeString(1, 'Q'));
+    expect(created.type).toBe(MessageType.Success);
+    await host.app(MessageType.EthereumGetAddress, ethPathPayload(), created.sessionId);
+    const reply = await host.app(MessageType.ButtonAck, new Uint8Array(), created.sessionId);
+    expect(reply.type).toBe(MessageType.EthereumAddress);
+    const expected = ethereumAddressFromPrivateKey(
+      derivePrivateKey(entropyFromMnemonic(FOUNDATION), PATH, 'Q'),
+    );
+    expect(decodeEthereumAddress(reply.payload).toLowerCase()).toBe(expected.toLowerCase());
+    expect(expected.toLowerCase()).not.toBe(EXPECTED_ADDRESS.toLowerCase());
+    expect(captured.at(-1)?.passphraseSource).toBe('host');
+  });
+
+  it('prefers a cached device seed over a host passphrase', async () => {
+    const captured: SigningRequest[] = [];
+    const confirmation = autoConfirm(true);
+    confirmation.confirm = async (request) => {
+      if (request.path === 'pairing') {
+        return true;
+      }
+      captured.push(request);
+      return true;
+    };
+    confirmation.getSeed = async () => mnemonicToSeedSync(FOUNDATION, 'P');
+    const host = new ThpHost(true, confirmation);
+    await host.allocate();
+    await host.handshake();
+    await host.pair();
+    await host.app(MessageType.ThpEndRequest, new Uint8Array());
+    const created = await host.app(MessageType.ThpCreateNewSession, encodeString(1, 'Q'));
+    await host.app(MessageType.EthereumGetAddress, ethPathPayload(), created.sessionId);
+    const reply = await host.app(MessageType.ButtonAck, new Uint8Array(), created.sessionId);
+    expect(reply.type).toBe(MessageType.EthereumAddress);
+    const withP = ethereumAddressFromPrivateKey(
+      derivePrivateKey(entropyFromMnemonic(FOUNDATION), PATH, 'P'),
+    );
+    const withQ = ethereumAddressFromPrivateKey(
+      derivePrivateKey(entropyFromMnemonic(FOUNDATION), PATH, 'Q'),
+    );
+    expect(decodeEthereumAddress(reply.payload).toLowerCase()).toBe(withP.toLowerCase());
+    expect(withP.toLowerCase()).not.toBe(withQ.toLowerCase());
+    expect(captured.at(-1)?.passphraseSource).toBeUndefined();
+  });
+
+  it('resetLink drops the channel so the next allocate works', async () => {
+    const host = new ThpHost();
+    await host.allocate();
+    host.handler.resetLink();
+    host.cid = 0;
+    host.sendSeq = 0;
+    host.initiator = undefined;
+    await host.allocate();
+    expect(host.cid).toBeGreaterThan(0);
   });
 });

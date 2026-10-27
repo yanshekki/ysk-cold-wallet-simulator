@@ -1,0 +1,23 @@
+appId: hk.ysk.cws
+tags:
+  - settings
+---
+# Given Settings → Ledger catalog
+# When a nonsense query is typed
+# Then the empty catalog state is shown
+- runFlow: onboarding.yaml
+- tapOn:
+    id: "tab-settings"
+- tapOn:
+    id: "settings-link-catalog"
+- assertVisible:
+    id: "catalog-table"
+- tapOn:
+    id: "catalog-search"
+- inputText: "zzz-no-such-ledger-app"
+- extendedWaitUntil:
+    visible:
+      id: "catalog-empty"
+    timeout: 8000
+- tapOn:
+    id: "screen-back"

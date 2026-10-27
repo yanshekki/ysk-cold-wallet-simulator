@@ -1,4 +1,6 @@
-appId: hk.ysk.coldwalletsimulator
+appId: hk.ysk.cws
+tags:
+  - console
 ---
 - launchApp
 - extendedWaitUntil:

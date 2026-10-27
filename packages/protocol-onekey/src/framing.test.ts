@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { bytesToHex } from './bytes';
-import { DEFAULT_MTU, V1Reassembler, V1_MAGIC, frameV1, splitOneKeyV1 } from './framing';
+import { bytesToHex, concatBytes, writeU16BE, writeU32BE } from './bytes';
+import { DEFAULT_MTU, MAX_PAYLOAD, V1Reassembler, V1_MAGIC, frameV1, splitOneKeyV1 } from './framing';
 
 describe('OneKey V1 BLE framing', () => {
   it('round-trips a payload that fits in one packet', () => {
@@ -57,5 +57,14 @@ describe('OneKey V1 BLE framing', () => {
     const assembled = new V1Reassembler().push(framed);
     expect(assembled?.type).toBe(0);
     expect(assembled?.payload.length).toBe(0);
+  });
+
+  it('rejects a declared V1 length over 1MiB and resets', () => {
+    const assembler = new V1Reassembler();
+    expect(() =>
+      assembler.push(concatBytes(V1_MAGIC, writeU16BE(1), writeU32BE(MAX_PAYLOAD + 1))),
+    ).toThrow(/too large/);
+    const framed = frameV1(1, Uint8Array.of(0x0a));
+    expect(assembler.push(framed)?.payload).toEqual(Uint8Array.of(0x0a));
   });
 });

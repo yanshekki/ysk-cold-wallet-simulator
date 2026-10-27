@@ -32,6 +32,7 @@ export function DeviceCard({
         accessibilityRole="button"
         accessibilityLabel={model.name}
         accessibilityState={{ disabled: !enabled, selected: !!selected }}
+        testID={`device-model-${model.id}`}
         disabled={!enabled}
         onPress={onSelect}
         style={styles.hit}
@@ -53,12 +54,22 @@ export function DeviceCard({
           </Text>
           <View style={styles.copies}>
             {onCopyName ? (
-              <Pressable accessibilityRole="button" onPress={onCopyName} hitSlop={6}>
+              <Pressable
+                testID="device-copy-name"
+                accessibilityRole="button"
+                onPress={onCopyName}
+                hitSlop={6}
+              >
                 <Text style={styles.copy}>Copy name</Text>
               </Pressable>
             ) : null}
             {onCopyUuid ? (
-              <Pressable accessibilityRole="button" onPress={onCopyUuid} hitSlop={6}>
+              <Pressable
+                testID="device-copy-uuid"
+                accessibilityRole="button"
+                onPress={onCopyUuid}
+                hitSlop={6}
+              >
                 <Text style={styles.copy}>Copy UUID</Text>
               </Pressable>
             ) : null}

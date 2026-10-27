@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { encodeString } from './proto';
 import {
+  PROTOCOL_V2_FRAME_MAX_BYTES,
   PROTO_HEAD_SOF,
   V2FrameAssembler,
   V2MessageType,
@@ -48,6 +49,15 @@ describe('OneKey Protocol V2 framing', () => {
     const frames = assembler.drain(frame.subarray(12));
     expect(frames).toHaveLength(1);
     expect(decodeFrame(frames[0]).messageTypeId).toBe(V2MessageType.Ping);
+    expect(assembler.buffered).toBe(false);
+  });
+
+  it('rejects a giant V2 chunk before buffering more than the frame max', () => {
+    const assembler = new V2FrameAssembler();
+    const chunk = new Uint8Array(100_000);
+    chunk[0] = PROTO_HEAD_SOF;
+    expect(() => assembler.drain(chunk)).toThrow(/overflow|invalid/i);
+    expect(assembler.bufferedBytes).toBeLessThanOrEqual(PROTOCOL_V2_FRAME_MAX_BYTES);
     expect(assembler.buffered).toBe(false);
   });
 });

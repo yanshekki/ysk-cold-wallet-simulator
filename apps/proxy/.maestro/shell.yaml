@@ -1,0 +1,29 @@
+url: http://127.0.0.1:8788
+tags:
+  - proxy
+  - shell
+---
+# Given CWS Proxy UI
+# When the three tabs and language chips are used
+# Then Proxy / Testnet host / Console stay reachable
+- launchApp
+- tapOn:
+    id: "tab-proxy"
+- assertVisible:
+    id: "proxy-power"
+- tapOn:
+    id: "tab-lab"
+- assertVisible:
+    id: "lab-brand-ledger"
+- tapOn:
+    id: "tab-console"
+- assertVisible:
+    id: "log-filter-all"
+- tapOn:
+    id: "lang-zh"
+- assertVisible:
+    id: "tab-lab"
+- tapOn:
+    id: "lang-en"
+- tapOn:
+    id: "tab-proxy"

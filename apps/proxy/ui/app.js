@@ -19,8 +19,10 @@ const COPY = {
     pairingSubmit: 'Pair',
     logs: 'Console',
     tabProxy: 'Proxy',
-    tabLab: 'Lab',
+    tabLab: 'Testnet host',
     tabConsole: 'Console',
+    labKicker: '/ TESTNET',
+    labFaucet: 'NEAR testnet faucet',
     labNeedGatt: 'Start the proxy and wait for the phone before running cases.',
     labWaitPhone: 'Proxy is up. Waiting for the phone Bluetooth link.',
     labReady: 'Phone link is up. Cases talk to the phone over Bluetooth, not HID.',
@@ -81,8 +83,10 @@ const COPY = {
     pairingSubmit: '配對',
     logs: '紀錄',
     tabProxy: '代理',
-    tabLab: '實驗室',
+    tabLab: '測試網主機',
     tabConsole: '紀錄',
+    labKicker: '/ 測試網主機',
+    labFaucet: 'NEAR 測試網水龍頭',
     labNeedGatt: '請先啟動代理，待電話連接後再執行案例。',
     labWaitPhone: '代理已啟動。正在等候電話藍牙連線。',
     labReady: '電話已連線。實驗室案例經電話藍牙傳送，不經 HID。',
@@ -272,6 +276,7 @@ const state = {
   matchIndex: 0,
   lab: null,
   labKey: '',
+  labBrand: 'ledger',
   labSection: '',
   labBusy: false,
   labResult: '',
@@ -324,7 +329,8 @@ function renderCopy() {
   $('tab-proxy').textContent = t('tabProxy');
   $('tab-lab').textContent = t('tabLab');
   $('tab-console-label').textContent = t('tabConsole');
-  $('lab-kicker').textContent = '/ LAB';
+  $('lab-kicker').textContent = t('labKicker');
+  $('lab-faucet').textContent = t('labFaucet');
   $('lab-run').textContent = t('labRun');
   $('lab-close').textContent = t('labClose');
   $('lab-label-path').textContent = t('labPath');
@@ -578,15 +584,22 @@ function maybeRefreshLab(status) {
   void fetchLabCatalog();
 }
 
+function labBrandQuery() {
+  return state.status?.brand || state.labBrand || 'ledger';
+}
+
 async function fetchLabCatalog() {
   try {
-    const response = await fetch('/lab/catalog');
+    const response = await fetch(`/lab/catalog?brand=${encodeURIComponent(labBrandQuery())}`);
     if (!response.ok) {
       return;
     }
     state.lab = await response.json();
   } catch {
     return;
+  }
+  if (state.lab?.brand) {
+    state.labBrand = state.lab.brand;
   }
   const sections = state.lab?.sections ?? [];
   if (!sections.some((section) => section.id === state.labSection)) {
@@ -598,16 +611,37 @@ async function fetchLabCatalog() {
 function renderLab() {
   const catalog = state.lab;
   const ready = Boolean(catalog?.ready);
+  const locked = Boolean(catalog?.connectedBrand);
   const status = $('lab-status');
   status.className = ready ? 'status' : 'status error';
   const waitCopy = state.status?.running ? 'labWaitPhone' : 'labNeedGatt';
   status.innerHTML = `<strong>${ready ? t('labReady') : t(waitCopy)}</strong>`;
+  const brands = $('lab-brands');
+  brands.replaceChildren();
+  for (const brand of ['ledger', 'onekey', 'trezor']) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.dataset.testid = `lab-brand-${brand}`;
+    button.textContent = BRAND_LABEL[brand];
+    button.classList.toggle('on', (catalog?.brand ?? state.labBrand) === brand);
+    button.disabled = locked && catalog?.connectedBrand !== brand;
+    button.addEventListener('click', () => {
+      if (locked) {
+        return;
+      }
+      state.labBrand = brand;
+      state.labSection = '';
+      void fetchLabCatalog();
+    });
+    brands.append(button);
+  }
   const sections = catalog?.sections ?? [];
   const nav = $('lab-sections');
   nav.replaceChildren();
   for (const section of sections) {
     const button = document.createElement('button');
     button.type = 'button';
+    button.dataset.testid = `lab-section-${section.id}`;
     button.textContent = t(section.id) || section.id;
     button.classList.toggle('on', section.id === state.labSection);
     button.addEventListener('click', () => {
@@ -618,12 +652,19 @@ function renderLab() {
   }
   const current = sections.find((section) => section.id === state.labSection) ?? sections[0];
   $('lab-section-title').textContent = current ? t(current.id) || current.id : '';
+  const faucet = $('lab-net');
+  const showFaucet = current?.id === 'near' && Boolean(catalog?.nearFaucet);
+  faucet.classList.toggle('hidden', !showFaucet);
+  if (showFaucet) {
+    $('lab-faucet').href = catalog.nearFaucet;
+  }
   const grid = $('lab-grid');
   grid.replaceChildren();
   for (const action of current?.actions ?? []) {
     const button = document.createElement('button');
     button.type = 'button';
     button.dataset.action = action.id;
+    button.dataset.testid = `lab-action-${action.id}`;
     button.textContent = state.lang === 'zh-HK' ? action.zh : action.en;
     button.disabled = !ready || state.labBusy;
     button.addEventListener('click', () => {

@@ -3,10 +3,12 @@ import { LogEditor, colors, space } from '@cws/ui';
 import { copyText, exportText } from '../../src/lab/copy';
 import { useT } from '../../src/i18n';
 import { useAppState } from '../../src/state/AppState';
+import { useAppLogs } from '../../src/state/logStore';
 
 export default function ConsoleScreen() {
   const t = useT();
-  const { logs, error, settings, clearLogs, showToast } = useAppState();
+  const { error, settings, clearLogs, showToast } = useAppState();
+  const logs = useAppLogs();
 
   const onClear = () => {
     if (!settings.confirmClearLogs) {

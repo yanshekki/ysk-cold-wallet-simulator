@@ -1,0 +1,30 @@
+appId: hk.ysk.cws
+tags:
+  - device
+  - security
+---
+# Given advertising is live on a physical phone
+# When a session passphrase is applied
+# Then the applied chip is visible (RAM overlay only)
+- runFlow: device-start.yaml
+- tapOn:
+    id: "device-passphrase"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "device-passphrase-sheet"
+    timeout: 8000
+    optional: true
+- tapOn:
+    id: "device-passphrase-input"
+    optional: true
+- inputText: "TREZOR"
+- tapOn:
+    id: "device-passphrase-apply"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "device-passphrase-applied"
+    timeout: 8000
+    optional: true
+- takeScreenshot: passphrase-result

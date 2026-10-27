@@ -1,0 +1,30 @@
+appId: hk.ysk.cws
+tags:
+  - vault
+  - import
+  - error
+---
+# Given the import form
+# When no words are entered
+# Then Submit stays disabled and the draft field remains
+- runFlow: onboarding.yaml
+- tapOn:
+    id: "tab-vault"
+- tapOn:
+    id: "vault-import"
+- extendedWaitUntil:
+    visible:
+      id: "import-draft"
+    timeout: 15000
+- assertVisible:
+    id: "import-paste"
+- assertVisible:
+    id: "import-submit"
+    enabled: false
+- tapOn:
+    id: "import-submit"
+    optional: true
+- assertVisible:
+    id: "import-draft"
+- tapOn:
+    id: "screen-back"

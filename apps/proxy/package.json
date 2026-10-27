@@ -10,16 +10,19 @@
     "start": "tsx src/main.ts",
     "app": "DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project macos/CWSProxy/CWSProxy.xcodeproj -scheme 'CWS Proxy' -configuration Debug -destination 'generic/platform=macOS' -derivedDataPath macos/CWSProxy/DerivedData ARCHS=arm64 ONLY_ACTIVE_ARCH=YES ENABLE_DEBUG_DYLIB=NO ENABLE_PREVIEWS=NO CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY='Apple Development: Shek Ki Yan (G8P899XYGC)' DEVELOPMENT_TEAM=K897VVZW77 PROVISIONING_PROFILE_SPECIFIER='CWS Proxy Dev'",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@cws/contracts": "*",
     "@cws/native-proxy": "*",
     "@cws/protocol-ledger": "*",
     "@cws/protocol-onekey": "*",
+    "@cws/protocol-qr": "*",
     "@cws/protocol-trezor": "*"
   },
   "devDependencies": {
+    "@playwright/test": "^1.56.1",
     "@scure/bip39": "^1.6.0",
     "@types/node": "^24.7.2",
     "esbuild": "^0.25.11",

@@ -1,4 +1,5 @@
 import {
+  applyConfirmationPath,
   bleAdvertiseName,
   describeEthMessage,
   describeEthTransaction,
@@ -31,7 +32,8 @@ import {
   wrapSeedPort,
   type SeedCache,
 } from '@cws/protocol-ledger';
-import { hashTypedData, signPsbtBytes, type Eip712TypedData } from '@cws/protocol-qr';
+import { hashTypedData, type Eip712TypedData } from '@cws/contracts';
+import { signPsbtBytes } from '@cws/protocol-qr';
 import { sha256 } from '@noble/hashes/sha2';
 import { COIN_BY_REQUEST, COIN_OPS, icarusAddress, type CoinOp } from './coins';
 import {
@@ -376,6 +378,13 @@ export class OneKeyV1ProtocolHandler implements ProtocolHandler {
 
   replaceSeed(seed: Uint8Array, icarusRoot?: Uint8Array): void {
     replaceSeedCache(this.seedCache, seed, icarusRoot);
+  }
+
+  resetLink(): void {
+    this.assembler.reset();
+    this.v2Assembler.reset();
+    this.pending = undefined;
+    this.v2TxSeq = 1;
   }
 
   private port(): ConfirmationPort {
@@ -1441,7 +1450,7 @@ function overlayPath(
   path: string,
   chains: readonly ChainPathId[],
 ): string {
-  return confirmation.resolvePath?.(path, chains) ?? path;
+  return applyConfirmationPath(confirmation.resolvePath, path, chains);
 }
 
 function previewMessage(message: Uint8Array): string {

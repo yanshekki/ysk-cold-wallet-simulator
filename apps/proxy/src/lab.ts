@@ -26,9 +26,10 @@ import {
   type LabAction,
   type LabCatalogSection,
   type LabDraft,
-} from '../../lab/src/cases';
-import { assertOk, encodeApdu } from '../../lab/src/apdu';
-import type { LabHostLike } from '../../lab/src/types';
+} from './catalog/cases';
+import { assertOk, encodeApdu } from './catalog/apdu';
+import { NEAR_FAUCET } from './catalog/rpc';
+import type { LabHostLike } from './catalog/types';
 import type { ThpClient } from './adapters/thp';
 import type { LogFn } from './log';
 import { PacketQueue } from './packets';
@@ -38,9 +39,17 @@ const SIGN_TIMEOUT_MS = 180_000;
 
 export type LabCatalog = {
   ready: boolean;
-  brand: Brand | null;
+  brand: Brand;
+  connectedBrand: Brand | null;
   sections: LabCatalogSection[];
+  nearFaucet: string;
 };
+
+const BRANDS: Brand[] = ['ledger', 'onekey', 'trezor'];
+
+export function parseLabBrand(value: string | null | undefined): Brand | undefined {
+  return BRANDS.find((brand) => brand === value);
+}
 
 export type LabDraftInput = {
   path?: string;
@@ -53,11 +62,18 @@ export type LabHandle = {
   close(): void;
 };
 
-export function labCatalogFor(brand: Brand | null, ready: boolean): LabCatalog {
+export function labCatalogFor(
+  brand: Brand | null,
+  ready: boolean,
+  connectedBrand: Brand | null = brand,
+): LabCatalog {
+  const selected = brand ?? connectedBrand ?? 'ledger';
   return {
-    ready,
-    brand,
-    sections: brand ? listLabCatalog(brand) : [],
+    ready: ready && connectedBrand === selected,
+    brand: selected,
+    connectedBrand,
+    sections: listLabCatalog(selected),
+    nearFaucet: NEAR_FAUCET,
   };
 }
 

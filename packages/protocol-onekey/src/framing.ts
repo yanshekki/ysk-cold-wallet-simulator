@@ -44,6 +44,10 @@ export class V1Reassembler {
   }
 
   push(chunk: Uint8Array): V1Message | null {
+    if (this.buffer.length + chunk.length > V1_HEADER_LENGTH + MAX_PAYLOAD) {
+      this.reset();
+      throw new Error('OneKey V1 payload too large');
+    }
     this.buffer = Uint8Array.from(concatBytes(this.buffer, chunk));
     if (this.expected < 0) {
       if (this.buffer.length < V1_HEADER_LENGTH) {

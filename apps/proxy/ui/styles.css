@@ -553,6 +553,34 @@ dd {
   color: var(--ok);
 }
 
+.lab-brands {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.lab-brands button {
+  min-height: 36px;
+  font-size: 12px;
+  padding: 0 12px;
+}
+
+.lab-brands button.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #0a0c10;
+}
+
+.lab-net {
+  margin: 0;
+}
+
+.lab-net a {
+  color: var(--ok);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
 .lab-sections {
   display: flex;
   flex-wrap: wrap;

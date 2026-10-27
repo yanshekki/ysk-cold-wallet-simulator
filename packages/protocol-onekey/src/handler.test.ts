@@ -99,6 +99,21 @@ describe('OneKeyV1ProtocolHandler', () => {
     expect(features.major).toBe(3);
   });
 
+  it('resetLink drops a pending address so ButtonAck cannot finish it', async () => {
+    const handler = new OneKeyV1ProtocolHandler({
+      model: classic,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy,
+    });
+    const button = await exchange(handler, frameV1(MessageType.EthereumGetAddress, ethPathPayload()));
+    expect(button.type).toBe(MessageType.ButtonRequest);
+    handler.resetLink();
+    const reply = await exchange(handler, frameV1(MessageType.ButtonAck, new Uint8Array()));
+    expect(reply.type).toBe(MessageType.Failure);
+    expect(decodeFailure(reply.payload).code).toBe(FailureType.UnexpectedMessage);
+  });
+
   it('reassembles a multi-chunk Features notify', async () => {
     const handler = new OneKeyV1ProtocolHandler({
       model: classic,

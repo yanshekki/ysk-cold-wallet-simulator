@@ -1,0 +1,32 @@
+appId: hk.ysk.cws
+tags:
+  - vault
+  - generate
+  - security
+---
+# Given a fresh BIP39 reveal
+# When the operator has not typed the quiz words
+# Then Confirm stays disabled so an unread phrase cannot be saved
+- runFlow: onboarding.yaml
+- tapOn:
+    id: "tab-vault"
+- tapOn:
+    id: "vault-generate"
+- tapOn:
+    id: "generate-words-12"
+- tapOn:
+    id: "generate-run"
+- extendedWaitUntil:
+    visible:
+      id: "generate-reveal"
+    timeout: 30000
+- assertVisible:
+    id: "generate-confirm"
+    enabled: false
+- tapOn:
+    id: "generate-confirm"
+    optional: true
+- assertVisible:
+    id: "generate-reveal"
+- tapOn:
+    id: "screen-back"

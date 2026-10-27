@@ -123,7 +123,7 @@ async function main(): Promise<void> {
     commands: {
       start: () => runtime.start(),
       stop: () => runtime.stop(),
-      labCatalog: () => runtime.labCatalog(),
+      labCatalog: (brand) => runtime.labCatalog(brand),
       runLab: (actionId, draft) => runtime.runLab(actionId, draft),
     },
     port: uiPort,

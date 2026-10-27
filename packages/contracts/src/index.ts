@@ -40,6 +40,7 @@ export interface SeedSlot {
 }
 
 export type {
+  PassphraseSource,
   SigningKind,
   SigningRequest,
 } from './signing';
@@ -50,6 +51,8 @@ export {
   slideProgress,
   shouldCommitSlide,
 } from './signing';
+export { bytesToHex, concatBytes, hexToBytes } from './bytes';
+export { hashTypedData, parseEip712, type Eip712TypedData } from './eip712';
 export type { EthTxInput, SigningDetail, SigningField, SigningStyle } from './signingPreview';
 export {
   describeBtcPsbt,
@@ -116,6 +119,7 @@ export {
   componentsToPath,
   isValidDerivationPath,
   mergeChainPaths,
+  applyConfirmationPath,
   overlayDerivationPath,
   pathFor,
   pathToComponents,

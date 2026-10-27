@@ -115,6 +115,29 @@ export class LedgerProtocolHandler implements ProtocolHandler {
 
   resetLink(): void {
     this.assembler.reset();
+    this.ethSession.pendingPersonal = undefined;
+    this.ethSession.pendingTx = undefined;
+    this.ethSession.pending712 = undefined;
+    this.ethSession.typed712 = undefined;
+    this.ethSession.token = undefined;
+    this.ethSession.nft = undefined;
+    this.ethSession.network = undefined;
+    this.ethSession.challenge = undefined;
+    this.nearSession.pendingSign = undefined;
+    this.avaxSession.pendingHash = undefined;
+    this.avaxSession.rootPath = undefined;
+    this.avaxSession.signChunks = undefined;
+    this.familySession.pendingSign = undefined;
+    this.btcSession.version = undefined;
+    this.btcSession.prevouts = undefined;
+    this.btcSession.prevout = undefined;
+    this.btcSession.amount = undefined;
+    this.btcSession.sequence = undefined;
+    this.btcSession.outputs = undefined;
+    this.btcSession.locktime = undefined;
+    this.btcSession.signIndex = undefined;
+    this.btcSession.clientPsbt = undefined;
+    this.btcSession.clientJob = undefined;
   }
 
   setApp(app: LedgerApp): void {

@@ -273,6 +273,8 @@ export const id: MessageTree = {
     slideAllow: 'Geser untuk mengizinkan',
     slidePair: 'Geser untuk memasangkan',
     slideOpen: 'Geser untuk membuka',
+    slideExportSeed: 'Geser untuk mengekspor benih',
+    hostPassphrase: 'Frasa sandi host',
   },
   unlock: {
     title: 'YSK',

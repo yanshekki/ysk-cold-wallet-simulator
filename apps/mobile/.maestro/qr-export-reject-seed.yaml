@@ -1,0 +1,55 @@
+appId: hk.ysk.cws
+tags:
+  - device
+  - qr
+  - security
+---
+# Given a vault seed exists
+# When crypto-seed QR export is chosen
+# Then SigningModal appears and Reject aborts (no seed QR)
+- runFlow: onboarding.yaml
+- tapOn:
+    id: "tab-vault"
+- tapOn:
+    id: "vault-import"
+- extendedWaitUntil:
+    visible:
+      id: "import-draft"
+    timeout: 15000
+- tapOn:
+    id: "import-draft"
+- inputText: "absent much beef salmon theme settle absorb festival fancy dinner tiny flavor"
+- tapOn:
+    id: "import-submit"
+- extendedWaitUntil:
+    visible:
+      id: "tab-vault"
+    timeout: 25000
+- tapOn:
+    id: "tab-device"
+- scrollUntilVisible:
+    element:
+      id: "device-qr-keystone"
+    direction: DOWN
+    timeout: 12000
+- tapOn:
+    id: "device-qr-keystone"
+- extendedWaitUntil:
+    visible:
+      id: "device-qr-sheet"
+    timeout: 20000
+- tapOn:
+    id: "device-qr-format"
+- tapOn:
+    id: "device-qr-format-crypto-seed"
+- extendedWaitUntil:
+    visible:
+      id: "signing-reject"
+    timeout: 15000
+- tapOn:
+    id: "signing-reject"
+- extendedWaitUntil:
+    notVisible:
+      id: "signing-reject"
+    timeout: 8000
+- takeScreenshot: qr-seed-rejected

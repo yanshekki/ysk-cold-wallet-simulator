@@ -9,6 +9,7 @@ import {
   SW_INS_NOT_SUPPORTED,
   SW_OK,
   SW_WRONG_LENGTH,
+  SW_WRONG_P1P2,
   type Apdu,
 } from '../apdu';
 import {
@@ -350,7 +351,7 @@ async function exportKey(apdu: Apdu, spec: FamilySpec, ctx: FamilyContext): Prom
   try {
     path = familyPath(ctx, spec, parseBip32Path(apdu.data).path);
   } catch {
-    path = 'm';
+    return encodeResponse(new Uint8Array(), SW_WRONG_P1P2);
   }
   if (apdu.p1 !== 0x00) {
     const ok = await ctx.confirmation.confirm({
@@ -383,14 +384,14 @@ async function signPayload(
 ): Promise<Uint8Array | null> {
   const hasMore = (apdu.p2 & 0x02) !== 0;
   if (!session.pendingSign || apdu.p1 === 0x00) {
-    let path = 'm';
-    let rest = apdu.data;
+    let path: string;
+    let rest: Uint8Array;
     try {
       const parsed = parseBip32Path(apdu.data);
       path = familyPath(ctx, spec, parsed.path);
       rest = parsed.rest;
     } catch {
-      rest = apdu.data;
+      return encodeResponse(new Uint8Array(), SW_WRONG_P1P2);
     }
     session.pendingSign = { path, payload: rest };
   } else {

@@ -213,7 +213,11 @@ export default function VaultScreen() {
       <Button testID="vault-generate" label={t('vault.generate')} onPress={() => router.push('/seeds/new')} />
       <Button testID="vault-import" label={t('vault.import')} variant="ghost" onPress={() => router.push('/seeds/import')} />
       {!slotsReady ? <Text style={styles.empty}>{t('common.loading')}</Text> : null}
-      {slotsReady && slots.length === 0 ? <Text style={styles.empty}>{t('vault.empty')}</Text> : null}
+      {slotsReady && slots.length === 0 ? (
+        <Text style={styles.empty} testID="vault-empty">
+          {t('vault.empty')}
+        </Text>
+      ) : null}
       {deriveError ? <Text style={styles.error}>{deriveError}</Text> : null}
       {slots.map((slot) => (
         <SeedCard
@@ -229,13 +233,21 @@ export default function VaultScreen() {
         >
           <View style={styles.actions}>
             <Button
-              testID={slot.backup === 'slip39' ? `vault-shares-${slot.id}` : `vault-phrase-${slot.id}`}
+              testID={
+                seed?.id === slot.id
+                  ? slot.backup === 'slip39'
+                    ? 'vault-shares-selected'
+                    : 'vault-phrase-selected'
+                  : slot.backup === 'slip39'
+                    ? `vault-shares-${slot.id}`
+                    : `vault-phrase-${slot.id}`
+              }
               label={slot.backup === 'slip39' ? t('vault.backupShares') : t('vault.backup')}
               variant="ghost"
               onPress={() => void onBackup(slot)}
             />
             <Button
-              testID={`vault-accounts-${slot.id}`}
+              testID={seed?.id === slot.id ? 'vault-accounts-selected' : `vault-accounts-${slot.id}`}
               label={t('vault.inspectTitle')}
               variant="ghost"
               onPress={() => onOpenAccounts(slot)}

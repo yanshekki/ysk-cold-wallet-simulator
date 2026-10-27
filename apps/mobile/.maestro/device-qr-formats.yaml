@@ -1,0 +1,38 @@
+appId: hk.ysk.cws
+tags:
+  - device
+  - qr
+---
+# Given a vault seed
+# When Keystone QR export is opened
+# Then xpub formats are listed and closing the sheet does not show SigningModal
+- runFlow: seed.yaml
+- tapOn:
+    id: "tab-device"
+- scrollUntilVisible:
+    element:
+      id: "device-qr-keystone"
+    direction: DOWN
+    timeout: 12000
+- tapOn:
+    id: "device-qr-keystone"
+- extendedWaitUntil:
+    visible:
+      id: "device-qr-sheet"
+    timeout: 20000
+- tapOn:
+    id: "device-qr-format"
+- assertVisible:
+    id: "device-qr-format-eth-hdkey"
+- assertVisible:
+    id: "device-qr-format-btc-hdkey"
+- tapOn:
+    id: "sheet-cancel"
+- assertVisible:
+    id: "device-qr-sheet"
+- tapOn:
+    id: "sheet-close"
+- extendedWaitUntil:
+    notVisible:
+      id: "device-qr-sheet"
+    timeout: 8000

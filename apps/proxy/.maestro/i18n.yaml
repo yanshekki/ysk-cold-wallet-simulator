@@ -1,0 +1,15 @@
+url: http://127.0.0.1:8788
+tags:
+  - proxy
+  - i18n
+---
+# Given English Proxy UI
+# When 繁 is tapped
+# Then the lab tab is 測試網主機
+- launchApp
+- tapOn:
+    id: "lang-zh"
+- assertVisible: "測試網主機"
+- tapOn:
+    id: "lang-en"
+- assertVisible: "Testnet host"

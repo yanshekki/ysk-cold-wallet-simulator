@@ -1,33 +1,4 @@
-export function concatBytes(...parts: Uint8Array[]): Uint8Array {
-  const total = parts.reduce((n, p) => n + p.length, 0);
-  const out = new Uint8Array(total);
-  let offset = 0;
-  for (const part of parts) {
-    out.set(part, offset);
-    offset += part.length;
-  }
-  return out;
-}
-
-export function bytesToHex(bytes: Uint8Array): string {
-  let hex = '';
-  for (const byte of bytes) {
-    hex += byte.toString(16).padStart(2, '0');
-  }
-  return hex;
-}
-
-export function hexToBytes(hex: string): Uint8Array {
-  const clean = hex.startsWith('0x') || hex.startsWith('0X') ? hex.slice(2) : hex;
-  if (clean.length % 2 !== 0) {
-    throw new Error('hex string must have even length');
-  }
-  const out = new Uint8Array(clean.length / 2);
-  for (let i = 0; i < out.length; i++) {
-    out[i] = Number.parseInt(clean.slice(i * 2, i * 2 + 2), 16);
-  }
-  return out;
-}
+export { bytesToHex, concatBytes, hexToBytes } from '@cws/contracts';
 
 export function readU16BE(bytes: Uint8Array, offset: number): number {
   return (bytes[offset] << 8) | bytes[offset + 1];

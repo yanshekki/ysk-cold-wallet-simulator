@@ -9,7 +9,7 @@ export const TAG_ERROR = 0x0e;
 export const DEFAULT_MTU = 20;
 export const MAX_MTU = 153;
 
-const MAX_OPEN_FRAMES = 8;
+export const MAX_OPEN_FRAMES = 8;
 
 export type ReassembledFrame = {
   tag: number;

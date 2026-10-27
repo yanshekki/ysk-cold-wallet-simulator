@@ -1,0 +1,39 @@
+appId: hk.ysk.cws
+tags:
+  - settings
+---
+# Given Settings → Data
+# When log retention chips and BLE suffix are used
+# Then the danger zone is still present and wipe stays gated
+- runFlow: onboarding.yaml
+- tapOn:
+    id: "tab-settings"
+- tapOn:
+    id: "settings-link-data"
+- assertVisible:
+    id: "data-logs"
+- tapOn:
+    id: "log-cap-200"
+- tapOn:
+    id: "log-cap-500"
+- assertVisible:
+    id: "data-ble"
+- tapOn:
+    id: "data-ble-suffix"
+- inputText: "QA"
+- assertVisible:
+    id: "data-about"
+- assertVisible:
+    id: "data-clear-console"
+- assertVisible:
+    id: "data-reset"
+- scrollUntilVisible:
+    element:
+      id: "data-wipe"
+    direction: DOWN
+    timeout: 8000
+- assertVisible:
+    id: "data-wipe"
+    enabled: false
+- tapOn:
+    id: "screen-back"

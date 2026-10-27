@@ -98,6 +98,7 @@ export function SlideToConfirm({ label, onConfirm, resetKey }: Props) {
     <View
       accessibilityRole="adjustable"
       accessibilityLabel={label}
+      testID="signing-slide"
       style={styles.track}
       onLayout={(event) => {
         travelRef.current = Math.max(0, event.nativeEvent.layout.width - THUMB - INSET * 2);

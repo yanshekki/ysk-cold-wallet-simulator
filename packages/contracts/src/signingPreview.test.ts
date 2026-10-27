@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SigningRequest } from './signing';
-import { describeBtcPsbt, describeEthTypedData, describeSigning, hex0x, parseEthTx } from './signingPreview';
+import { describeBtcPsbt, describeEthTransaction, describeEthTypedData, describeSigning, hex0x, parseEthTx } from './signingPreview';
 
 function concat(...parts: Uint8Array[]): Uint8Array {
   const total = parts.reduce((n, part) => n + part.length, 0);
@@ -295,6 +295,28 @@ describe('describeSigning', () => {
     );
     expect(detail.fields.find((field) => field.label === 'VALUE')?.value).toBe('0.001 BTC');
     expect(detail.fields.find((field) => field.label === 'FEE')?.value).toBe('0.0000025 BTC');
+  });
+
+  it('marks host-provided ERC-20 tickers untrusted and always shows the contract', () => {
+    const attacker = fromHex('0x1111111111111111111111111111111111111111');
+    const recipient = fromHex('0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+    const data = concat(
+      fromHex('0xa9059cbb'),
+      concat(new Uint8Array(12), recipient),
+      fromHex('0x00000000000000000000000000000000000000000000000000000000000f4240'),
+    );
+    const detail = describeEthTransaction({
+      path: "m/44'/60'/0'/0/0",
+      to: attacker,
+      data,
+      token: { ticker: 'USDT', decimals: 6, contract: attacker },
+    });
+    expect(detail.headline).toBe('Token transfer');
+    expect(detail.headline).not.toMatch(/USDT/);
+    expect(detail.warning).toMatch(/host/i);
+    expect(detail.fields.find((field) => field.label === 'CONTRACT')?.value).toBe(hex0x(attacker));
+    expect(detail.fields.find((field) => field.label === 'TICKER')?.value).toBe('USDT (host-provided)');
+    expect(detail.fields.find((field) => field.label === 'AMOUNT RAW')?.value).toBe('1000000');
   });
 
   it('returns attached detail unchanged', () => {

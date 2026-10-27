@@ -66,6 +66,7 @@ export function AddressInspector({
         return (
           <Pressable
             key={row.id}
+            testID={`inspect-${row.id}`}
             accessibilityRole="button"
             accessibilityLabel={`Copy ${row.label}`}
             onPress={() => onCopy(row.address)}
@@ -76,6 +77,7 @@ export function AddressInspector({
               <View style={styles.copyHit}>
                 {nearCreate ? (
                   <Pressable
+                    testID="vault-near-create"
                     accessibilityRole="button"
                     accessibilityLabel="Derive NEAR account"
                     onPress={onCreateNear}

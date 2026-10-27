@@ -9,7 +9,6 @@ import {
   type ReactNode,
 } from 'react';
 import type {
-  ApduLogEntry,
   ConfirmationPort,
   DeviceModel,
   LedgerApp,
@@ -20,38 +19,18 @@ import type {
   SigningRequest,
 } from '@cws/contracts';
 import { ledgerCatalog } from '@cws/contracts';
+import type { EthAirgapQr, QrFormatId, QrProfile, QrUrKind } from '@cws/protocol-qr';
 import {
-  BbqrDecoder,
-  FountainUrDecoder,
-  assertEthSignMatchesSeed,
-  decodeBtcSignRequest,
-  decodeCosmosSignRequest,
-  decodeEthSignRequest,
-  decodeSolSignRequest,
-  encodeBbqr,
-  encodeQrAccount,
-  isBbqrPart,
-  previewCryptoPsbt,
-  previewPsbt,
-  signBtcMessage,
-  signCosmosRequest,
-  signCryptoPsbt,
-  signEthRequest,
-  signPsbtBytes,
-  signSolRequest,
-  type EthAirgapQr,
-  type QrFormatId,
-  type QrProfile,
-  type QrUrKind,
-} from '@cws/protocol-qr';
-import {
-  btcMessageToSigningRequest,
-  cosmosSignToSigningRequest,
-  ethSignToSigningRequest,
-  psbtToSigningRequest,
-  solSignToSigningRequest,
-} from '../qr/signingRequest';
-import { createHandler, fetchManagerCatalog, getModel, isSimulatable, toBip32Seed } from '@cws/sdk';
+  QrAirgapSession,
+  createHandler,
+  exportQrAccountWithPolicy,
+  fetchManagerCatalog,
+  getModel,
+  isSimulatable,
+  toBip32Seed,
+  type QrScanStatus,
+} from '@cws/sdk';
+import { appendLogEntry, clearLogEntries } from './logStore';
 import { startAdvertising } from '../ble/peripheral';
 import type { PeripheralHandle } from '../ble/types';
 import { clearDisclaimerAcceptance, loadDisclaimerAccepted, saveDisclaimerAcceptance } from '../disclaimer/store';
@@ -81,10 +60,7 @@ type PendingConfirm = {
   resolve: (ok: boolean) => void;
 };
 
-export type QrScanStatus =
-  | { status: 'progress'; received: number; expected: number }
-  | { status: 'complete'; qr: EthAirgapQr }
-  | { status: 'rejected' };
+export type { QrScanStatus };
 
 type AppStateValue = {
   unlockedUntil: number | null;
@@ -94,7 +70,6 @@ type AppStateValue = {
   connected: boolean;
   connectedLabel: string;
   currentApp: LedgerApp;
-  logs: ApduLogEntry[];
   pending: SigningRequest | null;
   pairingCode: string | null;
   sessionPassphraseApplied: boolean;
@@ -140,7 +115,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [connected, setConnected] = useState(false);
   const [connectedLabel, setConnectedLabel] = useState('');
   const [currentApp, setCurrentApp] = useState<LedgerApp>('dashboard');
-  const [logs, setLogs] = useState<ApduLogEntry[]>([]);
   const [pending, setPending] = useState<SigningRequest | null>(null);
   const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [sessionPassphraseApplied, setSessionPassphraseApplied] = useState(false);
@@ -163,9 +137,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   });
   const pendingRef = useRef<PendingConfirm | null>(null);
   const secretSession = useRef(new SecretSession());
-  const qrDecoder = useRef(new FountainUrDecoder());
-  const bbqrDecoder = useRef(new BbqrDecoder());
-  const qrScanBusy = useRef(false);
+  const qrSession = useRef(new QrAirgapSession());
   const logSeq = useRef(0);
   const settingsRef = useRef(settings);
   const seedRef = useRef(seed);
@@ -179,21 +151,17 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       const entryChannel = channel ?? decoded.channel;
       const storedHex = redactLogHex(hex, entryNote);
       console.log(`[cws-${entryChannel}] ${direction} ${entryNote} ${storedHex}`.trim());
-      setLogs((current) => {
-        const cap = settingsRef.current.logCap || 1000;
-        const next = [
-          ...current,
-          {
-            id: `log-${logSeq.current++}`,
-            at: Date.now(),
-            direction,
-            hex: storedHex,
-            note: entryNote,
-            channel: entryChannel,
-          },
-        ];
-        return next.length > cap ? next.slice(next.length - cap) : next;
-      });
+      appendLogEntry(
+        {
+          id: `log-${logSeq.current++}`,
+          at: Date.now(),
+          direction,
+          hex: storedHex,
+          note: entryNote,
+          channel: entryChannel,
+        },
+        settingsRef.current.logCap || 1000,
+      );
     },
     [],
   );
@@ -220,7 +188,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const clearLogs = useCallback(() => {
-    setLogs([]);
+    clearLogEntries();
   }, []);
 
   const acceptDisclaimer = useCallback(async () => {
@@ -397,7 +365,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setSeed(null);
     seedRef.current = null;
     setCatalog([...ledgerCatalog()]);
-    setLogs([]);
+    clearLogEntries();
     setDisclaimerAccepted(false);
     setError(null);
     setUnlockedUntil(null);
@@ -525,149 +493,44 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       seedBytes = toBip32Seed(entropy, active.backup ?? 'bip39', '');
     }
     try {
-      return encodeQrAccount(seedBytes, profile, format ?? profile.defaultUr);
+      return await exportQrAccountWithPolicy({
+        seed: seedBytes,
+        profile,
+        format,
+        confirmation,
+        brand: active.brand,
+      });
     } finally {
       seedBytes.fill(0);
     }
-  }, []);
+  }, [confirmation]);
 
   const resetQrScan = useCallback(() => {
-    qrDecoder.current.reset();
-    bbqrDecoder.current.reset();
-    qrScanBusy.current = false;
+    qrSession.current.reset();
   }, []);
 
   const scanQrSign = useCallback(
     async (part: string): Promise<QrScanStatus> => {
-      if (qrScanBusy.current) {
-        return { status: 'progress', received: 0, expected: 0 };
+      const active = seedRef.current;
+      if (!active) {
+        throw new Error('errors.selectSeed');
       }
-      if (isBbqrPart(part)) {
-        const progress = bbqrDecoder.current.receive(part);
-        if (!progress.complete) {
-          return { status: 'progress', received: progress.received, expected: progress.expected };
-        }
-        qrScanBusy.current = true;
-        try {
-          if (!progress.success || !progress.payload || progress.type !== 'P') {
-            throw new Error(progress.error || 'errors.qrWrongType');
-          }
-          const active = seedRef.current;
-          if (!active) {
-            throw new Error('errors.selectSeed');
-          }
-          let seedBytes = secretSession.current.copySeed();
-          if (!seedBytes) {
-            const entropy = await loadEntropy(active.id);
-            seedBytes = toBip32Seed(entropy, active.backup ?? 'bip39', '');
-          }
-          try {
-            const preview = previewPsbt(seedBytes, progress.payload);
-            const ok = await confirmation.confirm(psbtToSigningRequest(preview));
-            if (!ok) {
-              return { status: 'rejected' };
-            }
-            const signed = signPsbtBytes(seedBytes, progress.payload);
-            const frames = encodeBbqr('P', signed.psbt).frames;
-            appendAppLog('sign', `qr bbqr-psbt ${preview.path}`);
-            return {
-              status: 'complete',
-              qr: {
-                ur: frames[0] ?? '',
-                parts: frames,
-                path: preview.path,
-                address: preview.address,
-                fingerprint: preview.fingerprint,
-                name: 'CWS',
-                urKind: 'bbqr',
-              },
-            };
-          } finally {
-            seedBytes.fill(0);
-          }
-        } finally {
-          bbqrDecoder.current.reset();
-          qrScanBusy.current = false;
-        }
+      let seedBytes = secretSession.current.copySeed();
+      if (!seedBytes) {
+        const entropy = await loadEntropy(active.id);
+        seedBytes = toBip32Seed(entropy, active.backup ?? 'bip39', '');
       }
-      const progress = qrDecoder.current.receive(part);
-      if (!progress.complete) {
-        return { status: 'progress', received: progress.received, expected: progress.expected };
-      }
-      qrScanBusy.current = true;
       try {
-        if (!progress.success || !progress.cbor || !progress.type) {
-          throw new Error(progress.error || 'errors.qrBadUr');
+        const result = await qrSession.current.receive(part, {
+          seedBytes,
+          confirm: (request) => confirmation.confirm(request),
+        });
+        if (result.status === 'complete') {
+          appendAppLog('sign', `qr ${result.qr.urKind} ${result.qr.path}`);
         }
-        const active = seedRef.current;
-        if (!active) {
-          throw new Error('errors.selectSeed');
-        }
-        let seedBytes = secretSession.current.copySeed();
-        if (!seedBytes) {
-          const entropy = await loadEntropy(active.id);
-          seedBytes = toBip32Seed(entropy, active.backup ?? 'bip39', '');
-        }
-        try {
-          if (progress.type === 'crypto-psbt') {
-            const preview = previewCryptoPsbt(seedBytes, progress.cbor);
-            const ok = await confirmation.confirm(psbtToSigningRequest(preview));
-            if (!ok) {
-              return { status: 'rejected' };
-            }
-            const qr = signCryptoPsbt(seedBytes, progress.cbor);
-            appendAppLog('sign', `qr crypto-psbt ${preview.path}`);
-            return { status: 'complete', qr };
-          }
-          if (progress.type === 'sol-sign-request') {
-            const request = decodeSolSignRequest(progress.cbor);
-            const ok = await confirmation.confirm(solSignToSigningRequest(request));
-            if (!ok) {
-              return { status: 'rejected' };
-            }
-            const qr = signSolRequest(seedBytes, request);
-            appendAppLog('sign', `qr sol ${request.path}`);
-            return { status: 'complete', qr };
-          }
-          if (progress.type === 'cosmos-sign-request') {
-            const request = decodeCosmosSignRequest(progress.cbor);
-            const ok = await confirmation.confirm(cosmosSignToSigningRequest(request));
-            if (!ok) {
-              return { status: 'rejected' };
-            }
-            const qr = signCosmosRequest(seedBytes, request);
-            appendAppLog('sign', `qr cosmos ${request.path}`);
-            return { status: 'complete', qr };
-          }
-          if (progress.type === 'btc-sign-request') {
-            const request = decodeBtcSignRequest(progress.cbor);
-            const ok = await confirmation.confirm(btcMessageToSigningRequest(request));
-            if (!ok) {
-              return { status: 'rejected' };
-            }
-            const qr = signBtcMessage(seedBytes, request);
-            appendAppLog('sign', `qr btc-msg ${request.path}`);
-            return { status: 'complete', qr };
-          }
-          if (progress.type !== 'eth-sign-request') {
-            throw new Error('errors.qrWrongType');
-          }
-          const request = decodeEthSignRequest(progress.cbor);
-          assertEthSignMatchesSeed(seedBytes, request);
-          const signing = ethSignToSigningRequest(request);
-          const ok = await confirmation.confirm(signing);
-          if (!ok) {
-            return { status: 'rejected' };
-          }
-          const signed = signEthRequest(seedBytes, request, request.origin ?? 'CWS');
-          appendAppLog('sign', `qr ${request.dataType} ${request.path}`);
-          return { status: 'complete', qr: signed.qr };
-        } finally {
-          seedBytes.fill(0);
-        }
+        return result;
       } finally {
-        qrDecoder.current.reset();
-        qrScanBusy.current = false;
+        seedBytes.fill(0);
       }
     },
     [appendAppLog, confirmation],
@@ -755,7 +618,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       connected,
       connectedLabel,
       currentApp,
-      logs,
       pending,
       pairingCode,
       sessionPassphraseApplied,
@@ -808,7 +670,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       hydrated,
       loading,
       lock,
-      logs,
       model,
       pairingCode,
       patchSettings,

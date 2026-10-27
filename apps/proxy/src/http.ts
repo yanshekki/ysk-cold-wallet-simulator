@@ -2,7 +2,8 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { LabCatalog, LabDraftInput } from './lab';
+import type { Brand } from '@cws/contracts';
+import { parseLabBrand, type LabCatalog, type LabDraftInput } from './lab';
 import type { PairingGate } from './pairing';
 import type { StatusBus } from './status';
 
@@ -24,7 +25,7 @@ const FILES: Record<string, string> = {
 export type UiCommands = {
   start(): void;
   stop(): void;
-  labCatalog(): LabCatalog;
+  labCatalog(requested?: Brand): LabCatalog;
   runLab(actionId: string, draft?: LabDraftInput): Promise<string>;
 };
 
@@ -87,7 +88,7 @@ export function startUiServer(opts: {
       return;
     }
     if (method === 'GET' && url.pathname === '/lab/catalog') {
-      json(res, 200, opts.commands.labCatalog());
+      json(res, 200, opts.commands.labCatalog(parseLabBrand(url.searchParams.get('brand'))));
       return;
     }
     if (method === 'POST' && url.pathname === '/lab/run') {

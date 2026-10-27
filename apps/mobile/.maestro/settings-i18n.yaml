@@ -1,0 +1,43 @@
+appId: hk.ysk.cws
+tags:
+  - settings
+  - i18n
+---
+# Given Settings → Language
+# When English then 繁體中文 are selected
+# Then the Device tab label follows the locale and is restored to 繁
+- runFlow: onboarding.yaml
+- tapOn:
+    id: "tab-settings"
+- tapOn:
+    id: "settings-link-language"
+- tapOn:
+    id: "language-open"
+- assertVisible:
+    id: "language-en"
+- assertVisible:
+    id: "language-zh-HK"
+- assertVisible:
+    id: "language-ja"
+- assertVisible:
+    id: "language-ar"
+- tapOn:
+    id: "language-en"
+- tapOn:
+    id: "screen-back"
+- tapOn:
+    id: "tab-device"
+- assertVisible: "Device"
+- tapOn:
+    id: "tab-settings"
+- tapOn:
+    id: "settings-link-language"
+- tapOn:
+    id: "language-open"
+- tapOn:
+    id: "language-zh-HK"
+- tapOn:
+    id: "screen-back"
+- tapOn:
+    id: "tab-device"
+- assertVisible: "錢包"

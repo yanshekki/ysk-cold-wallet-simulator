@@ -4,6 +4,7 @@ import { bytesToHex } from './bytes';
 import {
   BleReassembler,
   DEFAULT_MTU,
+  MAX_OPEN_FRAMES,
   framePayload,
   splitFramedPackets,
   TAG_APDU,
@@ -116,5 +117,26 @@ describe('Ledger BLE framing', () => {
     expect(assembler.push(bolosPkts[1])).toEqual({ tag: TAG_APDU, payload: bolos });
     expect(assembler.push(ethPkts[1])).toEqual({ tag: TAG_APDU, payload: eth });
     expect(assembler.push(avaxPkts[1])).toEqual({ tag: TAG_APDU, payload: avax });
+  });
+
+  it('drops seq > 64', () => {
+    const assembler = new BleReassembler();
+    expect(assembler.push(Uint8Array.of(0x05, 0x00, 0x41, 0x00))).toBeNull();
+  });
+
+  it('ignores truncated seq-0 header', () => {
+    const assembler = new BleReassembler();
+    expect(assembler.push(Uint8Array.of(0x05, 0x00, 0x00, 0xff))).toBeNull();
+    expect(assembler.push(Uint8Array.of(0x05, 0x00))).toBeNull();
+  });
+
+  it('caps incomplete giant frames at MAX_OPEN_FRAMES', () => {
+    const assembler = new BleReassembler();
+    for (let i = 0; i < 12; i++) {
+      assembler.push(Uint8Array.of(0x05, 0x00, 0x00, 0xff, 0xff, i));
+    }
+    assembler.reset();
+    expect(assembler.push(Uint8Array.of(0x05, 0x00, 0x01, 0x90, 0x00))).toBeNull();
+    expect(MAX_OPEN_FRAMES).toBe(8);
   });
 });

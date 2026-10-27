@@ -48,6 +48,18 @@ export {
   DEFAULT_MTU,
   type CreateHandlerOptions,
 } from './handler';
+export {
+  QrAirgapSession,
+  btcMessageToSigningRequest,
+  cosmosSignToSigningRequest,
+  ethSignToSigningRequest,
+  exportQrAccountWithPolicy,
+  needsConfirmForQrExport,
+  psbtToSigningRequest,
+  qrSeedExportRequest,
+  solSignToSigningRequest,
+  type QrScanStatus,
+} from './qr';
 
 export function getModel(id: string): DeviceModel | undefined {
   return ALL_MODELS.find((model) => model.id === id);

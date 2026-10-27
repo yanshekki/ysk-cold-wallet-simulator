@@ -271,6 +271,8 @@ export const en = {
     slideAllow: 'Slide to allow',
     slidePair: 'Slide to pair',
     slideOpen: 'Slide to open',
+    slideExportSeed: 'Slide to export seed',
+    hostPassphrase: 'Host passphrase',
   },
   unlock: {
     title: 'YSK',

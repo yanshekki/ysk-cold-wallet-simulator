@@ -27,3 +27,7 @@ apps/mobile/.expo/
 !.env.example
 web-build/
 .metro-health-check*
+apps/proxy/test-results/
+apps/proxy/playwright-report/
+apps/proxy/blob-report/
+apps/mobile/.maestro/screenshots/

@@ -137,6 +137,18 @@ export class ThpNoiseResponder {
     this.staticPublicKey = keys.publicKey;
   }
 
+  resetHandshake(): void {
+    this.ephemeral = undefined;
+    this.handshakeHash = new Uint8Array();
+    this.chainingKey = new Uint8Array();
+    this.handshakeKey = new Uint8Array();
+    this.keyRequest = new Uint8Array();
+    this.keyResponse = new Uint8Array();
+    this.nonceRequest = 0;
+    this.nonceResponse = 1;
+    this.ready = false;
+  }
+
   handshakeInit(payload: Uint8Array): Uint8Array {
     if (payload.length < 32) {
       throw new Error('handshake init too short');

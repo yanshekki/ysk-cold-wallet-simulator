@@ -1,4 +1,5 @@
 import { createHidHolder, runProxy, type HidHolder, type ProxyIo, type ProxyOptions } from './daemon';
+import type { Brand } from '@cws/contracts';
 import { labCatalogFor, type LabCatalog, type LabDraftInput, type LabHandle } from './lab';
 import type { LogFn } from './log';
 import type { PairingGate } from './pairing';
@@ -13,7 +14,7 @@ export type ProxyRuntime = {
   stop(): void;
   wait(): Promise<void>;
   busy(): boolean;
-  labCatalog(): LabCatalog;
+  labCatalog(requested?: Brand): LabCatalog;
   runLab(actionId: string, draft?: LabDraftInput): Promise<string>;
 };
 
@@ -129,9 +130,9 @@ export function createRuntime(
     busy() {
       return inFlight;
     },
-    labCatalog() {
+    labCatalog(requested) {
       const snap = bus.snapshot();
-      return labCatalogFor(snap.brand, Boolean(lab));
+      return labCatalogFor(snap.brand ?? requested ?? 'ledger', Boolean(lab), snap.brand);
     },
     async runLab(actionId, draft) {
       if (!lab) {

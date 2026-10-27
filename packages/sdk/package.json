@@ -12,6 +12,7 @@
     "@cws/contracts": "*",
     "@cws/protocol-ledger": "*",
     "@cws/protocol-onekey": "*",
+    "@cws/protocol-qr": "*",
     "@cws/protocol-trezor": "*",
     "@noble/curves": "^1.9.7",
     "@noble/hashes": "^1.8.0",

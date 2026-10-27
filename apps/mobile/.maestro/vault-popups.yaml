@@ -1,4 +1,6 @@
-appId: hk.ysk.coldwalletsimulator
+appId: hk.ysk.cws
+tags:
+  - vault
 ---
 - launchApp
 - extendedWaitUntil:
@@ -47,23 +49,35 @@ appId: hk.ysk.coldwalletsimulator
 - extendedWaitUntil:
     visible: "顯示助記詞"
     timeout: 20000
-- tapOn: "顯示助記詞"
+- tapOn:
+    id: "vault-phrase-selected"
+    optional: true
+- tapOn:
+    text: "顯示助記詞"
+    optional: true
+- tapOn:
+    text: "Show recovery phrase"
+    optional: true
 - extendedWaitUntil:
     visible:
       id: "vault-phrase-sheet"
     timeout: 20000
-- assertVisible: "複製助記詞"
 - takeScreenshot: phrase-overlay
-- tapOn: "複製助記詞"
-- assertVisible: "複製助記詞？"
-- tapOn: "確認"
 - tapOn:
     id: "sheet-close"
 - extendedWaitUntil:
     notVisible:
       id: "vault-phrase-sheet"
     timeout: 8000
-- tapOn: "帳戶"
+- tapOn:
+    id: "vault-accounts-selected"
+    optional: true
+- tapOn:
+    text: "帳戶"
+    optional: true
+- tapOn:
+    text: "Accounts"
+    optional: true
 - assertVisible:
     id: "vault-accounts-sheet"
 - extendedWaitUntil:

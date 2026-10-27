@@ -1,0 +1,43 @@
+appId: hk.ysk.cws
+tags:
+  - vault
+  - generate
+---
+# Given Vault generate
+# When BIP39 word-count chips are tapped
+# Then 12 / 15 / 18 / 21 / 24 remain on the form (no save)
+- runFlow: onboarding.yaml
+- tapOn:
+    id: "tab-vault"
+- tapOn:
+    id: "vault-generate"
+- extendedWaitUntil:
+    visible:
+      id: "generate-run"
+    timeout: 15000
+- assertVisible:
+    id: "generate-label"
+- assertVisible:
+    id: "generate-bip39"
+- tapOn:
+    id: "generate-words-12"
+- tapOn:
+    id: "generate-words-15"
+- tapOn:
+    id: "generate-words-18"
+- tapOn:
+    id: "generate-words-21"
+- tapOn:
+    id: "generate-words-24"
+- tapOn:
+    id: "generate-custom"
+- assertVisible:
+    id: "generate-custom-hex"
+- assertVisible:
+    id: "generate-custom-dice"
+- tapOn:
+    id: "generate-shake"
+- tapOn:
+    id: "screen-back"
+- assertVisible:
+    id: "vault-generate"

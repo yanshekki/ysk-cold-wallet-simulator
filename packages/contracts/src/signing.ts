@@ -7,7 +7,10 @@ export type SigningKind =
   | 'verify'
   | 'allow-manager'
   | 'pairing'
-  | 'open-app';
+  | 'open-app'
+  | 'export-seed';
+
+export type PassphraseSource = 'none' | 'device' | 'host';
 
 export interface SigningRequest {
   brand?: Brand;
@@ -17,10 +20,12 @@ export interface SigningRequest {
   message: string;
   rawPayload: Uint8Array;
   detail?: SigningDetail;
+  /** Actual derivation overlay for this request. Host must not silently diverge from the UI chip. */
+  passphraseSource?: PassphraseSource;
 }
 
 export function signingNeedsPassphrase(kind: SigningKind): boolean {
-  return kind === 'sign' || kind === 'address';
+  return kind === 'sign' || kind === 'address' || kind === 'export-seed';
 }
 
 export function signingSlideLabel(kind: SigningKind): string {
@@ -35,6 +40,8 @@ export function signingSlideLabel(kind: SigningKind): string {
       return 'signing.slidePair';
     case 'open-app':
       return 'signing.slideOpen';
+    case 'export-seed':
+      return 'signing.slideExportSeed';
     default:
       return 'signing.slideSign';
   }

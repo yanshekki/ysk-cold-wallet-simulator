@@ -17,6 +17,7 @@ type Props = {
   sessionPassphraseApplied?: boolean;
   passphraseAppliedLabel?: string;
   passphraseIdleLabel?: string;
+  passphraseHostLabel?: string;
   copy?: SigningCopy;
 };
 
@@ -31,6 +32,7 @@ export function SigningModal({
   sessionPassphraseApplied = false,
   passphraseAppliedLabel = 'Passphrase on',
   passphraseIdleLabel = 'No passphrase',
+  passphraseHostLabel = 'Host passphrase',
   copy,
 }: Props) {
   const brand = request?.brand;
@@ -38,6 +40,10 @@ export function SigningModal({
   const sheetMax = Math.round(Dimensions.get('window').height * 0.8);
   const previewMax = Math.round(Dimensions.get('window').height * 0.42);
   const showChip = request ? signingNeedsPassphrase(kind) : false;
+  const source = request?.passphraseSource;
+  const chipOn = source === 'host' || source === 'device' || sessionPassphraseApplied;
+  const chipLabel =
+    source === 'host' ? passphraseHostLabel : chipOn ? passphraseAppliedLabel : passphraseIdleLabel;
   const resetKey = request
     ? `${request.kind}:${request.path}:${request.title}:${describeSigning(request).headline}`
     : '';
@@ -60,13 +66,11 @@ export function SigningModal({
               </ScrollView>
             ) : null}
             {showChip ? (
-              <Text style={sessionPassphraseApplied ? styles.chipOn : styles.chipOff}>
-                {sessionPassphraseApplied ? passphraseAppliedLabel : passphraseIdleLabel}
-              </Text>
+              <Text style={chipOn ? styles.chipOn : styles.chipOff}>{chipLabel}</Text>
             ) : null}
             <SlideToConfirm label={slideLabel} onConfirm={onConfirm} resetKey={resetKey} />
             <View style={styles.actions}>
-              <Button label={rejectLabel} variant="danger" onPress={onReject} />
+              <Button testID="signing-reject" label={rejectLabel} variant="danger" onPress={onReject} />
             </View>
           </View>
         </View>

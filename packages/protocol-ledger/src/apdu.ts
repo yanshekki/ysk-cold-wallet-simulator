@@ -63,6 +63,9 @@ export function parseBip32Path(data: Uint8Array): { path: string; rest: Uint8Arr
     throw new Error('missing BIP32 path');
   }
   const count = data[0];
+  if (count < 1) {
+    throw new Error('empty BIP32 path');
+  }
   const needed = 1 + count * 4;
   if (data.length < needed) {
     throw new Error('truncated BIP32 path');

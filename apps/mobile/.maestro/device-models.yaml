@@ -1,0 +1,68 @@
+appId: hk.ysk.cws
+tags:
+  - device
+  - smoke
+---
+# Given the Device tab
+# When the operator scrolls the model list
+# Then every Ledger / Trezor / OneKey BLE model card is present
+- runFlow: onboarding.yaml
+- tapOn:
+    id: "tab-device"
+- assertVisible:
+    id: "device-model-nano-x"
+- scrollUntilVisible:
+    element:
+      id: "device-model-flex"
+    direction: DOWN
+    timeout: 8000
+- scrollUntilVisible:
+    element:
+      id: "device-model-stax"
+    direction: DOWN
+    timeout: 8000
+- scrollUntilVisible:
+    element:
+      id: "device-model-gen5"
+    direction: DOWN
+    timeout: 8000
+- scrollUntilVisible:
+    element:
+      id: "device-model-safe-7"
+    direction: DOWN
+    timeout: 8000
+- scrollUntilVisible:
+    element:
+      id: "device-model-classic"
+    direction: DOWN
+    timeout: 8000
+- scrollUntilVisible:
+    element:
+      id: "device-model-classic1s"
+    direction: DOWN
+    timeout: 8000
+- scrollUntilVisible:
+    element:
+      id: "device-model-pure"
+    direction: DOWN
+    timeout: 8000
+- scrollUntilVisible:
+    element:
+      id: "device-model-touch"
+    direction: DOWN
+    timeout: 8000
+- scrollUntilVisible:
+    element:
+      id: "device-model-pro"
+    direction: DOWN
+    timeout: 8000
+- scrollUntilVisible:
+    element:
+      id: "device-model-pro2"
+    direction: DOWN
+    timeout: 8000
+- scrollUntilVisible:
+    element:
+      id: "device-model-neo"
+    direction: DOWN
+    timeout: 8000

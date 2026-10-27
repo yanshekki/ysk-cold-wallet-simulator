@@ -273,6 +273,8 @@ export const ar: MessageTree = {
     slideAllow: 'اسحب للسماح',
     slidePair: 'اسحب للاقتران',
     slideOpen: 'اسحب للفتح',
+    slideExportSeed: 'اسحب لتصدير البذرة',
+    hostPassphrase: 'عبارة المرور من المضيف',
   },
   unlock: {
     title: 'YSK',
