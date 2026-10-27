@@ -48,6 +48,7 @@ import {
   loadActiveSlotId,
   loadCatalogOverlay,
   loadSettings,
+  normalizeSettings,
   resolveDefaultSlot,
   saveActiveSlotId,
   saveCatalogOverlay,
@@ -197,7 +198,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const patchSettings = useCallback(async (patch: Partial<AppSettings>) => {
-    const next = { ...settingsRef.current, ...patch };
+    const next = normalizeSettings({ ...settingsRef.current, ...patch }, settingsRef.current.language);
     settingsRef.current = next;
     setSettings(next);
     setFaceIdEnabled(next.faceIdEnabled);

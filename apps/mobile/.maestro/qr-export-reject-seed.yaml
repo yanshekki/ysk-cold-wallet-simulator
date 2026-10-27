@@ -46,6 +46,8 @@ tags:
     visible:
       id: "signing-reject"
     timeout: 15000
+- assertVisible:
+    id: "signing-hold"
 - tapOn:
     id: "signing-reject"
 - extendedWaitUntil:

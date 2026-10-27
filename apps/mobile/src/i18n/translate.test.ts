@@ -25,6 +25,17 @@ describe('platform-aware authenticator copy', () => {
     expect(translate('en', 'vault.authPrompt', { n: 1 }, 'ios')).toBe('Unlock');
   });
 
+  it('labels hold-to-confirm in English and zh-HK', () => {
+    expect(translate('en', 'signing.holdSign')).toBe('Hold to sign');
+    expect(translate('en', 'settings.holdDuration')).toContain('seconds');
+    expect(translate('zh-HK', 'signing.holdSign')).toBe('長按以簽署');
+    expect(translate('zh-HK', 'settings.holdDuration')).toContain('秒');
+    for (const language of LANGUAGES) {
+      expect(translate(language, 'signing.holdOpen')).not.toBe('signing.holdOpen');
+      expect(translate(language, 'settings.holdDurationHelp')).not.toBe('settings.holdDurationHelp');
+    }
+  });
+
   it('uses Face ID and Touch ID on iOS for EN and zh-HK', () => {
     expect(translate('en', 'settings.faceId', undefined, 'ios')).toBe('Face ID / Touch ID');
     expect(translate('en', 'unlock.fallback', undefined, 'ios')).toContain('Face ID');

@@ -1,25 +1,41 @@
 import { describe, expect, it } from 'vitest';
 import {
-  SLIDE_COMMIT_RATIO,
-  shouldCommitSlide,
+  HOLD_CONFIRM_DEFAULT_SECONDS,
+  HOLD_CONFIRM_MAX_SECONDS,
+  HOLD_CONFIRM_MIN_SECONDS,
+  HOLD_CONFIRM_SECONDS,
+  clampHoldDuration,
+  holdDurationMs,
+  holdProgress,
+  shouldCommitHold,
+  signingHoldLabel,
   signingNeedsPassphrase,
-  signingSlideLabel,
-  slideProgress,
 } from './signing';
 
-describe('slide-to-confirm math', () => {
-  it('commits once the thumb is past 50% of travel', () => {
-    expect(SLIDE_COMMIT_RATIO).toBe(0.5);
-    expect(shouldCommitSlide(0.49)).toBe(false);
-    expect(shouldCommitSlide(0.5)).toBe(true);
-    expect(shouldCommitSlide(1)).toBe(true);
+describe('hold-to-confirm math', () => {
+  it('defaults to 3 seconds and stays within 1–10', () => {
+    expect(HOLD_CONFIRM_DEFAULT_SECONDS).toBe(3);
+    expect(HOLD_CONFIRM_MIN_SECONDS).toBe(1);
+    expect(HOLD_CONFIRM_MAX_SECONDS).toBe(10);
+    expect(HOLD_CONFIRM_SECONDS).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    expect(clampHoldDuration(undefined)).toBe(3);
+    expect(clampHoldDuration('nope')).toBe(3);
+    expect(clampHoldDuration(0)).toBe(1);
+    expect(clampHoldDuration(3.2)).toBe(3);
+    expect(clampHoldDuration(3.7)).toBe(4);
+    expect(clampHoldDuration(99)).toBe(10);
+    expect(holdDurationMs(3)).toBe(3000);
+    expect(holdDurationMs(-4)).toBe(1000);
   });
 
-  it('clamps progress to the track', () => {
-    expect(slideProgress(-10, 100)).toBe(0);
-    expect(slideProgress(40, 100)).toBe(0.4);
-    expect(slideProgress(200, 100)).toBe(1);
-    expect(slideProgress(10, 0)).toBe(0);
+  it('commits only after the full duration', () => {
+    expect(holdProgress(-10, 3000)).toBe(0);
+    expect(holdProgress(1500, 3000)).toBe(0.5);
+    expect(holdProgress(3000, 3000)).toBe(1);
+    expect(holdProgress(4000, 3000)).toBe(1);
+    expect(holdProgress(10, 0)).toBe(1);
+    expect(shouldCommitHold(2999, 3000)).toBe(false);
+    expect(shouldCommitHold(3000, 3000)).toBe(true);
   });
 
   it('hides passphrase except for sign and address', () => {
@@ -32,13 +48,13 @@ describe('slide-to-confirm math', () => {
     expect(signingNeedsPassphrase('export-seed')).toBe(true);
   });
 
-  it('labels the bar from kind', () => {
-    expect(signingSlideLabel('sign')).toBe('signing.slideSign');
-    expect(signingSlideLabel('verify')).toBe('signing.slideVerify');
-    expect(signingSlideLabel('address')).toBe('signing.slideExport');
-    expect(signingSlideLabel('allow-manager')).toBe('signing.slideAllow');
-    expect(signingSlideLabel('open-app')).toBe('signing.slideOpen');
-    expect(signingSlideLabel('pairing')).toBe('signing.slidePair');
-    expect(signingSlideLabel('export-seed')).toBe('signing.slideExportSeed');
+  it('labels the hold control from kind', () => {
+    expect(signingHoldLabel('sign')).toBe('signing.holdSign');
+    expect(signingHoldLabel('verify')).toBe('signing.holdVerify');
+    expect(signingHoldLabel('address')).toBe('signing.holdExport');
+    expect(signingHoldLabel('allow-manager')).toBe('signing.holdAllow');
+    expect(signingHoldLabel('open-app')).toBe('signing.holdOpen');
+    expect(signingHoldLabel('pairing')).toBe('signing.holdPair');
+    expect(signingHoldLabel('export-seed')).toBe('signing.holdExportSeed');
   });
 });

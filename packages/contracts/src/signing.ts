@@ -28,34 +28,53 @@ export function signingNeedsPassphrase(kind: SigningKind): boolean {
   return kind === 'sign' || kind === 'address' || kind === 'export-seed';
 }
 
-export function signingSlideLabel(kind: SigningKind): string {
+export function signingHoldLabel(kind: SigningKind): string {
   switch (kind) {
     case 'address':
-      return 'signing.slideExport';
+      return 'signing.holdExport';
     case 'verify':
-      return 'signing.slideVerify';
+      return 'signing.holdVerify';
     case 'allow-manager':
-      return 'signing.slideAllow';
+      return 'signing.holdAllow';
     case 'pairing':
-      return 'signing.slidePair';
+      return 'signing.holdPair';
     case 'open-app':
-      return 'signing.slideOpen';
+      return 'signing.holdOpen';
     case 'export-seed':
-      return 'signing.slideExportSeed';
+      return 'signing.holdExportSeed';
     default:
-      return 'signing.slideSign';
+      return 'signing.holdSign';
   }
 }
 
-export const SLIDE_COMMIT_RATIO = 0.5;
+export const HOLD_CONFIRM_MIN_SECONDS = 1;
+export const HOLD_CONFIRM_MAX_SECONDS = 10;
+export const HOLD_CONFIRM_DEFAULT_SECONDS = 3;
 
-export function slideProgress(translationX: number, travel: number): number {
-  if (travel <= 0) {
-    return 0;
+export const HOLD_CONFIRM_SECONDS: readonly number[] = Array.from(
+  { length: HOLD_CONFIRM_MAX_SECONDS - HOLD_CONFIRM_MIN_SECONDS + 1 },
+  (_, i) => HOLD_CONFIRM_MIN_SECONDS + i,
+);
+
+export function clampHoldDuration(seconds: unknown): number {
+  const n = typeof seconds === 'number' ? seconds : Number(seconds);
+  if (!Number.isFinite(n)) {
+    return HOLD_CONFIRM_DEFAULT_SECONDS;
   }
-  return Math.min(1, Math.max(0, translationX / travel));
+  return Math.min(HOLD_CONFIRM_MAX_SECONDS, Math.max(HOLD_CONFIRM_MIN_SECONDS, Math.round(n)));
 }
 
-export function shouldCommitSlide(progress: number): boolean {
-  return progress >= SLIDE_COMMIT_RATIO;
+export function holdDurationMs(seconds: unknown): number {
+  return clampHoldDuration(seconds) * 1000;
+}
+
+export function holdProgress(elapsedMs: number, durationMs: number): number {
+  if (durationMs <= 0) {
+    return 1;
+  }
+  return Math.min(1, Math.max(0, elapsedMs / durationMs));
+}
+
+export function shouldCommitHold(elapsedMs: number, durationMs: number): boolean {
+  return holdProgress(elapsedMs, durationMs) >= 1;
 }

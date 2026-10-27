@@ -235,7 +235,7 @@ export interface ProtocolHandler {
 2. **Device** — Pick a BLE model (`DeviceCard`), optional session passphrase, Start advertising
 3. **Seed Vault** — Generate / import BIP39 or SLIP-39, HD inspect
 4. **Host** — `yarn proxy` / CWS Proxy. USB HID gadget plus the **Testnet host** tab (Ledger / OneKey / Trezor catalogs over the phone BLE link). Signing still confirms on the phone.
-5. **Signing Request** — `SigningModal` slide-to-confirm. ERC-20 tickers from PROVIDE_ERC20 are labeled host-provided.
+5. **Signing Request** — `SigningModal` hold-to-confirm. ERC-20 tickers from PROVIDE_ERC20 are labeled host-provided.
 6. **QR air-gap** — Export account UR / scan sign requests via `@cws/sdk` QR helpers
 7. **Stop** — Stop advertising, `resetLink`, wipe session seed
 

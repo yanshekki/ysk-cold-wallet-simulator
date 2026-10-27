@@ -1,9 +1,14 @@
 import { Dimensions, Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { describeSigning, signingNeedsPassphrase, type SigningRequest } from '@cws/contracts';
+import {
+  HOLD_CONFIRM_DEFAULT_SECONDS,
+  describeSigning,
+  signingNeedsPassphrase,
+  type SigningRequest,
+} from '@cws/contracts';
 import { Button } from './Button';
+import { HoldToConfirm } from './HoldToConfirm';
 import { SigningDetailView, type SigningCopy } from './SigningDetail';
-import { SlideToConfirm } from './SlideToConfirm';
 import { BRAND_LABEL, brandColor, colors, fonts, hairline, radius, space } from './theme';
 
 type Props = {
@@ -11,9 +16,10 @@ type Props = {
   request: SigningRequest | null;
   onConfirm: () => void;
   onReject: () => void;
-  slideLabel?: string;
+  holdLabel?: string;
   rejectLabel?: string;
   confirmTitle?: string;
+  holdDurationSeconds?: number;
   sessionPassphraseApplied?: boolean;
   passphraseAppliedLabel?: string;
   passphraseIdleLabel?: string;
@@ -26,9 +32,10 @@ export function SigningModal({
   request,
   onConfirm,
   onReject,
-  slideLabel = 'Slide to sign',
+  holdLabel = 'Hold to sign',
   rejectLabel = 'Reject',
   confirmTitle = 'Confirm on device',
+  holdDurationSeconds = HOLD_CONFIRM_DEFAULT_SECONDS,
   sessionPassphraseApplied = false,
   passphraseAppliedLabel = 'Passphrase on',
   passphraseIdleLabel = 'No passphrase',
@@ -68,7 +75,12 @@ export function SigningModal({
             {showChip ? (
               <Text style={chipOn ? styles.chipOn : styles.chipOff}>{chipLabel}</Text>
             ) : null}
-            <SlideToConfirm label={slideLabel} onConfirm={onConfirm} resetKey={resetKey} />
+            <HoldToConfirm
+              label={holdLabel}
+              onConfirm={onConfirm}
+              resetKey={resetKey}
+              durationSeconds={holdDurationSeconds}
+            />
             <View style={styles.actions}>
               <Button testID="signing-reject" label={rejectLabel} variant="danger" onPress={onReject} />
             </View>

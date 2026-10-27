@@ -45,11 +45,16 @@ export type {
   SigningRequest,
 } from './signing';
 export {
-  SLIDE_COMMIT_RATIO,
+  HOLD_CONFIRM_DEFAULT_SECONDS,
+  HOLD_CONFIRM_MAX_SECONDS,
+  HOLD_CONFIRM_MIN_SECONDS,
+  HOLD_CONFIRM_SECONDS,
+  clampHoldDuration,
+  holdDurationMs,
+  holdProgress,
+  shouldCommitHold,
+  signingHoldLabel,
   signingNeedsPassphrase,
-  signingSlideLabel,
-  slideProgress,
-  shouldCommitSlide,
 } from './signing';
 export { bytesToHex, concatBytes, hexToBytes } from './bytes';
 export { hashTypedData, parseEip712, type Eip712TypedData } from './eip712';
