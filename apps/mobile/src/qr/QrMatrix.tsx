@@ -1,59 +1,66 @@
-import { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Image, StyleSheet, View } from 'react-native';
 import QRCode from 'qrcode';
 
 type Props = {
   value: string;
   parts?: string[];
   size?: number;
+  /** Pause multi-frame animation (keeps iPhone cool; frees the JS thread for taps). */
+  paused?: boolean;
 };
 
-export function QrMatrix({ value, parts, size = 280 }: Props) {
+export function QrMatrix({ value, parts, size = 280, paused = false }: Props) {
   const frames = parts && parts.length > 0 ? parts : [value];
   const frameKey = frames.join('\n');
   const [index, setIndex] = useState(0);
+  const [uris, setUris] = useState<string[]>([]);
+
   useEffect(() => {
+    let cancelled = false;
     setIndex(0);
-    if (frames.length < 2) {
+    setUris([]);
+    void Promise.all(
+      frames.map((frame) =>
+        QRCode.toDataURL(frame, {
+          errorCorrectionLevel: 'M',
+          margin: 1,
+          width: size,
+          color: { dark: '#000000', light: '#ffffff' },
+        }),
+      ),
+    ).then((next) => {
+      if (!cancelled) {
+        setUris(next);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+    // frames is derived from frameKey; listing frames would churn the effect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [frameKey, size]);
+
+  useEffect(() => {
+    if (paused || uris.length < 2) {
       return;
     }
     const timer = setInterval(() => {
-      setIndex((current) => (current + 1) % frames.length);
-    }, 250);
+      setIndex((current) => (current + 1) % uris.length);
+    }, 300);
     return () => clearInterval(timer);
-  }, [frameKey, frames.length]);
-  const current = frames[index] ?? value;
-  const rows = useMemo(() => {
-    const qr = QRCode.create(current, { errorCorrectionLevel: 'M' });
-    const count = qr.modules.size;
-    const grid: boolean[][] = [];
-    for (let y = 0; y < count; y += 1) {
-      const row: boolean[] = [];
-      for (let x = 0; x < count; x += 1) {
-        row.push(Boolean(qr.modules.get(x, y)));
-      }
-      grid.push(row);
-    }
-    return grid;
-  }, [current]);
-  const cell = size / rows.length;
+  }, [paused, uris.length, frameKey]);
+
+  const uri = uris[Math.min(index, Math.max(uris.length - 1, 0))] ?? uris[0];
+  if (!uri) {
+    return <View style={[styles.frame, { width: size, height: size }]} />;
+  }
   return (
-    <View style={[styles.frame, { width: size, height: size }]}>
-      {rows.map((row, y) => (
-        <View key={y} style={{ flexDirection: 'row', height: cell }}>
-          {row.map((on, x) => (
-            <View
-              key={x}
-              style={{
-                width: cell,
-                height: cell,
-                backgroundColor: on ? '#000000' : '#ffffff',
-              }}
-            />
-          ))}
-        </View>
-      ))}
-    </View>
+    <Image
+      accessibilityIgnoresInvertColors
+      source={{ uri }}
+      style={[styles.frame, { width: size, height: size }]}
+    />
   );
 }
 
