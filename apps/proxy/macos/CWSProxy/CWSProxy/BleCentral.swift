@@ -366,9 +366,18 @@ final class BleCentral: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
       .map { $0.uuidString.lowercased() }
     let overflow = (advertisementData[CBAdvertisementDataOverflowServiceUUIDsKey] as? [CBUUID] ?? [])
       .map { $0.uuidString.lowercased() }
-    // Overflow UUIDs linger after the phone switches Trezor → OneKey. Trust
-    // this packet's primary list; only fall back to overflow when primary is empty.
-    let advertised = primary.isEmpty ? overflow : primary
+    // iOS often puts 128-bit CWS UUIDs in overflow while localName is in this
+    // packet. Overflow also lingers after CWS stops (or after Trezor → OneKey),
+    // so a Continuity advertisement can still look like a live wallet. Only
+    // trust overflow when this packet still carries a GAP local name.
+    let advertised: [String]
+    if !primary.isEmpty {
+      advertised = primary
+    } else if !local.isEmpty && !overflow.isEmpty {
+      advertised = overflow
+    } else {
+      advertised = []
+    }
     var name = previous?.name ?? ""
     let previousLabel = Self.gapLabel(name)
     let localChanged = !local.isEmpty && previousLabel.compare(local, options: [.caseInsensitive]) != .orderedSame
@@ -461,6 +470,7 @@ final class BleCentral: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
     } else if writeChar != nil {
       finishConnect(nil)
     } else {
+      forgetStale(peripheral)
       finishConnect(HidError.listenFailed(missingWriteMessage()))
     }
   }
@@ -480,13 +490,24 @@ final class BleCentral: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
     if writeChar != nil {
       finishConnect(nil)
     } else {
+      forgetStale(peripheral)
       finishConnect(HidError.listenFailed(missingWriteMessage()))
+    }
+  }
+
+  private func forgetStale(_ peripheral: CBPeripheral) {
+    seen.removeValue(forKey: peripheral.identifier)
+    scanHits.removeValue(forKey: peripheral.identifier)
+    if connected?.identifier == peripheral.identifier {
+      manager.cancelPeripheralConnection(peripheral)
     }
   }
 
   private func missingWriteMessage() -> String {
     let want = wantWrite?.uuidString.lowercased() ?? "?"
     let have = foundChars.isEmpty ? "none" : foundChars.joined(separator: ",")
+    // Host skips this peripheral and tries the next advertiser. Do not treat
+    // iOS system GATT (180a / Continuity) as a successful CWS connection.
     return "missing write characteristic want=\(want) have=\(have)"
   }
 

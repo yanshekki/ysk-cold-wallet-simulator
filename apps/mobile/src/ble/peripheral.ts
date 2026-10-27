@@ -146,6 +146,10 @@ export async function startAdvertising(
     throw new Error('errors.advertisePermission');
   }
 
+  // Optional 3-char suffix helps humans tell two phones apart. It is not a
+  // connection key: iOS wraps this in `{phone} [{localName}]`, Android often
+  // advertises the CWS name alone, and both phones may use the same OneKey
+  // serial form (`Pro 2 A1B2`). Proxy must confirm the writable GATT char.
   const suffix = options?.nameSuffix?.replace(/[^A-Za-z0-9]/g, '').slice(0, 3);
   const baseName = bleAdvertiseName(model);
   const localName = suffix && model.brand !== 'ledger' ? `${baseName} ${suffix}`.trim() : baseName;
