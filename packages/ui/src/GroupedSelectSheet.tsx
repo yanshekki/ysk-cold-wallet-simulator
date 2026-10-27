@@ -29,6 +29,12 @@ type Props = {
   cancelLabel?: string;
   searchPlaceholder?: string;
   testIDPrefix?: string;
+  /**
+   * Render as an absolute overlay without a Modal.
+   * Use inside an already-open Modal (e.g. Sheet.overlay) so iOS does not
+   * nest Modal-on-Modal — nested Modals drop taps / fail to present.
+   */
+  embedded?: boolean;
 };
 
 export function GroupedSelectSheet({
@@ -41,6 +47,7 @@ export function GroupedSelectSheet({
   cancelLabel = 'Cancel',
   searchPlaceholder = 'Search',
   testIDPrefix,
+  embedded = false,
 }: Props) {
   const [query, setQuery] = useState('');
   useEffect(() => {
@@ -74,126 +81,150 @@ export function GroupedSelectSheet({
       .filter((group) => group.options.length > 0);
   }, [groups, query]);
 
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
-      <KeyboardAvoidingView behavior="padding" automaticOffset style={styles.frame}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={cancelLabel}
-          onPress={onClose}
-          style={[StyleSheet.absoluteFill, styles.backdrop]}
-        />
-        <View style={styles.sheet}>
-          <View style={styles.header}>
-            <Text style={styles.kicker}>{title}</Text>
-            <Text style={styles.count}>{totalOptions}</Text>
-          </View>
-          {totalOptions > 12 ? (
-            <TextInput
-              testID="sheet-search"
-              value={query}
-              onChangeText={setQuery}
-              placeholder={searchPlaceholder}
-              placeholderTextColor={colors.muted}
-              autoCapitalize="none"
-              autoCorrect={false}
-              style={styles.search}
-            />
-          ) : null}
-          <ScrollView
-            style={styles.list}
-            contentContainerStyle={styles.listContent}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
-            {visibleGroups.map((group, groupIndex) => (
-              <View key={group.id} style={styles.section}>
-                {groupIndex > 0 ? <View style={styles.separator} /> : null}
-                <Text style={styles.sectionLabel}>{group.label}</Text>
-                <View style={styles.sectionCard}>
-                  {group.options.map((option, optionIndex) => {
-                    const active = option.id === selectedId;
-                    const last = optionIndex === group.options.length - 1;
-                    return (
-                      <Pressable
-                        key={option.id}
-                        testID={testIDPrefix ? `${testIDPrefix}${option.id}` : undefined}
-                        accessibilityRole="button"
-                        accessibilityState={{ selected: active }}
-                        onPress={() => onSelect(option.id)}
-                        style={({ pressed }) => [
-                          styles.row,
-                          !last && styles.rowDivider,
-                          option.danger && styles.rowDanger,
-                          active && (option.danger ? styles.rowDangerOn : styles.rowOn),
-                          pressed && styles.rowPressed,
-                        ]}
-                      >
-                        <View style={styles.rowBody}>
-                          <View style={styles.titleRow}>
-                            <Text
+  if (!visible) {
+    return null;
+  }
+
+  const body = (
+    <KeyboardAvoidingView behavior="padding" automaticOffset style={styles.frame}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={cancelLabel}
+        onPress={onClose}
+        style={[StyleSheet.absoluteFill, styles.backdrop]}
+      />
+      <View style={styles.sheet} onStartShouldSetResponder={() => true}>
+        <View style={styles.header}>
+          <Text style={styles.kicker}>{title}</Text>
+          <Text style={styles.count}>{totalOptions}</Text>
+        </View>
+        {totalOptions > 12 ? (
+          <TextInput
+            testID="sheet-search"
+            value={query}
+            onChangeText={setQuery}
+            placeholder={searchPlaceholder}
+            placeholderTextColor={colors.muted}
+            autoCapitalize="none"
+            autoCorrect={false}
+            style={styles.search}
+          />
+        ) : null}
+        <ScrollView
+          style={styles.list}
+          contentContainerStyle={styles.listContent}
+          keyboardShouldPersistTaps="handled"
+          nestedScrollEnabled
+          showsVerticalScrollIndicator={false}
+        >
+          {visibleGroups.map((group, groupIndex) => (
+            <View key={group.id} style={styles.section}>
+              {groupIndex > 0 ? <View style={styles.separator} /> : null}
+              <Text style={styles.sectionLabel}>{group.label}</Text>
+              <View style={styles.sectionCard}>
+                {group.options.map((option, optionIndex) => {
+                  const active = option.id === selectedId;
+                  const last = optionIndex === group.options.length - 1;
+                  return (
+                    <Pressable
+                      key={option.id}
+                      testID={testIDPrefix ? `${testIDPrefix}${option.id}` : undefined}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
+                      onPress={() => onSelect(option.id)}
+                      style={({ pressed }) => [
+                        styles.row,
+                        !last && styles.rowDivider,
+                        option.danger && styles.rowDanger,
+                        active && (option.danger ? styles.rowDangerOn : styles.rowOn),
+                        pressed && styles.rowPressed,
+                      ]}
+                    >
+                      <View style={styles.rowBody}>
+                        <View style={styles.titleRow}>
+                          <Text
+                            style={[
+                              styles.label,
+                              active && styles.labelOn,
+                              option.danger && styles.labelDanger,
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {option.label}
+                          </Text>
+                          {option.chip ? (
+                            <View
                               style={[
-                                styles.label,
-                                active && styles.labelOn,
-                                option.danger && styles.labelDanger,
+                                styles.chip,
+                                active && styles.chipOn,
+                                option.danger && styles.chipDanger,
                               ]}
-                              numberOfLines={1}
                             >
-                              {option.label}
-                            </Text>
-                            {option.chip ? (
-                              <View
+                              <Text
                                 style={[
-                                  styles.chip,
-                                  active && styles.chipOn,
-                                  option.danger && styles.chipDanger,
+                                  styles.chipText,
+                                  active && styles.chipTextOn,
+                                  option.danger && styles.chipTextDanger,
                                 ]}
                               >
-                                <Text
-                                  style={[
-                                    styles.chipText,
-                                    active && styles.chipTextOn,
-                                    option.danger && styles.chipTextDanger,
-                                  ]}
-                                >
-                                  {option.chip}
-                                </Text>
-                              </View>
-                            ) : null}
-                          </View>
-                          {option.subtitle ? (
-                            <Text
-                              style={[styles.subtitle, active && styles.subtitleOn]}
-                              numberOfLines={2}
-                            >
-                              {option.subtitle}
-                            </Text>
+                                {option.chip}
+                              </Text>
+                            </View>
                           ) : null}
                         </View>
-                        <Text
-                          style={[
-                            styles.check,
-                            active ? styles.checkOn : styles.checkOff,
-                            option.danger && active && styles.checkDanger,
-                          ]}
-                        >
-                          {active ? '\u2713' : ''}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
+                        {option.subtitle ? (
+                          <Text
+                            style={[styles.subtitle, active && styles.subtitleOn]}
+                            numberOfLines={2}
+                          >
+                            {option.subtitle}
+                          </Text>
+                        ) : null}
+                      </View>
+                      <Text
+                        style={[
+                          styles.check,
+                          active ? styles.checkOn : styles.checkOff,
+                          option.danger && active && styles.checkDanger,
+                        ]}
+                      >
+                        {active ? '\u2713' : ''}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
               </View>
-            ))}
-          </ScrollView>
-          <Button testID="sheet-cancel" label={cancelLabel} variant="ghost" onPress={onClose} />
-        </View>
-      </KeyboardAvoidingView>
+            </View>
+          ))}
+        </ScrollView>
+        <Button testID="sheet-cancel" label={cancelLabel} variant="ghost" onPress={onClose} />
+      </View>
+    </KeyboardAvoidingView>
+  );
+
+  if (embedded) {
+    return <View style={styles.embeddedHost}>{body}</View>;
+  }
+
+  return (
+    <Modal
+      visible
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+      statusBarTranslucent
+      presentationStyle="overFullScreen"
+    >
+      {body}
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  embeddedHost: {
+    ...StyleSheet.absoluteFill,
+    zIndex: 20,
+  },
   frame: {
     flex: 1,
     justifyContent: 'flex-end',

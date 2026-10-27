@@ -11,6 +11,8 @@ type Props = {
   closeIcon?: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
+  /** Rendered above the sheet inside the same Modal (avoids nested Modal on iOS). */
+  overlay?: ReactNode;
   testID?: string;
 };
 
@@ -22,6 +24,7 @@ export function Sheet({
   closeIcon,
   children,
   footer,
+  overlay,
   testID,
 }: Props) {
   return (
@@ -33,7 +36,12 @@ export function Sheet({
           onPress={onClose}
           style={[StyleSheet.absoluteFill, styles.backdrop]}
         />
-        <View style={styles.sheet} testID={testID}>
+        <View
+          style={styles.sheet}
+          testID={testID}
+          // Keep sheet touches from falling through to the backdrop Pressable on iOS.
+          onStartShouldSetResponder={() => true}
+        >
           <View style={styles.titleRow}>
             <Text style={styles.title} numberOfLines={1}>
               {title}
@@ -46,18 +54,20 @@ export function Sheet({
               hitSlop={8}
               style={styles.close}
             >
-              {closeIcon ?? <Text style={styles.closeGlyph}>{'\u00D7'}</Text>}
+              {closeIcon ?? <Text style={styles.closeGlyph}>{'×'}</Text>}
             </Pressable>
           </View>
           <ScrollView
             style={styles.body}
             contentContainerStyle={styles.bodyContent}
             keyboardShouldPersistTaps="handled"
+            nestedScrollEnabled
           >
             {children}
           </ScrollView>
           {footer ? <View style={styles.footer}>{footer}</View> : null}
         </View>
+        {overlay}
       </KeyboardAvoidingView>
     </Modal>
   );

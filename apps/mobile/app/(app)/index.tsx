@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   QR_PROFILES,
@@ -78,6 +78,7 @@ export default function DeviceScreen() {
   const [qr, setQr] = useState<EthAirgapQr | null>(null);
   const [qrProfile, setQrProfile] = useState<QrProfile | null>(null);
   const [formatSheet, setFormatSheet] = useState(false);
+  const [formatOpening, setFormatOpening] = useState(false);
   const [qrRefreshing, setQrRefreshing] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
   const [scanProgress, setScanProgress] = useState<{ received: number; expected: number } | null>(null);
@@ -160,6 +161,7 @@ export default function DeviceScreen() {
       return;
     }
     setFormatSheet(false);
+    setFormatOpening(false);
     setQrRefreshing(true);
     void exportQrAccount(profile, format)
       .then((next) => {
@@ -264,6 +266,51 @@ export default function DeviceScreen() {
   const qrFormat = qr?.format ?? (qrProfile ? defaultQrFormat(qrProfile) : 'eth-hdkey');
   const showFormatPicker = Boolean(qrProfile);
   const formatDefaultId = qrProfile ? defaultQrFormat(qrProfile) : null;
+  const formatBusy = formatOpening || formatSheet || qrRefreshing;
+
+  const openFormatPicker = useCallback(() => {
+    if (qrRefreshing || formatSheet || formatOpening) {
+      return;
+    }
+    // Paint spinner/overlay first so the tap feels instant, then open the picker.
+    setFormatOpening(true);
+    requestAnimationFrame(() => {
+      setFormatSheet(true);
+      setFormatOpening(false);
+    });
+  }, [formatOpening, formatSheet, qrRefreshing]);
+
+  const formatGroups = useMemo(() => {
+    if (!qrProfile) {
+      return [];
+    }
+    return groupQrFormats(qrFormatsFor(qrProfile)).map((group) => ({
+      id: group.id,
+      label: t(`device.qrFormatGroup.${group.id}`),
+      options: group.formats.map((id) => {
+        const isDefault = id === formatDefaultId;
+        const chip =
+          id === 'crypto-seed'
+            ? t('device.qrFormatGroup.sensitive')
+            : isDefault
+              ? t('device.qrFormatDefault')
+              : id === 'eth-multi'
+                ? 'OKX'
+                : id === 'eth-hdkey' || id === 'eth-account'
+                  ? t('device.qrWalletsRabby')
+                  : id === 'bbqr-xpub'
+                    ? 'Sparrow'
+                    : undefined;
+        return {
+          id,
+          label: t(`device.qrFormatOption.${id}`),
+          subtitle: qrFormatDetail(id),
+          chip,
+          danger: id === 'crypto-seed',
+        };
+      }),
+    }));
+  }, [formatDefaultId, qrProfile, t]);
 
   if (!hydrated) {
     return (
@@ -518,6 +565,7 @@ export default function DeviceScreen() {
       onClose={() => {
         setQrSheet(false);
         setFormatSheet(false);
+        setFormatOpening(false);
         setQrRefreshing(false);
         setQr(null);
         setQrProfile(null);
@@ -525,15 +573,50 @@ export default function DeviceScreen() {
       closeLabel={t('common.close')}
       closeIcon={<Ionicons name="close" size={22} color={colors.text} />}
       testID="device-qr-sheet"
+      overlay={
+        showFormatPicker && qrProfile && formatSheet ? (
+          <GroupedSelectSheet
+            embedded
+            visible={formatSheet}
+            title={t('device.qrFormat')}
+            selectedId={qrFormat}
+            groups={formatGroups}
+            onSelect={(id) => {
+              if (!isQrFormatId(id) || !qrProfile) {
+                setFormatSheet(false);
+                return;
+              }
+              if (id === qrFormat) {
+                setFormatSheet(false);
+                return;
+              }
+              onRefreshQrFormat(qrProfile, id);
+            }}
+            onClose={() => setFormatSheet(false)}
+            cancelLabel={t('common.cancel')}
+            searchPlaceholder={t('common.search')}
+            testIDPrefix="device-qr-format-"
+          />
+        ) : null
+      }
     >
       <Text style={styles.hint}>{qrHint}</Text>
       {qr ? (
         <>
           <View style={styles.qrStage}>
-            <View style={[styles.qrMatrixWrap, qrRefreshing && styles.qrMatrixDimmed]}>
-              <QrMatrix value={qr.ur} parts={qr.parts} />
+            <View
+              style={[
+                styles.qrMatrixWrap,
+                (qrRefreshing || formatOpening) && styles.qrMatrixDimmed,
+              ]}
+            >
+              <QrMatrix
+                value={qr.ur}
+                parts={qr.parts}
+                paused={formatBusy}
+              />
             </View>
-            {qrRefreshing ? (
+            {qrRefreshing || formatOpening ? (
               <View style={styles.qrRefreshOverlay} pointerEvents="none">
                 <ActivityIndicator color={colors.ok} />
                 <Text style={styles.qrRefreshLabel}>{t('device.qrPreparing')}</Text>
@@ -550,21 +633,26 @@ export default function DeviceScreen() {
           </Text>
           {showFormatPicker && qrProfile ? (
             <Pressable
+              testID="device-qr-path"
               accessibilityRole="button"
               accessibilityLabel={t('device.qrPathHint')}
-              disabled={qrRefreshing}
-              onPress={() => setFormatSheet(true)}
+              disabled={formatBusy}
+              onPress={openFormatPicker}
               style={({ pressed }) => [
                 styles.pathRow,
-                pressed && !qrRefreshing && styles.pathRowPressed,
-                qrRefreshing && styles.rowDisabled,
+                pressed && !formatBusy && styles.pathRowPressed,
+                formatBusy && styles.rowDisabled,
               ]}
             >
               <View style={styles.pathCopy}>
                 <Text style={styles.pathValue}>{qr.path}</Text>
                 <Text style={styles.pathMeta}>{t('device.qrPathFollowsFormat')}</Text>
               </View>
-              <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+              {formatBusy ? (
+                <ActivityIndicator color={colors.ok} />
+              ) : (
+                <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+              )}
             </Pressable>
           ) : (
             <Text style={styles.hint}>{qr.path}</Text>
@@ -574,72 +662,28 @@ export default function DeviceScreen() {
               testID="device-qr-format"
               accessibilityRole="button"
               accessibilityLabel={t('device.qrFormat')}
-              disabled={qrRefreshing}
-              onPress={() => setFormatSheet(true)}
+              disabled={formatBusy}
+              onPress={openFormatPicker}
               style={({ pressed }) => [
                 styles.formatRow,
-                pressed && !qrRefreshing && styles.pathRowPressed,
-                qrRefreshing && styles.rowDisabled,
+                pressed && !formatBusy && styles.pathRowPressed,
+                formatBusy && styles.rowDisabled,
               ]}
             >
               <Text style={styles.formatLabel}>{t('device.qrFormat')}</Text>
               <View style={styles.formatValueWrap}>
                 <Text style={styles.formatValue}>{t(`device.qrFormatOption.${qrFormat}`)}</Text>
-                <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+                {formatBusy ? (
+                  <ActivityIndicator color={colors.ok} />
+                ) : (
+                  <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+                )}
               </View>
             </Pressable>
           ) : null}
         </>
       ) : null}
     </Sheet>
-    {qrProfile ? (
-      <GroupedSelectSheet
-        visible={formatSheet}
-        title={t('device.qrFormat')}
-        selectedId={qrFormat}
-        groups={groupQrFormats(qrFormatsFor(qrProfile)).map((group) => ({
-          id: group.id,
-          label: t(`device.qrFormatGroup.${group.id}`),
-          options: group.formats.map((id) => {
-            const isDefault = id === formatDefaultId;
-            const chip =
-              id === 'crypto-seed'
-                ? t('device.qrFormatGroup.sensitive')
-                : isDefault
-                  ? t('device.qrFormatDefault')
-                  : id === 'eth-multi'
-                    ? 'OKX'
-                    : id === 'eth-hdkey' || id === 'eth-account'
-                      ? t('device.qrWalletsRabby')
-                      : id === 'bbqr-xpub'
-                        ? 'Sparrow'
-                        : undefined;
-            return {
-              id,
-              label: t(`device.qrFormatOption.${id}`),
-              subtitle: qrFormatDetail(id),
-              chip,
-              danger: id === 'crypto-seed',
-            };
-          }),
-        }))}
-        onSelect={(id) => {
-          if (!isQrFormatId(id) || !qrProfile) {
-            setFormatSheet(false);
-            return;
-          }
-          if (id === qrFormat) {
-            setFormatSheet(false);
-            return;
-          }
-          onRefreshQrFormat(qrProfile, id);
-        }}
-        onClose={() => setFormatSheet(false)}
-        cancelLabel={t('common.cancel')}
-        searchPlaceholder={t('common.search')}
-        testIDPrefix="device-qr-format-"
-      />
-    ) : null}
     </>
   );
 }
