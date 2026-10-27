@@ -3,7 +3,10 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   QR_PROFILES,
+  defaultQrFormat,
+  groupQrFormats,
   isQrFormatId,
+  qrFormatDetail,
   qrFormatsFor,
   type EthAirgapQr,
   type QrFormatId,
@@ -22,6 +25,7 @@ import {
   BRAND_LABEL,
   Button,
   DeviceCard,
+  GroupedSelectSheet,
   Screen,
   SelectSheet,
   Sheet,
@@ -74,6 +78,7 @@ export default function DeviceScreen() {
   const [qr, setQr] = useState<EthAirgapQr | null>(null);
   const [qrProfile, setQrProfile] = useState<QrProfile | null>(null);
   const [formatSheet, setFormatSheet] = useState(false);
+  const [qrRefreshing, setQrRefreshing] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
   const [scanProgress, setScanProgress] = useState<{ received: number; expected: number } | null>(null);
   const lastPart = useRef('');
@@ -135,18 +140,38 @@ export default function DeviceScreen() {
       setLocalError(t('device.qrNeedSeed'));
       return;
     }
-    void runWithLoading(
-      t('device.qrPreparing'),
-      () => exportQrAccount(profile, format ?? (profile.id === 'coldcard' ? 'bbqr-xpub' : 'eth-hdkey')),
-    )
+    const nextFormat = format ?? defaultQrFormat(profile);
+    void runWithLoading(t('device.qrPreparing'), () => exportQrAccount(profile, nextFormat))
       .then((next) => {
         setQr(next);
         setQrProfile(profile);
         setQrSheet(true);
+        setQrRefreshing(false);
         setLocalError(null);
       })
       .catch((err) => {
         setLocalError(err instanceof Error ? t(err.message) : t('device.qrNeedSeed'));
+      });
+  };
+
+  const onRefreshQrFormat = (profile: QrProfile, format: QrFormatId) => {
+    if (!seed) {
+      setLocalError(t('device.qrNeedSeed'));
+      return;
+    }
+    setFormatSheet(false);
+    setQrRefreshing(true);
+    void exportQrAccount(profile, format)
+      .then((next) => {
+        setQr(next);
+        setQrProfile(profile);
+        setLocalError(null);
+      })
+      .catch((err) => {
+        setLocalError(err instanceof Error ? t(err.message) : t('device.qrNeedSeed'));
+      })
+      .finally(() => {
+        setQrRefreshing(false);
       });
   };
 
@@ -236,8 +261,9 @@ export default function DeviceScreen() {
     }
     return t('device.qrHintRabby', { name: t(`device.qrBrand.${qrProfile.id}`) });
   })();
-  const qrFormat = qr?.format ?? (qrProfile?.id === 'coldcard' ? 'bbqr-xpub' : 'eth-hdkey');
+  const qrFormat = qr?.format ?? (qrProfile ? defaultQrFormat(qrProfile) : 'eth-hdkey');
   const showFormatPicker = Boolean(qrProfile);
+  const formatDefaultId = qrProfile ? defaultQrFormat(qrProfile) : null;
 
   if (!hydrated) {
     return (
@@ -492,6 +518,7 @@ export default function DeviceScreen() {
       onClose={() => {
         setQrSheet(false);
         setFormatSheet(false);
+        setQrRefreshing(false);
         setQr(null);
         setQrProfile(null);
       }}
@@ -502,7 +529,17 @@ export default function DeviceScreen() {
       <Text style={styles.hint}>{qrHint}</Text>
       {qr ? (
         <>
-          <QrMatrix value={qr.ur} parts={qr.parts} />
+          <View style={styles.qrStage}>
+            <View style={[styles.qrMatrixWrap, qrRefreshing && styles.qrMatrixDimmed]}>
+              <QrMatrix value={qr.ur} parts={qr.parts} />
+            </View>
+            {qrRefreshing ? (
+              <View style={styles.qrRefreshOverlay} pointerEvents="none">
+                <ActivityIndicator color={colors.ok} />
+                <Text style={styles.qrRefreshLabel}>{t('device.qrPreparing')}</Text>
+              </View>
+            ) : null}
+          </View>
           <Text
             style={styles.hint}
             onPress={() => {
@@ -511,36 +548,91 @@ export default function DeviceScreen() {
           >
             {qr.address}
           </Text>
-          <Text style={styles.hint}>{qr.path}</Text>
+          {showFormatPicker && qrProfile ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('device.qrPathHint')}
+              disabled={qrRefreshing}
+              onPress={() => setFormatSheet(true)}
+              style={({ pressed }) => [
+                styles.pathRow,
+                pressed && !qrRefreshing && styles.pathRowPressed,
+                qrRefreshing && styles.rowDisabled,
+              ]}
+            >
+              <View style={styles.pathCopy}>
+                <Text style={styles.pathValue}>{qr.path}</Text>
+                <Text style={styles.pathMeta}>{t('device.qrPathFollowsFormat')}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+            </Pressable>
+          ) : (
+            <Text style={styles.hint}>{qr.path}</Text>
+          )}
           {showFormatPicker && qrProfile ? (
             <Pressable
               testID="device-qr-format"
               accessibilityRole="button"
               accessibilityLabel={t('device.qrFormat')}
+              disabled={qrRefreshing}
               onPress={() => setFormatSheet(true)}
-              style={styles.formatRow}
+              style={({ pressed }) => [
+                styles.formatRow,
+                pressed && !qrRefreshing && styles.pathRowPressed,
+                qrRefreshing && styles.rowDisabled,
+              ]}
             >
-              <Text style={styles.hint}>{t('device.qrFormat')}</Text>
-              <Text style={styles.formatValue}>{t(`device.qrFormatOption.${qrFormat}`)}</Text>
+              <Text style={styles.formatLabel}>{t('device.qrFormat')}</Text>
+              <View style={styles.formatValueWrap}>
+                <Text style={styles.formatValue}>{t(`device.qrFormatOption.${qrFormat}`)}</Text>
+                <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+              </View>
             </Pressable>
           ) : null}
         </>
       ) : null}
     </Sheet>
     {qrProfile ? (
-      <SelectSheet
+      <GroupedSelectSheet
         visible={formatSheet}
         title={t('device.qrFormat')}
         selectedId={qrFormat}
-        options={qrFormatsFor(qrProfile).map((id) => ({
-          id,
-          label: t(`device.qrFormatOption.${id}`),
+        groups={groupQrFormats(qrFormatsFor(qrProfile)).map((group) => ({
+          id: group.id,
+          label: t(`device.qrFormatGroup.${group.id}`),
+          options: group.formats.map((id) => {
+            const isDefault = id === formatDefaultId;
+            const chip =
+              id === 'crypto-seed'
+                ? t('device.qrFormatGroup.sensitive')
+                : isDefault
+                  ? t('device.qrFormatDefault')
+                  : id === 'eth-multi'
+                    ? 'OKX'
+                    : id === 'eth-hdkey' || id === 'eth-account'
+                      ? t('device.qrWalletsRabby')
+                      : id === 'bbqr-xpub'
+                        ? 'Sparrow'
+                        : undefined;
+            return {
+              id,
+              label: t(`device.qrFormatOption.${id}`),
+              subtitle: qrFormatDetail(id),
+              chip,
+              danger: id === 'crypto-seed',
+            };
+          }),
         }))}
         onSelect={(id) => {
-          setFormatSheet(false);
-          if (isQrFormatId(id)) {
-            onOpenQr(qrProfile, id);
+          if (!isQrFormatId(id) || !qrProfile) {
+            setFormatSheet(false);
+            return;
           }
+          if (id === qrFormat) {
+            setFormatSheet(false);
+            return;
+          }
+          onRefreshQrFormat(qrProfile, id);
         }}
         onClose={() => setFormatSheet(false)}
         cancelLabel={t('common.cancel')}
@@ -633,16 +725,95 @@ const styles = StyleSheet.create({
     fontSize: 10,
     letterSpacing: 0.4,
   },
-  formatRow: {
-    minHeight: 44,
+  qrStage: {
+    alignSelf: 'center',
+    width: 280,
+    height: 280,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  qrMatrixWrap: {
+    width: 280,
+    height: 280,
+  },
+  qrMatrixDimmed: {
+    opacity: 0.22,
+  },
+  qrRefreshOverlay: {
+    ...StyleSheet.absoluteFill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: space.sm,
+    backgroundColor: 'rgba(7, 8, 10, 0.28)',
+  },
+  qrRefreshLabel: {
+    color: colors.text,
+    fontFamily: fonts.monoMedium,
+    fontSize: 11,
+    letterSpacing: 0.8,
+  },
+  pathRow: {
+    minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: space.md,
+    borderRadius: radius.sm,
+    borderWidth: hairline,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+    paddingHorizontal: space.md,
+    paddingVertical: space.sm,
+  },
+  pathRowPressed: {
+    opacity: 0.85,
+  },
+  pathCopy: {
+    flex: 1,
+    gap: 2,
+    minWidth: 0,
+  },
+  pathValue: {
+    color: colors.text,
+    fontFamily: fonts.mono,
+    fontSize: 12,
+  },
+  pathMeta: {
+    color: colors.muted,
+    fontFamily: fonts.sans,
+    fontSize: 11,
+    lineHeight: 15,
+  },
+  formatRow: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: space.md,
+    borderRadius: radius.sm,
+    borderWidth: hairline,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+    paddingHorizontal: space.md,
+    paddingVertical: space.sm,
+  },
+  formatLabel: {
+    color: colors.muted,
+    fontFamily: fonts.sans,
+    fontSize: 13,
+  },
+  formatValueWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    flexShrink: 1,
   },
   formatValue: {
     color: colors.text,
     fontFamily: fonts.sansSemi,
     fontSize: 13,
+  },
+  rowDisabled: {
+    opacity: 0.45,
   },
 });
