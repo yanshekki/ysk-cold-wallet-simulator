@@ -1,4 +1,5 @@
-import { Switch, Text, TextInput, View } from 'react-native';
+import { Pressable, Switch, Text, TextInput, View } from 'react-native';
+import { HOLD_CONFIRM_SECONDS } from '@cws/contracts';
 import { useT } from '../../../src/i18n';
 import { useAppState } from '../../../src/state/AppState';
 import { SettingsScreen } from '../../../src/settings/screen';
@@ -42,6 +43,26 @@ export default function SecuritySettingsScreen() {
           keyboardType="number-pad"
           style={styles.input}
         />
+        <Text style={styles.label}>{t('settings.holdDuration')}</Text>
+        <View testID="security-hold-duration" style={styles.row}>
+          {HOLD_CONFIRM_SECONDS.map((seconds) => (
+            <Pressable
+              key={seconds}
+              testID={`hold-duration-${seconds}`}
+              accessibilityRole="button"
+              accessibilityState={{ selected: settings.holdDurationSeconds === seconds }}
+              onPress={() => void patchSettings({ holdDurationSeconds: seconds })}
+              style={[styles.chip, settings.holdDurationSeconds === seconds && styles.chipOn]}
+            >
+              <Text
+                style={[styles.chipLabel, settings.holdDurationSeconds === seconds && styles.chipLabelOn]}
+              >
+                {seconds}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+        <Text style={styles.meta}>{t('settings.holdDurationHelp')}</Text>
       </View>
     </SettingsScreen>
   );

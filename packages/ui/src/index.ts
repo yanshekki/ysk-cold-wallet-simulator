@@ -7,7 +7,7 @@ export { SigningModal } from './SigningModal';
 export { SigningDetailView, type SigningCopy } from './SigningDetail';
 export { SelectSheet, type SelectSheetOption } from './SelectSheet';
 export { Sheet } from './Sheet';
-export { SlideToConfirm } from './SlideToConfirm';
+export { HoldToConfirm } from './HoldToConfirm';
 export { LogEditor, type LogEditorLabels } from './LogEditor';
 export { formatHex, formatLogText } from './logFormat';
 export {

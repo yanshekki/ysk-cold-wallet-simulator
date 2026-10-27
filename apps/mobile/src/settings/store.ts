@@ -2,8 +2,14 @@ import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import * as Localization from 'expo-localization';
 import type { ChainPathMap, LedgerInstalledApp } from '@cws/contracts';
-import { resetLedgerCatalogOverlay, setLedgerCatalogOverlay, type SeedSlot } from '@cws/contracts';
-import { isAppLanguage, type AppLanguage } from '../i18n';
+import {
+  HOLD_CONFIRM_DEFAULT_SECONDS,
+  clampHoldDuration,
+  resetLedgerCatalogOverlay,
+  setLedgerCatalogOverlay,
+  type SeedSlot,
+} from '@cws/contracts';
+import { isAppLanguage, type AppLanguage } from '../i18n/translate';
 
 const SETTINGS_KEY = 'cws.settings.v1';
 const ACTIVE_KEY = 'cws.activeSlot';
@@ -19,6 +25,7 @@ export type AppSettings = {
   faceIdEnabled: boolean;
   signReauth: boolean;
   autoLockMinutes: number;
+  holdDurationSeconds: number;
   catalogUpdatedAt: number | null;
   defaultPaths: ChainPathMap;
 };
@@ -32,9 +39,26 @@ export const DEFAULT_SETTINGS: AppSettings = {
   faceIdEnabled: true,
   signReauth: false,
   autoLockMinutes: 15,
+  holdDurationSeconds: HOLD_CONFIRM_DEFAULT_SECONDS,
   catalogUpdatedAt: null,
   defaultPaths: {},
 };
+
+export function normalizeSettings(
+  parsed: Partial<AppSettings>,
+  fallbackLanguage: AppLanguage,
+): AppSettings {
+  const storedLang = parsed.language ?? '';
+  const language = isAppLanguage(storedLang) ? storedLang : fallbackLanguage;
+  return {
+    ...DEFAULT_SETTINGS,
+    ...parsed,
+    language,
+    holdDurationSeconds: clampHoldDuration(
+      parsed.holdDurationSeconds ?? DEFAULT_SETTINGS.holdDurationSeconds,
+    ),
+  };
+}
 
 function webGet(key: string): string | null {
   try {
@@ -91,15 +115,13 @@ export async function loadSettings(): Promise<AppSettings> {
   const raw = await readRaw(SETTINGS_KEY);
   const detected = detectLanguage();
   if (!raw) {
-    return { ...DEFAULT_SETTINGS, language: detected };
+    return normalizeSettings({}, detected);
   }
   try {
     const parsed = JSON.parse(raw) as Partial<AppSettings>;
-    const storedLang = parsed.language ?? '';
-    const language = isAppLanguage(storedLang) ? storedLang : detected;
-    return { ...DEFAULT_SETTINGS, ...parsed, language };
+    return normalizeSettings(parsed, detected);
   } catch {
-    return { ...DEFAULT_SETTINGS, language: detected };
+    return normalizeSettings({}, detected);
   }
 }
 

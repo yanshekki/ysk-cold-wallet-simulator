@@ -4,7 +4,7 @@ tags:
   - security
 ---
 # Given Settings → Security
-# When the biometric toggle, sign re-auth, and auto-lock are shown
+# When the biometric toggle, sign re-auth, auto-lock, and hold duration are shown
 # Then the controls are tappable without leaving the screen
 - runFlow: onboarding.yaml
 - tapOn:
@@ -21,6 +21,14 @@ tags:
     id: "security-sign-reauth"
 - assertVisible:
     id: "security-autolock"
+- assertVisible:
+    id: "security-hold-duration"
+- assertVisible:
+    id: "hold-duration-3"
+- tapOn:
+    id: "hold-duration-5"
+- tapOn:
+    id: "hold-duration-3"
 - tapOn:
     id: "screen-back"
 - assertVisible:

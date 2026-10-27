@@ -3,7 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ledgerAppChip, signingSlideLabel } from '@cws/contracts';
+import { ledgerAppChip, signingHoldLabel } from '@cws/contracts';
 import {
   Hud,
   PairingTakeover,
@@ -36,6 +36,7 @@ export default function AppShell() {
     toast,
     lock,
     resolveSigning,
+    settings,
   } = useAppState();
   const [now, setNow] = useState(() => Date.now());
 
@@ -101,7 +102,8 @@ export default function AppShell() {
         request={pending}
         onConfirm={() => resolveSigning(true)}
         onReject={() => resolveSigning(false)}
-        slideLabel={t(signingSlideLabel(pending?.kind ?? 'sign'))}
+        holdLabel={t(signingHoldLabel(pending?.kind ?? 'sign'))}
+        holdDurationSeconds={settings.holdDurationSeconds}
         rejectLabel={t('signing.reject')}
         confirmTitle={t('signing.title')}
         sessionPassphraseApplied={sessionPassphraseApplied}

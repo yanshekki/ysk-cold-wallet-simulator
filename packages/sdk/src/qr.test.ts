@@ -54,7 +54,7 @@ describe('QR export policy', () => {
     ).rejects.toThrow('errors.qrExportRejected');
   });
 
-  it('exports eth-hdkey without a slide-to-confirm', async () => {
+  it('exports eth-hdkey without a hold-to-confirm', async () => {
     const seed = mnemonicToSeedSync(FOUNDATION);
     const confirmation = port(true);
     const qr = await exportQrAccountWithPolicy({
