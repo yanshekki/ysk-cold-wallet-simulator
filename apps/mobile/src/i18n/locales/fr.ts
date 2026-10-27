@@ -191,9 +191,17 @@ export const fr: MessageTree = {
     colVersion: 'Version',
     bundled: 'intégrée',
     session: 'Session',
-    faceId: 'Face ID',
+    faceId: {
+      ios: 'Face ID / Touch ID',
+      android: 'Biométrie',
+      default: 'Biométrie',
+    },
     signReauth: 'Réauthentifier pour signer',
-    signReauthHelp: 'Face ID après le glissement, avant la signature.',
+    signReauthHelp: {
+      ios: 'Confirmez avec Face ID ou Touch ID après le glissement, avant la signature.',
+      android: 'Confirmez avec l’empreinte ou le code de l’appareil après le glissement, avant la signature.',
+      default: 'Confirmez avec la biométrie ou le code de l’appareil après le glissement, avant la signature.',
+    },
     autoLock: 'Verrouillage auto (minutes)',
     bleSuffix: 'Suffixe BLE',
     blePreview: '{{name}}',
@@ -280,10 +288,18 @@ export const fr: MessageTree = {
     title: 'YSK',
     button: 'Déverrouiller',
     enroll: 'Définissez un code ou une biométrie.',
-    fallback: 'Utilisez Face ID ou le code de l’appareil.',
+    fallback: {
+      ios: 'Utilisez Face ID, Touch ID ou le code de l’appareil.',
+      android: 'Utilisez l’empreinte ou le code de l’appareil.',
+      default: 'Utilisez la biométrie ou le code de l’appareil.',
+    },
     webDev: 'Utilisez un appareil physique.',
     devSkip: 'Le déverrouillage n’est pas disponible sur cet appareil.',
-    enrolled: 'Face ID ou code de l’appareil.',
+    enrolled: {
+      ios: 'Face ID, Touch ID ou code de l’appareil.',
+      android: 'Empreinte ou code de l’appareil.',
+      default: 'Biométrie ou code de l’appareil.',
+    },
     notEnrolled: 'Définissez un code ou une biométrie.',
     prompt: 'Déverrouiller',
     failed: 'Échec du déverrouillage',
@@ -357,8 +373,14 @@ export const fr: MessageTree = {
     noSecretsBody:
       'YSK n’exploite pas de compte ni de serveur CWS recevant des Secrets. Les Secrets restent sur votre appareil (y compris le stockage sécurisé du système et la session en mémoire), sauf si vous les copiez, exportez ou transmettez vous-même (y compris à un Hôte en Bluetooth).',
     onDeviceTitle: 'Informations sur cet appareil',
-    onDeviceBody:
-      'Le Logiciel stocke sur l’appareil : les réglages, la langue, les graines que vous générez ou importez, les journaux APDU, le suffixe BLE et l’état local associé. Face ID et le code de l’appareil sont traités par le système d’exploitation. YSK ne peut pas extraire, réinitialiser ni récupérer des Secrets depuis votre appareil.',
+    onDeviceBody: {
+      ios:
+        'Le Logiciel stocke sur l’appareil : les réglages, la langue, les graines que vous générez ou importez, les journaux APDU, le suffixe BLE et l’état local associé. Face ID, Touch ID et le code de l’appareil sont traités par le système d’exploitation. YSK ne peut pas extraire, réinitialiser ni récupérer des Secrets depuis votre appareil.',
+      android:
+        'Le Logiciel stocke sur l’appareil : les réglages, la langue, les graines que vous générez ou importez, les journaux APDU, le suffixe BLE et l’état local associé. La biométrie et le code de l’appareil sont traités par le système d’exploitation. YSK ne peut pas extraire, réinitialiser ni récupérer des Secrets depuis votre appareil.',
+      default:
+        'Le Logiciel stocke sur l’appareil : les réglages, la langue, les graines que vous générez ou importez, les journaux APDU, le suffixe BLE et l’état local associé. La biométrie et le code de l’appareil sont traités par le système d’exploitation. YSK ne peut pas extraire, réinitialiser ni récupérer des Secrets depuis votre appareil.',
+    },
     transfersTitle: 'Quand des informations quittent l’appareil',
     transfersBody:
       'Uniquement si vous utilisez la fonction : (a) l’APDU Bluetooth vers un Hôte que vous connectez (radio locale, pas les serveurs YSK) peut inclure des commandes, des clés publiques et des charges de transaction que vous approuvez ; (b) Apple ou Google, en tant qu’opérateur du système et de la boutique, peuvent traiter des identifiants d’installation, de plantage et d’appareil selon leurs conditions ; (c) l’ouverture de ysk.hk utilise le navigateur du système, et non un client réseau de CWS ; (d) si vous mettez à jour les apps Ledger, CWS interroge le catalogue public Ledger Manager de l’appareil sélectionné. Cette requête ne contient pas de Secrets. YSK n’inclut pas de SDK publicitaire ou d’analytique produit tiers.',

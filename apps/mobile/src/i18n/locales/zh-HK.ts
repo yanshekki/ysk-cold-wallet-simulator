@@ -191,9 +191,17 @@ export const zhHK: MessageTree = {
     colVersion: '版本',
     bundled: '內建',
     session: '工作階段',
-    faceId: 'Face ID',
+    faceId: {
+      ios: 'Face ID／Touch ID',
+      android: '生物識別',
+      default: '生物識別',
+    },
     signReauth: '簽署再認證',
-    signReauthHelp: '滑動確認後須通過 Face ID，方會產生簽名。',
+    signReauthHelp: {
+      ios: '滑動確認後須通過 Face ID、Touch ID 或裝置密碼，方會產生簽名。',
+      android: '滑動確認後須通過指紋或裝置密碼，方會產生簽名。',
+      default: '滑動確認後須通過生物識別或裝置密碼，方會產生簽名。',
+    },
     autoLock: '自動鎖定（分鐘）',
     bleSuffix: '藍牙名稱後綴',
     blePreview: '{{name}}',
@@ -280,10 +288,18 @@ export const zhHK: MessageTree = {
     title: 'YSK',
     button: '解鎖',
     enroll: '請先設定螢幕鎖定 PIN 或生物識別。',
-    fallback: '請使用 Face ID 或裝置密碼。',
+    fallback: {
+      ios: '請使用 Face ID、Touch ID 或裝置密碼。',
+      android: '請使用指紋或裝置密碼。',
+      default: '請使用生物識別或裝置密碼。',
+    },
     webDev: '請使用實體裝置。',
     devSkip: '此裝置無法解鎖。',
-    enrolled: 'Face ID 或裝置密碼。',
+    enrolled: {
+      ios: 'Face ID、Touch ID 或裝置密碼。',
+      android: '指紋或裝置密碼。',
+      default: '生物識別或裝置密碼。',
+    },
     notEnrolled: '請先設定螢幕鎖定 PIN 或生物識別。',
     prompt: '解鎖',
     failed: '解鎖失敗',
@@ -357,8 +373,14 @@ export const zhHK: MessageTree = {
     noSecretsBody:
       'YSK 並不營運會接收秘密資料的 CWS 帳戶或後端。秘密資料留在你的裝置（包括系統安全儲存及記憶體工作階段），除非你自行複製、匯出或傳送（包括經藍牙傳至主機）。',
     onDeviceTitle: '本裝置上的資料',
-    onDeviceBody:
-      '本軟件在裝置上儲存：設定、語言、你產生或匯入的種子、APDU 紀錄、藍牙名稱後綴及相關本地狀態。Face ID 及裝置密碼由作業系統處理。YSK 無法從你的裝置擷取、重設或尋回秘密資料。',
+    onDeviceBody: {
+      ios:
+        '本軟件在裝置上儲存：設定、語言、你產生或匯入的種子、APDU 紀錄、藍牙名稱後綴及相關本地狀態。Face ID、Touch ID 及裝置密碼由作業系統處理。YSK 無法從你的裝置擷取、重設或尋回秘密資料。',
+      android:
+        '本軟件在裝置上儲存：設定、語言、你產生或匯入的種子、APDU 紀錄、藍牙名稱後綴及相關本地狀態。生物識別及裝置密碼由作業系統處理。YSK 無法從你的裝置擷取、重設或尋回秘密資料。',
+      default:
+        '本軟件在裝置上儲存：設定、語言、你產生或匯入的種子、APDU 紀錄、藍牙名稱後綴及相關本地狀態。生物識別及裝置密碼由作業系統處理。YSK 無法從你的裝置擷取、重設或尋回秘密資料。',
+    },
     transfersTitle: '何時會離開本裝置',
     transfersBody:
       '僅在你使用相關功能時：(a) 經藍牙將 APDU 傳至你連接的主機（本地無線電，並非 YSK 伺服器），可能包括你批准的指令、公鑰及交易內容；(b) Apple 或 Google 作為作業系統及商店營運者，可按其條款處理安裝、當機及裝置識別碼；(c) 開啟 ysk.hk 使用系統瀏覽器，而非 CWS 網絡客戶端；(d) 若你點選「更新 Ledger App」，CWS 會向 Ledger Manager 的公開目錄查詢所選裝置的 App 清單。該請求不含秘密資料。YSK 不含第三方廣告或產品分析 SDK。',

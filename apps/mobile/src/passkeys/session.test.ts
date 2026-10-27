@@ -37,7 +37,7 @@ describe('passkeys session', () => {
     session.setFaceIdEnabled(true);
   });
 
-  it('skips Face ID when the production toggle is off', async () => {
+  it('skips OS authentication when the production toggle is off', async () => {
     getEnrolledLevelAsync.mockResolvedValue(1);
     const { unlock, setFaceIdEnabled } = await import('./session');
     setFaceIdEnabled(false);
@@ -46,7 +46,7 @@ describe('passkeys session', () => {
     setFaceIdEnabled(true);
   });
 
-  it('skips Face ID in a DEV build without calling the platform authenticator', async () => {
+  it('skips OS authentication in a DEV build without calling the platform authenticator', async () => {
     isDevBuild.mockReturnValue(true);
     const { unlock, describeUnlock, DEV_SKIP_MESSAGE } = await import('./session');
     await expect(unlock()).resolves.toBe(true);

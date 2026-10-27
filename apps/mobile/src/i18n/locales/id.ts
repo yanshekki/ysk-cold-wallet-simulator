@@ -191,9 +191,17 @@ export const id: MessageTree = {
     colVersion: 'Version',
     bundled: 'bawaan',
     session: 'Sesi',
-    faceId: 'Face ID',
+    faceId: {
+      ios: 'Face ID / Touch ID',
+      android: 'Biometrik',
+      default: 'Biometrik',
+    },
     signReauth: 'Autentikasi ulang untuk menandatangani',
-    signReauthHelp: 'Face ID setelah geser, sebelum tanda tangan.',
+    signReauthHelp: {
+      ios: 'Konfirmasi dengan Face ID atau Touch ID setelah geser, sebelum tanda tangan dirilis.',
+      android: 'Konfirmasi dengan sidik jari atau kode perangkat setelah geser, sebelum tanda tangan dirilis.',
+      default: 'Konfirmasi dengan biometrik atau kode perangkat setelah geser, sebelum tanda tangan dirilis.',
+    },
     autoLock: 'Kunci otomatis (menit)',
     bleSuffix: 'Akhiran nama BLE',
     blePreview: '{{name}}',
@@ -280,10 +288,18 @@ export const id: MessageTree = {
     title: 'YSK',
     button: 'Buka kunci',
     enroll: 'Atur PIN atau biometrik layar kunci.',
-    fallback: 'Gunakan Face ID atau kode perangkat.',
+    fallback: {
+      ios: 'Gunakan Face ID, Touch ID, atau kode perangkat.',
+      android: 'Gunakan sidik jari atau kode perangkat.',
+      default: 'Gunakan biometrik atau kode perangkat.',
+    },
     webDev: 'Gunakan perangkat fisik.',
     devSkip: 'Buka kunci tidak tersedia di perangkat ini.',
-    enrolled: 'Face ID atau kode perangkat.',
+    enrolled: {
+      ios: 'Face ID, Touch ID, atau kode perangkat.',
+      android: 'Sidik jari atau kode perangkat.',
+      default: 'Biometrik atau kode perangkat.',
+    },
     notEnrolled: 'Atur PIN atau biometrik layar kunci.',
     prompt: 'Buka kunci',
     failed: 'Gagal membuka kunci',
@@ -357,8 +373,14 @@ export const id: MessageTree = {
     noSecretsBody:
       'YSK tidak mengoperasikan akun atau backend CWS yang menerima Rahasia. Rahasia tetap di perangkat Anda (termasuk penyimpanan aman sistem dan sesi di memori), kecuali Anda menyalin, mengekspor, atau mengirimkannya sendiri (termasuk ke Host melalui Bluetooth).',
     onDeviceTitle: 'Informasi pada perangkat ini',
-    onDeviceBody:
-      'Perangkat Lunak menyimpan di perangkat: pengaturan, bahasa, seed yang Anda hasilkan atau impor, log APDU, akhiran nama BLE, dan status lokal terkait. Face ID dan kode perangkat diproses oleh sistem operasi. YSK tidak dapat mengambil, mengatur ulang, atau memulihkan Rahasia dari perangkat Anda.',
+    onDeviceBody: {
+      ios:
+        'Perangkat Lunak menyimpan di perangkat: pengaturan, bahasa, seed yang Anda hasilkan atau impor, log APDU, akhiran nama BLE, dan status lokal terkait. Face ID, Touch ID, dan kode perangkat diproses oleh sistem operasi. YSK tidak dapat mengambil, mengatur ulang, atau memulihkan Rahasia dari perangkat Anda.',
+      android:
+        'Perangkat Lunak menyimpan di perangkat: pengaturan, bahasa, seed yang Anda hasilkan atau impor, log APDU, akhiran nama BLE, dan status lokal terkait. Biometrik dan kode perangkat diproses oleh sistem operasi. YSK tidak dapat mengambil, mengatur ulang, atau memulihkan Rahasia dari perangkat Anda.',
+      default:
+        'Perangkat Lunak menyimpan di perangkat: pengaturan, bahasa, seed yang Anda hasilkan atau impor, log APDU, akhiran nama BLE, dan status lokal terkait. Biometrik dan kode perangkat diproses oleh sistem operasi. YSK tidak dapat mengambil, mengatur ulang, atau memulihkan Rahasia dari perangkat Anda.',
+    },
     transfersTitle: 'Kapan informasi meninggalkan perangkat',
     transfersBody:
       'Hanya jika Anda menggunakan fitur: (a) APDU Bluetooth ke Host yang Anda hubungkan (radio lokal, bukan server YSK) dapat mencakup perintah, kunci publik, dan muatan transaksi yang Anda setujui; (b) Apple atau Google, sebagai operator sistem dan toko, dapat memproses pengenal pemasangan, kerusakan, dan perangkat menurut ketentuan mereka; (c) membuka ysk.hk menggunakan peramban sistem, bukan klien jaringan CWS; (d) jika Anda memperbarui aplikasi Ledger, CWS meminta katalog publik Ledger Manager untuk perangkat yang dipilih. Permintaan itu tidak mencakup Rahasia. YSK tidak menyertakan SDK iklan atau analitik produk pihak ketiga.',

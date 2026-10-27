@@ -158,7 +158,7 @@ await SecureStore.setItemAsync(key, base64Seed, {
 });
 ```
 
-**Tradeoff:** `requireAuthentication: true` is **not** set. Extra biometric prompts on every SecureStore read fail under iPhone Mirroring (“continue on iPhone”). The 15-minute app session already required the platform authenticator. Release builds should keep Settings Face ID on; turning it off still allows Start in the current code.
+**Tradeoff:** `requireAuthentication: true` is **not** set. Extra biometric prompts on every SecureStore read fail under iPhone Mirroring (“continue on iPhone”). The 15-minute app session already required the platform authenticator. Release builds should keep the Settings biometric toggle on; turning it off still allows Start in the current code.
 
 - Android: Hardware-backed Keystore when available
 - iOS: Keychain, device-unlocked
@@ -179,13 +179,13 @@ Each seed is a slot:
 
 ## 5. App Unlock (local authentication)
 
-This repo has **no associated domain**, so full WebAuthn passkeys are not used. Unlock is `expo-local-authentication` (Face ID / device PIN) in `apps/mobile/src/passkeys/session.ts`.
+This repo has **no associated domain**, so full WebAuthn passkeys are not used. Unlock is `expo-local-authentication` (OS biometric / device passcode) in `apps/mobile/src/passkeys/session.ts`.
 
 **Flow:**
 
 1. Disclaimer, then Unlock.
 2. Release: OS biometric / passcode. Success unlocks a session (`autoLockMinutes`, default 15).
-3. Debug: skip the OS prompt so USB/lab tests can proceed (annotated in code).
+3. Debug: skip the OS prompt, Android FLAG_SECURE, and the new-seed verify quiz so USB / screenshot-gated lab tests can proceed (annotated in code). Release keeps all three.
 4. Session expiry returns to `/unlock`. Passphrase overlay is wiped with `SecretSession`.
 
 Do not document this as a resident passkey. A future associated-domain passkey can sit in front of the same session gate.
@@ -231,7 +231,7 @@ export interface ProtocolHandler {
 
 ## 7. App Flow
 
-1. **Unlock** — Face ID / device passcode (debug skip in development)
+1. **Unlock** — OS biometric / device passcode (debug skip in development)
 2. **Device** — Pick a BLE model (`DeviceCard`), optional session passphrase, Start advertising
 3. **Seed Vault** — Generate / import BIP39 or SLIP-39, HD inspect
 4. **Host** — `yarn proxy` / CWS Proxy. USB HID gadget plus the **Testnet host** tab (Ledger / OneKey / Trezor catalogs over the phone BLE link). Signing still confirms on the phone.
@@ -280,9 +280,9 @@ export interface ProtocolHandler {
 - **BLE link is not LE Secure Connections.** Hosts still talk the vendor protocol once GATT is up.
 - **Real devices have Secure Elements.** This is a software simulator. Treat it as a development/testing tool, not a replacement for a hardware wallet for large amounts.
 - Host apps may perform extra checks (Genuine, certificates). Do not expect Ledger Live Genuine to pass.
-- iOS has no `preventScreenCapture` equivalent to Android `FLAG_SECURE`.
+- iOS has no `preventScreenCapture` equivalent to Android `FLAG_SECURE`. Release Android still sets FLAG_SECURE on Vault / secret screens; debug skips it so `adb screencap` QA can see the UI.
 
 ---
 
-**Document version:** 1.2  
+**Document version:** 1.3  
 **Date:** 2026-10-27
