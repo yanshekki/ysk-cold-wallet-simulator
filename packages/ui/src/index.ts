@@ -6,6 +6,11 @@ export { AddressInspector } from './AddressInspector';
 export { SigningModal } from './SigningModal';
 export { SigningDetailView, type SigningCopy } from './SigningDetail';
 export { SelectSheet, type SelectSheetOption } from './SelectSheet';
+export {
+  GroupedSelectSheet,
+  type GroupedSelectGroup,
+  type GroupedSelectOption,
+} from './GroupedSelectSheet';
 export { Sheet } from './Sheet';
 export { HoldToConfirm } from './HoldToConfirm';
 export { LogEditor, type LogEditorLabels } from './LogEditor';

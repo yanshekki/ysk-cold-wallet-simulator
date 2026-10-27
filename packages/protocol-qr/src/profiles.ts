@@ -187,3 +187,96 @@ export function qrFormatsFor(profile: QrProfile): QrFormatId[] {
   }
   return formats;
 }
+
+export type QrFormatGroupId = 'eth' | 'btc' | 'bbqr' | 'sensitive';
+
+export type QrFormatGroup = {
+  id: QrFormatGroupId;
+  formats: QrFormatId[];
+};
+
+const FORMAT_GROUP: Record<QrFormatId, QrFormatGroupId> = {
+  'eth-hdkey': 'eth',
+  'eth-multi': 'eth',
+  'eth-account': 'eth',
+  'btc-hdkey': 'btc',
+  'btc-nested': 'btc',
+  'btc-legacy': 'btc',
+  'btc-taproot': 'btc',
+  'btc-test': 'btc',
+  'btc-output': 'btc',
+  'bbqr-xpub': 'bbqr',
+  'crypto-seed': 'sensitive',
+};
+
+/** Display path that encodeQrAccount puts on the QR for each format. */
+const FORMAT_PATH: Record<QrFormatId, string> = {
+  'eth-hdkey': "m/44'/60'/0'/0/0",
+  'eth-multi': "m/44'/60'/0'/0/0",
+  'eth-account': "m/44'/60'/0'/0/0",
+  'btc-hdkey': "m/84'/0'/0'/0/0",
+  'btc-nested': "m/49'/0'/0'/0/0",
+  'btc-legacy': "m/44'/0'/0'/0/0",
+  'btc-taproot': "m/86'/0'/0'/0/0",
+  'btc-test': "m/84'/1'/0'/0/0",
+  'btc-output': "m/84'/0'/0'/0/0",
+  'bbqr-xpub': "m/84'/0'/0'/0/0",
+  'crypto-seed': 'm',
+};
+
+const FORMAT_UR_LABEL: Record<QrFormatId, string> = {
+  'eth-hdkey': 'crypto-hdkey',
+  'eth-multi': 'crypto-multi-accounts',
+  'eth-account': 'crypto-account',
+  'btc-hdkey': 'crypto-hdkey',
+  'btc-nested': 'crypto-hdkey',
+  'btc-legacy': 'crypto-hdkey',
+  'btc-taproot': 'crypto-hdkey',
+  'btc-test': 'crypto-hdkey',
+  'btc-output': 'crypto-output',
+  'bbqr-xpub': 'BBQr',
+  'crypto-seed': 'crypto-seed',
+};
+
+const GROUP_ORDER: readonly QrFormatGroupId[] = ['eth', 'btc', 'bbqr', 'sensitive'];
+
+export function qrFormatGroupOf(id: QrFormatId): QrFormatGroupId {
+  return FORMAT_GROUP[id];
+}
+
+export function qrFormatPath(id: QrFormatId): string {
+  return FORMAT_PATH[id];
+}
+
+export function qrFormatUrLabel(id: QrFormatId): string {
+  return FORMAT_UR_LABEL[id];
+}
+
+/** Subtitle for format picker rows: encoding kind + derivation path. */
+export function qrFormatDetail(id: QrFormatId): string {
+  return `${FORMAT_UR_LABEL[id]} · ${FORMAT_PATH[id]}`;
+}
+
+export function defaultQrFormat(profile: QrProfile): QrFormatId {
+  return profile.id === 'coldcard' ? 'bbqr-xpub' : 'eth-hdkey';
+}
+
+/**
+ * Group `qrFormatsFor` results for the format picker.
+ * Preserves relative order within each group; omits empty groups.
+ */
+export function groupQrFormats(formats: readonly QrFormatId[]): QrFormatGroup[] {
+  const buckets: Record<QrFormatGroupId, QrFormatId[]> = {
+    eth: [],
+    btc: [],
+    bbqr: [],
+    sensitive: [],
+  };
+  for (const id of formats) {
+    buckets[FORMAT_GROUP[id]].push(id);
+  }
+  return GROUP_ORDER.filter((group) => buckets[group].length > 0).map((id) => ({
+    id,
+    formats: buckets[id],
+  }));
+}
