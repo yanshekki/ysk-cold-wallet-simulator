@@ -191,9 +191,17 @@ export const de: MessageTree = {
     colVersion: 'Version',
     bundled: 'integriert',
     session: 'Sitzung',
-    faceId: 'Face ID',
+    faceId: {
+      ios: 'Face ID / Touch ID',
+      android: 'Biometrie',
+      default: 'Biometrie',
+    },
     signReauth: 'Vor dem Signieren erneut authentifizieren',
-    signReauthHelp: 'Face ID nach dem Schieben, vor der Signatur.',
+    signReauthHelp: {
+      ios: 'Nach dem Schieben mit Face ID oder Touch ID bestätigen, bevor die Signatur erstellt wird.',
+      android: 'Nach dem Schieben mit Fingerabdruck oder Gerätecode bestätigen, bevor die Signatur erstellt wird.',
+      default: 'Nach dem Schieben mit Biometrie oder Gerätecode bestätigen, bevor die Signatur erstellt wird.',
+    },
     autoLock: 'Autosperre (Minuten)',
     bleSuffix: 'BLE-Namenssuffix',
     blePreview: '{{name}}',
@@ -280,10 +288,18 @@ export const de: MessageTree = {
     title: 'YSK',
     button: 'Entsperren',
     enroll: 'Sperrbildschirm-PIN oder Biometrie einrichten.',
-    fallback: 'Face ID oder Gerätecode verwenden.',
+    fallback: {
+      ios: 'Face ID, Touch ID oder Gerätecode verwenden.',
+      android: 'Fingerabdruck oder Gerätecode verwenden.',
+      default: 'Biometrie oder Gerätecode verwenden.',
+    },
     webDev: 'Physisches Gerät verwenden.',
     devSkip: 'Entsperren ist auf diesem Gerät nicht verfügbar.',
-    enrolled: 'Face ID oder Gerätecode.',
+    enrolled: {
+      ios: 'Face ID, Touch ID oder Gerätecode.',
+      android: 'Fingerabdruck oder Gerätecode.',
+      default: 'Biometrie oder Gerätecode.',
+    },
     notEnrolled: 'Sperrbildschirm-PIN oder Biometrie einrichten.',
     prompt: 'Entsperren',
     failed: 'Entsperren fehlgeschlagen',
@@ -357,8 +373,14 @@ export const de: MessageTree = {
     noSecretsBody:
       'YSK betreibt kein CWS-Konto und kein Backend, das Geheimnisse empfängt. Geheimnisse verbleiben auf Ihrem Gerät (einschließlich des sicheren Speichers des Systems und der Sitzung im Arbeitsspeicher), es sei denn, Sie kopieren, exportieren oder übermitteln sie selbst (einschließlich an einen Host per Bluetooth).',
     onDeviceTitle: 'Informationen auf diesem Gerät',
-    onDeviceBody:
-      'Die Software speichert auf dem Gerät: Einstellungen, Sprache, von Ihnen erzeugte oder importierte Seeds, APDU-Protokolle, BLE-Namenssuffix und zugehörigen lokalen Zustand. Face ID und Gerätecode werden vom Betriebssystem verarbeitet. YSK kann Geheimnisse von Ihrem Gerät weder abrufen noch zurücksetzen noch wiederherstellen.',
+    onDeviceBody: {
+      ios:
+        'Die Software speichert auf dem Gerät: Einstellungen, Sprache, von Ihnen erzeugte oder importierte Seeds, APDU-Protokolle, BLE-Namenssuffix und zugehörigen lokalen Zustand. Face ID, Touch ID und Gerätecode werden vom Betriebssystem verarbeitet. YSK kann Geheimnisse von Ihrem Gerät weder abrufen noch zurücksetzen noch wiederherstellen.',
+      android:
+        'Die Software speichert auf dem Gerät: Einstellungen, Sprache, von Ihnen erzeugte oder importierte Seeds, APDU-Protokolle, BLE-Namenssuffix und zugehörigen lokalen Zustand. Biometrie und Gerätecode werden vom Betriebssystem verarbeitet. YSK kann Geheimnisse von Ihrem Gerät weder abrufen noch zurücksetzen noch wiederherstellen.',
+      default:
+        'Die Software speichert auf dem Gerät: Einstellungen, Sprache, von Ihnen erzeugte oder importierte Seeds, APDU-Protokolle, BLE-Namenssuffix und zugehörigen lokalen Zustand. Biometrie und Gerätecode werden vom Betriebssystem verarbeitet. YSK kann Geheimnisse von Ihrem Gerät weder abrufen noch zurücksetzen noch wiederherstellen.',
+    },
     transfersTitle: 'Wann Informationen das Gerät verlassen',
     transfersBody:
       'Nur wenn Sie die Funktion nutzen: (a) Bluetooth-APDU an einen verbundenen Host (lokales Funk, keine YSK-Server) kann von Ihnen freigegebene Befehle, öffentliche Schlüssel und Transaktionsnutzlasten enthalten; (b) Apple oder Google als Betreiber von System und Store können Installations-, Absturz- und Gerätekennungen nach ihren Bedingungen verarbeiten; (c) das Öffnen von ysk.hk nutzt den Systembrowser, keinen CWS-Netzwerkclient; (d) wenn Sie Ledger-Apps aktualisieren, fordert CWS den öffentlichen Ledger-Manager-Katalog für das gewählte Gerät an. Diese Anfrage enthält keine Geheimnisse. YSK enthält kein SDK Dritter für Werbung oder Produktanalytik.',

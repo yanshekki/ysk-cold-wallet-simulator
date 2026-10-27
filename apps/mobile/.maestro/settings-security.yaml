@@ -4,7 +4,7 @@ tags:
   - security
 ---
 # Given Settings → Security
-# When Face ID, sign re-auth, and auto-lock are shown
+# When the biometric toggle, sign re-auth, and auto-lock are shown
 # Then the controls are tappable without leaving the screen
 - runFlow: onboarding.yaml
 - tapOn:

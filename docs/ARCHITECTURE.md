@@ -158,7 +158,7 @@ await SecureStore.setItemAsync(key, base64Seed, {
 });
 ```
 
-**Tradeoff:** `requireAuthentication: true` is **not** set. Extra biometric prompts on every SecureStore read fail under iPhone Mirroring (“continue on iPhone”). The 15-minute app session already required the platform authenticator. Release builds should keep Settings Face ID on; turning it off still allows Start in the current code.
+**Tradeoff:** `requireAuthentication: true` is **not** set. Extra biometric prompts on every SecureStore read fail under iPhone Mirroring (“continue on iPhone”). The 15-minute app session already required the platform authenticator. Release builds should keep the Settings biometric toggle on; turning it off still allows Start in the current code.
 
 - Android: Hardware-backed Keystore when available
 - iOS: Keychain, device-unlocked
@@ -179,7 +179,7 @@ Each seed is a slot:
 
 ## 5. App Unlock (local authentication)
 
-This repo has **no associated domain**, so full WebAuthn passkeys are not used. Unlock is `expo-local-authentication` (Face ID / device PIN) in `apps/mobile/src/passkeys/session.ts`.
+This repo has **no associated domain**, so full WebAuthn passkeys are not used. Unlock is `expo-local-authentication` (OS biometric / device passcode) in `apps/mobile/src/passkeys/session.ts`.
 
 **Flow:**
 
@@ -231,7 +231,7 @@ export interface ProtocolHandler {
 
 ## 7. App Flow
 
-1. **Unlock** — Face ID / device passcode (debug skip in development)
+1. **Unlock** — OS biometric / device passcode (debug skip in development)
 2. **Device** — Pick a BLE model (`DeviceCard`), optional session passphrase, Start advertising
 3. **Seed Vault** — Generate / import BIP39 or SLIP-39, HD inspect
 4. **Host** — `yarn proxy` / CWS Proxy. USB HID gadget plus the **Testnet host** tab (Ledger / OneKey / Trezor catalogs over the phone BLE link). Signing still confirms on the phone.

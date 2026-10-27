@@ -103,7 +103,7 @@ async function readSecret(key: string): Promise<string | null> {
     // Fall through to the authenticated copy of older slots.
   }
   if (isDevBuild()) {
-    // Debug builds skip Face ID; authenticated SecureStore copies stay unread.
+    // Debug builds skip OS authentication; authenticated SecureStore copies stay unread.
     return null;
   }
   try {
