@@ -1,4 +1,6 @@
-import { mnemonicToEntropy } from '@scure/bip39';
+import { mnemonicToEntropy, mnemonicToSeedSync } from '@scure/bip39';
+import { HDKey } from '@scure/bip32';
+import { buildP2wpkhPsbt } from '@cws/protocol-qr';
 import { wordlist } from '@scure/bip39/wordlists/english';
 import { describe, expect, it } from 'vitest';
 import { ONEKEY_MODELS, type ConfirmationPort } from '@cws/contracts';
@@ -23,8 +25,13 @@ import {
   isAckFrame,
 } from './index';
 import { decodeFields, encodeBytes, encodeString, readOptionalString } from './proto';
-import { concatBytes, hexToBytes } from './bytes';
-import { encodeSuccess } from './messages';
+import { concatBytes, encodeUtf8, hexToBytes } from './bytes';
+import {
+  EthereumDataType,
+  encodeSuccess,
+  encodeTypedStructAck,
+  encodeTypedValueAck,
+} from './messages';
 
 const FOUNDATION = 'test test test test test test test test test test test junk';
 const PATH = "m/44'/60'/0'/0/0";
@@ -549,5 +556,115 @@ describe('OneKey V2 BLE handshake', () => {
     expect(reply.messageTypeId).toBe(MessageType.Features);
     expect(decodeFeatures(reply.pbPayload).vendor).toBe('onekey.so');
     expect(decodeFeatures(reply.pbPayload).model).toBe('pro');
+  });
+
+  it('lists SignPsbt in ProtocolInfo supported messages', async () => {
+    const handler = new OneKeyV1ProtocolHandler({
+      model: pro,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy,
+    });
+    const request = encodeProtobufFrame(V2MessageType.ProtocolInfoRequest, encodeUint32(1, 1), 0, 1, 1);
+    const reply = await exchangeV2(handler, request);
+    const ids = decodeFields(reply.pbPayload)
+      .filter((field) => field.field === 3)
+      .map((field) => field.varint);
+    expect(ids).toContain(MessageType.SignPsbt);
+    expect(ids).toContain(MessageType.SolanaSignTx);
+    expect(ids).toContain(MessageType.CardanoSignTxInit);
+  });
+
+  it('signs a matched PSBT after ButtonAck', async () => {
+    const handler = new OneKeyV1ProtocolHandler({
+      model: pro,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy,
+    });
+    const seed = mnemonicToSeedSync(FOUNDATION);
+    const master = HDKey.fromMasterSeed(seed);
+    const node = master.derive("m/84'/0'/0'/0/0");
+    const psbt = buildP2wpkhPsbt({
+      amount: 10000n,
+      pubkey: node.publicKey!,
+      fingerprint: master.fingerprint,
+      pathIndexes: [0x80000054, 0x80000000, 0x80000000, 0, 0],
+      outputScript: Uint8Array.of(0x00, 0x14, ...new Uint8Array(20).fill(0x33)),
+      outputAmount: 8000n,
+    });
+    const button = await exchange(handler, frameV1(MessageType.SignPsbt, encodeBytes(1, psbt)));
+    expect(button.type).toBe(MessageType.ButtonRequest);
+    const reply = await exchange(handler, frameV1(MessageType.ButtonAck, new Uint8Array()));
+    expect(reply.type).toBe(MessageType.SignedPsbt);
+    expect(reply.payload.length).toBeGreaterThan(10);
+  });
+
+  it('streams Cardano 1-in-1-out to witness 316 then finished 319', async () => {
+    const handler = new OneKeyV1ProtocolHandler({
+      model: pro,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy,
+    });
+    const payload = concatBytes(
+      encodeRepeatedUint32(1, [0x8000073c, 0x80000717, 0x80000000, 0, 0]),
+      encodeBytes(2, hexToBytes('0xcafebabe')),
+    );
+    const init = await exchange(handler, frameV1(MessageType.CardanoSignTxInit, payload));
+    expect(init.type).toBe(MessageType.CardanoTxItemAck);
+    const input = await exchange(
+      handler,
+      frameV1(MessageType.CardanoTxInput, encodeRepeatedUint32(1, [0x8000073c, 0x80000717, 0x80000000, 0, 0])),
+    );
+    expect(input.type).toBe(MessageType.CardanoTxItemAck);
+    const output = await exchange(handler, frameV1(MessageType.CardanoTxOutput, encodeString(1, 'addr1test')));
+    expect(output.type).toBe(MessageType.ButtonRequest);
+    const witness = await exchange(handler, frameV1(MessageType.ButtonAck, new Uint8Array()));
+    expect(witness.type).toBe(MessageType.CardanoTxWitnessResponse);
+    expect(witness.type).toBe(316);
+    const finished = await exchange(handler, frameV1(MessageType.CardanoTxHostAck, new Uint8Array()));
+    expect(finished.type).toBe(MessageType.CardanoSignTxFinished);
+  });
+
+  it('signs EIP-712 Mail through the struct/value loop', async () => {
+    const handler = new OneKeyV1ProtocolHandler({
+      model: pro,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy,
+    });
+    const start = await exchange(
+      handler,
+      frameV1(
+        MessageType.EthereumSignTypedData,
+        concatBytes(encodeRepeatedUint32(1, [0x8000002c, 0x8000003c, 0x80000000, 0, 0]), encodeString(2, 'Mail')),
+      ),
+    );
+    expect(start.type).toBe(MessageType.EthereumTypedDataStructRequest);
+    const domainAck = await exchange(
+      handler,
+      frameV1(
+        MessageType.EthereumTypedDataStructAck,
+        encodeTypedStructAck([{ name: 'name', dataType: EthereumDataType.STRING }]),
+      ),
+    );
+    expect(domainAck.type).toBe(MessageType.EthereumTypedDataStructRequest);
+    const mailAck = await exchange(
+      handler,
+      frameV1(
+        MessageType.EthereumTypedDataStructAck,
+        encodeTypedStructAck([{ name: 'contents', dataType: EthereumDataType.STRING }]),
+      ),
+    );
+    expect(mailAck.type).toBe(MessageType.EthereumTypedDataValueRequest);
+    await exchange(handler, frameV1(MessageType.EthereumTypedDataValueAck, encodeTypedValueAck(encodeUtf8('Ether Mail'))));
+    const button = await exchange(
+      handler,
+      frameV1(MessageType.EthereumTypedDataValueAck, encodeTypedValueAck(encodeUtf8('hi'))),
+    );
+    expect(button.type).toBe(MessageType.ButtonRequest);
+    const done = await exchange(handler, frameV1(MessageType.ButtonAck, new Uint8Array()));
+    expect(done.type).toBe(MessageType.EthereumTypedDataSignature);
   });
 });

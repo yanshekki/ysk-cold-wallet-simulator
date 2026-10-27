@@ -1,13 +1,13 @@
 import '../src/lab/polyfillCrypto';
 import 'react-native-reanimated';
 import { useEffect } from 'react';
-import { View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Constants from 'expo-constants';
 import { Redirect, Stack, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { BootSplash, LoadingOverlay, colors } from '@cws/ui';
+import { BootSplash, KeyboardProvider, LoadingOverlay, colors } from '@cws/ui';
 import { isRtl, useT } from '../src/i18n';
 import { sessionRedirect } from '../src/passkeys';
 import { releaseCaptureOverlay } from '../src/seeds/screenGuard';
@@ -36,10 +36,10 @@ function LoadingHost() {
 function BootGate({ fontsReady }: { fontsReady: boolean }) {
   const { hydrated, settings } = useAppState();
   const t = useT();
-  const direction = isRtl(settings.language) ? 'rtl' : 'ltr';
+  const frame = isRtl(settings.language) ? ({ flex: 1, direction: 'rtl' } as const) : styles.frame;
   if (!fontsReady || !hydrated) {
     return (
-      <View style={{ flex: 1, direction }}>
+      <View style={frame}>
         <BootSplash
           label={t('common.loading')}
           version={Constants.expoConfig?.version ?? '1.0.0'}
@@ -50,11 +50,11 @@ function BootGate({ fontsReady }: { fontsReady: boolean }) {
   return (
     <>
       <SessionGate />
-      <View style={{ flex: 1, direction }}>
+      <View style={frame}>
         <Stack
           screenOptions={{
             headerShown: false,
-            contentStyle: { backgroundColor: colors.bg },
+            contentStyle: styles.stack,
           }}
         >
           <Stack.Screen name="index" />
@@ -78,12 +78,25 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <SafeAreaProvider style={{ flex: 1 }}>
-        <AppStateProvider>
-          <StatusBar style="light" />
-          <BootGate fontsReady={fontsReady} />
-        </AppStateProvider>
-      </SafeAreaProvider>
+      <KeyboardProvider preload={false}>
+        <SafeAreaProvider style={{ flex: 1 }}>
+          <AppStateProvider>
+            <StatusBar style="light" />
+            <BootGate fontsReady={fontsReady} />
+          </AppStateProvider>
+        </SafeAreaProvider>
+      </KeyboardProvider>
     </GestureHandlerRootView>
   );
 }
+
+const styles = StyleSheet.create({
+  frame: {
+    flex: 1,
+  },
+  stack: {
+    backgroundColor: colors.bg,
+    paddingLeft: 0,
+    paddingRight: 0,
+  },
+});

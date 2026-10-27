@@ -78,7 +78,6 @@ export function eip1559EthTx(): Uint8Array {
   return concatBytes(Uint8Array.of(0x02), rlp(EIP1559_FIELDS));
 }
 
-/** Complete EIP-4844 typed envelope. parseEthTx returns null (decode-failed stand-in). */
 export function eip4844EthTx(): Uint8Array {
   return concatBytes(
     Uint8Array.of(0x03),
@@ -98,8 +97,34 @@ export function eip4844EthTx(): Uint8Array {
   );
 }
 
+export function eip7702EthTx(): Uint8Array {
+  return concatBytes(
+    Uint8Array.of(0x04),
+    rlp([
+      SEPOLIA,
+      new Uint8Array(),
+      GAS_PRICE,
+      MAX_FEE,
+      GAS,
+      TO,
+      new Uint8Array(),
+      new Uint8Array(),
+      [],
+      [[SEPOLIA, TO, new Uint8Array(), Uint8Array.of(1), new Uint8Array(32).fill(0x11), new Uint8Array(32).fill(0x22)]],
+    ]),
+  );
+}
+
 export function garbageEthTx(): Uint8Array {
-  return eip4844EthTx();
+  return Uint8Array.of(0x03, 0xff, 0x00, 0x01);
+}
+
+export function erc20TransferEthTx(): Uint8Array {
+  const selector = hexToBytes('0xa9059cbb');
+  const toWord = concatBytes(new Uint8Array(12), TO);
+  const amount = hexToBytes('0x' + '00'.repeat(31) + '01');
+  const data = concatBytes(selector, toWord, amount);
+  return concatBytes(Uint8Array.of(0x02), rlp([...EIP1559_FIELDS.slice(0, 7), data, []]));
 }
 
 function rlpInt(bytes: Uint8Array): Uint8Array {

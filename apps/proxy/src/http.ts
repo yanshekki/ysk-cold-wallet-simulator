@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { LabCatalog, LabDraftInput } from './lab';
 import type { PairingGate } from './pairing';
 import type { StatusBus } from './status';
 
@@ -23,6 +24,8 @@ const FILES: Record<string, string> = {
 export type UiCommands = {
   start(): void;
   stop(): void;
+  labCatalog(): LabCatalog;
+  runLab(actionId: string, draft?: LabDraftInput): Promise<string>;
 };
 
 export type UiServer = {
@@ -77,6 +80,42 @@ export function startUiServer(opts: {
     const url = new URL(req.url ?? '/', 'http://127.0.0.1');
     if (method === 'GET' && url.pathname === '/events') {
       writeSse(res, opts.bus, clients);
+      return;
+    }
+    if (method === 'GET' && url.pathname === '/status') {
+      json(res, 200, opts.bus.snapshot());
+      return;
+    }
+    if (method === 'GET' && url.pathname === '/lab/catalog') {
+      json(res, 200, opts.commands.labCatalog());
+      return;
+    }
+    if (method === 'POST' && url.pathname === '/lab/run') {
+      void readBody(req).then(async (body) => {
+        let actionId = '';
+        let draft: LabDraftInput = {};
+        try {
+          const parsed = body ? (JSON.parse(body) as { actionId?: unknown; draft?: LabDraftInput }) : {};
+          actionId = typeof parsed.actionId === 'string' ? parsed.actionId : '';
+          if (parsed.draft && typeof parsed.draft === 'object') {
+            draft = parsed.draft;
+          }
+        } catch {
+          json(res, 400, { ok: false, error: 'invalid json' });
+          return;
+        }
+        if (!actionId) {
+          json(res, 400, { ok: false, error: 'actionId required' });
+          return;
+        }
+        try {
+          const result = await opts.commands.runLab(actionId, draft);
+          json(res, 200, { ok: true, result });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          json(res, 409, { ok: false, error: message });
+        }
+      });
       return;
     }
     if (method === 'POST' && url.pathname === '/start') {

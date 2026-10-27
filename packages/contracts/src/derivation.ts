@@ -17,7 +17,10 @@ export type ChainPathId =
   | 'apt'
   | 'sui'
   | 'ltc'
-  | 'doge';
+  | 'doge'
+  | 'stellar'
+  | 'tezos'
+  | 'bnb';
 
 export type ChainPathMap = Partial<Record<ChainPathId, string>>;
 
@@ -46,6 +49,9 @@ export const CHAIN_PATH_IDS: ChainPathId[] = [
   'sui',
   'ltc',
   'doge',
+  'stellar',
+  'tezos',
+  'bnb',
 ];
 
 export const DEFAULT_CHAIN_PATHS: Record<ChainPathId, string> = {
@@ -63,11 +69,14 @@ export const DEFAULT_CHAIN_PATHS: Record<ChainPathId, string> = {
   xrp: "m/44'/144'/0'/0/0",
   ada: "m/1852'/1815'/0'/0/0",
   dot: "m/44'/354'/0'/0'/0'",
-  ton: "m/44'/607'/0'",
+  ton: "m/44'/607'/0'/0'/0'/0'",
   apt: "m/44'/637'/0'/0'/0'",
   sui: "m/44'/784'/0'/0'/0'",
   ltc: "m/84'/2'/0'/0/0",
   doge: "m/44'/3'/0'/0/0",
+  stellar: "m/44'/148'/0'",
+  tezos: "m/44'/1729'/0'",
+  bnb: "m/44'/714'/0'/0/0",
 };
 
 export const CHAIN_PATH_LABELS: Record<ChainPathId, string> = {
@@ -90,6 +99,9 @@ export const CHAIN_PATH_LABELS: Record<ChainPathId, string> = {
   sui: 'Sui',
   ltc: 'Litecoin',
   doge: 'Dogecoin',
+  stellar: 'Stellar',
+  tezos: 'Tezos',
+  bnb: 'BNB Beacon',
 };
 
 const HARDENED = /^(m)(\/\d+'?)*$/;

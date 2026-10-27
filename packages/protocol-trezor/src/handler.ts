@@ -9,6 +9,7 @@ import type {
 } from '@cws/contracts';
 import { TREZOR_FIRMWARE, describeEthMessage } from '@cws/contracts';
 import {
+  bip143Sighash,
   bitcoinP2pkh,
   deriveEd25519PrivateKey,
   deriveEd25519PrivateKeyFromSeed,
@@ -18,18 +19,24 @@ import {
   deriveIcarusFromRoot,
   derivePrivateKeyFromSeed,
   ed25519PublicKey,
+  hash160,
   icarusRootFor,
+  p2wpkhScriptCode,
   publicKeyCompressed,
   replaceSeedCache,
   seedFor,
   signEd25519,
   signIcarus,
   signSecp256k1Recoverable,
+  u32le,
   wrapSeedPort,
   type SeedCache,
 } from '@cws/protocol-ledger';
+import { bech32 } from '@scure/base';
 import { sha256 } from '@noble/hashes/sha2';
 import { keccak_256 } from '@noble/hashes/sha3';
+import { schnorr } from '@noble/curves/secp256k1';
+import { bip341Sighash, hashTypedData, taprootOutputKey, type Eip712TypedData, type ParsedPsbt } from '@cws/protocol-qr';
 import { COIN_BY_REQUEST, icarusAddress, type CoinOp } from './coins';
 import {
   asBytes,
@@ -92,13 +99,20 @@ import {
   decodeEthereumSignMessage,
   decodeEthereumSignTx,
   decodeEthereumSignTxEip1559,
+  decodeCardanoSignTxInit,
+  decodeCardanoTxInput,
+  decodeEthereumSignTypedData,
   decodeEthereumSignTypedHash,
   decodePathBytes,
   decodePairingRequest,
   decodeSelectMethod,
+  decodeSignTx,
   decodeTxAck,
+  decodeTypedStructAck,
+  decodeTypedValueAck,
   encodeButtonRequest,
   encodeBytesSignature,
+  encodeCardanoWitness,
   encodeCodeEntryCommitment,
   encodeCodeEntryCpaceTrezor,
   encodeCodeEntrySecret,
@@ -113,7 +127,10 @@ import {
   encodeStringAddress,
   encodeSuccess,
   encodeTypedDataSignature,
+  encodeTypedStructRequest,
+  encodeTypedValueRequest,
   encodeTxRequest,
+  InputScriptType,
   isEthSignTx,
   isEthSignTxEip1559,
   TxRequestType,
@@ -196,10 +213,41 @@ type PendingAction =
       kind: 'btc-tx';
       sessionId: number;
       path: string;
-      prevout: Uint8Array;
-      amount: bigint;
-      outputAmount: bigint;
+      inputsCount: number;
+      outputsCount: number;
+      version: number;
+      lockTime: number;
+      inputs: BtcTxInput[];
+      outputs: BtcTxOutput[];
       rawPayload: Uint8Array;
+    }
+  | {
+      kind: 'eth-712-stream';
+      sessionId: number;
+      path: string;
+      primaryType: string;
+      types: Record<string, Array<{ name: string; type: string }>>;
+      domain: Record<string, unknown>;
+      message: Record<string, unknown>;
+      phase: 'struct' | 'value' | 'confirm';
+      structQueue: string[];
+      requestedStruct?: string;
+      valueQueue: Array<{ path: number[]; target: 'domain' | 'message'; field: string; type: string }>;
+      requestedValue?: { path: number[]; target: 'domain' | 'message'; field: string; type: string };
+      rawPayload: Uint8Array;
+    }
+  | {
+      kind: 'cardano-tx';
+      sessionId: number;
+      path: string;
+      payload: Uint8Array;
+      inputsRemaining: number;
+      outputsRemaining: number;
+      rawPayload: Uint8Array;
+    }
+  | {
+      kind: 'cardano-done';
+      sessionId: number;
     }
   | {
       kind: 'coin';
@@ -209,6 +257,23 @@ type PendingAction =
       payload: Uint8Array;
       rawPayload: Uint8Array;
     };
+
+type BtcTxInput = {
+  path: string;
+  prevout: Uint8Array;
+  amount: bigint;
+  sequence: number;
+  scriptType: number;
+};
+
+type BtcTxOutput = {
+  amount: bigint;
+  script: Uint8Array;
+  address: string;
+  change: boolean;
+  changePath?: string;
+  outputScriptType?: number;
+};
 
 function encodeL4(sessionId: number, type: number, payload: Uint8Array): Uint8Array {
   return concatBytes(Uint8Array.of(sessionId & 0xff), writeU16BE(type), payload);
@@ -419,7 +484,7 @@ export class TrezorThpProtocolHandler implements ProtocolHandler {
           encodeFailure(FailureType.ActionCancelled, 'Cancelled'),
         );
       case MessageType.ButtonAck:
-        return this.finishPending(sessionId);
+        return this.handleButtonAck(sessionId);
       case MessageType.EthereumGetAddress:
         return this.handleEthGetAddress(sessionId, payload);
       case MessageType.EthereumSignMessage:
@@ -436,6 +501,22 @@ export class TrezorThpProtocolHandler implements ProtocolHandler {
         return this.handleBtcSignTx(sessionId, payload);
       case MessageType.TxAck:
         return this.handleTxAck(sessionId, payload);
+      case MessageType.EthereumSignTypedData:
+        return this.handleEthSignTypedData(sessionId, payload);
+      case MessageType.EthereumTypedDataStructAck:
+        return this.handleTypedStructAck(sessionId, payload);
+      case MessageType.EthereumTypedDataValueAck:
+        return this.handleTypedValueAck(sessionId, payload);
+      case MessageType.CardanoSignTxInit:
+        return this.handleCardanoSignTxInit(sessionId, payload);
+      case MessageType.CardanoTxInput:
+        return this.handleCardanoTxInput(sessionId, payload);
+      case MessageType.CardanoTxOutput:
+        return this.handleCardanoTxOutput(sessionId, payload);
+      case MessageType.CardanoTxHostAck:
+      case MessageType.CardanoTxItemAck:
+      case MessageType.CardanoTxWitnessRequest:
+        return this.handleCardanoContinue(sessionId);
       default:
         break;
     }
@@ -724,13 +805,17 @@ export class TrezorThpProtocolHandler implements ProtocolHandler {
   }
 
   private handleBtcSignTx(sessionId: number, payload: Uint8Array): Uint8Array {
+    const decoded = decodeSignTx(payload);
     this.pending = {
       kind: 'btc-tx',
       sessionId,
       path: "m/84'/0'/0'/0/0",
-      prevout: new Uint8Array(36),
-      amount: 0n,
-      outputAmount: 0n,
+      inputsCount: Math.max(1, decoded.inputsCount),
+      outputsCount: Math.max(1, decoded.outputsCount),
+      version: decoded.version,
+      lockTime: decoded.lockTime,
+      inputs: [],
+      outputs: [],
       rawPayload: payload,
     };
     return encodeL4(sessionId, MessageType.TxRequest, encodeTxRequest(TxRequestType.TXINPUT, 0));
@@ -742,21 +827,227 @@ export class TrezorThpProtocolHandler implements ProtocolHandler {
       return encodeL4(sessionId, MessageType.Failure, encodeFailure(FailureType.UnexpectedMessage, 'No SignTx'));
     }
     const ack = decodeTxAck(payload);
-    if (ack.addressN.length) {
-      pending.path = overlayPath(this.confirmation, pathToString(ack.addressN), [
-        'btc-legacy',
-        'btc-nested',
-        'btc-native',
-        'btc-taproot',
-      ]);
-    }
-    if (ack.prevHash.length) {
-      pending.prevout = ack.prevHash;
-      pending.amount = ack.amount;
+    if (pending.inputs.length < pending.inputsCount) {
+      if (!ack.prevHash.length) {
+        return encodeL4(sessionId, MessageType.Failure, encodeFailure(FailureType.DataError, 'Expected TXINPUT'));
+      }
+      const scriptType = ack.scriptType ?? InputScriptType.SPENDWITNESS;
+      if (
+        scriptType !== InputScriptType.SPENDWITNESS &&
+        scriptType !== InputScriptType.SPENDP2SHWITNESS &&
+        scriptType !== InputScriptType.SPENDTAPROOT
+      ) {
+        return encodeL4(sessionId, MessageType.Failure, encodeFailure(FailureType.DataError, 'Unsupported script type'));
+      }
+      const path = ack.addressN.length
+        ? overlayPath(this.confirmation, pathToString(ack.addressN), [
+            'btc-legacy',
+            'btc-nested',
+            'btc-native',
+            'btc-taproot',
+          ])
+        : pending.path;
+      pending.path = path;
+      pending.inputs.push({
+        path,
+        prevout:
+          ack.prevHash.length === 36
+            ? ack.prevHash
+            : concatBytes(ack.prevHash.length === 32 ? ack.prevHash : ack.prevHash.subarray(0, 32), u32le(ack.prevIndex)),
+        amount: ack.amount,
+        sequence: ack.sequence,
+        scriptType,
+      });
+      if (pending.inputs.length < pending.inputsCount) {
+        return encodeL4(
+          sessionId,
+          MessageType.TxRequest,
+          encodeTxRequest(TxRequestType.TXINPUT, pending.inputs.length),
+        );
+      }
       return encodeL4(sessionId, MessageType.TxRequest, encodeTxRequest(TxRequestType.TXOUTPUT, 0));
     }
-    pending.outputAmount = ack.outputAmount;
+    const changePath = ack.outputAddressN.length
+      ? overlayPath(this.confirmation, pathToString(ack.outputAddressN), [
+          'btc-legacy',
+          'btc-nested',
+          'btc-native',
+          'btc-taproot',
+        ])
+      : '';
+    pending.outputs.push({
+      amount: ack.outputAmount,
+      script: changePath ? new Uint8Array() : scriptFromAddress(ack.address),
+      address: ack.address || (changePath ? `change ${changePath}` : ''),
+      change: Boolean(changePath),
+      changePath: changePath || undefined,
+      outputScriptType: ack.outputScriptType,
+    });
+    if (pending.outputs.length < pending.outputsCount) {
+      return encodeL4(
+        sessionId,
+        MessageType.TxRequest,
+        encodeTxRequest(TxRequestType.TXOUTPUT, pending.outputs.length),
+      );
+    }
     return encodeL4(sessionId, MessageType.ButtonRequest, encodeButtonRequest(ButtonRequestType.SignTx));
+  }
+
+  private handleEthSignTypedData(sessionId: number, payload: Uint8Array): Uint8Array {
+    const decoded = decodeEthereumSignTypedData(payload);
+    if (decoded.addressN.length === 0 || !decoded.primaryType) {
+      return encodeL4(sessionId, MessageType.Failure, encodeFailure(FailureType.DataError, 'Invalid EthereumSignTypedData'));
+    }
+    this.pending = {
+      kind: 'eth-712-stream',
+      sessionId,
+      path: overlayPath(this.confirmation, pathToString(decoded.addressN), ['eth']),
+      primaryType: decoded.primaryType,
+      types: {},
+      domain: {},
+      message: {},
+      phase: 'struct',
+      structQueue: decoded.primaryType === 'EIP712Domain' ? ['EIP712Domain'] : ['EIP712Domain', decoded.primaryType],
+      valueQueue: [],
+      rawPayload: payload,
+    };
+    return this.nextTypedStruct(sessionId);
+  }
+
+  private handleTypedStructAck(sessionId: number, payload: Uint8Array): Uint8Array {
+    const pending = this.pending;
+    if (!pending || pending.kind !== 'eth-712-stream' || pending.phase !== 'struct' || !pending.requestedStruct) {
+      return encodeL4(sessionId, MessageType.Failure, encodeFailure(FailureType.UnexpectedMessage, 'No struct request'));
+    }
+    pending.types[pending.requestedStruct] = decodeTypedStructAck(payload);
+    pending.requestedStruct = undefined;
+    if (pending.structQueue.length) {
+      return this.nextTypedStruct(sessionId);
+    }
+    pending.phase = 'value';
+    pending.valueQueue = [
+      ...(pending.types.EIP712Domain ?? []).map((field, index) => ({
+        path: [0, index],
+        target: 'domain' as const,
+        field: field.name,
+        type: field.type,
+      })),
+      ...(pending.types[pending.primaryType] ?? []).map((field, index) => ({
+        path: [1, index],
+        target: 'message' as const,
+        field: field.name,
+        type: field.type,
+      })),
+    ];
+    return this.nextTypedValue(sessionId);
+  }
+
+  private handleTypedValueAck(sessionId: number, payload: Uint8Array): Uint8Array {
+    const pending = this.pending;
+    if (!pending || pending.kind !== 'eth-712-stream' || pending.phase !== 'value' || !pending.requestedValue) {
+      return encodeL4(sessionId, MessageType.Failure, encodeFailure(FailureType.UnexpectedMessage, 'No value request'));
+    }
+    const raw = decodeTypedValueAck(payload);
+    const target = pending.requestedValue.target === 'domain' ? pending.domain : pending.message;
+    target[pending.requestedValue.field] = decodeTypedAtomic(pending.requestedValue.type, raw);
+    pending.requestedValue = undefined;
+    if (pending.valueQueue.length) {
+      return this.nextTypedValue(sessionId);
+    }
+    pending.phase = 'confirm';
+    return encodeL4(sessionId, MessageType.ButtonRequest, encodeButtonRequest(ButtonRequestType.ProtectCall));
+  }
+
+  private nextTypedStruct(sessionId: number): Uint8Array {
+    const pending = this.pending;
+    if (!pending || pending.kind !== 'eth-712-stream') {
+      return encodeL4(sessionId, MessageType.Failure, encodeFailure(FailureType.ProcessError, 'No typed data'));
+    }
+    const name = pending.structQueue.shift();
+    if (!name) {
+      return encodeL4(sessionId, MessageType.Failure, encodeFailure(FailureType.DataError, 'Empty struct queue'));
+    }
+    pending.requestedStruct = name;
+    return encodeL4(sessionId, MessageType.EthereumTypedDataStructRequest, encodeTypedStructRequest(name));
+  }
+
+  private nextTypedValue(sessionId: number): Uint8Array {
+    const pending = this.pending;
+    if (!pending || pending.kind !== 'eth-712-stream') {
+      return encodeL4(sessionId, MessageType.Failure, encodeFailure(FailureType.ProcessError, 'No typed data'));
+    }
+    const next = pending.valueQueue.shift();
+    if (!next) {
+      pending.phase = 'confirm';
+      return encodeL4(sessionId, MessageType.ButtonRequest, encodeButtonRequest(ButtonRequestType.ProtectCall));
+    }
+    pending.requestedValue = next;
+    return encodeL4(sessionId, MessageType.EthereumTypedDataValueRequest, encodeTypedValueRequest(next.path));
+  }
+
+  private handleCardanoSignTxInit(sessionId: number, payload: Uint8Array): Uint8Array {
+    const decoded = decodeCardanoSignTxInit(payload);
+    if (decoded.certificatesCount > 0 || decoded.mintCount > 0) {
+      return encodeL4(sessionId, MessageType.Failure, encodeFailure(FailureType.DataError, 'Unsupported Cardano extras'));
+    }
+    if (decoded.inputsCount < 1 || decoded.outputsCount < 1) {
+      return encodeL4(sessionId, MessageType.Failure, encodeFailure(FailureType.DataError, 'Need 1-in-1-out'));
+    }
+    const path = decoded.addressN.length
+      ? overlayPath(this.confirmation, pathToString(decoded.addressN), ['ada'])
+      : "m/1852'/1815'/0'/0/0";
+    this.pending = {
+      kind: 'cardano-tx',
+      sessionId,
+      path,
+      payload: decoded.body,
+      inputsRemaining: decoded.inputsCount,
+      outputsRemaining: decoded.outputsCount,
+      rawPayload: payload,
+    };
+    return encodeL4(sessionId, MessageType.CardanoTxItemAck, new Uint8Array());
+  }
+
+  private handleCardanoTxInput(sessionId: number, payload: Uint8Array): Uint8Array {
+    const pending = this.pending;
+    if (!pending || pending.kind !== 'cardano-tx' || pending.inputsRemaining <= 0) {
+      return encodeL4(sessionId, MessageType.Failure, encodeFailure(FailureType.UnexpectedMessage, 'No Cardano input'));
+    }
+    const decoded = decodeCardanoTxInput(payload);
+    if (decoded.addressN.length) {
+      pending.path = overlayPath(this.confirmation, pathToString(decoded.addressN), ['ada']);
+    }
+    pending.inputsRemaining -= 1;
+    return encodeL4(sessionId, MessageType.CardanoTxItemAck, new Uint8Array());
+  }
+
+  private handleCardanoTxOutput(sessionId: number, _payload: Uint8Array): Uint8Array {
+    const pending = this.pending;
+    if (!pending || pending.kind !== 'cardano-tx' || pending.inputsRemaining > 0 || pending.outputsRemaining <= 0) {
+      return encodeL4(sessionId, MessageType.Failure, encodeFailure(FailureType.UnexpectedMessage, 'No Cardano output'));
+    }
+    pending.outputsRemaining -= 1;
+    if (pending.outputsRemaining > 0) {
+      return encodeL4(sessionId, MessageType.CardanoTxItemAck, new Uint8Array());
+    }
+    return encodeL4(sessionId, MessageType.ButtonRequest, encodeButtonRequest(ButtonRequestType.SignTx));
+  }
+
+  private handleCardanoContinue(sessionId: number): Uint8Array {
+    const pending = this.pending;
+    if (!pending || pending.kind !== 'cardano-done') {
+      return encodeL4(sessionId, MessageType.Failure, encodeFailure(FailureType.UnexpectedMessage, 'No Cardano finish'));
+    }
+    this.pending = undefined;
+    return encodeL4(sessionId, MessageType.CardanoSignTxFinished, new Uint8Array());
+  }
+
+  private handleButtonAck(sessionId: number): Uint8Array | Promise<Uint8Array> {
+    const pending = this.pending;
+    if (pending?.kind === 'cardano-done') {
+      return this.handleCardanoContinue(sessionId);
+    }
+    return this.finishPending(sessionId);
   }
 
   private handleCoin(sessionId: number, op: CoinOp, payload: Uint8Array): Uint8Array {
@@ -782,6 +1073,9 @@ export class TrezorThpProtocolHandler implements ProtocolHandler {
         MessageType.Failure,
         encodeFailure(FailureType.UnexpectedMessage, 'No pending request'),
       );
+    }
+    if (pending.kind === 'cardano-done') {
+      return encodeL4(pending.sessionId, MessageType.CardanoSignTxFinished, new Uint8Array());
     }
     const signing = isSignPending(pending);
     const request: SigningRequest = {
@@ -873,11 +1167,56 @@ export class TrezorThpProtocolHandler implements ProtocolHandler {
         encodeMessageSignature(bitcoinP2pkh(node.publicKey), concatBytes(Uint8Array.of((sig[64] ?? 0) + 27), sig.subarray(0, 64))),
       );
     }
-    if (pending.kind === 'btc-tx') {
+    if (pending.kind === 'eth-712-stream') {
+      if (pending.phase !== 'confirm') {
+        return encodeL4(
+          pending.sessionId,
+          MessageType.Failure,
+          encodeFailure(FailureType.UnexpectedMessage, 'Typed data incomplete'),
+        );
+      }
+      const typed: Eip712TypedData = {
+        types: pending.types,
+        primaryType: pending.primaryType,
+        domain: pending.domain,
+        message: pending.message,
+      };
+      let digest: Uint8Array;
+      try {
+        digest = hashTypedData(typed);
+      } catch {
+        return encodeL4(pending.sessionId, MessageType.Failure, encodeFailure(FailureType.DataError, 'Bad typed data'));
+      }
       const privateKey = secp(pending.path);
-      const hash = sha256(sha256(concatBytes(pending.prevout, u64le(pending.amount), u64le(pending.outputAmount))));
-      const sig = signSecp256k1Recoverable(privateKey, hash).subarray(0, 64);
-      return encodeL4(pending.sessionId, MessageType.TxRequest, encodeTxRequest(TxRequestType.TXFINISHED, 0, sig));
+      const address = ethereumAddressFromPrivateKey(privateKey);
+      const sig = signSecp256k1Recoverable(privateKey, digest);
+      const v = (sig[64] ?? 0) + 27;
+      return encodeL4(
+        pending.sessionId,
+        MessageType.EthereumTypedDataSignature,
+        encodeTypedDataSignature(concatBytes(sig.subarray(0, 64), Uint8Array.of(v)), address),
+      );
+    }
+    if (pending.kind === 'cardano-tx') {
+      const body = pending.payload.length ? pending.payload : sha256(pending.rawPayload);
+      const node = icarusRoot
+        ? deriveIcarusFromRoot(icarusRoot, pending.path)
+        : deriveIcarus(this.entropy, pending.path, overlay, this.backup);
+      const sig = signIcarus(node, body);
+      this.pending = { kind: 'cardano-done', sessionId: pending.sessionId };
+      return encodeL4(pending.sessionId, MessageType.CardanoTxWitnessResponse, encodeCardanoWitness(node.publicKey, sig));
+    }
+    if (pending.kind === 'btc-tx') {
+      try {
+        const signatures = signBtcInputs(pending, secp);
+        return encodeL4(
+          pending.sessionId,
+          MessageType.TxRequest,
+          encodeTxRequest(TxRequestType.TXFINISHED, 0, signatures),
+        );
+      } catch {
+        return encodeL4(pending.sessionId, MessageType.Failure, encodeFailure(FailureType.ProcessError, 'SignTx failed'));
+      }
     }
     if (pending.kind === 'coin') {
       return this.coinFinish(pending, overlay, seed, icarusRoot);
@@ -962,8 +1301,10 @@ function isSignPending(pending: PendingAction): boolean {
     pending.kind === 'eth-tx' ||
     pending.kind === 'eth-tx-1559' ||
     pending.kind === 'eth-712' ||
+    pending.kind === 'eth-712-stream' ||
     pending.kind === 'btc-sign-msg' ||
     pending.kind === 'btc-tx' ||
+    pending.kind === 'cardano-tx' ||
     (pending.kind === 'coin' && pending.op.kind === 'sign')
   );
 }
@@ -972,17 +1313,130 @@ function pendingTitle(pending: PendingAction): string {
   if (pending.kind === 'coin') {
     return pending.op.title;
   }
-  if (pending.kind === 'eth-tx' || pending.kind === 'eth-tx-1559' || pending.kind === 'btc-tx') {
+  if (pending.kind === 'eth-tx' || pending.kind === 'eth-tx-1559' || pending.kind === 'btc-tx' || pending.kind === 'cardano-tx') {
     return 'Sign transaction';
   }
-  if (pending.kind === 'eth-sign' || pending.kind === 'eth-712' || pending.kind === 'btc-sign-msg') {
+  if (pending.kind === 'eth-sign' || pending.kind === 'eth-712' || pending.kind === 'eth-712-stream' || pending.kind === 'btc-sign-msg') {
     return 'Sign message';
   }
   return 'Export address';
 }
 
 function pendingMessage(pending: PendingAction): string {
+  if (pending.kind === 'cardano-done') {
+    return 'Sign Cardano transaction';
+  }
+  if (pending.kind === 'btc-tx') {
+    const change = pending.outputs.filter((output) => output.change).length;
+    return `${pendingTitle(pending)}\n${pending.path}\n${pending.inputs.length}-in-${pending.outputs.length}-out${change ? ` · ${change} change` : ''}`;
+  }
   return `${pendingTitle(pending)}\n${pending.path}`;
+}
+
+function compactSize(value: number): Uint8Array {
+  if (value < 0xfd) {
+    return Uint8Array.of(value);
+  }
+  return Uint8Array.of(0xfd, value & 0xff, (value >> 8) & 0xff);
+}
+
+function decodeTypedAtomic(type: string, raw: Uint8Array): unknown {
+  if (type === 'string' || type.startsWith('string')) {
+    return new TextDecoder().decode(raw);
+  }
+  if (type === 'address') {
+    const addr = raw.length >= 20 ? raw.subarray(raw.length - 20) : raw;
+    return `0x${Array.from(addr, (byte) => byte.toString(16).padStart(2, '0')).join('')}`;
+  }
+  if (type === 'bool') {
+    return raw.some((byte) => byte !== 0);
+  }
+  return `0x${Array.from(raw, (byte) => byte.toString(16).padStart(2, '0')).join('')}`;
+}
+
+function resolveOutputScript(
+  output: BtcTxOutput,
+  secp: (path: string) => Uint8Array,
+): Uint8Array {
+  if (output.script.length) {
+    return output.script;
+  }
+  if (!output.changePath) {
+    return concatBytes(Uint8Array.of(0x00, 0x14), new Uint8Array(20));
+  }
+  const priv = secp(output.changePath);
+  if (output.outputScriptType === 6 || output.changePath.includes("/86'")) {
+    return concatBytes(Uint8Array.of(0x51, 0x20), taprootOutputKey(priv).outputXOnly);
+  }
+  return concatBytes(Uint8Array.of(0x00, 0x14), hash160(publicKeyCompressed(priv)));
+}
+
+function signBtcInputs(
+  pending: Extract<PendingAction, { kind: 'btc-tx' }>,
+  secp: (path: string) => Uint8Array,
+): Uint8Array[] {
+  const prevouts = concatBytes(...pending.inputs.map((input) => input.prevout));
+  const sequences = concatBytes(...pending.inputs.map((input) => u32le(input.sequence)));
+  const outputs = concatBytes(
+    ...pending.outputs.map((output) => {
+      const script = resolveOutputScript(output, secp);
+      return concatBytes(u64le(output.amount), compactSize(script.length), script);
+    }),
+  );
+  const parsed: ParsedPsbt = {
+    version: pending.version,
+    locktime: pending.lockTime,
+    inputs: pending.inputs.map((input) => ({ prevout: input.prevout, script: new Uint8Array(), sequence: input.sequence })),
+    outputs: pending.outputs.map((output) => ({ amount: output.amount, script: resolveOutputScript(output, secp) })),
+    global: new Map(),
+    inputMaps: pending.inputs.map(() => new Map()),
+    outputMaps: pending.outputs.map(() => new Map()),
+  };
+  const amounts = pending.inputs.map((input) => input.amount);
+  const scripts = pending.inputs.map((input) => {
+    const priv = secp(input.path);
+    if (input.scriptType === InputScriptType.SPENDTAPROOT) {
+      return concatBytes(Uint8Array.of(0x51, 0x20), taprootOutputKey(priv).outputXOnly);
+    }
+    return concatBytes(Uint8Array.of(0x00, 0x14), hash160(publicKeyCompressed(priv)));
+  });
+  return pending.inputs.map((input, index) => {
+    const privateKey = secp(input.path);
+    if (input.scriptType === InputScriptType.SPENDTAPROOT) {
+      const tweaked = taprootOutputKey(privateKey);
+      const hash = bip341Sighash(parsed, index, amounts, scripts, 0);
+      return schnorr.sign(hash, tweaked.tweakedPriv);
+    }
+    const pub = publicKeyCompressed(privateKey);
+    const hash = bip143Sighash({
+      version: pending.version,
+      prevout: input.prevout,
+      amount: input.amount,
+      sequence: input.sequence,
+      scriptCode: p2wpkhScriptCode(hash160(pub)),
+      outputs,
+      locktime: pending.lockTime,
+      prevouts,
+      sequences,
+    });
+    return signSecp256k1Recoverable(privateKey, hash).subarray(0, 64);
+  });
+}
+
+function scriptFromAddress(address: string): Uint8Array {
+  if (address.startsWith('bc1') || address.startsWith('tb1') || address.startsWith('ltc1')) {
+    try {
+      const decoded = bech32.decode(address);
+      const version = decoded.words[0] ?? 0;
+      const payload = bech32.fromWords(decoded.words.slice(1));
+      if (version === 0 && payload.length === 20) {
+        return concatBytes(Uint8Array.of(0x00, 0x14), payload);
+      }
+    } catch {
+      // fall through to dummy native script
+    }
+  }
+  return concatBytes(Uint8Array.of(0x00, 0x14), new Uint8Array(20));
 }
 
 function u64le(value: bigint): Uint8Array {

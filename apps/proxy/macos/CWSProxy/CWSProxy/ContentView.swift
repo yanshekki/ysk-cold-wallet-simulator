@@ -22,10 +22,7 @@ struct ContentView: View {
             .foregroundStyle(Color(red: 124 / 255, green: 132 / 255, blue: 145 / 255))
         }
       }
-      NativeDock(
-        onStart: { session.requestStart() },
-        onStop: { session.requestStop() }
-      )
+      NativeDock(session: session)
     }
     .frame(minWidth: 420, minHeight: 740)
   }
@@ -42,13 +39,17 @@ private func nativeURL(_ url: URL) -> URL {
 }
 
 struct NativeDock: View {
-  let onStart: () -> Void
-  let onStop: () -> Void
+  @ObservedObject var session: ProxySession
 
   var body: some View {
     HStack(spacing: 8) {
-      dockButton("Start", color: Color(red: 1, green: 90 / 255, blue: 31 / 255), action: onStart)
-      dockButton("Stop", color: Color(red: 1, green: 92 / 255, blue: 122 / 255), action: onStop)
+      dockButton(
+        session.running ? "Stop" : "Start",
+        color: session.running
+          ? Color(red: 1, green: 92 / 255, blue: 122 / 255)
+          : Color(red: 1, green: 90 / 255, blue: 31 / 255),
+        action: { session.requestToggle() }
+      )
     }
     .padding(.horizontal, 12)
     .padding(.top, 10)

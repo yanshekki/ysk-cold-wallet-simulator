@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { encodeAppAndVersion } from './apps/dashboard';
+import { bytesToHex } from './bytes';
 import {
   BleReassembler,
   DEFAULT_MTU,
@@ -8,7 +10,6 @@ import {
   TAG_ERROR,
   TAG_MTU,
 } from './framing';
-import { bytesToHex } from './bytes';
 
 describe('Ledger BLE framing', () => {
   it('round-trips a payload that fits in one packet', () => {
@@ -57,7 +58,7 @@ describe('Ledger BLE framing', () => {
     expect(assembler.push(Uint8Array.of(0x05, 0x00, 0x01, 0x90, 0x00))).toBeNull();
   });
 
-  it('rejects broken sequence numbers', () => {
+  it('ignores a stray high sequence until the missing packets arrive', () => {
     const assembler = new BleReassembler();
     const first = framePayload(TAG_APDU, new Uint8Array(30), DEFAULT_MTU);
     const packets = splitFramedPackets(first, DEFAULT_MTU);
@@ -66,6 +67,54 @@ describe('Ledger BLE framing', () => {
     const broken = Uint8Array.from(packets[1]);
     broken[1] = 0x00;
     broken[2] = 0x09;
-    expect(() => assembler.push(broken)).toThrow(/sequence/);
+    expect(assembler.push(broken)).toBeNull();
+    let result = null;
+    for (const packet of packets.slice(1)) {
+      result = assembler.push(packet);
+    }
+    expect(result).not.toBeNull();
+    expect(result?.payload.length).toBe(30);
+  });
+
+  it('reassembles packets that arrive out of order or duplicated', () => {
+    const payload = new Uint8Array(80).map((_, i) => i + 1);
+    const packets = splitFramedPackets(framePayload(TAG_APDU, payload, DEFAULT_MTU), DEFAULT_MTU);
+    expect(packets.length).toBeGreaterThan(3);
+    const assembler = new BleReassembler();
+    expect(assembler.push(packets[0])).toBeNull();
+    expect(assembler.push(packets[packets.length - 1])).toBeNull();
+    expect(assembler.push(packets[1])).toBeNull();
+    expect(assembler.push(packets[1])).toBeNull();
+    let result = null;
+    for (const packet of packets.slice(1)) {
+      result = assembler.push(packet) ?? result;
+    }
+    expect(result).not.toBeNull();
+    expect(bytesToHex(result!.payload)).toBe(bytesToHex(payload));
+  });
+
+  it('reassembles interleaved GET_APP replies that each start with seq=0', () => {
+    const assembler = new BleReassembler();
+    const eth = encodeAppAndVersion('Ethereum', '1.11.0');
+    const bolos = encodeAppAndVersion('BOLOS', '2.7.1');
+    const avax = encodeAppAndVersion('Avalanche', '1.4.22');
+    expect(eth.length).toBe(21);
+    expect(bolos.length).toBe(17);
+    expect(avax.length).toBe(22);
+    const ethPkts = splitFramedPackets(framePayload(TAG_APDU, eth, DEFAULT_MTU), DEFAULT_MTU);
+    const bolosPkts = splitFramedPackets(framePayload(TAG_APDU, bolos, DEFAULT_MTU), DEFAULT_MTU);
+    const avaxPkts = splitFramedPackets(framePayload(TAG_APDU, avax, DEFAULT_MTU), DEFAULT_MTU);
+    expect(ethPkts).toHaveLength(2);
+    expect(bolosPkts).toHaveLength(2);
+    expect(avaxPkts).toHaveLength(2);
+
+    expect(assembler.push(ethPkts[0])).toBeNull();
+    expect(assembler.push(bolosPkts[0])).toBeNull();
+    expect(assembler.push(ethPkts[0])).toBeNull();
+    expect(assembler.push(avaxPkts[0])).toBeNull();
+    expect(assembler.push(ethPkts[1])).toEqual({ tag: TAG_APDU, payload: eth });
+    expect(assembler.push(bolosPkts[1])).toEqual({ tag: TAG_APDU, payload: bolos });
+    expect(assembler.push(ethPkts[1])).toEqual({ tag: TAG_APDU, payload: eth });
+    expect(assembler.push(avaxPkts[1])).toEqual({ tag: TAG_APDU, payload: avax });
   });
 });

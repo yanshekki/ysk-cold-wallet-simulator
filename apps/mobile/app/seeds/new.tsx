@@ -107,15 +107,17 @@ export default function NewSeedScreen() {
         setShares(created.shares);
       });
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'generate failed';
+      const message = err instanceof Error ? err.message : 'generate.failed';
       if (message === 'too few events') {
         setError(
           customKind === 'dice'
             ? t('generate.customTooShortDice', { n: minDiceRolls(wordCount) })
             : t('generate.customTooShortHex', { n: minHexChars(wordCount) }),
         );
+      } else if (message === 'rng returned all zeros') {
+        setError(t('generate.failed'));
       } else {
-        setError(message);
+        setError(t(message));
       }
     } finally {
       setBusy(false);
@@ -127,7 +129,7 @@ export default function NewSeedScreen() {
 
   const confirm = async () => {
     if (!secret || !model || !verified) {
-      setError('Generate a seed and select a model first');
+      setError(t('generate.needSeedAndModel'));
       return;
     }
     const ok = await requestUnlock(t('unlock.prompt'));
@@ -139,7 +141,7 @@ export default function NewSeedScreen() {
         const saved = await saveSlot(
           {
             id: newSlotId(),
-            label: label.trim() || 'Unnamed',
+            label: label.trim() || t('generate.defaultName'),
             brand: model.brand,
             modelId: model.id,
             backup,
@@ -159,7 +161,7 @@ export default function NewSeedScreen() {
         router.back();
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'failed to store seed');
+      setError(err instanceof Error ? t(err.message) : t('generate.saveFailed'));
     }
   };
 

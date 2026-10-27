@@ -3,7 +3,7 @@ import type { GATTCharacteristicPermission } from 'munim-bluetooth';
 import { bleAdvertiseName, type DeviceModel, type ProtocolHandler } from '@cws/contracts';
 import { DEFAULT_MTU, splitNotify } from '@cws/sdk';
 import { bytesToHex, hexToBytes } from './hex';
-import type { PeripheralCallbacks, PeripheralHandle } from './types';
+import type { HandlerSource, PeripheralCallbacks, PeripheralHandle } from './types';
 
 export type { PeripheralCallbacks, PeripheralHandle };
 
@@ -11,7 +11,7 @@ type BleModule = typeof import('munim-bluetooth');
 type Subscription = (() => void) | void;
 
 const ADVERTISE_WAIT_MS = 8000;
-const NOTIFY_GAP_MS = 12;
+const NOTIFY_GAP_MS = 40;
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => {
@@ -130,16 +130,20 @@ function waitForAdvertisingStarted(ble: BleModule): {
   };
 }
 
+function resolveHandler(handler: HandlerSource): ProtocolHandler {
+  return typeof handler === 'function' ? handler() : handler;
+}
+
 export async function startAdvertising(
   model: DeviceModel,
-  handler: ProtocolHandler,
+  handler: HandlerSource,
   callbacks: PeripheralCallbacks,
   options?: { nameSuffix?: string },
 ): Promise<PeripheralHandle> {
   const ble = await import('munim-bluetooth');
   const allowed = await ble.requestBluetoothPermission(['advertise', 'connect']);
   if (!allowed) {
-    throw new Error('Bluetooth advertising permission was not granted');
+    throw new Error('errors.advertisePermission');
   }
 
   const suffix = options?.nameSuffix?.replace(/[^A-Za-z0-9]/g, '').slice(0, 3);
@@ -147,17 +151,20 @@ export async function startAdvertising(
   const localName = suffix && model.brand !== 'ledger' ? `${baseName} ${suffix}`.trim() : baseName;
 
   try {
+    ble.stopAdvertising();
+  } catch {
+    // ignore: may not be advertising yet
+  }
+  await delay(1_200);
+  try {
     configureServices(ble, model);
   } catch (error) {
     throw mapBleError(error);
   }
 
   const subscriptions: Subscription[] = [];
-  let lastWriteHex = '';
-  let lastWriteAt = 0;
 
   subscriptions.push(ble.addEventListener('adapterStateChanged', () => undefined));
-  subscriptions.push(ble.addEventListener('backgroundSessionStarted', () => undefined));
 
   subscriptions.push(
     ble.addEventListener('advertisingStartFailed', (event) => {
@@ -167,16 +174,21 @@ export async function startAdvertising(
     }),
   );
 
+  let writeEpoch = 0;
   subscriptions.push(
     ble.addEventListener('peripheralSubscribed', (event) => {
+      writeEpoch += 1;
       if (!event.characteristicUUID || sameBleUuid(event.characteristicUUID, model.notifyCharUUID)) {
         callbacks.onConnected(event.centralId ?? 'host');
       }
+      resolveHandler(handler).resetLink?.();
     }),
   );
 
   subscriptions.push(
     ble.addEventListener('peripheralUnsubscribed', () => {
+      writeEpoch += 1;
+      resolveHandler(handler).resetLink?.();
       callbacks.onDisconnected();
     }),
   );
@@ -187,27 +199,28 @@ export async function startAdvertising(
       if (event.responseRequired && event.requestId) {
         void ble.respondToPeripheralWriteRequest(event.requestId, true).catch(() => undefined);
       }
+      const epoch = writeEpoch;
       writeTail = writeTail
         .then(async () => {
+          if (epoch !== writeEpoch) {
+            return;
+          }
           if (!event.value) {
             return;
           }
           callbacks.onConnected(event.centralId ?? 'host');
           const incoming = hexToBytes(event.value);
           const hex = bytesToHex(incoming);
-          const now = Date.now();
-          if (hex === lastWriteHex && now - lastWriteAt < 250) {
-            return;
-          }
-          lastWriteHex = hex;
-          lastWriteAt = now;
           callbacks.onLog('in', hex, `GATT write ${event.characteristicUUID ?? ''}`.trim());
-          const outgoing = await handler.handleWrite(incoming);
-          if (!outgoing || outgoing.length === 0) {
+          const outgoing = await resolveHandler(handler).handleWrite(incoming);
+          if (epoch !== writeEpoch || !outgoing || outgoing.length === 0) {
             return;
           }
           const packets = splitNotify(model, outgoing, notifyMtu(model, incoming.length));
           for (let index = 0; index < packets.length; index += 1) {
+            if (epoch !== writeEpoch) {
+              return;
+            }
             const packet = packets[index];
             const packetHex = bytesToHex(packet);
             callbacks.onLog('out', packetHex, 'GATT notify');
@@ -256,29 +269,11 @@ export async function startAdvertising(
     throw mapBleError(error);
   }
 
-  if (Platform.OS === 'android') {
-    try {
-      ble.startBackgroundSession({
-        serviceUUIDs: [model.serviceUUID],
-        localName,
-        androidNotificationTitle: 'YSK Cold Wallet Simulator',
-        androidNotificationText: `Advertising as ${model.name}`,
-      });
-    } catch (error) {
-      for (const sub of subscriptions) {
-        unsubscribe(sub);
-      }
-      ble.stopAdvertising();
-      throw mapBleError(error);
-    }
-  }
-
   return {
     stop: async () => {
       for (const sub of subscriptions) {
         unsubscribe(sub);
       }
-      ble.stopBackgroundSession();
       ble.stopAdvertising();
     },
   };
@@ -286,6 +281,5 @@ export async function startAdvertising(
 
 export async function stopAdvertising(): Promise<void> {
   const ble = await import('munim-bluetooth');
-  ble.stopBackgroundSession();
   ble.stopAdvertising();
 }

@@ -2,6 +2,8 @@ const path = require('path');
 const { getDefaultConfig } = require('expo/metro-config');
 
 const config = getDefaultConfig(__dirname);
+const workspaceRoot = path.resolve(__dirname, '../..');
+config.watchFolders = [...new Set([...(config.watchFolders ?? []), workspaceRoot])];
 const upstreamResolve = config.resolver.resolveRequest;
 const slip39Crypto = path.resolve(__dirname, '../../packages/sdk/src/node-crypto-shim.ts');
 const nobleCrypto = path.resolve(__dirname, 'src/lab/nobleCrypto.ts');
@@ -30,6 +32,10 @@ function isNobleCrypto(moduleName, origin) {
 }
 
 config.resolver.unstable_conditionNames = ['react-native', 'browser', 'require', 'import'];
+config.resolver.extraNodeModules = {
+  ...(config.resolver.extraNodeModules ?? {}),
+  buffer: path.resolve(workspaceRoot, 'node_modules/buffer'),
+};
 
 config.resolver.resolveRequest = (context, moduleName, platform) => {
   const origin = typeof context.originModulePath === 'string' ? context.originModulePath.replace(/\\/g, '/') : '';

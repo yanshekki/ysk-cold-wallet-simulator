@@ -31,4 +31,9 @@ export { PairingTakeover } from './PairingTakeover';
 export { Toast } from './Toast';
 export { LoadingOverlay } from './LoadingOverlay';
 export { MnemonicGrid, type MnemonicGridLabels } from './MnemonicGrid';
-export { KeyboardProvider, KeyboardAwareScrollView, KeyboardStickyView } from './keyboard';
+export {
+  KeyboardAvoidingView,
+  KeyboardAwareScrollView,
+  KeyboardProvider,
+  KeyboardStickyView,
+} from './keyboard';

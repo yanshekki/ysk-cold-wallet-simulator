@@ -1,6 +1,6 @@
 import { UsbHidReassembler, wrapUsbHid, type UsbProtobuf } from '@cws/protocol-trezor';
-import type { AdapterHandle, HidPort } from '../ports';
-import { serializeWrites } from '../ports';
+import type { AdapterHandle, ExclusiveLock, HidPort } from '../ports';
+import { createExclusive, serializeWrites } from '../ports';
 import type { LogFn } from '../log';
 import type { ThpClient, TrezorMessage } from './thp';
 
@@ -8,10 +8,16 @@ export async function forwardUsb(thp: ThpClient, message: UsbProtobuf): Promise<
   return thp.app(message.type, message.payload);
 }
 
-export function attachTrezor(hid: HidPort, thp: ThpClient, log: LogFn): AdapterHandle {
+export function attachTrezor(
+  hid: HidPort,
+  thp: ThpClient,
+  log: LogFn,
+  exclusive: ExclusiveLock = createExclusive(),
+): AdapterHandle {
   const usb = new UsbHidReassembler();
   const queue = serializeWrites((error) => log(`trezor write failed: ${String(error)}`));
   let hidCount = 0;
+  let labAwaiting = false;
   const offHid = hid.onInput((report) => {
     hidCount += 1;
     let message: UsbProtobuf | null;
@@ -26,12 +32,18 @@ export function attachTrezor(hid: HidPort, thp: ThpClient, log: LogFn): AdapterH
       return;
     }
     const request = message;
-    queue.push(async () => {
-      const reply = await forwardUsb(thp, request);
-      for (const out of wrapUsbHid(reply.type, reply.payload)) {
-        hid.write(out);
-      }
-    });
+    queue.push(() =>
+      exclusive.run(async () => {
+        if (labAwaiting) {
+          log('hid dropped, lab in flight');
+          return;
+        }
+        const reply = await forwardUsb(thp, request);
+        for (const out of wrapUsbHid(reply.type, reply.payload)) {
+          hid.write(out);
+        }
+      }),
+    );
   });
   return {
     close() {
@@ -41,6 +53,9 @@ export function attachTrezor(hid: HidPort, thp: ThpClient, log: LogFn): AdapterH
     },
     idle() {
       return queue.idle();
+    },
+    setLabAwaiting(active) {
+      labAwaiting = active;
     },
   };
 }

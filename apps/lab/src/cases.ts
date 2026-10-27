@@ -1,13 +1,24 @@
-import { componentsToPath, pathToComponents } from '@cws/contracts';
+import { componentsToPath, pathToComponents, type Brand } from '@cws/contracts';
 import {
+  CLA_FRAMEWORK,
+  ClientCommandInterpreter,
   FUJI_C_CHAIN_ID,
   FUJI_HRP,
   FUJI_X_CHAIN_ID,
+  INS_CONTINUE,
+  SW_INTERRUPTED,
   buildP2wpkhPsbt,
+  encodeSignPsbtCommand,
   ledgerFlowFromPsbt,
+  prepareSignPsbtInterpreter,
+  psbtMapsToByteMaps,
+  serializeWalletPolicy,
   u32le,
+  walletIdOf,
 } from '@cws/protocol-ledger';
+import { buildP2wpkhPsbt as buildQrPsbt, parsePsbt } from '@cws/protocol-qr';
 import {
+  EthereumDataType as OneKeyEthereumDataType,
   MessageType as OneKeyMessageType,
   decodeBitcoinAddress,
   decodeEthereumAddress,
@@ -16,9 +27,13 @@ import {
   encodeBytes,
   encodeRepeatedUint32,
   encodeString,
+  encodeTypedStructAck as okEncodeTypedStructAck,
+  encodeTypedValueAck as okEncodeTypedValueAck,
   encodeUint32,
 } from '@cws/protocol-onekey';
 import {
+  EthereumDataType as TrezorEthereumDataType,
+  InputScriptType as TrezorInputScriptType,
   MessageType as TrezorMessageType,
   decodeEthereumAddress as decodeTrezorAddress,
   decodeEthereumMessageSignature as decodeTrezorMessageSignature,
@@ -26,6 +41,8 @@ import {
   encodeMessage as trezorEncodeMessage,
   encodeRepeatedUint32 as trezorEncodeRepeatedUint32,
   encodeString as trezorEncodeString,
+  encodeTypedStructAck as trezorEncodeTypedStructAck,
+  encodeTypedValueAck as trezorEncodeTypedValueAck,
   encodeUint32 as trezorEncodeUint32,
 } from '@cws/protocol-trezor';
 import {
@@ -43,18 +60,34 @@ import {
   PATH_SUI,
   PATH_TON,
   PATH_TRX,
+  PATH_XLM,
+  PATH_XTZ,
+  PATH_BNB,
+  PATH_TAPROOT,
   PATH_XRP,
   assertOk,
   bytesToHex,
   concatBytes,
+  decodeAscii,
   decodePubAndAddress,
   encodeNearPath,
   encodePath,
   hexToBytes,
+  responseBody,
+  statusWord,
 } from './apdu';
-import type { LabHost } from './host';
+import type { LabHostLike as LabHost } from './types';
 import { NEAR_FAUCET, broadcastSepolia, nearViewAccount, solanaDevnetHealth } from './rpc';
-import { eip1559EthTx, eip1559Signed, eip2930EthTx, garbageEthTx, legacyEthTx } from './rlp';
+import {
+  eip1559EthTx,
+  eip1559Signed,
+  eip2930EthTx,
+  eip4844EthTx,
+  eip7702EthTx,
+  erc20TransferEthTx,
+  garbageEthTx,
+  legacyEthTx,
+} from './rlp';
 
 export type LabDraft = {
   path: string;
@@ -101,6 +134,57 @@ function payloadOf(draft: LabDraft, fallback: Uint8Array): Uint8Array {
     return new TextEncoder().encode(draft.utf8);
   }
   return fallback;
+}
+
+const MAIL_JSON =
+  '{"types":{"EIP712Domain":[{"name":"name","type":"string"}],"Mail":[{"name":"contents","type":"string"}]},"primaryType":"Mail","domain":{"name":"Ether Mail"},"message":{"contents":"hi"}}';
+
+async function ledgerContinue(
+  tx: ReturnType<LabHost['requireLedger']>,
+  interpreter: ClientCommandInterpreter,
+  cla: number,
+  ins: number,
+  p1: number,
+  p2: number,
+  data: Uint8Array,
+  note: string,
+): Promise<Uint8Array> {
+  let payload = await tx.send(cla, ins, p1, p2, data);
+  let guard = 0;
+  while (statusWord(payload) === SW_INTERRUPTED) {
+    guard += 1;
+    if (guard > 400) {
+      throw new Error(`${note} CONTINUE loop`);
+    }
+    const reply = interpreter.execute(responseBody(payload));
+    payload = await tx.send(CLA_FRAMEWORK, INS_CONTINUE, 0x00, 0x01, reply);
+  }
+  return assertOk(payload, note);
+}
+
+async function defaultClientWallet(tx: ReturnType<LabHost['requireLedger']>): Promise<{
+  serialize: Uint8Array;
+  interpreter: ClientCommandInterpreter;
+  template: string;
+  keysInfo: string[];
+}> {
+  const xfp = await tx.sendOk(0xe1, 0x05, 0x00, 0x00, new Uint8Array(), 'GET_MASTER_FINGERPRINT');
+  const account = concatBytes(Uint8Array.of(0x00), encodePath([0x80000054, 0x80000000, 0x80000000]));
+  const xpub = decodeAscii(await tx.sendOk(0xe1, 0x00, 0x00, 0x00, account, 'GET_EXTENDED_PUBKEY'));
+  const fingerprint = bytesToHex(xfp);
+  const template = 'wpkh(@0/**)';
+  const keysInfo = [`[${fingerprint}/84'/0'/0']${xpub}`];
+  const serialize = serializeWalletPolicy({
+    version: 2,
+    name: '',
+    descriptorTemplate: template,
+    keysInfo,
+  });
+  const interpreter = new ClientCommandInterpreter();
+  interpreter.addKnownPreimage(serialize);
+  interpreter.addKnownPreimage(new TextEncoder().encode(template));
+  interpreter.addKnownList(keysInfo.map((info) => new TextEncoder().encode(info)));
+  return { serialize, interpreter, template, keysInfo };
 }
 
 function describeKey(body: Uint8Array): string {
@@ -268,13 +352,31 @@ const LEDGER: LabAction[] = [
     run: (host, draft) => signEthTx(host, payloadOf(draft, eip1559EthTx()), pathOf(draft, PATH_ETH), 'SIGN_TX 1559'),
   },
   {
+    id: 'eth-4844',
+    brand: 'ledger',
+    section: 'ethereum',
+    en: 'SIGN_TX EIP-4844',
+    zh: '簽署 EIP-4844',
+    editor: { path: pathString(PATH_ETH), hex: bytesToHex(eip4844EthTx()) },
+    run: (host, draft) => signEthTx(host, payloadOf(draft, eip4844EthTx()), pathOf(draft, PATH_ETH), 'SIGN_TX 4844'),
+  },
+  {
+    id: 'eth-7702',
+    brand: 'ledger',
+    section: 'ethereum',
+    en: 'SIGN_TX EIP-7702',
+    zh: '簽署 EIP-7702',
+    editor: { path: pathString(PATH_ETH), hex: bytesToHex(eip7702EthTx()) },
+    run: (host, draft) => signEthTx(host, payloadOf(draft, eip7702EthTx()), pathOf(draft, PATH_ETH), 'SIGN_TX 7702'),
+  },
+  {
     id: 'eth-garbage',
     brand: 'ledger',
     section: 'ethereum',
-    en: 'SIGN_TX undecodable (EIP-4844 envelope)',
+    en: 'SIGN_TX undecodable',
     zh: '簽署無法解碼交易',
-    noteEn: 'Complete 0x03 RLP. Phone shows decode-failed; page still gets 9000.',
-    noteZh: '完整 0x03 RLP。電話顯示無法解碼，網頁仍會收到 9000。',
+    noteEn: 'Truncated typed envelope. Phone shows decode-failed; page still gets 9000.',
+    noteZh: '截斷的類型交易。電話顯示無法解碼，網頁仍會收到 9000。',
     editor: { path: pathString(PATH_ETH), hex: bytesToHex(garbageEthTx()) },
     run: (host, draft) => signEthTx(host, payloadOf(draft, garbageEthTx()), pathOf(draft, PATH_ETH), 'SIGN_TX garbage'),
   },
@@ -301,6 +403,55 @@ const LEDGER: LabAction[] = [
         'EIP-712',
       );
       return `sig 0x${bytesToHex(body)}`;
+    },
+  },
+  {
+    id: 'eth-712-full',
+    brand: 'ledger',
+    section: 'ethereum',
+    en: 'EIP-712 full typed data',
+    zh: 'EIP-712 完整類型資料',
+    editor: {
+      path: pathString(PATH_ETH),
+      utf8: '{"types":{"EIP712Domain":[{"name":"name","type":"string"}],"Mail":[{"name":"contents","type":"string"}]},"primaryType":"Mail","domain":{"name":"Ether Mail"},"message":{"contents":"hi"}}',
+    },
+    run: async (host, draft) => {
+      const tx = host.requireLedger();
+      await tx.openApp('Ethereum');
+      const json = payloadOf(draft, new TextEncoder().encode(MAIL_JSON));
+      await tx.sendOk(0xe0, 0x1c, 0x00, 0x00, json, 'EIP-712 JSON');
+      const body = await tx.sendOk(
+        0xe0,
+        0x0c,
+        0x00,
+        0x01,
+        encodePath(pathOf(draft, PATH_ETH)),
+        'EIP-712 P2=01',
+      );
+      return `sig 0x${bytesToHex(body)}`;
+    },
+  },
+  {
+    id: 'eth-erc20',
+    brand: 'ledger',
+    section: 'ethereum',
+    en: 'ERC-20 info then transfer',
+    zh: 'ERC-20 資訊後轉帳',
+    editor: { path: pathString(PATH_ETH), hex: bytesToHex(erc20TransferEthTx()) },
+    run: async (host, draft) => {
+      const tx = host.requireLedger();
+      await tx.openApp('Ethereum');
+      const ticker = new TextEncoder().encode('USDT');
+      const contract = hexToBytes('0xdac17f958d2ee523a2206206994597c13d831ec7');
+      const info = concatBytes(
+        Uint8Array.of(ticker.length),
+        ticker,
+        contract,
+        Uint8Array.of(0, 0, 0, 6),
+        Uint8Array.of(0, 0, 0, 1),
+      );
+      await tx.sendOk(0xe0, 0x0a, 0x00, 0x00, info, 'PROVIDE_ERC20');
+      return signEthTx(host, payloadOf(draft, erc20TransferEthTx()), pathOf(draft, PATH_ETH), 'SIGN_TX erc20');
     },
   },
   {
@@ -384,6 +535,66 @@ const LEDGER: LabAction[] = [
     },
   },
   {
+    id: 'sol-v0-sign',
+    brand: 'ledger',
+    section: 'solana',
+    en: 'Sign v0 lookup-table message',
+    zh: '簽署 v0 lookup-table',
+    editor: { path: pathString(PATH_SOL) },
+    run: async (host, draft) => {
+      const payer = new Uint8Array(32);
+      payer[0] = 1;
+      const blockhash = new Uint8Array(32);
+      blockhash[31] = 2;
+      const message = concatBytes(
+        Uint8Array.of(0x80, 1, 0, 0, 1),
+        payer,
+        blockhash,
+        Uint8Array.of(0, 1),
+        new Uint8Array(32),
+        Uint8Array.of(0, 0),
+      );
+      return familySign(host, 'Solana', 0xe0, 0x06, pathOf(draft, PATH_SOL), message);
+    },
+  },
+  {
+    id: 'atom-proto-sign',
+    brand: 'ledger',
+    section: 'family',
+    en: 'Cosmos protobuf SignDoc',
+    zh: 'Cosmos protobuf SignDoc',
+    editor: { path: pathString(PATH_ATOM) },
+    run: async (host, draft) => {
+      const chain = new TextEncoder().encode('cosmoshub-4');
+      const message = Uint8Array.from([0x1a, chain.length, ...chain, 0x20, 0x01]);
+      return familySign(host, 'Cosmos', 0x55, 0x02, pathOf(draft, PATH_ATOM), message);
+    },
+  },
+  {
+    id: 'trx-transfer-sign',
+    brand: 'ledger',
+    section: 'family',
+    en: 'TRX TransferContract',
+    zh: 'TRX TransferContract',
+    editor: { path: pathString(PATH_TRX) },
+    run: async (host, draft) => {
+      const to = Uint8Array.of(0x41, ...new Array(20).fill(0x11));
+      const message = Uint8Array.from([0x12, 21, ...to, 0x18, 0xe8, 0x07]);
+      return familySign(host, 'Tron', 0xe0, 0x04, pathOf(draft, PATH_TRX), message);
+    },
+  },
+  {
+    id: 'xlm-envelope-sign',
+    brand: 'ledger',
+    section: 'family',
+    en: 'XLM envelope type',
+    zh: 'XLM envelope',
+    editor: { path: pathString(PATH_XLM) },
+    run: async (host, draft) => {
+      return familySign(host, 'Stellar', 0xe0, 0x04, pathOf(draft, PATH_XLM), Uint8Array.of(0, 0, 0, 2, 0xaa));
+    },
+  },
+  {
     id: 'near-addr',
     brand: 'ledger',
     section: 'near',
@@ -435,6 +646,118 @@ function btcFamily(): LabAction[] {
       zh: 'Bitcoin 匯出金鑰',
       editor: { path: pathString(PATH_BTC) },
       run: (host, draft) => btcExport(host, 'Bitcoin', pathOf(draft, PATH_BTC)),
+    },
+    {
+      id: 'btc-taproot',
+      brand: 'ledger',
+      section: 'bitcoin',
+      en: 'Bitcoin Taproot address',
+      zh: 'Bitcoin Taproot 地址',
+      editor: { path: pathString(PATH_TAPROOT) },
+      run: async (host, draft) => {
+        const tx = host.requireLedger();
+        await tx.openApp('Bitcoin');
+        return describeKey(
+          await tx.sendOk(0xe0, 0x40, 0x00, 0x04, encodePath(pathOf(draft, PATH_TAPROOT)), 'GET_WALLET_PUBLIC_KEY taproot'),
+        );
+      },
+    },
+    {
+      id: 'btc-e1-xfp',
+      brand: 'ledger',
+      section: 'bitcoin',
+      en: 'Bitcoin Client fingerprint',
+      zh: 'Bitcoin Client 指紋',
+      run: async (host) => {
+        const tx = host.requireLedger();
+        await tx.openApp('Bitcoin');
+        const body = await tx.sendOk(0xe1, 0x05, 0x00, 0x00, new Uint8Array(), 'GET_MASTER_FINGERPRINT');
+        return `xfp 0x${bytesToHex(body)}`;
+      },
+    },
+    {
+      id: 'btc-e1-psbt',
+      brand: 'ledger',
+      section: 'bitcoin',
+      en: 'Bitcoin Client SIGN_PSBT',
+      zh: 'Bitcoin Client 簽署 PSBT',
+      run: async (host) => {
+        const tx = host.requireLedger();
+        await tx.openApp('Bitcoin');
+        const native = [0x80000054, 0x80000000, 0x80000000, 0, 0];
+        const exported = await tx.sendOk(0xe0, 0x40, 0x00, 0x02, encodePath(native), 'GET_WALLET_PUBLIC_KEY native');
+        const pubLen = exported[0]!;
+        const pub = exported.subarray(1, 1 + pubLen);
+        const xfp = await tx.sendOk(0xe1, 0x05, 0x00, 0x00, new Uint8Array(), 'GET_MASTER_FINGERPRINT');
+        const fingerprint = (xfp[0]! << 24) | (xfp[1]! << 16) | (xfp[2]! << 8) | xfp[3]!;
+        const psbt = buildQrPsbt({
+          amount: 10000n,
+          pubkey: pub,
+          fingerprint: fingerprint >>> 0,
+          pathIndexes: native,
+          outputScript: concatBytes(Uint8Array.of(0x00, 0x14), new Uint8Array(20).fill(0x33)),
+          outputAmount: 8000n,
+        });
+        const body = await tx.sendOk(0xe1, 0x04, 0x00, 0x00, psbt, 'SIGN_PSBT');
+        return `psbt 0x${bytesToHex(body).slice(0, 96)}`;
+      },
+    },
+    {
+      id: 'btc-e1-register',
+      brand: 'ledger',
+      section: 'bitcoin',
+      en: 'Bitcoin Client REGISTER_WALLET',
+      zh: 'Bitcoin Client 註冊錢包',
+      run: async (host) => {
+        const tx = host.requireLedger();
+        await tx.openApp('Bitcoin');
+        const { serialize, interpreter } = await defaultClientWallet(tx);
+        const registered = await ledgerContinue(
+          tx,
+          interpreter,
+          0xe1,
+          0x02,
+          0x00,
+          0x01,
+          concatBytes(Uint8Array.of(serialize.length), serialize),
+          'REGISTER_WALLET',
+        );
+        return `wallet_id 0x${bytesToHex(registered.subarray(0, 32))}`;
+      },
+    },
+    {
+      id: 'btc-e1-merkle-psbt',
+      brand: 'ledger',
+      section: 'bitcoin',
+      en: 'Bitcoin Client merklized SIGN_PSBT',
+      zh: 'Bitcoin Client merklized 簽署 PSBT',
+      run: async (host) => {
+        const tx = host.requireLedger();
+        await tx.openApp('Bitcoin');
+        const native = [0x80000054, 0x80000000, 0x80000000, 0, 0];
+        const exported = await tx.sendOk(0xe0, 0x40, 0x00, 0x02, encodePath(native), 'GET_WALLET_PUBLIC_KEY native');
+        const pubLen = exported[0]!;
+        const pub = exported.subarray(1, 1 + pubLen);
+        const xfp = await tx.sendOk(0xe1, 0x05, 0x00, 0x00, new Uint8Array(), 'GET_MASTER_FINGERPRINT');
+        const fingerprint = (xfp[0]! << 24) | (xfp[1]! << 16) | (xfp[2]! << 8) | xfp[3]!;
+        const psbt = buildQrPsbt({
+          amount: 10000n,
+          pubkey: pub,
+          fingerprint: fingerprint >>> 0,
+          pathIndexes: native,
+          outputScript: concatBytes(Uint8Array.of(0x00, 0x14), new Uint8Array(20).fill(0x33)),
+          outputAmount: 8000n,
+        });
+        const { serialize, interpreter, template, keysInfo } = await defaultClientWallet(tx);
+        const parsed = parsePsbt(psbt);
+        const global = psbtMapsToByteMaps([parsed.global])[0]!;
+        const inputs = psbtMapsToByteMaps(parsed.inputMaps);
+        const outputs = psbtMapsToByteMaps(parsed.outputMaps);
+        prepareSignPsbtInterpreter(interpreter, global, inputs, outputs, serialize, template, keysInfo);
+        const command = encodeSignPsbtCommand(global, inputs, outputs, walletIdOf(serialize));
+        const done = await ledgerContinue(tx, interpreter, 0xe1, 0x04, 0x00, 0x01, command, 'SIGN_PSBT merkle');
+        return `yields ${interpreter.yielded.length} finished 0x${bytesToHex(done).slice(0, 32)}`;
+      },
     },
     {
       id: 'btc-hash',
@@ -722,6 +1045,18 @@ function otherFamilies(): LabAction[] {
     signEn: string;
     signZh: string;
   }> = [
+    {
+      id: 'xlm',
+      app: 'Stellar',
+      cla: 0xe0,
+      pub: 0x02,
+      sign: 0x04,
+      path: PATH_XLM,
+      addrEn: 'Stellar export key',
+      addrZh: 'Stellar 匯出金鑰',
+      signEn: 'Stellar sign (raw)',
+      signZh: 'Stellar 簽署（原始）',
+    },
     {
       id: 'ada',
       app: 'Cardano',
@@ -1020,6 +1355,35 @@ const ONEKEY: LabAction[] = [
     },
   },
   {
+    id: 'ok-eth-712-full',
+    brand: 'onekey',
+    section: 'ethereum',
+    en: 'ETH SignTypedData Mail',
+    zh: 'ETH 簽署類型資料 Mail',
+    editor: { path: pathString(PATH_ETH) },
+    run: async (host, draft) => {
+      const onekey = host.requireOneKey();
+      await onekey.call(
+        OneKeyMessageType.EthereumSignTypedData,
+        concatBytes(encodeRepeatedUint32(1, addressN(pathOf(draft, PATH_ETH))), encodeString(2, 'Mail')),
+      );
+      await onekey.call(
+        OneKeyMessageType.EthereumTypedDataStructAck,
+        okEncodeTypedStructAck([{ name: 'name', dataType: OneKeyEthereumDataType.STRING }]),
+      );
+      await onekey.call(
+        OneKeyMessageType.EthereumTypedDataStructAck,
+        okEncodeTypedStructAck([{ name: 'contents', dataType: OneKeyEthereumDataType.STRING }]),
+      );
+      await onekey.call(OneKeyMessageType.EthereumTypedDataValueAck, okEncodeTypedValueAck(new TextEncoder().encode('Ether Mail')));
+      const done = await onekey.call(
+        OneKeyMessageType.EthereumTypedDataValueAck,
+        okEncodeTypedValueAck(new TextEncoder().encode('hi')),
+      );
+      return `type=${done.type} 0x${bytesToHex(done.payload).slice(0, 96)}`;
+    },
+  },
+  {
     id: 'ok-btc-addr',
     brand: 'onekey',
     section: 'bitcoin',
@@ -1151,6 +1515,32 @@ const ONEKEY: LabAction[] = [
       return actions;
     },
   ),
+  {
+    id: 'ok-ada-sign',
+    brand: 'onekey',
+    section: 'family',
+    en: 'ADA SignTx item stream',
+    zh: 'ADA 簽署 item stream',
+    editor: { path: pathString(PATH_ADA), hex: 'cafebabe' },
+    run: async (host, draft) => {
+      const onekey = host.requireOneKey();
+      const path = pathOf(draft, PATH_ADA);
+      const init = await onekey.call(
+        OneKeyMessageType.CardanoSignTxInit,
+        concatBytes(encodeRepeatedUint32(1, path), encodeBytes(2, payloadOf(draft, hexToBytes('0xcafebabe')))),
+      );
+      if (init.type !== OneKeyMessageType.CardanoTxItemAck) {
+        throw new Error(`expected TxItemAck, got ${init.type}`);
+      }
+      await onekey.call(OneKeyMessageType.CardanoTxInput, encodeRepeatedUint32(1, path));
+      const witness = await onekey.call(OneKeyMessageType.CardanoTxOutput, concatBytes(encodeString(1, 'addr1test'), encodeUint32(2, 1)));
+      if (witness.type !== OneKeyMessageType.CardanoTxWitnessResponse) {
+        throw new Error(`expected witness 316, got ${witness.type}`);
+      }
+      const finished = await onekey.call(OneKeyMessageType.CardanoTxHostAck, new Uint8Array());
+      return `witness 316 finished=${finished.type} 0x${bytesToHex(witness.payload).slice(0, 64)}`;
+    },
+  },
 ];
 
 function tzCall(
@@ -1290,6 +1680,42 @@ const TREZOR: LabAction[] = [
     },
   },
   {
+    id: 'tz-eth-712-full',
+    brand: 'trezor',
+    section: 'ethereum',
+    en: 'ETH SignTypedData Mail',
+    zh: 'ETH 簽署類型資料 Mail',
+    editor: { path: pathString(PATH_ETH) },
+    run: async (host, draft) => {
+      const trezor = host.requireTrezor();
+      const start = await trezor.app(
+        TrezorMessageType.EthereumSignTypedData,
+        concatBytes(trezorEncodeRepeatedUint32(1, pathOf(draft, PATH_ETH)), trezorEncodeString(2, 'Mail')),
+      );
+      if (start.type !== TrezorMessageType.EthereumTypedDataStructRequest) {
+        throw new Error(`expected StructRequest, got ${start.type}`);
+      }
+      await trezor.app(
+        TrezorMessageType.EthereumTypedDataStructAck,
+        trezorEncodeTypedStructAck([{ name: 'name', dataType: TrezorEthereumDataType.STRING }]),
+      );
+      await trezor.app(
+        TrezorMessageType.EthereumTypedDataStructAck,
+        trezorEncodeTypedStructAck([{ name: 'contents', dataType: TrezorEthereumDataType.STRING }]),
+      );
+      await trezor.app(TrezorMessageType.EthereumTypedDataValueAck, trezorEncodeTypedValueAck(new TextEncoder().encode('Ether Mail')));
+      const button = await trezor.app(
+        TrezorMessageType.EthereumTypedDataValueAck,
+        trezorEncodeTypedValueAck(new TextEncoder().encode('hi')),
+      );
+      const done =
+        button.type === TrezorMessageType.ButtonRequest
+          ? await trezor.app(TrezorMessageType.ButtonAck, new Uint8Array())
+          : button;
+      return `type=${done.type} 0x${bytesToHex(done.payload).slice(0, 96)}`;
+    },
+  },
+  {
     id: 'tz-btc-addr',
     brand: 'trezor',
     section: 'bitcoin',
@@ -1351,6 +1777,42 @@ const TREZOR: LabAction[] = [
     },
   },
   {
+    id: 'tz-btc-2in',
+    brand: 'trezor',
+    section: 'bitcoin',
+    en: 'BTC SignTx (2-in-2-out)',
+    zh: 'BTC 簽署 2-in-2-out',
+    editor: { path: pathString(PATH_BTC) },
+    run: async (host, draft) => {
+      const trezor = host.requireTrezor();
+      await trezor.app(TrezorMessageType.SignTx, concatBytes(trezorEncodeUint32(1, 2), trezorEncodeUint32(2, 2)));
+      const input = (prev: number, index: number) =>
+        concatBytes(
+          trezorEncodeRepeatedUint32(1, pathOf(draft, PATH_BTC).slice(0, 4).concat(index)),
+          trezorEncodeBytes(2, new Uint8Array(32).fill(prev)),
+          trezorEncodeUint32(3, 0),
+          trezorEncodeUint32(6, TrezorInputScriptType.SPENDWITNESS),
+          trezorEncodeUint32(8, 10000),
+        );
+      await trezor.app(TrezorMessageType.TxAck, trezorEncodeMessage(1, trezorEncodeMessage(2, input(0x11, 0))));
+      await trezor.app(TrezorMessageType.TxAck, trezorEncodeMessage(1, trezorEncodeMessage(2, input(0x22, 1))));
+      await trezor.app(
+        TrezorMessageType.TxAck,
+        trezorEncodeMessage(1, trezorEncodeMessage(5, concatBytes(trezorEncodeString(1, 'bc1qtest'), trezorEncodeUint32(2, 8000)))),
+      );
+      const change = concatBytes(
+        trezorEncodeUint32(2, 9000),
+        trezorEncodeUint32(3, 4),
+        trezorEncodeRepeatedUint32(4, pathOf(draft, PATH_BTC).slice(0, 4).concat(0).map((value, index) => (index === 3 ? 1 : value))),
+      );
+      let next = await trezor.app(TrezorMessageType.TxAck, trezorEncodeMessage(1, trezorEncodeMessage(5, change)));
+      if (next.type === TrezorMessageType.ButtonRequest) {
+        next = await trezor.app(TrezorMessageType.ButtonAck, new Uint8Array());
+      }
+      return `type=${next.type} 0x${bytesToHex(next.payload).slice(0, 96)}`;
+    },
+  },
+  {
     id: 'tz-sol-addr',
     brand: 'trezor',
     section: 'solana',
@@ -1387,6 +1849,92 @@ const TREZOR: LabAction[] = [
     run: tzCall(TrezorMessageType.CardanoGetAddress, PATH_ADA, trezorEncodeUint32(2, 1)),
   },
   {
+    id: 'tz-ada-sign',
+    brand: 'trezor',
+    section: 'family',
+    en: 'ADA SignTx item stream',
+    zh: 'ADA 簽署 item stream',
+    editor: { path: pathString(PATH_ADA), hex: 'cafebabe' },
+    run: async (host, draft) => {
+      const trezor = host.requireTrezor();
+      const path = pathOf(draft, PATH_ADA);
+      const init = await trezor.app(
+        TrezorMessageType.CardanoSignTxInit,
+        concatBytes(trezorEncodeRepeatedUint32(1, path), trezorEncodeBytes(2, payloadOf(draft, hexToBytes('0xcafebabe')))),
+      );
+      if (init.type !== TrezorMessageType.CardanoTxItemAck) {
+        throw new Error(`expected TxItemAck, got ${init.type}`);
+      }
+      await trezor.app(TrezorMessageType.CardanoTxInput, trezorEncodeRepeatedUint32(1, path));
+      let next = await trezor.app(
+        TrezorMessageType.CardanoTxOutput,
+        concatBytes(trezorEncodeString(1, 'addr1test'), trezorEncodeUint32(2, 1)),
+      );
+      if (next.type === TrezorMessageType.ButtonRequest) {
+        next = await trezor.app(TrezorMessageType.ButtonAck, new Uint8Array());
+      }
+      if (next.type !== TrezorMessageType.CardanoTxWitnessResponse) {
+        throw new Error(`expected witness 316, got ${next.type}`);
+      }
+      const finished = await trezor.app(TrezorMessageType.CardanoTxHostAck, new Uint8Array());
+      return `witness 316 finished=${finished.type} 0x${bytesToHex(next.payload).slice(0, 64)}`;
+    },
+  },
+  {
+    id: 'tz-xlm-addr',
+    brand: 'trezor',
+    section: 'family',
+    en: 'XLM GetAddress',
+    zh: 'XLM 匯出地址',
+    editor: { path: pathString(PATH_XLM) },
+    run: tzCall(TrezorMessageType.StellarGetAddress, PATH_XLM, trezorEncodeUint32(2, 1)),
+  },
+  {
+    id: 'tz-xlm-sign',
+    brand: 'trezor',
+    section: 'family',
+    en: 'XLM SignTx',
+    zh: 'XLM 簽署',
+    editor: { path: pathString(PATH_XLM), hex: 'cafebabe' },
+    run: tzSign(TrezorMessageType.StellarSignTx, PATH_XLM, hexToBytes('0xcafebabe')),
+  },
+  {
+    id: 'tz-xtz-addr',
+    brand: 'trezor',
+    section: 'family',
+    en: 'XTZ GetAddress',
+    zh: 'XTZ 匯出地址',
+    editor: { path: pathString(PATH_XTZ) },
+    run: tzCall(TrezorMessageType.TezosGetAddress, PATH_XTZ, trezorEncodeUint32(2, 1)),
+  },
+  {
+    id: 'tz-xtz-sign',
+    brand: 'trezor',
+    section: 'family',
+    en: 'XTZ SignTx',
+    zh: 'XTZ 簽署',
+    editor: { path: pathString(PATH_XTZ), hex: 'cafebabe' },
+    run: tzSign(TrezorMessageType.TezosSignTx, PATH_XTZ, hexToBytes('0xcafebabe')),
+  },
+  {
+    id: 'tz-bnb-addr',
+    brand: 'trezor',
+    section: 'family',
+    en: 'BNB GetAddress',
+    zh: 'BNB 匯出地址',
+    editor: { path: pathString(PATH_BNB) },
+    run: tzCall(TrezorMessageType.BinanceGetAddress, PATH_BNB, trezorEncodeUint32(2, 1)),
+  },
+  {
+    id: 'tz-bnb-sign',
+    brand: 'trezor',
+    section: 'family',
+    en: 'BNB SignTx',
+    zh: 'BNB 簽署',
+    editor: { path: pathString(PATH_BNB), hex: 'cafebabe' },
+    run: tzSign(TrezorMessageType.BinanceSignTx, PATH_BNB, hexToBytes('0xcafebabe')),
+  },
+  {
     id: 'tz-xrp-addr',
     brand: 'trezor',
     section: 'family',
@@ -1407,6 +1955,43 @@ const TREZOR: LabAction[] = [
 ];
 
 export const LAB_ACTIONS: LabAction[] = [...LEDGER, ...ONEKEY, ...TREZOR];
+
+export type LabCatalogAction = {
+  id: string;
+  section: string;
+  en: string;
+  zh: string;
+  editor?: LabEditor;
+};
+
+export type LabCatalogSection = {
+  id: string;
+  actions: LabCatalogAction[];
+};
+
+export const LAB_SECTION_ORDER: Record<Brand, string[]> = {
+  ledger: ['dashboard', 'ethereum', 'solana', 'near', 'bitcoin', 'avalanche', 'family'],
+  onekey: ['onekey', 'ethereum', 'bitcoin', 'solana', 'near', 'family'],
+  trezor: ['trezor', 'ethereum', 'bitcoin', 'solana', 'family'],
+};
+
+export function listLabCatalog(brand: Brand): LabCatalogSection[] {
+  const items = LAB_ACTIONS.filter((item) => item.brand === brand);
+  return LAB_SECTION_ORDER[brand]
+    .map((id) => ({
+      id,
+      actions: items
+        .filter((item) => item.section === id)
+        .map((item) => ({
+          id: item.id,
+          section: item.section,
+          en: item.en,
+          zh: item.zh,
+          editor: item.editor,
+        })),
+    }))
+    .filter((section) => section.actions.length > 0);
+}
 
 async function signEthTxBytes(
   host: LabHost,

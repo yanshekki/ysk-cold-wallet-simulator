@@ -7,12 +7,14 @@ final class ProxySession: ObservableObject {
   @Published var uiURL: URL?
   @Published var errorMessage: String?
   @Published var ready = false
+  @Published var running = false
 
   let uiPort = 8788
   private var started = false
   private var hid: HidServer?
   private var ble: BleServer?
   private let node = NodeProcess()
+  private var statusTimer: Timer?
 
   var socketPath: String {
     let tmp = FileManager.default.temporaryDirectory.path
@@ -54,6 +56,8 @@ final class ProxySession: ObservableObject {
   }
 
   func stop() {
+    statusTimer?.invalidate()
+    statusTimer = nil
     node.stop()
     hid?.stop()
     ble?.stop()
@@ -61,6 +65,15 @@ final class ProxySession: ObservableObject {
     ble = nil
     started = false
     ready = false
+    running = false
+  }
+
+  func requestToggle() {
+    if running {
+      requestStop()
+    } else {
+      requestStart()
+    }
   }
 
   func requestStart() {
@@ -68,13 +81,34 @@ final class ProxySession: ObservableObject {
   }
 
   func requestStop() {
-    hid?.dropDevice()
     ble?.dropLink()
     post("stop") { [weak self] ok in
       if !ok {
         self?.recoverNode()
       }
     }
+  }
+
+  private func startStatusPoll() {
+    statusTimer?.invalidate()
+    statusTimer = Timer.scheduledTimer(withTimeInterval: 0.4, repeats: true) { [weak self] _ in
+      Task { @MainActor in
+        await self?.refreshRunning()
+      }
+    }
+  }
+
+  private func refreshRunning() async {
+    guard let url = URL(string: "http://127.0.0.1:\(uiPort)/status") else {
+      return
+    }
+    guard let (data, response) = try? await URLSession.shared.data(from: url),
+          (response as? HTTPURLResponse)?.statusCode == 200,
+          let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+    else {
+      return
+    }
+    running = obj["running"] as? Bool ?? false
   }
 
   private func recoverNode() {
@@ -114,6 +148,7 @@ final class ProxySession: ObservableObject {
         uiURL = url
         ready = true
         errorMessage = nil
+        startStatusPoll()
         return
       }
       try? await Task.sleep(nanoseconds: 200_000_000)

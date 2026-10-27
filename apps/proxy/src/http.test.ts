@@ -52,6 +52,24 @@ describe('proxy ui http', () => {
           stopped += 1;
           bus.idle();
         },
+        labCatalog() {
+          return {
+            ready: false,
+            brand: 'ledger',
+            sections: [
+              {
+                id: 'dashboard',
+                actions: [{ id: 'dash-version', section: 'dashboard', en: 'GET_VERSION', zh: '讀取版本' }],
+              },
+            ],
+          };
+        },
+        async runLab(actionId) {
+          if (actionId === 'dash-version') {
+            return '0x3300';
+          }
+          throw new Error('Start the proxy and wait for GATT');
+        },
       },
       port: 0,
     });
@@ -59,14 +77,17 @@ describe('proxy ui http', () => {
     const html = await page.text();
     expect(page.status).toBe(200);
     expect(html).toContain('CWS Proxy');
-    expect(html).toContain('id="start"');
-    expect(html).toContain('id="stop"');
+    expect(html).toContain('id="power"');
+    expect(html).not.toContain('id="start"');
+    expect(html).not.toContain('id="stop"');
+    expect(html).toContain('id="tab-lab"');
     expect(html).toContain('id="tab-console"');
     expect(html).toContain('id="logs"');
 
     const script = await fetch(`${server.url}/app.js`);
     const js = await script.text();
-    expect(js).toContain("bindCommand('stop', '/stop')");
+    expect(js).toContain('bindPower');
+    expect(js).toContain("post(state.status?.running ? '/stop' : '/start')");
     expect(js).not.toContain("$('clock').textContent = 'IDLE'");
 
     const css = await fetch(`${server.url}/styles.css`);
@@ -76,11 +97,26 @@ describe('proxy ui http', () => {
     expect(styles).toContain('html.native-shell .dock');
     expect(js).toContain("get('native')");
 
+    const idleStatus = await fetch(`${server.url}/status`);
+    expect(idleStatus.status).toBe(200);
+    expect(await idleStatus.json()).toMatchObject({ running: false, phase: 'idle' });
+
+    const catalog = await fetch(`${server.url}/lab/catalog`);
+    expect(catalog.status).toBe(200);
+    expect(await catalog.json()).toMatchObject({
+      ready: false,
+      brand: 'ledger',
+      sections: [{ id: 'dashboard', actions: [{ id: 'dash-version' }] }],
+    });
+
     const start = await fetch(`${server.url}/start`, { method: 'POST' });
     expect(start.status).toBe(200);
     expect(started).toBe(1);
     expect(bus.snapshot().running).toBe(true);
     expect(bus.snapshot().radio).toBe('SCAN');
+
+    const liveStatus = await fetch(`${server.url}/status`);
+    expect(await liveStatus.json()).toMatchObject({ running: true, phase: 'scanning' });
 
     const frame = await readSseFrame(`${server.url}/events`);
     expect(frame).toContain('data:');
@@ -95,6 +131,21 @@ describe('proxy ui http', () => {
     const cleared = await fetch(`${server.url}/logs/clear`, { method: 'POST' });
     expect(cleared.status).toBe(200);
     expect(bus.snapshot().logs).toEqual([]);
+
+    const labRun = await fetch(`${server.url}/lab/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ actionId: 'dash-version' }),
+    });
+    expect(labRun.status).toBe(200);
+    expect(await labRun.json()).toEqual({ ok: true, result: '0x3300' });
+
+    const labMissing = await fetch(`${server.url}/lab/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    expect(labMissing.status).toBe(400);
 
     const pair = await fetch(`${server.url}/pairing`, {
       method: 'POST',

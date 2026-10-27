@@ -60,6 +60,10 @@ export function encodeString(field: number, value: string): Uint8Array {
   return encodeBytes(field, encodeUtf8(value));
 }
 
+export function encodeMessage(field: number, value: Uint8Array): Uint8Array {
+  return encodeBytes(field, value);
+}
+
 export function encodeRepeatedUint32(field: number, values: number[]): Uint8Array {
   return concatBytes(...values.map((value) => encodeUint32(field, value)));
 }

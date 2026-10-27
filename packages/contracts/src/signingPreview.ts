@@ -64,6 +64,41 @@ export function formatWeiEth(wei: bigint): { eth: string; wei: string } {
   return { eth, wei: `${wei.toString()} wei` };
 }
 
+export function formatSatsBtc(sats: bigint): string {
+  const unit = 100_000_000n;
+  const sign = sats < 0n ? '-' : '';
+  const value = sats < 0n ? -sats : sats;
+  const whole = value / unit;
+  const frac = value % unit;
+  if (frac === 0n) {
+    return `${sign}${whole} BTC`;
+  }
+  return `${sign}${whole}.${frac.toString().padStart(8, '0').replace(/0+$/, '')} BTC`;
+}
+
+export function describeBtcPsbt(input: {
+  path: string;
+  outputs: Array<{ address: string; amountSats: bigint }>;
+  feeSats?: bigint;
+}): SigningDetail {
+  const fields: SigningField[] = [
+    { label: 'CHAIN', value: 'Bitcoin' },
+    { label: 'PATH', value: input.path, mono: true },
+  ];
+  for (const output of input.outputs) {
+    fields.push({ label: 'TO', value: output.address, mono: true });
+    fields.push({ label: 'VALUE', value: formatSatsBtc(output.amountSats) });
+  }
+  if (input.feeSats != null) {
+    fields.push({ label: 'FEE', value: formatSatsBtc(input.feeSats) });
+  }
+  return {
+    style: 'btc-hash',
+    headline: 'Sign Bitcoin transaction',
+    fields,
+  };
+}
+
 function formatAddress(bytes: Uint8Array): string {
   if (bytes.length === 0) {
     return '(contract create)';
@@ -163,10 +198,14 @@ export type EthTxInput = {
   gasLimit?: Uint8Array;
   maxFeePerGas?: Uint8Array;
   maxPriorityFeePerGas?: Uint8Array;
+  maxFeePerBlobGas?: Uint8Array;
   to?: Uint8Array;
   value?: Uint8Array;
   data?: Uint8Array;
   accessListCount?: number;
+  blobCount?: number;
+  authorizationCount?: number;
+  token?: { ticker: string; decimals: number };
   envelopeHex?: string;
 };
 
@@ -216,18 +255,97 @@ export function describeEthTransaction(input: EthTxInput): SigningDetail {
   if (input.accessListCount && input.accessListCount > 0) {
     push('ACCESS LIST', `${input.accessListCount} keys`, false);
   }
+  if (input.maxFeePerBlobGas) {
+    push('BLOB FEE', `${bigintFromBytes(input.maxFeePerBlobGas).toString()} wei`);
+  }
+  if (input.blobCount && input.blobCount > 0) {
+    push('BLOBS', String(input.blobCount), false);
+  }
+  if (input.authorizationCount && input.authorizationCount > 0) {
+    push('AUTHORIZATIONS', String(input.authorizationCount), false);
+  }
   const data = input.data ?? new Uint8Array();
-  if (data.length >= 4) {
+  const erc20 = describeErc20(data, input.token);
+  if (erc20) {
+    for (const field of erc20.fields) {
+      fields.push(field);
+    }
+  } else if (data.length >= 4) {
     push('SELECTOR', hex0x(data.subarray(0, 4)));
   }
-  if (data.length > 0) {
+  if (data.length > 0 && !erc20) {
     push('DATA', hex0x(data));
   }
   return {
     style: 'eth-tx',
-    headline: 'Ethereum transaction',
+    headline: erc20?.headline ?? 'Ethereum transaction',
     fields,
     hex: input.envelopeHex,
+  };
+}
+
+function describeErc20(
+  data: Uint8Array,
+  token?: { ticker: string; decimals: number },
+): { headline: string; fields: SigningField[] } | null {
+  if (data.length < 68) {
+    return null;
+  }
+  const selector = toHex(data.subarray(0, 4));
+  const method = selector === 'a9059cbb' ? 'transfer' : selector === '095ea7b3' ? 'approve' : null;
+  if (!method) {
+    return null;
+  }
+  const target = data.subarray(16, 36);
+  const amount = bigintFromBytes(data.subarray(36, 68));
+  const ticker = token?.ticker;
+  const decimals = token?.decimals ?? 18;
+  const unit = 10n ** BigInt(decimals);
+  const whole = amount / unit;
+  const frac = amount % unit;
+  const formatted =
+    frac === 0n
+      ? `${whole}${ticker ? ` ${ticker}` : ''}`
+      : `${whole}.${frac.toString().padStart(decimals, '0').replace(/0+$/, '')}${ticker ? ` ${ticker}` : ''}`;
+  return {
+    headline: method === 'transfer' ? `Token transfer${ticker ? ` (${ticker})` : ''}` : `Token approve${ticker ? ` (${ticker})` : ''}`,
+    fields: [
+      { label: 'METHOD', value: method },
+      { label: method === 'transfer' ? 'TO' : 'SPENDER', value: hex0x(target), mono: true },
+      { label: 'AMOUNT', value: formatted },
+    ],
+  };
+}
+
+export function describeEthTypedData(path: string, json: Uint8Array): SigningDetail {
+  const text = asPrintable(json);
+  let primary = '';
+  let domain = '';
+  if (text) {
+    try {
+      const parsed = JSON.parse(text) as { primaryType?: unknown; domain?: { name?: unknown } };
+      if (typeof parsed.primaryType === 'string') {
+        primary = parsed.primaryType;
+      }
+      if (typeof parsed.domain?.name === 'string') {
+        domain = parsed.domain.name;
+      }
+    } catch {
+      // fall through to hex dump
+    }
+  }
+  const fields: SigningField[] = [{ label: 'PATH', value: path, mono: true }];
+  if (primary) {
+    fields.push({ label: 'TYPE', value: primary });
+  }
+  if (domain) {
+    fields.push({ label: 'DOMAIN', value: domain });
+  }
+  return {
+    style: 'eth-message',
+    headline: 'EIP-712 typed data',
+    fields,
+    hex: primary ? undefined : hex0x(json),
   };
 }
 
@@ -257,13 +375,15 @@ export function parseEthTx(raw: Uint8Array): EthTxInput | null {
   }
   let type = 'legacy';
   let offset = 0;
-  if (raw[0]! <= 0x03 && raw.length > 1 && raw[1]! >= 0xc0) {
+  if (raw[0]! <= 0x04 && raw.length > 1 && raw[1]! >= 0xc0) {
     if (raw[0] === 0x01) {
       type = 'eip2930';
     } else if (raw[0] === 0x02) {
       type = 'eip1559';
     } else if (raw[0] === 0x03) {
-      return null;
+      type = 'eip4844';
+    } else if (raw[0] === 0x04) {
+      type = 'eip7702';
     }
     offset = 1;
   }
@@ -273,7 +393,7 @@ export function parseEthTx(raw: Uint8Array): EthTxInput | null {
   }
   const items = decoded.value;
   const envelopeHex = hex0x(raw);
-  if (type === 'eip1559') {
+  if (type === 'eip1559' || type === 'eip4844' || type === 'eip7702') {
     if (items.length < 8) {
       return null;
     }
@@ -289,7 +409,7 @@ export function parseEthTx(raw: Uint8Array): EthTxInput | null {
       return null;
     }
     const access = items[8];
-    return {
+    const parsed: EthTxInput = {
       type,
       chainId,
       nonce,
@@ -302,6 +422,16 @@ export function parseEthTx(raw: Uint8Array): EthTxInput | null {
       accessListCount: Array.isArray(access) ? access.length : undefined,
       envelopeHex,
     };
+    if (type === 'eip4844') {
+      parsed.maxFeePerBlobGas = asBytes(items[9]) ?? undefined;
+      const blobs = items[10];
+      parsed.blobCount = Array.isArray(blobs) ? blobs.length : undefined;
+    }
+    if (type === 'eip7702') {
+      const auths = items[9];
+      parsed.authorizationCount = Array.isArray(auths) ? auths.length : undefined;
+    }
+    return parsed;
   }
   if (type === 'eip2930') {
     if (items.length < 7) {

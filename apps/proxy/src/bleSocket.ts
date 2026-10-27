@@ -119,7 +119,7 @@ export class BleSocketClient {
               this.scanWait = undefined;
               wait.reject(new Error('ble scan timed out'));
             }
-          }, timeoutMs + 2_000);
+          }, timeoutMs + 5_000);
           this.scanWait = wait;
           this.send({ op: 'scan', timeoutMs });
         }),
@@ -246,6 +246,9 @@ export class BleSocketClient {
       } else if (frame.op === 'disconnected') {
         this.linked = false;
       } else if (frame.op === 'ok') {
+        if (frame.writeUuid) {
+          this.writeUuid = frame.writeUuid;
+        }
         const rpc = this.pending;
         this.pending = undefined;
         rpc?.resolve();

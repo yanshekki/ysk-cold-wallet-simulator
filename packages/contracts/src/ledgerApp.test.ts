@@ -25,7 +25,8 @@ describe('ledger app labels', () => {
   it('lists BOLOS plus the installed Manager catalog', () => {
     expect(LEDGER_APPS[0]).toBe('dashboard');
     expect(LEDGER_APPS).toContain('solana');
-    expect(LEDGER_INSTALLED_APPS.length).toBeGreaterThanOrEqual(8);
+    expect(LEDGER_INSTALLED_APPS.length).toBeGreaterThanOrEqual(100);
+    expect(LEDGER_INSTALLED_APPS.some((app) => app.openAppName === 'Cardano ADA')).toBe(true);
   });
 
   it('orders the open-app picker by common hardware-wallet usage', () => {
@@ -40,6 +41,8 @@ describe('ledger app labels', () => {
     expect(matchLedgerApp('Bitcoin')).toBe('bitcoin');
     expect(matchLedgerApp('Solana')).toBe('solana');
     expect(matchLedgerApp('Avalanche')).toBe('avalanche');
+    expect(matchLedgerApp('Cardano ADA')).toBe('cardano');
+    expect(matchLedgerApp('Stellar')).toBe('stellar');
     expect(matchLedgerApp('unknown-chain')).toBeUndefined();
   });
 
@@ -47,6 +50,7 @@ describe('ledger app labels', () => {
     expect(inferLedgerFamily('Cardano ADA')).toBe('cardano');
     expect(inferLedgerFamily('Bitcoin Test')).toBe('bitcoin');
     expect(inferLedgerFamily('Helium-Solana')).toBe('solana');
+    expect(inferLedgerFamily('Stellar')).toBe('stellar');
     expect(slugLedgerApp('Cardano ADA')).toBe('cardano');
   });
 });

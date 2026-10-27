@@ -49,9 +49,12 @@ export {
   encodeDeviceInfo,
   encodeDeviceStatus,
   encodeProtocolInfo,
+  encodeTypedStructAck,
+  encodeTypedValueAck,
   encodeV2Failure,
+  EthereumDataType,
 } from './messages';
-export { encodeBool, encodeBytes, encodeRepeatedUint32, encodeString, encodeUint32 } from './proto';
+export { encodeBool, encodeBytes, encodeMessage, encodeRepeatedUint32, encodeString, encodeUint32 } from './proto';
 export {
   bitcoinP2pkhAddress,
   derivePrivateKey,

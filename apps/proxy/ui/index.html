@@ -29,6 +29,7 @@
         </header>
         <nav class="tabs" role="tablist">
           <button type="button" id="tab-proxy" class="tab on" role="tab" aria-selected="true" data-tab="proxy"></button>
+          <button type="button" id="tab-lab" class="tab" role="tab" aria-selected="false" data-tab="lab"></button>
           <button type="button" id="tab-console" class="tab" role="tab" aria-selected="false" data-tab="console">
             <span id="tab-console-label"></span>
             <span id="log-badge" class="badge hidden">0</span>
@@ -89,6 +90,35 @@
             </div>
           </section>
         </main>
+        <main id="pane-lab" class="screen hidden">
+          <p class="kicker" id="lab-kicker">/ LAB</p>
+          <p id="lab-status" class="status"></p>
+          <div id="lab-sections" class="lab-sections"></div>
+          <h2 id="lab-section-title" class="lab-heading"></h2>
+          <div id="lab-grid" class="lab-grid"></div>
+          <pre id="lab-result" class="lab-result hidden"></pre>
+        </main>
+        <div id="lab-modal" class="modal hidden" hidden>
+          <div class="modal-card">
+            <h2 id="lab-modal-title"></h2>
+            <label id="lab-field-path" class="field hidden">
+              <span id="lab-label-path">Path</span>
+              <input id="lab-input-path" />
+            </label>
+            <label id="lab-field-utf8" class="field hidden">
+              <span id="lab-label-utf8">UTF-8</span>
+              <textarea id="lab-input-utf8" rows="4"></textarea>
+            </label>
+            <label id="lab-field-hex" class="field hidden">
+              <span id="lab-label-hex">Hex</span>
+              <textarea id="lab-input-hex" rows="4"></textarea>
+            </label>
+            <div class="row">
+              <button type="button" id="lab-run" class="primary"></button>
+              <button type="button" id="lab-close"></button>
+            </div>
+          </div>
+        </div>
         <section id="pane-console" class="console-root hidden">
           <div class="instrument">
             <div class="log-chips">
@@ -122,8 +152,7 @@
           <ol id="logs" class="logs"></ol>
         </section>
         <footer class="dock">
-          <button type="button" id="start" class="primary"></button>
-          <button type="button" id="stop" class="danger"></button>
+          <button type="button" id="power" class="primary"></button>
         </footer>
       </div>
     </div>

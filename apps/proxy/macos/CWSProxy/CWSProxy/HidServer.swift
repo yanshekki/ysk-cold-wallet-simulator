@@ -9,6 +9,8 @@ final class HidServer {
   private var clientFd: Int32 = -1
   private var running = false
   private var hid: HidDevice?
+  private var hidVid = -1
+  private var hidPid = -1
   private var incoming = Data()
 
   init(socketPath: String) {
@@ -49,7 +51,7 @@ final class HidServer {
       Darwin.close(fd)
       throw HidError.listenFailed("bind: \(String(cString: strerror(errno)))")
     }
-    if Darwin.listen(fd, 1) != 0 {
+    if Darwin.listen(fd, 8) != 0 {
       Darwin.close(fd)
       throw HidError.listenFailed("listen: \(String(cString: strerror(errno)))")
     }
@@ -71,6 +73,8 @@ final class HidServer {
     clientFd = -1
     let device = hid
     hid = nil
+    hidVid = -1
+    hidPid = -1
     lock.unlock()
     if listen >= 0 {
       Darwin.shutdown(listen, SHUT_RDWR)
@@ -98,33 +102,37 @@ final class HidServer {
         continue
       }
       lock.lock()
-      if !running || clientFd >= 0 {
+      if !running {
         lock.unlock()
         Darwin.close(fd)
         continue
       }
+      let previous = clientFd
       clientFd = fd
       incoming.removeAll(keepingCapacity: true)
       lock.unlock()
+      if previous >= 0 && previous != fd {
+        Darwin.shutdown(previous, SHUT_RDWR)
+        Darwin.close(previous)
+      }
       Thread.detachNewThread { [weak self] in
-        self?.readLoop()
+        self?.readLoop(fd)
       }
     }
   }
 
-  private func readLoop() {
+  private func readLoop(_ fd: Int32) {
     while true {
       lock.lock()
-      let fd = clientFd
-      let alive = running
+      let alive = running && clientFd == fd
       lock.unlock()
-      if !alive || fd < 0 {
+      if !alive {
         return
       }
       var chunk = [UInt8](repeating: 0, count: 4096)
       let n = Darwin.recv(fd, &chunk, chunk.count, 0)
       if n <= 0 {
-        dropClient()
+        dropClient(fd)
         return
       }
       lock.lock()
@@ -138,8 +146,16 @@ final class HidServer {
       } catch {
         lock.unlock()
         send(.init(op: .error, message: error.localizedDescription))
-        dropClient()
+        dropClient(fd)
         return
+      }
+    }
+  }
+
+  private func bindHost(_ device: HidDevice) {
+    device.onHostReport = { [weak self] report in
+      DispatchQueue.global(qos: .userInitiated).async {
+        self?.send(.init(op: .input, report: report.base64EncodedString()))
       }
     }
   }
@@ -147,25 +163,35 @@ final class HidServer {
   private func handle(_ frame: HidFrame) {
     switch frame.op {
     case .open:
+      let vid = frame.vid ?? 0
+      let pid = frame.pid ?? 0
+      lock.lock()
+      let existing = hid
+      let reuse = existing != nil && hidVid == vid && hidPid == pid
+      lock.unlock()
+      if reuse, let existing {
+        bindHost(existing)
+        send(.init(op: .ok))
+        return
+      }
       dropHid()
+      Thread.sleep(forTimeInterval: 0.15)
       guard let raw = frame.descriptor, let descriptor = Data(base64Encoded: raw) else {
         send(.init(op: .error, message: HidError.missingDescriptor.localizedDescription))
         return
       }
       do {
         let device = try HidDevice(
-          vid: frame.vid ?? 0,
-          pid: frame.pid ?? 0,
+          vid: vid,
+          pid: pid,
           name: frame.name ?? "CWS",
           descriptor: descriptor
         )
-        device.onHostReport = { [weak self] report in
-          DispatchQueue.global(qos: .userInitiated).async {
-            self?.send(.init(op: .input, report: report.base64EncodedString()))
-          }
-        }
+        bindHost(device)
         lock.lock()
         hid = device
+        hidVid = vid
+        hidPid = pid
         lock.unlock()
         send(.init(op: .ok))
       } catch {
@@ -217,18 +243,19 @@ final class HidServer {
     }
   }
 
-  private func dropClient() {
+  private func dropClient(_ expected: Int32) {
     lock.lock()
-    let fd = clientFd
+    guard clientFd == expected else {
+      lock.unlock()
+      return
+    }
     clientFd = -1
     incoming.removeAll(keepingCapacity: false)
-    let device = hid
-    hid = nil
+    hid?.onHostReport = nil
     lock.unlock()
-    if fd >= 0 {
-      Darwin.close(fd)
+    if expected >= 0 {
+      Darwin.close(expected)
     }
-    device?.close()
   }
 
   func dropDevice() {
@@ -239,6 +266,8 @@ final class HidServer {
     lock.lock()
     let device = hid
     hid = nil
+    hidVid = -1
+    hidPid = -1
     lock.unlock()
     device?.close()
   }

@@ -1,22 +1,28 @@
+import { Buffer } from 'buffer';
 import { getRandomBytes } from 'expo-crypto';
+
+const gBuffer = globalThis as typeof globalThis & { Buffer?: typeof Buffer };
+const existing = gBuffer.Buffer;
+if (!existing || typeof existing.from !== 'function' || typeof existing.alloc !== 'function') {
+  try {
+    gBuffer.Buffer = Buffer;
+  } catch {
+    try {
+      Object.defineProperty(globalThis, 'Buffer', {
+        configurable: true,
+        writable: true,
+        value: Buffer,
+      });
+    } catch {
+      // Hermes may freeze Buffer; protocol-qr installs its own copy if missing.
+    }
+  }
+}
 
 function getRandomValues<T extends ArrayBufferView>(buffer: T): T {
   const bytes = getRandomBytes(buffer.byteLength);
   new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength).set(bytes);
   return buffer;
-}
-
-function bytesFrom(value: ArrayBuffer | ArrayBufferView | ArrayLike<number>): Uint8Array {
-  if (value instanceof Uint8Array) {
-    return value;
-  }
-  if (ArrayBuffer.isView(value)) {
-    return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
-  }
-  if (value instanceof ArrayBuffer) {
-    return new Uint8Array(value);
-  }
-  return Uint8Array.from(value);
 }
 
 export function expoRng(length: number): Uint8Array {
@@ -61,9 +67,3 @@ try {
   // ignore
 }
 
-if (typeof (globalThis as { Buffer?: unknown }).Buffer === 'undefined') {
-  Object.defineProperty(globalThis, 'Buffer', {
-    configurable: true,
-    value: { from: bytesFrom },
-  });
-}

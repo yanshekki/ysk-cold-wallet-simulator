@@ -1,6 +1,6 @@
 import type { BackupKind, ChainPathId } from '@cws/contracts';
 import { base58 } from '@scure/base';
-import { cardanoEnterprise, deriveIcarus, xrpClassic } from '@cws/protocol-ledger';
+import { cardanoEnterprise, cosmosBech32, deriveIcarus, stellarAddress, tezosTz1, xrpClassic } from '@cws/protocol-ledger';
 import { MessageType } from './messages';
 
 export type CoinCurve = 'secp256k1' | 'ed25519' | 'icarus';
@@ -66,6 +66,57 @@ export const COIN_OPS: CoinOp[] = [
     curve: 'secp256k1',
     chains: ['xrp'],
     title: 'Sign XRP transaction',
+  },
+  {
+    request: MessageType.StellarGetAddress,
+    reply: MessageType.StellarAddress,
+    kind: 'address',
+    curve: 'ed25519',
+    chains: ['stellar'],
+    title: 'Export Stellar address',
+    addressOf: stellarAddress,
+  },
+  {
+    request: MessageType.StellarSignTx,
+    reply: MessageType.StellarSignedTx,
+    kind: 'sign',
+    curve: 'ed25519',
+    chains: ['stellar'],
+    title: 'Sign Stellar transaction',
+  },
+  {
+    request: MessageType.TezosGetAddress,
+    reply: MessageType.TezosAddress,
+    kind: 'address',
+    curve: 'ed25519',
+    chains: ['tezos'],
+    title: 'Export Tezos address',
+    addressOf: tezosTz1,
+  },
+  {
+    request: MessageType.TezosSignTx,
+    reply: MessageType.TezosSignedTx,
+    kind: 'sign',
+    curve: 'ed25519',
+    chains: ['tezos'],
+    title: 'Sign Tezos transaction',
+  },
+  {
+    request: MessageType.BinanceGetAddress,
+    reply: MessageType.BinanceAddress,
+    kind: 'address',
+    curve: 'secp256k1',
+    chains: ['bnb'],
+    title: 'Export Binance address',
+    addressOf: (pub) => cosmosBech32(pub, 'bnb'),
+  },
+  {
+    request: MessageType.BinanceSignTx,
+    reply: MessageType.BinanceSignedTx,
+    kind: 'sign',
+    curve: 'secp256k1',
+    chains: ['bnb'],
+    title: 'Sign Binance transaction',
   },
 ];
 

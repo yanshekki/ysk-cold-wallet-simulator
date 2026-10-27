@@ -1,3 +1,5 @@
+import { LEDGER_MANAGER_SNAPSHOT } from './ledgerCatalog.snapshot';
+
 export type LedgerInstalledAppId =
   | 'bitcoin'
   | 'ethereum'
@@ -29,6 +31,7 @@ export type LedgerAppFamily =
   | 'ton'
   | 'aptos'
   | 'sui'
+  | 'stellar'
   | 'unknown';
 
 export type LedgerApp = 'dashboard' | string;
@@ -57,6 +60,7 @@ const FAMILY_RULES: [RegExp, LedgerAppFamily][] = [
   [/^ton$/i, 'ton'],
   [/aptos/i, 'aptos'],
   [/^sui/i, 'sui'],
+  [/stellar/i, 'stellar'],
 ];
 
 export function inferLedgerFamily(name: string): LedgerAppFamily {
@@ -100,6 +104,7 @@ function chipFor(name: string, family: LedgerAppFamily): string {
       ton: 'TON',
       aptos: 'APT',
       sui: 'SUI',
+      stellar: 'XLM',
     };
     if (name.toLowerCase().includes('litecoin')) {
       return 'LTC';
@@ -112,34 +117,8 @@ function chipFor(name: string, family: LedgerAppFamily): string {
   return name.replace(/[^A-Za-z0-9]/g, '').slice(0, 4).toUpperCase() || 'APP';
 }
 
-function row(
-  id: LedgerInstalledAppId,
-  openAppName: string,
-  version: string,
-  chip: string,
-  family: LedgerAppFamily,
-): LedgerInstalledApp {
-  return { id, openAppName, version, chip, family };
-}
-
 /** Bundled Manager snapshot so BLE works offline. Overlay replaces this after Update. */
-export const LEDGER_INSTALLED_APPS: readonly LedgerInstalledApp[] = [
-  row('bitcoin', 'Bitcoin', '2.4.2', 'BTC', 'bitcoin'),
-  row('ethereum', 'Ethereum', '1.23.0', 'ETH', 'ethereum'),
-  row('avalanche', 'Avalanche', '1.4.23', 'AVAX', 'avalanche'),
-  row('solana', 'Solana', '1.16.0', 'SOL', 'solana'),
-  row('xrp', 'XRP', '2.6.1', 'XRP', 'xrp'),
-  row('cardano', 'Cardano', '7.2.1', 'ADA', 'cardano'),
-  row('polkadot', 'Polkadot', '100.0.11', 'DOT', 'polkadot'),
-  row('tron', 'Tron', '0.8.3', 'TRX', 'tron'),
-  row('cosmos', 'Cosmos', '2.36.15', 'ATOM', 'cosmos'),
-  row('near', 'NEAR', '1.3.2', 'NEAR', 'near'),
-  row('ton', 'TON', '2.2.0', 'TON', 'ton'),
-  row('aptos', 'Aptos', '0.9.0', 'APT', 'aptos'),
-  row('sui', 'Sui', '0.9.2', 'SUI', 'sui'),
-  row('dogecoin', 'Dogecoin', '2.2.3', 'DOGE', 'bitcoin'),
-  row('litecoin', 'Litecoin', '2.2.3', 'LTC', 'bitcoin'),
-];
+export const LEDGER_INSTALLED_APPS: readonly LedgerInstalledApp[] = LEDGER_MANAGER_SNAPSHOT;
 
 let overlay: LedgerInstalledApp[] | undefined;
 

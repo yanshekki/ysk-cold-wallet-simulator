@@ -1,5 +1,6 @@
 import CoreBluetooth
 import Foundation
+import os.log
 
 struct BleScanHit {
   var id: String
@@ -7,10 +8,15 @@ struct BleScanHit {
   var services: [String]
 }
 
+private struct PendingWrite {
+  let data: Data
+  let cont: CheckedContinuation<Void, Error>
+}
+
 final class BleCentral: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
   private let queue = DispatchQueue(label: "hk.ysk.cws.ble")
   private var manager: CBCentralManager!
-  private var readyWait: CheckedContinuation<Void, Never>?
+  private var readyWait: CheckedContinuation<Void, Error>?
   private var scanWait: CheckedContinuation<[BleScanHit], Never>?
   private var connectWait: CheckedContinuation<Void, Error>?
   private var scanHits: [UUID: BleScanHit] = [:]
@@ -21,15 +27,29 @@ final class BleCentral: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
   private var wantWrite: CBUUID?
   private var wantNotify: CBUUID?
   private var pendingServices = 0
-  private var pendingWrites: [Data] = []
+  private var pendingWrites: [PendingWrite] = []
+  private var writeInFlight = false
   private var scanToken = 0
   private var notifyArmed = false
+  private var foundChars: [String] = []
+  private var discoveredChars: [CBCharacteristic] = []
+  private(set) var boundWriteUuid = ""
+  private var didReceiveState = false
   var onNotify: ((Data) -> Void)?
   var onDisconnected: (() -> Void)?
 
   override init() {
     super.init()
-    manager = CBCentralManager(delegate: self, queue: queue)
+    recreateManager()
+  }
+
+  private func recreateManager() {
+    manager = CBCentralManager(
+      delegate: self,
+      queue: queue,
+      options: [CBCentralManagerOptionShowPowerAlertKey: true]
+    )
+    didReceiveState = false
   }
 
   func isLinked() -> Bool {
@@ -40,17 +60,18 @@ final class BleCentral: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
     queue.async { self.resetLink() }
   }
 
-  func scan(timeoutMs: Int) async -> [BleScanHit] {
-    await waitReady()
+  func scan(timeoutMs: Int) async throws -> [BleScanHit] {
+    try await waitReady()
     return await withCheckedContinuation { (cont: CheckedContinuation<[BleScanHit], Never>) in
       self.queue.async {
         self.resetLink()
-        self.takeScan()?.resume(returning: Array(self.scanHits.values))
+        self.takeScan()?.resume(returning: [])
         self.scanWait = cont
         self.scanHits.removeAll()
         self.scanToken += 1
         let token = self.scanToken
         self.manager.stopScan()
+        os_log("ble scan start state=%{public}@", log: .default, type: .info, self.radioStateMessage())
         self.manager.scanForPeripherals(withServices: nil, options: [
           CBCentralManagerScanOptionAllowDuplicatesKey: true,
         ])
@@ -60,6 +81,13 @@ final class BleCentral: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
           }
           self.manager.stopScan()
           let hits = Array(self.scanHits.values)
+          os_log(
+            "ble scan done hits=%{public}d state=%{public}@",
+            log: .default,
+            type: .info,
+            hits.count,
+            self.radioStateMessage()
+          )
           self.takeScan()?.resume(returning: hits)
         }
       }
@@ -67,7 +95,7 @@ final class BleCentral: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
   }
 
   func connect(id: String, writeUuid: String, notifyUuid: String) async throws {
-    await waitReady()
+    try await waitReady()
     do {
       try await connectInner(id: id, writeUuid: writeUuid, notifyUuid: notifyUuid)
     } catch {
@@ -76,11 +104,13 @@ final class BleCentral: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
     }
   }
 
-  func write(_ data: Data) {
-    queue.async {
-      self.notifyArmed = true
-      self.pendingWrites.append(data)
-      self.flushWrites()
+  func write(_ data: Data) async throws {
+    try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+      self.queue.async {
+        self.notifyArmed = true
+        self.pendingWrites.append(PendingWrite(data: data, cont: cont))
+        self.flushWrites()
+      }
     }
   }
 
@@ -97,6 +127,9 @@ final class BleCentral: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
         self.writeChar = nil
         self.notifyChar = nil
         self.pendingServices = 0
+        self.foundChars = []
+        self.discoveredChars = []
+        self.boundWriteUuid = ""
         let peripheral =
           self.seen[uuid] ?? self.manager.retrievePeripherals(withIdentifiers: [uuid]).first
         guard let peripheral else {
@@ -122,23 +155,80 @@ final class BleCentral: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
     }
   }
 
-  private func waitReady() async {
-    await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+  private func waitReady() async throws {
+    try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
       self.queue.async {
         if self.manager.state == .poweredOn {
           cont.resume()
           return
         }
+        self.takeReady()?.resume(throwing: HidError.listenFailed("replaced"))
+        // Rebuilds and Google Drive hardlinks change the TCC identity. Recreate
+        // the manager so a Settings toggle is picked up without Cmd+Q.
+        if self.didReceiveState, self.connected == nil {
+          os_log(
+            "ble recreate manager %{public}@",
+            log: .default,
+            type: .info,
+            self.radioStateMessage()
+          )
+          self.recreateManager()
+        }
         self.readyWait = cont
-        self.queue.asyncAfter(deadline: .now() + .seconds(5)) {
-          self.takeReady()?.resume()
+        self.queue.asyncAfter(deadline: .now() + .seconds(4)) {
+          guard let wait = self.takeReady() else {
+            return
+          }
+          if self.manager.state == .poweredOn {
+            wait.resume()
+          } else {
+            wait.resume(throwing: HidError.listenFailed(self.radioFailureMessage()))
+          }
         }
       }
     }
   }
 
+  private func radioFailureMessage() -> String {
+    switch manager.state {
+    case .poweredOff:
+      return "Bluetooth is off (\(radioStateMessage()))"
+    case .unsupported:
+      return "Bluetooth unsupported (\(radioStateMessage()))"
+    default:
+      break
+    }
+    switch CBCentralManager.authorization {
+    case .denied, .restricted:
+      return "Bluetooth permission denied (\(radioStateMessage())). System Settings → Privacy & Security → Bluetooth → enable this CWS Proxy copy, then Stop and Start."
+    default:
+      return radioStateMessage()
+    }
+  }
+
+  private func radioStateMessage() -> String {
+    let auth: String
+    switch CBCentralManager.authorization {
+    case .allowedAlways: auth = "allowed"
+    case .denied: auth = "denied"
+    case .restricted: auth = "restricted"
+    case .notDetermined: auth = "notDetermined"
+    @unknown default: auth = "unknown"
+    }
+    let state: String
+    switch manager.state {
+    case .poweredOn: state = "poweredOn"
+    case .poweredOff: state = "poweredOff"
+    case .unauthorized: state = "unauthorized"
+    case .unsupported: state = "unsupported"
+    case .resetting: state = "resetting"
+    default: state = "unknown"
+    }
+    return "ble \(state) auth=\(auth)"
+  }
+
   private func resetLink() {
-    pendingWrites.removeAll(keepingCapacity: false)
+    failPendingWrites(HidError.listenFailed("disconnected"))
     notifyArmed = false
     if let peripheral = connected {
       manager.cancelPeripheralConnection(peripheral)
@@ -160,7 +250,7 @@ final class BleCentral: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
     }
   }
 
-  private func takeReady() -> CheckedContinuation<Void, Never>? {
+  private func takeReady() -> CheckedContinuation<Void, Error>? {
     let wait = readyWait
     readyWait = nil
     return wait
@@ -178,29 +268,88 @@ final class BleCentral: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
     return wait
   }
 
+  private func failPendingWrites(_ error: Error) {
+    writeInFlight = false
+    let waiting = pendingWrites
+    pendingWrites.removeAll(keepingCapacity: false)
+    for item in waiting {
+      item.cont.resume(throwing: error)
+    }
+  }
+
+  private func finishWrite(_ error: Error?) {
+    guard writeInFlight, !pendingWrites.isEmpty else {
+      writeInFlight = false
+      return
+    }
+    writeInFlight = false
+    let item = pendingWrites.removeFirst()
+    if let error {
+      item.cont.resume(throwing: error)
+    } else {
+      item.cont.resume()
+    }
+    flushWrites()
+  }
+
   private func flushWrites() {
+    guard !writeInFlight, let next = pendingWrites.first else {
+      return
+    }
     guard let peripheral = connected, let characteristic = writeChar else {
+      failPendingWrites(HidError.listenFailed("BLE write before connect"))
       return
     }
     let canWwr = characteristic.properties.contains(.writeWithoutResponse)
     let canWr = characteristic.properties.contains(.write)
-    while let data = pendingWrites.first {
-      if canWwr, !canWr, !peripheral.canSendWriteWithoutResponse {
-        return
+    if canWwr, !canWr, !peripheral.canSendWriteWithoutResponse {
+      return
+    }
+    writeInFlight = true
+    if canWr {
+      peripheral.writeValue(next.data, for: characteristic, type: .withResponse)
+      let token = next.data
+      queue.asyncAfter(deadline: .now() + .milliseconds(2_000)) {
+        guard self.writeInFlight, self.pendingWrites.first?.data == token else {
+          return
+        }
+        self.finishWrite(nil)
       }
-      pendingWrites.removeFirst()
-      if canWr {
-        peripheral.writeValue(data, for: characteristic, type: .withResponse)
-      } else if canWwr {
-        peripheral.writeValue(data, for: characteristic, type: .withoutResponse)
-      }
+    } else if canWwr {
+      peripheral.writeValue(next.data, for: characteristic, type: .withoutResponse)
+      finishWrite(nil)
+    } else {
+      finishWrite(HidError.listenFailed("characteristic is not writable"))
     }
   }
 
   func centralManagerDidUpdateState(_ central: CBCentralManager) {
+    didReceiveState = true
+    os_log("ble state %{public}@", log: .default, type: .info, radioStateMessage())
     if central.state == .poweredOn {
       takeReady()?.resume()
     }
+  }
+
+  private static func sameUuid(_ left: CBUUID, _ right: CBUUID?) -> Bool {
+    guard let right else {
+      return false
+    }
+    if left == right {
+      return true
+    }
+    let a = left.uuidString.lowercased().replacingOccurrences(of: "-", with: "")
+    let b = right.uuidString.lowercased().replacingOccurrences(of: "-", with: "")
+    return a == b || a.hasSuffix(b) || b.hasSuffix(a)
+  }
+
+  private static func gapLabel(_ advertised: String) -> String {
+    let name = advertised.trimmingCharacters(in: .whitespacesAndNewlines)
+    if let start = name.lastIndex(of: "["), let end = name.lastIndex(of: "]"), start < end {
+      let inner = name[name.index(after: start)..<end]
+      return inner.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    return name
   }
 
   func centralManager(
@@ -213,20 +362,26 @@ final class BleCentral: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
     let previous = scanHits[peripheral.identifier]
     let gap = peripheral.name ?? ""
     let local = advertisementData[CBAdvertisementDataLocalNameKey] as? String ?? ""
+    let primary = (advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID] ?? [])
+      .map { $0.uuidString.lowercased() }
+    let overflow = (advertisementData[CBAdvertisementDataOverflowServiceUUIDsKey] as? [CBUUID] ?? [])
+      .map { $0.uuidString.lowercased() }
+    // Overflow UUIDs linger after the phone switches Trezor → OneKey. Trust
+    // this packet's primary list; only fall back to overflow when primary is empty.
+    let advertised = primary.isEmpty ? overflow : primary
     var name = previous?.name ?? ""
-    if !gap.isEmpty, !local.isEmpty, gap != local {
-      name = "\(gap) [\(local)]"
-    } else if !local.isEmpty, !gap.isEmpty, !name.contains("[") {
-      name = "\(gap) [\(local)]"
-    } else if name.isEmpty {
-      name = gap.isEmpty ? local : gap
+    let previousLabel = Self.gapLabel(name)
+    let localChanged = !local.isEmpty && previousLabel.compare(local, options: [.caseInsensitive]) != .orderedSame
+    if !local.isEmpty {
+      name = !gap.isEmpty && gap != local ? "\(gap) [\(local)]" : local
+    } else if name.isEmpty || (!advertised.isEmpty && advertised != (previous?.services ?? [])) {
+      name = gap
     }
     var uuids = previous?.services ?? []
-    let advertised =
-      (advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID] ?? [])
-      + (advertisementData[CBAdvertisementDataOverflowServiceUUIDsKey] as? [CBUUID] ?? [])
-    for uuid in advertised.map({ $0.uuidString.lowercased() }) where !uuids.contains(uuid) {
-      uuids.append(uuid)
+    if !advertised.isEmpty {
+      uuids = advertised
+    } else if localChanged {
+      uuids = []
     }
     scanHits[peripheral.identifier] = BleScanHit(
       id: peripheral.identifier.uuidString,
@@ -256,7 +411,7 @@ final class BleCentral: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
       connected = nil
       writeChar = nil
       notifyChar = nil
-      pendingWrites.removeAll(keepingCapacity: false)
+      failPendingWrites(error ?? HidError.listenFailed("BLE disconnected"))
       onDisconnected?()
     }
     finishConnect(error ?? HidError.listenFailed("BLE disconnected"))
@@ -287,10 +442,12 @@ final class BleCentral: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
       return
     }
     for characteristic in service.characteristics ?? [] {
-      if characteristic.uuid == wantWrite {
+      discoveredChars.append(characteristic)
+      foundChars.append("\(service.uuid.uuidString.lowercased())/\(characteristic.uuid.uuidString.lowercased())")
+      if Self.sameUuid(characteristic.uuid, wantWrite) {
         writeChar = characteristic
       }
-      if characteristic.uuid == wantNotify {
+      if Self.sameUuid(characteristic.uuid, wantNotify) {
         notifyChar = characteristic
       }
     }
@@ -298,12 +455,13 @@ final class BleCentral: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
     guard pendingServices == 0 else {
       return
     }
+    bindKnownChars()
     if let notifyChar {
       peripheral.setNotifyValue(true, for: notifyChar)
     } else if writeChar != nil {
       finishConnect(nil)
     } else {
-      finishConnect(HidError.listenFailed("missing write characteristic"))
+      finishConnect(HidError.listenFailed(missingWriteMessage()))
     }
   }
 
@@ -316,11 +474,52 @@ final class BleCentral: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
       finishConnect(error)
       return
     }
+    if characteristic.isNotifying {
+      notifyArmed = true
+    }
     if writeChar != nil {
       finishConnect(nil)
     } else {
-      finishConnect(HidError.listenFailed("missing write characteristic"))
+      finishConnect(HidError.listenFailed(missingWriteMessage()))
     }
+  }
+
+  private func missingWriteMessage() -> String {
+    let want = wantWrite?.uuidString.lowercased() ?? "?"
+    let have = foundChars.isEmpty ? "none" : foundChars.joined(separator: ",")
+    return "missing write characteristic want=\(want) have=\(have)"
+  }
+
+  private func bindKnownChars() {
+    if writeChar == nil {
+      writeChar = discoveredChars.first { Self.isKnownWrite($0.uuid) }
+    }
+    if notifyChar == nil {
+      notifyChar = discoveredChars.first { Self.isKnownNotify($0.uuid) }
+    }
+    boundWriteUuid = writeChar?.uuid.uuidString.lowercased() ?? ""
+  }
+
+  private static func isKnownWrite(_ uuid: CBUUID) -> Bool {
+    if sameUuid(uuid, CBUUID(string: "00000002-0000-1000-8000-00805f9b34fb")) {
+      return true
+    }
+    if sameUuid(uuid, CBUUID(string: "8c000002-a59b-4d58-a9ad-073df69fa1b1")) {
+      return true
+    }
+    let value = uuid.uuidString.lowercased()
+    return value.hasPrefix("13d63400") && value.contains("-0002-")
+  }
+
+  private static func isKnownNotify(_ uuid: CBUUID) -> Bool {
+    if sameUuid(uuid, CBUUID(string: "00000003-0000-1000-8000-00805f9b34fb")) {
+      return true
+    }
+    if sameUuid(uuid, CBUUID(string: "8c000003-a59b-4d58-a9ad-073df69fa1b1")) {
+      return true
+    }
+    let value = uuid.uuidString.lowercased()
+    return value.hasPrefix("13d63400") && value.contains("-0001-")
   }
 
   func peripheral(
@@ -339,7 +538,7 @@ final class BleCentral: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
     didWriteValueFor characteristic: CBCharacteristic,
     error: Error?
   ) {
-    _ = error
+    finishWrite(error)
   }
 
   func peripheralIsReady(toSendWriteWithoutResponse peripheral: CBPeripheral) {

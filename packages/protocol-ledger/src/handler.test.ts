@@ -1,8 +1,8 @@
 import { mnemonicToEntropy, mnemonicToSeedSync } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
 import { describe, expect, it } from 'vitest';
-import { LEDGER_MODELS, describeSigning, overlayDerivationPath, type ConfirmationPort } from '@cws/contracts';
-import { encodeResponse, SW_CLA_NOT_SUPPORTED, SW_DENY, SW_OK, SW_WRONG_LENGTH } from './apdu';
+import { LEDGER_MODELS, catalogVersion, describeSigning, overlayDerivationPath, type ConfirmationPort } from '@cws/contracts';
+import { encodeResponse, SW_DENY, SW_OK } from './apdu';
 import { FUJI_HRP, FUJI_X_CHAIN_ID, avalancheBech32Address } from './apps/avalanche';
 import {
   deriveEd25519PrivateKey,
@@ -93,6 +93,10 @@ describe('LedgerProtocolHandler', () => {
     const payload = await exchange(handler, apdu([0xb0, 0x01, 0x00, 0x00, 0x00]));
     const text = Array.from(payload, (b) => String.fromCharCode(b)).join('');
     expect(text).toContain('BOLOS');
+    expect(payload[0]).toBe(0x01);
+    expect(payload[1]).toBe(5);
+    expect(payload[7]).toBeGreaterThan(0);
+    expect(payload.length).toBeGreaterThan(9);
     expect(payload[payload.length - 2]).toBe(0x90);
     expect(payload[payload.length - 1]).toBe(0x00);
   });
@@ -179,7 +183,7 @@ describe('LedgerProtocolHandler', () => {
     const version = await exchange(handler, apdu([0xb0, 0x01, 0x00, 0x00, 0x00]));
     const versionText = Array.from(version, (b) => String.fromCharCode(b)).join('');
     expect(versionText).toContain('Solana');
-    expect(versionText).toContain('1.16.0');
+    expect(versionText).toContain('1.17.1');
   });
 
   it('does not open an app when the user rejects', async () => {
@@ -344,6 +348,42 @@ describe('LedgerProtocolHandler', () => {
       apdu([0xe0, 0x02, 0x00, 0x00, pathBytes.length, ...pathBytes]),
     );
     expect(handler.getApp()).toBe('ethereum');
+    expect((payload[payload.length - 2] << 8) | payload[payload.length - 1]).toBe(SW_OK);
+  });
+
+  it('opens Cardano when CLA 0xd7 arrives on the dashboard', async () => {
+    const handler = new LedgerProtocolHandler({
+      model: nanoX,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy,
+    });
+    const payload = await exchange(handler, apdu([0xd7, 0x00, 0x00, 0x00, 0x00]));
+    expect(handler.getApp()).toBe('cardano');
+    expect((payload[payload.length - 2] << 8) | payload[payload.length - 1]).toBe(SW_OK);
+  });
+
+  it('opens Avalanche when GET_VERSION arrives on the dashboard', async () => {
+    const handler = new LedgerProtocolHandler({
+      model: nanoX,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy,
+    });
+    const payload = await exchange(handler, apdu([0x80, 0x00, 0x00, 0x00, 0x00]));
+    expect(handler.getApp()).toBe('avalanche');
+    expect((payload[payload.length - 2] << 8) | payload[payload.length - 1]).toBe(SW_OK);
+  });
+
+  it('opens NEAR when GET_VERSION arrives on the dashboard', async () => {
+    const handler = new LedgerProtocolHandler({
+      model: nanoX,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy,
+    });
+    const payload = await exchange(handler, apdu([0x80, 0x06, 0x00, 0x00, 0x00]));
+    expect(handler.getApp()).toBe('near');
     expect((payload[payload.length - 2] << 8) | payload[payload.length - 1]).toBe(SW_OK);
   });
 
@@ -519,7 +559,7 @@ describe('LedgerProtocolHandler', () => {
     }
     const payload = await exchange(
       handler,
-      apdu([0xe0, 0x40, 0x00, 0x00, pathBytes.length, ...pathBytes]),
+      apdu([0xe0, 0x40, 0x01, 0x00, pathBytes.length, ...pathBytes]),
     );
     const sw = (payload[payload.length - 2] << 8) | payload[payload.length - 1];
     expect(sw).toBe(SW_DENY);
@@ -529,14 +569,19 @@ describe('LedgerProtocolHandler', () => {
     const handler = handlerFor('nano-x');
     handler.setApp('near');
     const payload = await exchange(handler, apdu([0x80, 0x06, 0x00, 0x00, 0x00]));
-    expect(Array.from(payload)).toEqual([1, 3, 2, 0x90, 0x00]);
+    const [major, minor, patch] = catalogVersion('near', '1.3.2')
+      .split('.')
+      .map((part) => Number.parseInt(part, 10) || 0);
+    expect(Array.from(payload)).toEqual([major & 0xff, minor & 0xff, patch & 0xff, 0x90, 0x00]);
   });
 
-  it('returns 0x6e00 for NEAR CLA while another app is open', async () => {
+  it('switches to NEAR GET_VERSION when Ethereum is still open', async () => {
     const handler = handlerFor('nano-x');
+    handler.setApp('ethereum');
     const payload = await exchange(handler, apdu([0x80, 0x06, 0x00, 0x00, 0x00]));
+    expect(handler.getApp()).toBe('near');
     const sw = (payload[payload.length - 2] << 8) | payload[payload.length - 1];
-    expect(sw).toBe(SW_CLA_NOT_SUPPORTED);
+    expect(sw).toBe(SW_OK);
   });
 
   it('exports the NEAR ed25519 public key after a confirm', async () => {
@@ -634,7 +679,10 @@ describe('LedgerProtocolHandler', () => {
     const handler = handlerFor('nano-x');
     handler.setApp('avalanche');
     const payload = await exchange(handler, apdu([0x80, 0x00, 0x00, 0x00, 0x00]));
-    expect(Array.from(payload.slice(0, 5))).toEqual([0, 1, 4, 23, 0]);
+    const [major, minor, patch] = catalogVersion('avalanche', '1.4.23')
+      .split('.')
+      .map((part) => Number.parseInt(part, 10) || 0);
+    expect(Array.from(payload.slice(0, 5))).toEqual([0, major & 0xff, minor & 0xff, patch & 0xff, 0]);
     expect(Array.from(payload.slice(5, 9))).toEqual([0x33, 0x00, 0x00, 0x04]);
     expect((payload[payload.length - 2] << 8) | payload[payload.length - 1]).toBe(SW_OK);
   });
@@ -753,7 +801,21 @@ describe('LedgerProtocolHandler', () => {
     expect(address.toLowerCase()).toBe(EXPECTED_ADDRESS.toLowerCase());
   });
 
-  it('does not fake success for an empty SIGN_TX', async () => {
+  it('treats empty E0 03 as TON GET_APP_CONFIGURATION even if Solana is open', async () => {
+    const handler = new LedgerProtocolHandler({
+      model: nanoX,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy,
+    });
+    handler.setApp('solana');
+    const payload = await exchange(handler, apdu([0xe0, 0x03, 0x00, 0x00, 0x00]));
+    const sw = (payload[payload.length - 2] << 8) | payload[payload.length - 1];
+    expect(sw).toBe(SW_OK);
+    expect(handler.getApp()).toBe('ton');
+  });
+
+  it('treats empty E0 04 as Solana GET_APP_CONFIGURATION even if Ethereum is open', async () => {
     const handler = new LedgerProtocolHandler({
       model: nanoX,
       confirmation: autoConfirm(),
@@ -763,7 +825,162 @@ describe('LedgerProtocolHandler', () => {
     handler.setApp('ethereum');
     const payload = await exchange(handler, apdu([0xe0, 0x04, 0x00, 0x00, 0x00]));
     const sw = (payload[payload.length - 2] << 8) | payload[payload.length - 1];
-    expect(sw).toBe(SW_WRONG_LENGTH);
+    expect(sw).toBe(SW_OK);
+    expect(handler.getApp()).toBe('solana');
+    const [major, minor, patch] = catalogVersion('solana', '1.16.0')
+      .split('.')
+      .map((part) => Number.parseInt(part, 10) || 0);
+    expect(Array.from(payload.slice(0, 5))).toEqual([
+      0x01,
+      0x00,
+      major & 0xff,
+      minor & 0xff,
+      patch & 0xff,
+    ]);
+  });
+
+  it('keeps empty E0 04 as TON GET_APP_NAME instead of switching to Solana', async () => {
+    const handler = new LedgerProtocolHandler({
+      model: nanoX,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy,
+    });
+    handler.setApp('ton');
+    const payload = await exchange(handler, apdu([0xe0, 0x04, 0x00, 0x00, 0x00]));
+    const sw = (payload[payload.length - 2] << 8) | payload[payload.length - 1];
+    expect(sw).toBe(SW_OK);
+    expect(handler.getApp()).toBe('ton');
+    expect(Array.from(payload.slice(0, 3))).toEqual([0x54, 0x4f, 0x4e]);
+  });
+
+  it('returns a raw 32-byte TON public key on E0 05 without switching to Solana', async () => {
+    const handler = new LedgerProtocolHandler({
+      model: nanoX,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy,
+    });
+    handler.setApp('ton');
+    const path = [0x8000002c, 0x8000025f, 0x80000000];
+    const pathBytes: number[] = [path.length];
+    for (const component of path) {
+      pathBytes.push(
+        (component >>> 24) & 0xff,
+        (component >>> 16) & 0xff,
+        (component >>> 8) & 0xff,
+        component & 0xff,
+      );
+    }
+    const payload = await exchange(handler, apdu([0xe0, 0x05, 0x01, 0x00, pathBytes.length, ...pathBytes]));
+    const sw = (payload[payload.length - 2] << 8) | payload[payload.length - 1];
+    expect(sw).toBe(SW_OK);
+    expect(handler.getApp()).toBe('ton');
+    expect(payload.length).toBe(34);
+    const expected = ed25519PublicKey(deriveEd25519PrivateKey(entropy, "m/44'/607'/0'"));
+    expect(Array.from(payload.slice(0, 32))).toEqual(Array.from(expected));
+  });
+
+  it('returns a 32-byte TON key for the Ledger Live 6-component path, not a signature', async () => {
+    const handler = new LedgerProtocolHandler({
+      model: nanoX,
+      confirmation: autoConfirm(false),
+      slotId: 'slot',
+      entropy,
+    });
+    const path = [0x8000002c, 0x8000025f, 0x80000000, 0x80000000, 0x80000000, 0x80000000];
+    const pathBytes: number[] = [path.length];
+    for (const component of path) {
+      pathBytes.push(
+        (component >>> 24) & 0xff,
+        (component >>> 16) & 0xff,
+        (component >>> 8) & 0xff,
+        component & 0xff,
+      );
+    }
+    const version = await exchange(handler, apdu([0xe0, 0x03, 0x00, 0x00, 0x00]));
+    expect((version[version.length - 2] << 8) | version[version.length - 1]).toBe(SW_OK);
+    const payload = await exchange(handler, apdu([0xe0, 0x05, 0x00, 0x00, pathBytes.length, ...pathBytes]));
+    const sw = (payload[payload.length - 2] << 8) | payload[payload.length - 1];
+    expect(sw).toBe(SW_OK);
+    expect(payload.length).toBe(34);
+    const expected = ed25519PublicKey(
+      deriveEd25519PrivateKey(entropy, "m/44'/607'/0'/0'/0'/0'"),
+    );
+    expect(Array.from(payload.slice(0, 32))).toEqual(Array.from(expected));
+  });
+
+  it('switches empty E0 06 from NEAR or Bitcoin to Tron GET_APP_CONFIGURATION', async () => {
+    for (const app of ['near', 'bitcoin'] as const) {
+      const handler = handlerFor('nano-x');
+      handler.setApp(app);
+      const payload = await exchange(handler, apdu([0xe0, 0x06, 0x00, 0x00, 0x00]));
+      expect(handler.getApp()).toBe('tron');
+      expect((payload[payload.length - 2] << 8) | payload[payload.length - 1]).toBe(SW_OK);
+      expect(payload.length).toBe(6);
+    }
+  });
+
+  it('switches empty E0 06 from TON to Tron GET_APP_CONFIGURATION', async () => {
+    const handler = handlerFor('nano-x');
+    handler.setApp('ton');
+    const payload = await exchange(handler, apdu([0xe0, 0x06, 0x00, 0x00, 0x00]));
+    expect(handler.getApp()).toBe('tron');
+    const [major, minor, patch] = catalogVersion('tron', '0.8.3')
+      .split('.')
+      .map((part) => Number.parseInt(part, 10) || 0);
+    expect(Array.from(payload)).toEqual([0x00, major & 0xff, minor & 0xff, patch & 0xff, 0x90, 0x00]);
+  });
+
+  it('switches empty E0 06 from Tron to Stellar GET_APP_CONFIGURATION', async () => {
+    const handler = handlerFor('nano-x');
+    handler.setApp('tron');
+    const payload = await exchange(handler, apdu([0xe0, 0x06, 0x00, 0x00, 0x00]));
+    expect(handler.getApp()).toBe('stellar');
+    const [major, minor, patch] = catalogVersion('stellar', '6.1.0')
+      .split('.')
+      .map((part) => Number.parseInt(part, 10) || 0);
+    expect(Array.from(payload)).toEqual([0x00, major & 0xff, minor & 0xff, patch & 0xff, 0x90, 0x00]);
+  });
+
+  it('does not treat XRP GET_VERSION as Bitcoin because 44\'/144\' contains 44\'/0\'', async () => {
+    const handler = handlerFor('nano-x');
+    handler.setApp('xrp');
+    const path = [0x8000002c, 0x80000090, 0x80000000, 0, 0];
+    const pathBytes: number[] = [path.length];
+    for (const component of path) {
+      pathBytes.push(
+        (component >>> 24) & 0xff,
+        (component >>> 16) & 0xff,
+        (component >>> 8) & 0xff,
+        component & 0xff,
+      );
+    }
+    const payload = await exchange(handler, apdu([0xe0, 0x02, 0x01, 0x00, pathBytes.length, ...pathBytes]));
+    const sw = (payload[payload.length - 2] << 8) | payload[payload.length - 1];
+    expect(sw).toBe(SW_OK);
+    expect(handler.getApp()).toBe('xrp');
+  });
+
+  it('exports a silent NEAR public key from TON on CLA 80 INS 04', async () => {
+    const handler = handlerFor('nano-x');
+    handler.setApp('ton');
+    const path = [0x8000002c, 0x8000018d, 0x80000000, 0x80000000, 0x80000001];
+    const pathBytes: number[] = [];
+    for (const component of path) {
+      pathBytes.push(
+        (component >>> 24) & 0xff,
+        (component >>> 16) & 0xff,
+        (component >>> 8) & 0xff,
+        component & 0xff,
+      );
+    }
+    const payload = await exchange(handler, apdu([0x80, 0x04, 0x01, 0x57, pathBytes.length, ...pathBytes]));
+    const sw = (payload[payload.length - 2] << 8) | payload[payload.length - 1];
+    expect(sw).toBe(SW_OK);
+    expect(handler.getApp()).toBe('near');
+    const expected = ed25519PublicKey(deriveEd25519PrivateKey(entropy, "m/44'/397'/0'/0'/1'"));
+    expect(Array.from(payload.slice(0, 32))).toEqual(Array.from(expected));
   });
 
   it('signs a complete Ethereum RLP payload', async () => {
@@ -912,6 +1129,22 @@ describe('LedgerProtocolHandler', () => {
     const sw = (payload[payload.length - 2] << 8) | payload[payload.length - 1];
     expect(sw).toBe(SW_OK);
     expect(payload.length).toBe(32 + 2);
+  });
+
+  it('exports a Solana pubkey silently when P1 is 0 even if confirm would deny', async () => {
+    const handler = new LedgerProtocolHandler({
+      model: nanoX,
+      confirmation: autoConfirm(false),
+      slotId: 'slot',
+      entropy,
+    });
+    handler.setApp('solana');
+    const pathBytes = [0x02, 0x80, 0x00, 0x00, 0x2c, 0x80, 0x00, 0x01, 0xf5];
+    const silent = await exchange(handler, apdu([0xe0, 0x05, 0x00, 0x00, pathBytes.length, ...pathBytes]));
+    expect((silent[silent.length - 2] << 8) | silent[silent.length - 1]).toBe(SW_OK);
+    expect(silent.length).toBe(32 + 2);
+    const shown = await exchange(handler, apdu([0xe0, 0x05, 0x01, 0x00, pathBytes.length, ...pathBytes]));
+    expect((shown[shown.length - 2] << 8) | shown[shown.length - 1]).toBe(SW_OK);
   });
 
   it('uses a cached seed from replaceSeed instead of getPassphrase', async () => {

@@ -37,8 +37,21 @@ import {
   encodeCredentialRequest,
   encodePairingRequest,
   encodeSelectMethod,
+  encodeTypedStructAck,
+  encodeTypedValueAck,
+  EthereumDataType,
+  InputScriptType,
+  TxRequestType,
 } from './messages';
-import { encodeBytes, encodeRepeatedUint32, encodeUint32 } from './proto';
+import {
+  decodeFields,
+  encodeBytes,
+  encodeMessage,
+  encodeRepeatedUint32,
+  encodeString,
+  encodeUint32,
+  readOptionalString,
+} from './proto';
 import { ThpNoiseInitiator } from './noise';
 import { Cpace, codeEntryCommitment } from './pairing';
 
@@ -311,6 +324,172 @@ describe('TrezorThpProtocolHandler', () => {
     const unknown = await host.app(999, new Uint8Array());
     expect(unknown.type).toBe(MessageType.Failure);
     expect(decodeFailure(unknown.payload).code).toBe(FailureType.UnexpectedMessage);
+  });
+
+  it('exports a Stellar G-address after confirm', async () => {
+    const host = new ThpHost();
+    await host.allocate();
+    await host.handshake();
+    await host.pair();
+    await host.app(MessageType.ThpEndRequest, new Uint8Array());
+    const payload = concatBytes(
+      encodeRepeatedUint32(1, [0x8000002c, 0x80000094, 0x80000000]),
+      encodeUint32(2, 1),
+    );
+    const button = await host.app(MessageType.StellarGetAddress, payload);
+    expect(button.type).toBe(MessageType.ButtonRequest);
+    const reply = await host.app(MessageType.ButtonAck, new Uint8Array());
+    expect(reply.type).toBe(MessageType.StellarAddress);
+    const address = readOptionalString(decodeFields(reply.payload), 1) ?? '';
+    expect(address.startsWith('G')).toBe(true);
+  });
+
+  it('signs a 1-in-1-out Bitcoin tx with BIP143', async () => {
+    const host = new ThpHost();
+    await host.allocate();
+    await host.handshake();
+    await host.pair();
+    await host.app(MessageType.ThpEndRequest, new Uint8Array());
+    const start = await host.app(
+      MessageType.SignTx,
+      concatBytes(encodeUint32(1, 1), encodeUint32(2, 1)),
+    );
+    expect(start.type).toBe(MessageType.TxRequest);
+    const input = concatBytes(
+      encodeRepeatedUint32(1, [0x80000054, 0x80000000, 0x80000000, 0, 0]),
+      encodeBytes(2, new Uint8Array(32).fill(0x11)),
+      encodeUint32(3, 0),
+      encodeUint32(8, 10000),
+    );
+    const mid = await host.app(MessageType.TxAck, encodeMessage(1, encodeMessage(2, input)));
+    expect(mid.type).toBe(MessageType.TxRequest);
+    const output = concatBytes(encodeString(1, 'bc1qtest'), encodeUint32(2, 8000));
+    const button = await host.app(MessageType.TxAck, encodeMessage(1, encodeMessage(5, output)));
+    expect(button.type).toBe(MessageType.ButtonRequest);
+    const done = await host.app(MessageType.ButtonAck, new Uint8Array());
+    expect(done.type).toBe(MessageType.TxRequest);
+    expect(decodeFields(done.payload).find((field) => field.field === 1)?.varint).toBe(TxRequestType.TXFINISHED);
+    expect(decodeFields(done.payload).find((field) => field.field === 3)?.bytes.length).toBeGreaterThan(8);
+  });
+
+  it('signs a 2-in-2-out Bitcoin tx with BIP143 and a change output', async () => {
+    const host = new ThpHost();
+    await host.allocate();
+    await host.handshake();
+    await host.pair();
+    await host.app(MessageType.ThpEndRequest, new Uint8Array());
+    const start = await host.app(MessageType.SignTx, concatBytes(encodeUint32(1, 2), encodeUint32(2, 2)));
+    expect(start.type).toBe(MessageType.TxRequest);
+    const input = (prev: number, index: number) =>
+      concatBytes(
+        encodeRepeatedUint32(1, [0x80000054, 0x80000000, 0x80000000, 0, index]),
+        encodeBytes(2, new Uint8Array(32).fill(prev)),
+        encodeUint32(3, 0),
+        encodeUint32(6, InputScriptType.SPENDWITNESS),
+        encodeUint32(8, 10000),
+      );
+    expect((await host.app(MessageType.TxAck, encodeMessage(1, encodeMessage(2, input(0x11, 0))))).type).toBe(
+      MessageType.TxRequest,
+    );
+    expect((await host.app(MessageType.TxAck, encodeMessage(1, encodeMessage(2, input(0x22, 1))))).type).toBe(
+      MessageType.TxRequest,
+    );
+    const spend = concatBytes(encodeString(1, 'bc1qtest'), encodeUint32(2, 8000));
+    expect((await host.app(MessageType.TxAck, encodeMessage(1, encodeMessage(5, spend)))).type).toBe(MessageType.TxRequest);
+    const change = concatBytes(
+      encodeUint32(2, 9000),
+      encodeUint32(3, 4),
+      encodeRepeatedUint32(4, [0x80000054, 0x80000000, 0x80000000, 1, 0]),
+    );
+    const button = await host.app(MessageType.TxAck, encodeMessage(1, encodeMessage(5, change)));
+    expect(button.type).toBe(MessageType.ButtonRequest);
+    const done = await host.app(MessageType.ButtonAck, new Uint8Array());
+    expect(done.type).toBe(MessageType.TxRequest);
+    expect(decodeFields(done.payload).filter((field) => field.field === 3)).toHaveLength(2);
+  });
+
+  it('signs a taproot key-path input', async () => {
+    const host = new ThpHost();
+    await host.allocate();
+    await host.handshake();
+    await host.pair();
+    await host.app(MessageType.ThpEndRequest, new Uint8Array());
+    await host.app(MessageType.SignTx, concatBytes(encodeUint32(1, 1), encodeUint32(2, 1)));
+    const input = concatBytes(
+      encodeRepeatedUint32(1, [0x80000056, 0x80000000, 0x80000000, 0, 0]),
+      encodeBytes(2, new Uint8Array(32).fill(0x33)),
+      encodeUint32(3, 0),
+      encodeUint32(6, InputScriptType.SPENDTAPROOT),
+      encodeUint32(8, 12000),
+    );
+    await host.app(MessageType.TxAck, encodeMessage(1, encodeMessage(2, input)));
+    const output = concatBytes(encodeString(1, 'bc1ptest'), encodeUint32(2, 10000));
+    const button = await host.app(MessageType.TxAck, encodeMessage(1, encodeMessage(5, output)));
+    expect(button.type).toBe(MessageType.ButtonRequest);
+    const done = await host.app(MessageType.ButtonAck, new Uint8Array());
+    expect(done.type).toBe(MessageType.TxRequest);
+    const serialized = decodeFields(done.payload).find((field) => field.field === 3)?.bytes;
+    expect(serialized?.length).toBeGreaterThan(64);
+  });
+
+  it('signs EIP-712 Mail through the struct/value loop', async () => {
+    const host = new ThpHost();
+    await host.allocate();
+    await host.handshake();
+    await host.pair();
+    await host.app(MessageType.ThpEndRequest, new Uint8Array());
+    const start = await host.app(
+      MessageType.EthereumSignTypedData,
+      concatBytes(encodeRepeatedUint32(1, [0x8000002c, 0x8000003c, 0x80000000, 0, 0]), encodeString(2, 'Mail')),
+    );
+    expect(start.type).toBe(MessageType.EthereumTypedDataStructRequest);
+    expect(readOptionalString(decodeFields(start.payload), 1)).toBe('EIP712Domain');
+    const domainAck = await host.app(
+      MessageType.EthereumTypedDataStructAck,
+      encodeTypedStructAck([{ name: 'name', dataType: EthereumDataType.STRING }]),
+    );
+    expect(domainAck.type).toBe(MessageType.EthereumTypedDataStructRequest);
+    expect(readOptionalString(decodeFields(domainAck.payload), 1)).toBe('Mail');
+    const mailAck = await host.app(
+      MessageType.EthereumTypedDataStructAck,
+      encodeTypedStructAck([{ name: 'contents', dataType: EthereumDataType.STRING }]),
+    );
+    expect(mailAck.type).toBe(MessageType.EthereumTypedDataValueRequest);
+    const domainValue = await host.app(MessageType.EthereumTypedDataValueAck, encodeTypedValueAck(encodeUtf8('Ether Mail')));
+    expect(domainValue.type).toBe(MessageType.EthereumTypedDataValueRequest);
+    const messageValue = await host.app(MessageType.EthereumTypedDataValueAck, encodeTypedValueAck(encodeUtf8('hi')));
+    expect(messageValue.type).toBe(MessageType.ButtonRequest);
+    const done = await host.app(MessageType.ButtonAck, new Uint8Array());
+    expect(done.type).toBe(MessageType.EthereumTypedDataSignature);
+    expect(done.payload.length).toBeGreaterThan(20);
+  });
+
+  it('streams Cardano 1-in-1-out to witness 316 then finished 319', async () => {
+    const host = new ThpHost();
+    await host.allocate();
+    await host.handshake();
+    await host.pair();
+    await host.app(MessageType.ThpEndRequest, new Uint8Array());
+    const init = await host.app(
+      MessageType.CardanoSignTxInit,
+      concatBytes(
+        encodeRepeatedUint32(1, [0x8000073c, 0x80000717, 0x80000000, 0, 0]),
+        encodeBytes(2, encodeUtf8('cafebabe')),
+      ),
+    );
+    expect(init.type).toBe(MessageType.CardanoTxItemAck);
+    const input = await host.app(
+      MessageType.CardanoTxInput,
+      encodeRepeatedUint32(1, [0x8000073c, 0x80000717, 0x80000000, 0, 0]),
+    );
+    expect(input.type).toBe(MessageType.CardanoTxItemAck);
+    const output = await host.app(MessageType.CardanoTxOutput, concatBytes(encodeString(1, 'addr1test'), encodeUint32(2, 1)));
+    expect(output.type).toBe(MessageType.ButtonRequest);
+    const witness = await host.app(MessageType.ButtonAck, new Uint8Array());
+    expect(witness.type).toBe(MessageType.CardanoTxWitnessResponse);
+    expect(witness.type).not.toBe(325);
+    const finished = await host.app(MessageType.CardanoTxHostAck, new Uint8Array());
+    expect(finished.type).toBe(MessageType.CardanoSignTxFinished);
   });
 
   it('issues an HMAC credential when the host asks', async () => {

@@ -12,7 +12,8 @@
     "mobile:android": "yarn workspace @cws/mobile android",
     "mobile:ios": "yarn workspace @cws/mobile ios",
     "typecheck": "yarn workspaces run typecheck",
-    "test": "yarn workspaces run test"
+    "test": "yarn workspaces run test",
+    "postinstall": "node scripts/patch-keyboard-controller-insets.js"
   },
   "packageManager": "yarn@1.22.22"
 }

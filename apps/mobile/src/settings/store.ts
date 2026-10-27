@@ -8,6 +8,7 @@ import { isAppLanguage, type AppLanguage } from '../i18n';
 const SETTINGS_KEY = 'cws.settings.v1';
 const ACTIVE_KEY = 'cws.activeSlot';
 const CATALOG_KEY = 'cws.ledger.catalog';
+const CATALOG_CHUNK = 1800;
 
 export type AppSettings = {
   language: AppLanguage;
@@ -126,8 +127,36 @@ export async function saveActiveSlotId(id: string | null): Promise<void> {
   await writeRaw(ACTIVE_KEY, id);
 }
 
+async function deleteRaw(key: string): Promise<void> {
+  if (Platform.OS === 'web') {
+    try {
+      globalThis.localStorage?.removeItem(key);
+    } catch {
+      // ignore
+    }
+    return;
+  }
+  try {
+    await SecureStore.deleteItemAsync(key);
+  } catch {
+    // ignore
+  }
+}
+
 export async function loadCatalogOverlay(): Promise<LedgerInstalledApp[] | undefined> {
-  const raw = await readRaw(CATALOG_KEY);
+  const countRaw = await readRaw(`${CATALOG_KEY}.n`);
+  let raw: string | null = null;
+  if (countRaw) {
+    const count = Number.parseInt(countRaw, 10);
+    if (Number.isFinite(count) && count > 0) {
+      const parts: string[] = [];
+      for (let i = 0; i < count; i += 1) {
+        parts.push((await readRaw(`${CATALOG_KEY}.${i}`)) ?? '');
+      }
+      raw = parts.join('');
+    }
+  }
+  raw ??= await readRaw(CATALOG_KEY);
   if (!raw) {
     return undefined;
   }
@@ -145,23 +174,28 @@ export async function loadCatalogOverlay(): Promise<LedgerInstalledApp[] | undef
 
 export async function saveCatalogOverlay(apps: LedgerInstalledApp[]): Promise<void> {
   setLedgerCatalogOverlay(apps);
-  await writeRaw(CATALOG_KEY, JSON.stringify(apps));
+  const raw = JSON.stringify(apps);
+  if (Platform.OS === 'web') {
+    webSet(CATALOG_KEY, raw);
+    return;
+  }
+  const chunks = Math.max(1, Math.ceil(raw.length / CATALOG_CHUNK));
+  await writeRaw(`${CATALOG_KEY}.n`, String(chunks));
+  for (let i = 0; i < chunks; i += 1) {
+    await writeRaw(`${CATALOG_KEY}.${i}`, raw.slice(i * CATALOG_CHUNK, (i + 1) * CATALOG_CHUNK));
+  }
+  await deleteRaw(CATALOG_KEY);
 }
 
 export async function clearCatalogOverlay(): Promise<void> {
   resetLedgerCatalogOverlay();
-  if (Platform.OS === 'web') {
-    try {
-      globalThis.localStorage?.removeItem(CATALOG_KEY);
-    } catch {
-      // ignore
-    }
-    return;
-  }
-  try {
-    await SecureStore.deleteItemAsync(CATALOG_KEY);
-  } catch {
-    // ignore
+  const countRaw = await readRaw(`${CATALOG_KEY}.n`);
+  const count = Number.parseInt(countRaw ?? '0', 10);
+  await deleteRaw(CATALOG_KEY);
+  await deleteRaw(`${CATALOG_KEY}.n`);
+  const n = Number.isFinite(count) ? count : 0;
+  for (let i = 0; i < Math.max(n, 16); i += 1) {
+    await deleteRaw(`${CATALOG_KEY}.${i}`);
   }
 }
 

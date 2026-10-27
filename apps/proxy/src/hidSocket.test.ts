@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { encodeHidFrame, openHidSocket, takeHidFrames, type HidFrame } from './hidSocket';
 
 const FLEX = LEDGER_MODELS.find((model) => model.id === 'flex')!;
+const GEN5 = LEDGER_MODELS.find((model) => model.id === 'gen5')!;
 
 describe('hid socket frames', () => {
   it('round-trips length-prefixed JSON', () => {
@@ -104,5 +105,65 @@ describe('openHidSocket', () => {
     const pending = openHidSocket(socketPath, FLEX, abort.signal);
     abort.abort();
     await expect(pending).rejects.toThrow(/aborted/);
+  });
+
+  it('retries open after the first client is dropped', async () => {
+    socketPath = path.join(os.tmpdir(), `cws-hid-retry-${Date.now()}.sock`);
+    let connections = 0;
+    server = net.createServer((socket) => {
+      connections += 1;
+      if (connections === 1) {
+        socket.destroy();
+        return;
+      }
+      let leftover = Buffer.alloc(0);
+      socket.on('data', (chunk) => {
+        leftover = Buffer.concat([leftover, chunk]);
+        const taken = takeHidFrames(leftover);
+        leftover = taken.rest;
+        for (const frame of taken.frames) {
+          if (frame.op === 'open') {
+            socket.write(encodeHidFrame({ op: 'ok' }));
+          }
+        }
+      });
+    });
+    await new Promise<void>((resolve, reject) => {
+      server!.once('error', reject);
+      server!.listen(socketPath, resolve);
+    });
+    const hid = await openHidSocket(socketPath, FLEX);
+    expect(connections).toBeGreaterThanOrEqual(2);
+    hid.close();
+  });
+
+  it('switches vid/pid on the same socket', async () => {
+    socketPath = path.join(os.tmpdir(), `cws-hid-switch-${Date.now()}.sock`);
+    const opens: Array<{ vid?: number; pid?: number }> = [];
+    server = net.createServer((socket) => {
+      let leftover = Buffer.alloc(0);
+      socket.on('data', (chunk) => {
+        leftover = Buffer.concat([leftover, chunk]);
+        const taken = takeHidFrames(leftover);
+        leftover = taken.rest;
+        for (const frame of taken.frames) {
+          if (frame.op === 'open') {
+            opens.push({ vid: frame.vid, pid: frame.pid });
+            socket.write(encodeHidFrame({ op: 'ok' }));
+          }
+        }
+      });
+    });
+    await new Promise<void>((resolve, reject) => {
+      server!.once('error', reject);
+      server!.listen(socketPath, resolve);
+    });
+    const hid = await openHidSocket(socketPath, FLEX);
+    await hid.switchModel!(GEN5);
+    hid.close();
+    expect(opens).toEqual([
+      { vid: FLEX.usb.vendorId, pid: FLEX.usb.productId },
+      { vid: GEN5.usb.vendorId, pid: GEN5.usb.productId },
+    ]);
   });
 });

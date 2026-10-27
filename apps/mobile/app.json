@@ -2,7 +2,7 @@
   "expo": {
     "name": "CWS",
     "slug": "ysk-cold-wallet-simulator",
-    "version": "1.0.0",
+    "version": "1.0.4",
     "orientation": "portrait",
     "scheme": "cws",
     "userInterfaceStyle": "dark",
@@ -33,21 +33,31 @@
       [
         "munim-bluetooth",
         {
-          "isBackgroundEnabled": true,
-          "modes": [
-            "peripheral",
-            "central"
+          "androidBluetoothPermissions": [
+            "advertise"
           ],
-          "bluetoothAlwaysPermission": "Allow YSK Cold Wallet Simulator to act as a hardware wallet over Bluetooth"
+          "multipeerServiceTypes": false,
+          "bluetoothBackground": false,
+          "bluetoothAlwaysUsageDescription": "Allow YSK Cold Wallet Simulator to act as a hardware wallet over Bluetooth"
         }
       ],
+      "./plugins/withForegroundOnlyBle",
       "expo-localization",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "CWS scans wallet QR codes to sign air-gap requests.",
+          "recordAudioAndroid": false,
+          "microphonePermission": false
+        }
+      ]
     ],
     "android": {
       "package": "hk.ysk.cws",
-      "versionCode": 1,
+      "versionCode": 5,
       "label": "CWS",
+      "allowBackup": false,
       "softwareKeyboardLayoutMode": "resize",
       "navigationBar": {
           "backgroundColor": "#07080A"
@@ -61,16 +71,24 @@
         "android.permission.BLUETOOTH_ADMIN",
         "android.permission.BLUETOOTH_ADVERTISE",
         "android.permission.BLUETOOTH_CONNECT",
-        "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.FOREGROUND_SERVICE",
-        "android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE",
-        "android.permission.POST_NOTIFICATIONS",
         "android.permission.USE_BIOMETRIC",
-        "android.permission.USE_FINGERPRINT"
+        "android.permission.USE_FINGERPRINT",
+        "android.permission.CAMERA"
       ],
       "blockedPermissions": [
-        "android.permission.INTERNET",
-        "android.permission.ACCESS_NETWORK_STATE"
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.ACTIVITY_RECOGNITION",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.BLUETOOTH_SCAN",
+        "android.permission.VIBRATE",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE",
+        "android.permission.POST_NOTIFICATIONS"
       ]
     },
     "web": {
@@ -80,18 +98,16 @@
     },
     "ios": {
       "bundleIdentifier": "hk.ysk.cws",
-      "buildNumber": "1",
+      "buildNumber": "5",
       "appleTeamId": "K897VVZW77",
       "infoPlist": {
         "CFBundleDisplayName": "CWS",
         "NSBluetoothAlwaysUsageDescription": "This app simulates a hardware wallet over Bluetooth",
+        "NSCameraUsageDescription": "CWS scans wallet QR codes to sign air-gap requests.",
         "NSFaceIDUsageDescription": "Unlock the seed vault",
         "NSMotionUsageDescription": "Optional extra entropy while generating a seed",
         "UIStatusBarStyle": "UIStatusBarStyleLightContent",
-        "ITSAppUsesNonExemptEncryption": false,
-        "UIBackgroundModes": [
-          "bluetooth-peripheral"
-        ]
+        "ITSAppUsesNonExemptEncryption": false
       }
     }
   }

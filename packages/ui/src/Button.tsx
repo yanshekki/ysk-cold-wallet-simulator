@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text } from 'react-native';
 import { colors, fonts, hairline, radius, space } from './theme';
 
 type Props = {
@@ -14,6 +14,9 @@ export function Button({ label, onPress, variant = 'primary', disabled, testID }
     <Pressable
       testID={testID}
       accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: !!disabled }}
+      collapsable={false}
       disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [
@@ -26,8 +29,10 @@ export function Button({ label, onPress, variant = 'primary', disabled, testID }
       ]}
     >
       <Text
+        numberOfLines={1}
         style={[
           styles.label,
+          variant === 'primary' && styles.primaryLabel,
           variant === 'ghost' && styles.ghostLabel,
           variant === 'danger' && styles.dangerLabel,
         ]}
@@ -45,7 +50,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: space.lg,
-    overflow: 'hidden',
+    paddingVertical: space.sm,
+    flexDirection: 'row',
+    flexShrink: 0,
+    ...Platform.select({
+      ios: { overflow: 'hidden' as const },
+      default: {},
+    }),
   },
   primary: {
     backgroundColor: colors.accent,
@@ -67,10 +78,15 @@ const styles = StyleSheet.create({
     opacity: 0.82,
   },
   label: {
-    color: colors.bg,
     fontFamily: fonts.sansSemi,
     fontSize: 14,
-    letterSpacing: 0.4,
+    letterSpacing: Platform.OS === 'android' ? 0 : 0.4,
+    includeFontPadding: false,
+    flexShrink: 0,
+    textAlign: 'center',
+  },
+  primaryLabel: {
+    color: colors.onAccent,
   },
   ghostLabel: {
     color: colors.text,

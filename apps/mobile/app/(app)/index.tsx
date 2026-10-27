@@ -1,6 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  QR_PROFILES,
+  isQrFormatId,
+  qrFormatsFor,
+  type EthAirgapQr,
+  type QrFormatId,
+  type QrProfile,
+} from '@cws/protocol-qr';
 import type { Brand, DeviceModel, LedgerApp } from '@cws/contracts';
 import {
   ALL_MODELS,
@@ -24,6 +32,8 @@ import {
   space,
 } from '@cws/ui';
 import { copyText } from '../../src/lab/copy';
+import { QrMatrix } from '../../src/qr/QrMatrix';
+import { QrScanner } from '../../src/qr/QrScanner';
 import { useT } from '../../src/i18n';
 import { useAppState } from '../../src/state/AppState';
 
@@ -48,6 +58,11 @@ export default function DeviceScreen() {
     passphraseFingerprint,
     applySessionPassphrase,
     clearSessionPassphrase,
+    exportQrAccount,
+    scanQrSign,
+    resetQrScan,
+    runWithLoading,
+    pending,
   } = useAppState();
   const [busy, setBusy] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
@@ -55,6 +70,13 @@ export default function DeviceScreen() {
   const [appPicked, setAppPicked] = useState(false);
   const [passSheet, setPassSheet] = useState(false);
   const [passDraft, setPassDraft] = useState('');
+  const [qrSheet, setQrSheet] = useState(false);
+  const [qr, setQr] = useState<EthAirgapQr | null>(null);
+  const [qrProfile, setQrProfile] = useState<QrProfile | null>(null);
+  const [formatSheet, setFormatSheet] = useState(false);
+  const [scanOpen, setScanOpen] = useState(false);
+  const [scanProgress, setScanProgress] = useState<{ received: number; expected: number } | null>(null);
+  const lastPart = useRef('');
 
   useEffect(() => {
     if (!advertising) {
@@ -65,6 +87,12 @@ export default function DeviceScreen() {
     }
   }, [advertising]);
 
+  useEffect(() => {
+    if (pending) {
+      setScanOpen(false);
+    }
+  }, [pending]);
+
   const isLedger = model?.protocol === 'ledger-apdu';
   const canStart = !!seed && !!model && isSimulatable(model) && !advertising;
   const pickerApps = ledgerPickerApps();
@@ -74,7 +102,11 @@ export default function DeviceScreen() {
       return;
     }
     if (advertising && model?.id !== next.id) {
-      void stopSimulation();
+      void stopSimulation().then(() => {
+        selectModel(next);
+        setLocalError(null);
+      });
+      return;
     }
     selectModel(next);
     setLocalError(null);
@@ -97,6 +129,115 @@ export default function DeviceScreen() {
       setBusy(false);
     }
   };
+
+  const onOpenQr = (profile: QrProfile, format?: QrFormatId) => {
+    if (!seed) {
+      setLocalError(t('device.qrNeedSeed'));
+      return;
+    }
+    void runWithLoading(
+      t('device.qrPreparing'),
+      () => exportQrAccount(profile, format ?? (profile.id === 'coldcard' ? 'bbqr-xpub' : 'eth-hdkey')),
+    )
+      .then((next) => {
+        setQr(next);
+        setQrProfile(profile);
+        setQrSheet(true);
+        setLocalError(null);
+      })
+      .catch((err) => {
+        setLocalError(err instanceof Error ? t(err.message) : t('device.qrNeedSeed'));
+      });
+  };
+
+  const closeScan = () => {
+    setScanOpen(false);
+    setScanProgress(null);
+    lastPart.current = '';
+    resetQrScan();
+  };
+
+  const onOpenScan = () => {
+    if (!seed) {
+      setLocalError(t('device.qrNeedSeed'));
+      return;
+    }
+    lastPart.current = '';
+    setScanProgress(null);
+    resetQrScan();
+    setScanOpen(true);
+    setLocalError(null);
+  };
+
+  const onScanPart = (part: string) => {
+    if (part === lastPart.current) {
+      return;
+    }
+    lastPart.current = part;
+    void scanQrSign(part)
+      .then((result) => {
+        if (result.status === 'progress') {
+          setScanProgress({ received: result.received, expected: result.expected });
+          return;
+        }
+        closeScan();
+        if (result.status === 'complete') {
+          setQr(result.qr);
+          setQrProfile(null);
+          setQrSheet(true);
+          setLocalError(null);
+        }
+      })
+      .catch((err) => {
+        closeScan();
+        setLocalError(err instanceof Error ? t(err.message) : t('errors.qrBadUr'));
+      });
+  };
+
+  const qrHint = (() => {
+    if (qr?.urKind === 'eth-signature') {
+      return t('device.qrGetSignature');
+    }
+    if (qr?.urKind === 'crypto-psbt' || (qr?.urKind === 'bbqr' && !qrProfile)) {
+      return t('device.qrGetSignatureBtc');
+    }
+    if (qr?.urKind === 'sol-signature' || qr?.urKind === 'cosmos-signature' || qr?.urKind === 'btc-signature') {
+      return t('device.qrGetSignatureOther');
+    }
+    if (!qr || !qrProfile) {
+      return t('device.qrNeedSeed');
+    }
+    if (qr.format === 'bbqr-xpub' || qr.urKind === 'bbqr') {
+      return t('device.qrHintBbqr');
+    }
+    if (qr.format === 'crypto-seed' || qr.urKind === 'crypto-seed') {
+      return t('device.qrHintSeed');
+    }
+    if (qr.format === 'btc-output' || qr.urKind === 'crypto-output') {
+      return t('device.qrHintOutput');
+    }
+    if (qr.format === 'eth-account' || qr.urKind === 'crypto-account') {
+      return t('device.qrHintAccount');
+    }
+    if (
+      qr.format === 'btc-hdkey' ||
+      qr.format === 'btc-nested' ||
+      qr.format === 'btc-legacy' ||
+      qr.format === 'btc-taproot' ||
+      qr.format === 'btc-test'
+    ) {
+      return t('device.qrHintBtc');
+    }
+    if (qr.format === 'eth-multi' || qr.urKind === 'crypto-multi-accounts') {
+      return t('device.qrHintMulti');
+    }
+    if (qrProfile.walletHint === 'metamask') {
+      return t('device.qrHintMetamask');
+    }
+    return t('device.qrHintRabby', { name: t(`device.qrBrand.${qrProfile.id}`) });
+  })();
+  const qrFormat = qr?.format ?? (qrProfile?.id === 'coldcard' ? 'bbqr-xpub' : 'eth-hdkey');
+  const showFormatPicker = Boolean(qrProfile);
 
   if (!hydrated) {
     return (
@@ -239,6 +380,37 @@ export default function DeviceScreen() {
           })}
         </View>
       ))}
+      <View style={styles.group}>
+        <Text style={styles.groupLabel}>{t('device.qrGroup')}</Text>
+        <Button
+          testID="device-qr-scan"
+          label={t('device.qrScan')}
+          variant="ghost"
+          onPress={onOpenScan}
+        />
+        <Text style={styles.hint}>{t('device.qrScanHint')}</Text>
+        <View style={styles.qrGrid}>
+          {QR_PROFILES.map((profile) => {
+            const selected = qrSheet && qrProfile?.id === profile.id;
+            return (
+              <Pressable
+                key={profile.id}
+                testID={`device-qr-${profile.id}`}
+                accessibilityRole="button"
+                accessibilityLabel={t(`device.qrBrand.${profile.id}`)}
+                onPress={() => onOpenQr(profile)}
+                style={[styles.qrCard, selected && styles.qrCardSelected]}
+              >
+                <Text style={styles.qrBrand}>{t(`device.qrBrand.${profile.id}`)}</Text>
+                <Text style={styles.qrMeta}>
+                  {t(profile.walletHint === 'metamask' ? 'device.qrWalletsMetamask' : 'device.qrWalletsRabby')}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        {localError ? <Text style={styles.error}>{localError}</Text> : null}
+      </View>
     </Screen>
     <Sheet
       visible={passSheet}
@@ -267,6 +439,96 @@ export default function DeviceScreen() {
         style={styles.input}
       />
     </Sheet>
+    <QrScanner
+      visible={scanOpen && !pending}
+      hint={t('device.qrScanHint')}
+      progressLabel={
+        scanProgress && scanProgress.expected > 0
+          ? t('device.qrScanProgress', {
+              received: scanProgress.received,
+              expected: scanProgress.expected,
+            })
+          : undefined
+      }
+      deniedLabel={t('device.qrCameraDenied')}
+      allowLabel={t('device.qrAllowCamera')}
+      closeLabel={t('common.close')}
+      onClose={closeScan}
+      onPart={onScanPart}
+    />
+    <Sheet
+      visible={qrSheet}
+      title={
+        qr?.urKind === 'eth-signature' ||
+        qr?.urKind === 'crypto-psbt' ||
+        qr?.urKind === 'sol-signature' ||
+        qr?.urKind === 'cosmos-signature' ||
+        qr?.urKind === 'btc-signature' ||
+        (qr?.urKind === 'bbqr' && !qrProfile)
+          ? t('device.qrSignTitle')
+          : qrProfile
+            ? t(`device.qrBrand.${qrProfile.id}`)
+            : t('device.qrTitle')
+      }
+      onClose={() => {
+        setQrSheet(false);
+        setFormatSheet(false);
+        setQr(null);
+        setQrProfile(null);
+      }}
+      closeLabel={t('common.close')}
+      closeIcon={<Ionicons name="close" size={22} color={colors.text} />}
+      testID="device-qr-sheet"
+    >
+      <Text style={styles.hint}>{qrHint}</Text>
+      {qr ? (
+        <>
+          <QrMatrix value={qr.ur} parts={qr.parts} />
+          <Text
+            style={styles.hint}
+            onPress={() => {
+              void onCopy('address', qr.address);
+            }}
+          >
+            {qr.address}
+          </Text>
+          <Text style={styles.hint}>{qr.path}</Text>
+          {showFormatPicker && qrProfile ? (
+            <Pressable
+              testID="device-qr-format"
+              accessibilityRole="button"
+              accessibilityLabel={t('device.qrFormat')}
+              onPress={() => setFormatSheet(true)}
+              style={styles.formatRow}
+            >
+              <Text style={styles.hint}>{t('device.qrFormat')}</Text>
+              <Text style={styles.formatValue}>{t(`device.qrFormatOption.${qrFormat}`)}</Text>
+            </Pressable>
+          ) : null}
+        </>
+      ) : null}
+    </Sheet>
+    {qrProfile ? (
+      <SelectSheet
+        visible={formatSheet}
+        title={t('device.qrFormat')}
+        selectedId={qrFormat}
+        options={qrFormatsFor(qrProfile).map((id) => ({
+          id,
+          label: t(`device.qrFormatOption.${id}`),
+        }))}
+        onSelect={(id) => {
+          setFormatSheet(false);
+          if (isQrFormatId(id)) {
+            onOpenQr(qrProfile, id);
+          }
+        }}
+        onClose={() => setFormatSheet(false)}
+        cancelLabel={t('common.cancel')}
+        searchPlaceholder={t('common.search')}
+        testIDPrefix="device-qr-format-"
+      />
+    ) : null}
     </>
   );
 }
@@ -320,5 +582,48 @@ const styles = StyleSheet.create({
     fontFamily: fonts.mono,
     paddingHorizontal: space.md,
     minHeight: 40,
+  },
+  qrGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: space.sm,
+  },
+  qrCard: {
+    flexGrow: 1,
+    flexBasis: 150,
+    maxWidth: '48%',
+    backgroundColor: colors.card,
+    borderColor: colors.border,
+    borderWidth: hairline,
+    borderRadius: radius.sm,
+    padding: space.md,
+    minHeight: 72,
+    gap: 4,
+  },
+  qrCardSelected: {
+    borderColor: colors.accent,
+  },
+  qrBrand: {
+    color: colors.text,
+    fontFamily: fonts.sansSemi,
+    fontSize: 15,
+  },
+  qrMeta: {
+    color: colors.muted,
+    fontFamily: fonts.mono,
+    fontSize: 10,
+    letterSpacing: 0.4,
+  },
+  formatRow: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: space.md,
+  },
+  formatValue: {
+    color: colors.text,
+    fontFamily: fonts.sansSemi,
+    fontSize: 13,
   },
 });

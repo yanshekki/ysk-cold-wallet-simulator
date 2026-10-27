@@ -18,16 +18,36 @@ import {
   signSecp256k1Recoverable,
 } from '../crypto';
 import type { BackupKind, ConfirmationPort, SigningRequest } from '@cws/contracts';
-import { catalogVersion, describeEthMessage, describeSigning } from '@cws/contracts';
+import {
+  catalogVersion,
+  describeEthMessage,
+  describeEthTransaction,
+  describeEthTypedData,
+  describeSigning,
+  parseEthTx,
+} from '@cws/contracts';
+import { hashTypedData, parseEip712, type Eip712TypedData } from '@cws/protocol-qr';
 import { keccak_256 } from '@noble/hashes/sha3';
 
 function ethAppVersionBytes(): Uint8Array {
   const version = catalogVersion('ethereum', '1.23.0');
   const [major, minor, patch] = version.split('.').map((part) => Number.parseInt(part, 10) || 0);
-  return Uint8Array.of(0x00, major & 0xff, minor & 0xff, patch & 0xff);
+  return Uint8Array.of(0x01, major & 0xff, minor & 0xff, patch & 0xff);
 }
 
 export const ETH_APP_VERSION = ethAppVersionBytes();
+
+type TypedField = { name: string; type: string };
+
+type TypedStream = {
+  types: Record<string, TypedField[]>;
+  currentStruct?: string;
+  rootStruct?: string;
+  domain: Record<string, unknown>;
+  message: Record<string, unknown>;
+  primaryType?: string;
+  json?: Uint8Array;
+};
 
 export type EthSession = {
   pendingPersonal?: {
@@ -39,6 +59,15 @@ export type EthSession = {
     path: string;
     payload: Uint8Array;
   };
+  pending712?: {
+    path: string;
+    payload: Uint8Array;
+  };
+  typed712?: TypedStream;
+  token?: { ticker: string; decimals: number; contract: Uint8Array };
+  nft?: { collection: string; contract: Uint8Array };
+  network?: { ticker: string; chainId: number };
+  challenge?: Uint8Array;
 };
 
 export type EthContext = {
@@ -60,7 +89,25 @@ export async function handleEthereumApdu(apdu: Apdu, ctx: EthContext): Promise<U
     case 0x04:
       return handleSignTx(apdu, ctx);
     case 0x0c:
-      return handleEip712Hashed(apdu, ctx);
+      return handleEip712Sign(apdu, ctx);
+    case 0x1a:
+      return handleEip712Definition(apdu, ctx);
+    case 0x1c:
+      return handleEip712Implementation(apdu, ctx);
+    case 0x0a:
+      return handleProvideErc20(apdu, ctx);
+    case 0x12:
+    case 0x16:
+    case 0x1e:
+      return encodeResponse(new Uint8Array(), SW_OK);
+    case 0x14:
+      return handleProvideNft(apdu, ctx);
+    case 0x20:
+      return handleGetChallenge(ctx);
+    case 0x30:
+      return handleProvideNetwork(apdu, ctx);
+    case 0x34:
+      return handleSign7702(apdu, ctx);
     default:
       return encodeResponse(new Uint8Array(), SW_INS_NOT_SUPPORTED);
   }
@@ -185,6 +232,7 @@ async function handleSignTx(apdu: Apdu, ctx: EthContext): Promise<Uint8Array | n
 
   const raw = pending.payload.slice(0, needed);
   ctx.session.pendingTx = undefined;
+  const parsed = parseEthTx(raw);
   const request: SigningRequest = {
     brand: 'ledger',
     kind: 'sign',
@@ -192,8 +240,17 @@ async function handleSignTx(apdu: Apdu, ctx: EthContext): Promise<Uint8Array | n
     path: pending.path,
     message: `Sign Ethereum transaction\n${pending.path}\n0x${Array.from(raw, (b) => b.toString(16).padStart(2, '0')).join('').slice(0, 96)}`,
     rawPayload: raw,
+    detail: parsed
+      ? describeEthTransaction({ ...parsed, path: pending.path, token: ctx.session.token })
+      : describeSigning({
+          brand: 'ledger',
+          kind: 'sign',
+          title: 'Sign Ethereum transaction',
+          path: pending.path,
+          message: 'Sign Ethereum transaction',
+          rawPayload: raw,
+        }),
   };
-  request.detail = describeSigning(request);
   const ok = await ctx.confirmation.confirm(request);
   if (!ok) {
     return encodeResponse(new Uint8Array(), SW_DENY);
@@ -202,12 +259,12 @@ async function handleSignTx(apdu: Apdu, ctx: EthContext): Promise<Uint8Array | n
   const privateKey = derivePrivateKeyFromSeed(seed, pending.path);
   const hash = keccak_256(raw);
   const sig = signSecp256k1Recoverable(privateKey, hash);
-  const typed = raw[0] <= 0x03;
+  const typed = raw[0] <= 0x04;
   const v = typed ? sig[64] : (sig[64] ?? 0) + 27;
   return encodeResponse(concatBytes(Uint8Array.of(v), sig.subarray(0, 64)), SW_OK);
 }
 
-async function handleEip712Hashed(apdu: Apdu, ctx: EthContext): Promise<Uint8Array> {
+async function handleEip712Sign(apdu: Apdu, ctx: EthContext): Promise<Uint8Array> {
   let path: string;
   let rest: Uint8Array;
   try {
@@ -217,19 +274,125 @@ async function handleEip712Hashed(apdu: Apdu, ctx: EthContext): Promise<Uint8Arr
   } catch {
     return encodeResponse(new Uint8Array(), SW_WRONG_LENGTH);
   }
+  if (apdu.p2 === 0x01) {
+    return signTypedStream(ctx, path);
+  }
   if (rest.length < 64) {
     return encodeResponse(new Uint8Array(), SW_WRONG_LENGTH);
   }
   const domain = rest.subarray(0, 32);
   const structHash = rest.subarray(32, 64);
   const digest = keccak_256(concatBytes(Uint8Array.of(0x19, 0x01), domain, structHash));
+  return finishTypedSign(ctx, path, digest, rest.subarray(0, 64), `Sign EIP-712 hashed message\n${path}`);
+}
+
+function typedStream(ctx: EthContext): TypedStream {
+  ctx.session.typed712 ??= { types: {}, domain: {}, message: {} };
+  return ctx.session.typed712;
+}
+
+function handleEip712Definition(apdu: Apdu, ctx: EthContext): Uint8Array {
+  const stream = typedStream(ctx);
+  if (apdu.p2 === 0x00) {
+    stream.currentStruct = encodeAsciiToString(apdu.data);
+    stream.types[stream.currentStruct] = [];
+    return encodeResponse(new Uint8Array(), SW_OK);
+  }
+  if (apdu.p2 !== 0xff || !stream.currentStruct) {
+    return encodeResponse(new Uint8Array(), SW_INS_NOT_SUPPORTED);
+  }
+  const field = parseStructField(apdu.data);
+  if (!field) {
+    return encodeResponse(new Uint8Array(), SW_WRONG_LENGTH);
+  }
+  stream.types[stream.currentStruct] = [...(stream.types[stream.currentStruct] ?? []), field];
+  return encodeResponse(new Uint8Array(), SW_OK);
+}
+
+function handleEip712Implementation(apdu: Apdu, ctx: EthContext): Uint8Array {
+  const jsonish = looksLikeJson(apdu.data);
+  if (jsonish) {
+    const stream = typedStream(ctx);
+    stream.json = jsonish;
+    try {
+      const parsed = parseEip712(jsonish);
+      stream.types = parsed.types;
+      stream.primaryType = parsed.primaryType;
+      stream.domain = parsed.domain;
+      stream.message = parsed.message;
+    } catch {
+      return encodeResponse(new Uint8Array(), SW_INS_NOT_SUPPORTED);
+    }
+    return encodeResponse(new Uint8Array(), SW_OK);
+  }
+  const stream = typedStream(ctx);
+  if (apdu.p2 === 0x00) {
+    stream.rootStruct = encodeAsciiToString(apdu.data);
+    if (stream.rootStruct !== 'EIP712Domain') {
+      stream.primaryType = stream.rootStruct;
+    }
+    return encodeResponse(new Uint8Array(), SW_OK);
+  }
+  if (apdu.p2 === 0x0f) {
+    return encodeResponse(new Uint8Array(), SW_OK);
+  }
+  if (apdu.p2 !== 0xff || !stream.rootStruct) {
+    return encodeResponse(new Uint8Array(), SW_INS_NOT_SUPPORTED);
+  }
+  if (apdu.data.length < 2) {
+    return encodeResponse(new Uint8Array(), SW_WRONG_LENGTH);
+  }
+  const valueLen = (apdu.data[0]! << 8) | apdu.data[1]!;
+  const raw = apdu.data.subarray(2, 2 + valueLen);
+  const target = stream.rootStruct === 'EIP712Domain' ? stream.domain : stream.message;
+  const fields = stream.types[stream.rootStruct] ?? [];
+  const field = fields[Object.keys(target).length];
+  if (!field) {
+    return encodeResponse(new Uint8Array(), SW_WRONG_LENGTH);
+  }
+  target[field.name] = decodeFieldValue(field.type, raw);
+  return encodeResponse(new Uint8Array(), SW_OK);
+}
+
+async function signTypedStream(ctx: EthContext, path: string): Promise<Uint8Array> {
+  const stream = ctx.session.typed712;
+  ctx.session.typed712 = undefined;
+  if (!stream) {
+    return encodeResponse(new Uint8Array(), SW_WRONG_LENGTH);
+  }
+  const typed: Eip712TypedData = stream.json
+    ? parseEip712(stream.json)
+    : {
+        types: stream.types,
+        primaryType: stream.primaryType ?? 'Mail',
+        domain: stream.domain,
+        message: stream.message,
+      };
+  let digest: Uint8Array;
+  try {
+    digest = hashTypedData(typed);
+  } catch {
+    return encodeResponse(new Uint8Array(), SW_INS_NOT_SUPPORTED);
+  }
+  const raw = stream.json ?? new TextEncoder().encode(JSON.stringify(typed));
+  return finishTypedSign(ctx, path, digest, raw, `Sign EIP-712 typed data\n${path}`);
+}
+
+async function finishTypedSign(
+  ctx: EthContext,
+  path: string,
+  digest: Uint8Array,
+  raw: Uint8Array,
+  message: string,
+): Promise<Uint8Array> {
   const request: SigningRequest = {
     brand: 'ledger',
     kind: 'sign',
     title: 'Sign EIP-712 typed data',
     path,
-    message: `Sign EIP-712 hashed message\n${path}`,
-    rawPayload: rest.subarray(0, 64),
+    message,
+    rawPayload: raw,
+    detail: describeEthTypedData(path, raw),
   };
   const ok = await ctx.confirmation.confirm(request);
   if (!ok) {
@@ -242,16 +405,238 @@ async function handleEip712Hashed(apdu: Apdu, ctx: EthContext): Promise<Uint8Arr
   return encodeResponse(concatBytes(Uint8Array.of(v), sig.subarray(0, 64)), SW_OK);
 }
 
+function looksLikeJson(data: Uint8Array): Uint8Array | null {
+  if (data.length && data[0] === 0x7b) {
+    return data;
+  }
+  try {
+    const parsed = parseBip32Path(data);
+    if (parsed.rest.length && parsed.rest[0] === 0x7b) {
+      return parsed.rest;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function parseStructField(data: Uint8Array): TypedField | null {
+  if (data.length < 3) {
+    return null;
+  }
+  const desc = data[0]!;
+  const typeCode = desc & 0x0f;
+  const hasSize = (desc & 0x40) !== 0;
+  const isArray = (desc & 0x80) !== 0;
+  let offset = 1;
+  let typeName = '';
+  if (typeCode === 0) {
+    const nameLen = data[offset] ?? 0;
+    typeName = encodeAsciiToString(data.subarray(offset + 1, offset + 1 + nameLen));
+    offset += 1 + nameLen;
+  }
+  let typeSize = 0;
+  if (hasSize) {
+    typeSize = data[offset] ?? 0;
+    offset += 1;
+  }
+  if (isArray) {
+    const levels = data[offset] ?? 0;
+    offset += 1;
+    for (let index = 0; index < levels; index += 1) {
+      const kind = data[offset] ?? 0;
+      offset += kind === 1 ? 2 : 1;
+    }
+  }
+  const keyLen = data[offset] ?? 0;
+  const name = encodeAsciiToString(data.subarray(offset + 1, offset + 1 + keyLen));
+  if (!name) {
+    return null;
+  }
+  return { name, type: solidityType(typeCode, typeName, typeSize, isArray) };
+}
+
+function solidityType(typeCode: number, typeName: string, typeSize: number, isArray: boolean): string {
+  const bits = typeSize ? typeSize * 8 : 256;
+  let type =
+    typeCode === 0
+      ? typeName
+      : typeCode === 1
+        ? `int${bits}`
+        : typeCode === 2
+          ? `uint${bits}`
+          : typeCode === 3
+            ? 'address'
+            : typeCode === 4
+              ? 'bool'
+              : typeCode === 5
+                ? 'string'
+                : typeCode === 6
+                  ? `bytes${typeSize || 32}`
+                  : 'bytes';
+  if (isArray) {
+    type += '[]';
+  }
+  return type;
+}
+
+function decodeFieldValue(type: string, raw: Uint8Array): unknown {
+  if (type === 'string' || type.startsWith('string')) {
+    return encodeAsciiToString(raw);
+  }
+  if (type === 'address') {
+    return `0x${Array.from(raw.subarray(raw.length - 20), (byte) => byte.toString(16).padStart(2, '0')).join('')}`;
+  }
+  if (type === 'bool') {
+    return raw.some((byte) => byte !== 0);
+  }
+  if (type.startsWith('uint') || type.startsWith('int')) {
+    return `0x${Array.from(raw, (byte) => byte.toString(16).padStart(2, '0')).join('')}`;
+  }
+  if (type === 'bytes' || type.startsWith('bytes')) {
+    return `0x${Array.from(raw, (byte) => byte.toString(16).padStart(2, '0')).join('')}`;
+  }
+  return encodeAsciiToString(raw);
+}
+
+function handleProvideNft(apdu: Apdu, ctx: EthContext): Uint8Array {
+  const data = apdu.data;
+  if (data.length < 2) {
+    return encodeResponse(new Uint8Array(), SW_WRONG_LENGTH);
+  }
+  const nameLen = data[0]!;
+  if (data.length < 1 + nameLen + 20) {
+    return encodeResponse(new Uint8Array(), SW_WRONG_LENGTH);
+  }
+  ctx.session.nft = {
+    collection: encodeAsciiToString(data.subarray(1, 1 + nameLen)),
+    contract: data.subarray(1 + nameLen, 1 + nameLen + 20).slice(),
+  };
+  return encodeResponse(new Uint8Array(), SW_OK);
+}
+
+function handleGetChallenge(ctx: EthContext): Uint8Array {
+  const challenge = new Uint8Array(32);
+  crypto.getRandomValues(challenge);
+  ctx.session.challenge = challenge;
+  return encodeResponse(challenge, SW_OK);
+}
+
+function handleProvideNetwork(apdu: Apdu, ctx: EthContext): Uint8Array {
+  const data = apdu.data;
+  if (data.length < 2) {
+    return encodeResponse(new Uint8Array(), SW_OK);
+  }
+  const tickerLen = data[0]!;
+  const ticker = encodeAsciiToString(data.subarray(1, 1 + tickerLen));
+  const chainId = data.length >= 1 + tickerLen + 8 ? Number(readU32BE(data, 1 + tickerLen + 4)) : 1;
+  ctx.session.network = { ticker, chainId };
+  return encodeResponse(new Uint8Array(), SW_OK);
+}
+
+async function handleSign7702(apdu: Apdu, ctx: EthContext): Promise<Uint8Array> {
+  let path: string;
+  let rest: Uint8Array;
+  try {
+    const parsed = parseBip32Path(apdu.data);
+    path = ethPath(ctx, parsed.path);
+    rest = parsed.rest;
+  } catch {
+    return encodeResponse(new Uint8Array(), SW_WRONG_LENGTH);
+  }
+  if (rest.length < 32) {
+    return encodeResponse(new Uint8Array(), SW_WRONG_LENGTH);
+  }
+  const digest =
+    rest.length === 32
+      ? rest
+      : keccak_256(concatBytes(Uint8Array.of(0x05), rlpList([rlpInt(readBig(rest, 20, 8)), rlpBytes(rest.subarray(0, 20)), rlpInt(readBig(rest, 28, 8))])));
+  const request: SigningRequest = {
+    brand: 'ledger',
+    kind: 'sign',
+    title: 'Sign EIP-7702 authorization',
+    path,
+    message: `Sign EIP-7702 authorization\n${path}`,
+    rawPayload: rest,
+  };
+  const ok = await ctx.confirmation.confirm(request);
+  if (!ok) {
+    return encodeResponse(new Uint8Array(), SW_DENY);
+  }
+  const seed = await seedFor(ctx.confirmation, ctx.slotId, ctx.entropy, ctx.backup ?? 'bip39');
+  const sig = signSecp256k1Recoverable(derivePrivateKeyFromSeed(seed, path), digest);
+  return encodeResponse(concatBytes(Uint8Array.of(sig[64] ?? 0), sig.subarray(0, 64)), SW_OK);
+}
+
+function readBig(bytes: Uint8Array, offset: number, size: number): bigint {
+  let value = 0n;
+  for (let index = 0; index < size; index += 1) {
+    value = (value << 8n) + BigInt(bytes[offset + index] ?? 0);
+  }
+  return value;
+}
+
+function rlpBytes(bytes: Uint8Array): Uint8Array {
+  if (bytes.length === 1 && bytes[0]! < 0x80) {
+    return bytes;
+  }
+  if (bytes.length <= 55) {
+    return concatBytes(Uint8Array.of(0x80 + bytes.length), bytes);
+  }
+  const len = Uint8Array.of((bytes.length >> 8) & 0xff, bytes.length & 0xff);
+  return concatBytes(Uint8Array.of(0xb7 + len.length), len, bytes);
+}
+
+function rlpInt(value: bigint): Uint8Array {
+  if (value === 0n) {
+    return Uint8Array.of(0x80);
+  }
+  const raw: number[] = [];
+  let next = value;
+  while (next > 0n) {
+    raw.unshift(Number(next & 0xffn));
+    next >>= 8n;
+  }
+  return rlpBytes(Uint8Array.from(raw));
+}
+
+function rlpList(items: Uint8Array[]): Uint8Array {
+  const body = concatBytes(...items);
+  if (body.length <= 55) {
+    return concatBytes(Uint8Array.of(0xc0 + body.length), body);
+  }
+  const len = Uint8Array.of((body.length >> 8) & 0xff, body.length & 0xff);
+  return concatBytes(Uint8Array.of(0xf7 + len.length), len, body);
+}
+
+function handleProvideErc20(apdu: Apdu, ctx: EthContext): Uint8Array {
+  const data = apdu.data;
+  if (data.length < 2) {
+    return encodeResponse(new Uint8Array(), SW_WRONG_LENGTH);
+  }
+  const tickerLen = data[0]!;
+  if (data.length < 1 + tickerLen + 20) {
+    return encodeResponse(new Uint8Array(), SW_WRONG_LENGTH);
+  }
+  const ticker = encodeAsciiToString(data.subarray(1, 1 + tickerLen));
+  const offset = 1 + tickerLen;
+  const contract = data.subarray(offset, offset + 20).slice();
+  const decimals = data.length >= offset + 24 ? readU32BE(data, offset + 20) : 18;
+  ctx.session.token = { ticker, decimals, contract };
+  return encodeResponse(new Uint8Array(), SW_OK);
+}
+
+function encodeAsciiToString(bytes: Uint8Array): string {
+  return Array.from(bytes, (byte) => String.fromCharCode(byte)).join('');
+}
+
 function rlpFullLength(bytes: Uint8Array): number | null {
   if (bytes.length === 0) {
     return null;
   }
   let offset = 0;
-  if (bytes[0] <= 0x7f && bytes[0] <= 0x03) {
+  if (bytes[0] <= 0x04 && bytes.length > 1 && bytes[1] >= 0xc0) {
     offset = 1;
-    if (bytes.length < 2) {
-      return null;
-    }
   }
   const inner = rlpLengthAt(bytes, offset);
   return inner == null ? null : inner + offset;

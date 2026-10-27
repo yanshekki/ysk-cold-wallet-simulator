@@ -13,6 +13,10 @@ describe('derivation paths', () => {
     expect(DEFAULT_CHAIN_PATHS.near).toBe("m/44'/397'/0'/0'/1'");
   });
 
+  it('uses the Ledger Live TON path with six hardened components', () => {
+    expect(DEFAULT_CHAIN_PATHS.ton).toBe("m/44'/607'/0'/0'/0'/0'");
+  });
+
   it('accepts hardened custom paths', () => {
     expect(isValidDerivationPath("m/44'/60'/0'/0/0")).toBe(true);
     expect(isValidDerivationPath('44/60')).toBe(false);

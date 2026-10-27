@@ -1,11 +1,32 @@
-import { mnemonicToEntropy } from '@scure/bip39';
+import { mnemonicToEntropy, mnemonicToSeedSync } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
+import { HDKey } from '@scure/bip32';
 import { describe, expect, it } from 'vitest';
 import { LEDGER_MODELS, catalogVersion, type ConfirmationPort, type LedgerApp } from '@cws/contracts';
-import { SW_INS_NOT_SUPPORTED, SW_OK } from '../apdu';
+import { buildP2wpkhPsbt as buildQrPsbt, parsePsbt } from '@cws/protocol-qr';
+import { SW_INS_NOT_SUPPORTED, SW_INTERRUPTED, SW_OK } from '../apdu';
+import {
+  CLA_FRAMEWORK,
+  ClientCommandInterpreter,
+  defaultWalletPolicy,
+  encodeSignPsbtCommand,
+  INS_CONTINUE,
+  prepareSignPsbtInterpreter,
+  psbtMapsToByteMaps,
+  serializeWalletPolicy,
+  walletIdOf,
+} from '../index';
 import { deriveEd25519PrivateKey, signEd25519 } from '../crypto';
 import { BleReassembler, DEFAULT_MTU, framePayload, splitFramedPackets, TAG_APDU } from '../framing';
 import { LedgerProtocolHandler } from '../handler';
+import { concatBytes } from '../bytes';
+import {
+  previewCosmosSignDoc,
+  previewSolanaMessage,
+  previewStellarEnvelope,
+  previewTezosOperation,
+  previewTronTransfer,
+} from './generic';
 
 const FOUNDATION = 'test test test test test test test test test test test junk';
 
@@ -120,10 +141,18 @@ const FAMILIES: FamilyCase[] = [
   {
     app: 'ton',
     cla: 0xe0,
-    versionIns: 0x01,
-    pubkeyIns: 0x02,
+    versionIns: 0x03,
+    pubkeyIns: 0x05,
     path: [0x8000002c, 0x8000025f, 0x80000000],
-    address: (value) => value.length >= 48,
+    rawPubkey: 32,
+  },
+  {
+    app: 'stellar',
+    cla: 0xe0,
+    versionIns: 0x06,
+    pubkeyIns: 0x02,
+    path: [0x8000002c, 0x80000094, 0x80000000],
+    rawPubkey: 32,
   },
   {
     app: 'aptos',
@@ -222,7 +251,13 @@ describe('Ledger family APDU bodies', () => {
     const [major, minor, patch] = catalogVersion('solana', '1.16.0')
       .split('.')
       .map((part) => Number.parseInt(part, 10) || 0);
-    expect(Array.from(payload.slice(0, 4))).toEqual([0x01, major & 0xff, minor & 0xff, patch & 0xff]);
+    expect(Array.from(payload.slice(0, 5))).toEqual([
+      0x01,
+      0x00,
+      major & 0xff,
+      minor & 0xff,
+      patch & 0xff,
+    ]);
   });
 
   it('Solana chunked SIGN ACKs MORE with empty 9000 then returns 64-byte ed25519', async () => {
@@ -284,5 +319,224 @@ describe('Ledger family APDU bodies', () => {
     const signed = await exchange(device, apdu([0xe0, 0x48, 0x00, 0x00, path.length, ...path]));
     expect(swOf(signed)).toBe(SW_OK);
     expect(signed.length).toBeGreaterThan(4);
+  });
+
+  it('Bitcoin GET_WALLET_PUBLIC_KEY p2=0x04 returns a bc1p address', async () => {
+    const device = handler();
+    device.setApp('bitcoin');
+    const pathBytes = encodePath([0x80000056, 0x80000000, 0x80000000, 0, 0]);
+    const payload = await exchange(device, apdu([0xe0, 0x40, 0x00, 0x04, pathBytes.length, ...pathBytes]));
+    expect(swOf(payload)).toBe(SW_OK);
+    const decoded = decodePubAddr(payload);
+    expect(decoded.address.startsWith('bc1p')).toBe(true);
+  });
+
+  it('Bitcoin Client CLA 0xE1 returns fingerprint and signs a raw PSBT', async () => {
+    const device = handler();
+    device.setApp('bitcoin');
+    const xfp = await exchange(device, apdu([0xe1, 0x05, 0x00, 0x00, 0x00]));
+    expect(swOf(xfp)).toBe(SW_OK);
+    expect(xfp.length).toBe(6);
+
+    const seed = mnemonicToSeedSync(FOUNDATION);
+    const master = HDKey.fromMasterSeed(seed);
+    const node = master.derive("m/84'/0'/0'/0/0");
+    const psbt = buildQrPsbt({
+      amount: 10000n,
+      pubkey: node.publicKey!,
+      fingerprint: master.fingerprint,
+      pathIndexes: [0x80000054, 0x80000000, 0x80000000, 0, 0],
+      outputScript: concatBytes(Uint8Array.of(0x00, 0x14), new Uint8Array(20).fill(0x33)),
+      outputAmount: 8000n,
+    });
+    expect(psbt.length).toBeLessThan(256);
+    const signed = await exchange(device, apdu([0xe1, 0x04, 0x00, 0x00, psbt.length, ...psbt]));
+    expect(swOf(signed)).toBe(SW_OK);
+    expect(signed.length).toBeGreaterThan(7);
+  });
+
+  it('Ethereum INS 0x1C JSON then 0x0C P2=01 signs EIP-712', async () => {
+    const device = handler();
+    device.setApp('ethereum');
+    const json = new TextEncoder().encode(
+      '{"types":{"EIP712Domain":[{"name":"name","type":"string"}],"Mail":[{"name":"contents","type":"string"}]},"primaryType":"Mail","domain":{"name":"Ether Mail"},"message":{"contents":"hi"}}',
+    );
+    const stored = await exchange(device, apdu([0xe0, 0x1c, 0x00, 0x00, json.length, ...json]));
+    expect(swOf(stored)).toBe(SW_OK);
+    const pathBytes = encodePath([0x8000002c, 0x8000003c, 0x80000000, 0, 0]);
+    const payload = await exchange(device, apdu([0xe0, 0x0c, 0x00, 0x01, pathBytes.length, ...pathBytes]));
+    expect(swOf(payload)).toBe(SW_OK);
+    expect(payload.length).toBe(67);
+  });
+
+  it('Ethereum INS 0x1A/0x1C stream then 0x0C P2=01 signs Mail', async () => {
+    const device = handler();
+    device.setApp('ethereum');
+    const send = async (ins: number, p2: number, data: number[]) => {
+      const payload = await exchange(device, apdu([0xe0, ins, 0x00, p2, data.length, ...data]));
+      expect(swOf(payload)).toBe(SW_OK);
+      return payload;
+    };
+    const name = (text: string) => Array.from(new TextEncoder().encode(text));
+    await send(0x1a, 0x00, name('EIP712Domain'));
+    await send(0x1a, 0xff, [0x05, 4, ...name('name')]);
+    await send(0x1a, 0x00, name('Mail'));
+    await send(0x1a, 0xff, [0x05, 8, ...name('contents')]);
+    await send(0x1c, 0x00, name('EIP712Domain'));
+    const domain = name('Ether Mail');
+    await send(0x1c, 0xff, [0x00, domain.length, ...domain]);
+    await send(0x1c, 0x00, name('Mail'));
+    const contents = name('hi');
+    await send(0x1c, 0xff, [0x00, contents.length, ...contents]);
+    const pathBytes = encodePath([0x8000002c, 0x8000003c, 0x80000000, 0, 0]);
+    const payload = await exchange(device, apdu([0xe0, 0x0c, 0x00, 0x01, pathBytes.length, ...pathBytes]));
+    expect(swOf(payload)).toBe(SW_OK);
+    expect(payload.length).toBe(67);
+  });
+
+  it('family previews decode SOL v0, Cosmos protobuf, TRX transfer, XLM envelope, XTZ tag', () => {
+    const payer = new Uint8Array(32);
+    payer[0] = 1;
+    const blockhash = new Uint8Array(32);
+    blockhash[31] = 2;
+    const solV0 = concatBytes(
+      Uint8Array.of(0x80, 1, 0, 0, 1),
+      payer,
+      blockhash,
+      Uint8Array.of(0, 1),
+      new Uint8Array(32),
+      Uint8Array.of(0, 0),
+    );
+    expect(previewSolanaMessage(solV0)).toMatch(/v0 · fee payer /);
+    expect(previewSolanaMessage(solV0)).toMatch(/1 lookup table/);
+
+    const cosmos = Uint8Array.from([0x1a, 11, ...new TextEncoder().encode('cosmoshub-4'), 0x20, 0x01]);
+    expect(previewCosmosSignDoc(cosmos)).toBe('chain cosmoshub-4 · account 1');
+
+    const to = Uint8Array.of(0x41, ...new Array(20).fill(0x11));
+    const trx = Uint8Array.from([0x12, 21, ...to, 0x18, 0xe8, 0x07]);
+    expect(previewTronTransfer(trx)).toMatch(/Transfer 1000 to /);
+
+    expect(previewStellarEnvelope(Uint8Array.of(0, 0, 0, 2, 0xaa))).toBe('Stellar tx · 5 bytes');
+    expect(previewTezosOperation(Uint8Array.of(0x6c, ...new Array(21).fill(0x22)))).toMatch(/^Tezos transaction · /);
+  });
+
+  it('Ethereum GET_APP_CONFIGURATION sets arbitrary-data flag and GET_CHALLENGE returns 32 bytes', async () => {
+    const device = handler();
+    device.setApp('ethereum');
+    const config = await exchange(device, apdu([0xe0, 0x06, 0x00, 0x00, 0x00]));
+    expect(swOf(config)).toBe(SW_OK);
+    expect(config[0]).toBe(0x01);
+    const challenge = await exchange(device, apdu([0xe0, 0x20, 0x00, 0x00, 0x00]));
+    expect(swOf(challenge)).toBe(SW_OK);
+    expect(challenge.length).toBe(34);
+  });
+
+  it('Ethereum INS 0x0A stores ERC-20 metadata', async () => {
+    const device = handler();
+    device.setApp('ethereum');
+    const ticker = [0x55, 0x53, 0x44, 0x54];
+    const info = [ticker.length, ...ticker, ...new Array(20).fill(0x11), 0, 0, 0, 6, 0, 0, 0, 1];
+    const payload = await exchange(device, apdu([0xe0, 0x0a, 0x00, 0x00, info.length, ...info]));
+    expect(swOf(payload)).toBe(SW_OK);
+  });
+
+  async function continueUntilDone(
+    device: LedgerProtocolHandler,
+    interpreter: ClientCommandInterpreter,
+    first: Uint8Array,
+  ): Promise<Uint8Array> {
+    let payload = await exchange(device, first);
+    let guard = 0;
+    while (swOf(payload) === SW_INTERRUPTED) {
+      guard += 1;
+      expect(guard).toBeLessThan(400);
+      const reply = interpreter.execute(payload.subarray(0, payload.length - 2));
+      payload = await exchange(device, apdu([CLA_FRAMEWORK, INS_CONTINUE, 0x00, 0x01, reply.length, ...reply]));
+    }
+    return payload;
+  }
+
+  it('Bitcoin Client registers a default wallet and returns an address', async () => {
+    const device = handler();
+    device.setApp('bitcoin');
+    const seed = mnemonicToSeedSync(FOUNDATION);
+    const policy = defaultWalletPolicy(seed);
+    const serialize = serializeWalletPolicy(policy);
+    const interpreter = new ClientCommandInterpreter();
+    interpreter.addKnownPreimage(serialize);
+    interpreter.addKnownPreimage(new TextEncoder().encode(policy.descriptorTemplate));
+    interpreter.addKnownList(policy.keysInfo.map((info) => new TextEncoder().encode(info)));
+    const register = [serialize.length, ...serialize];
+    const registered = await continueUntilDone(
+      device,
+      interpreter,
+      apdu([0xe1, 0x02, 0x00, 0x01, register.length, ...register]),
+    );
+    expect(swOf(registered)).toBe(SW_OK);
+    expect(registered.length).toBe(66);
+    expect(Array.from(registered.subarray(0, 32))).toEqual(Array.from(walletIdOf(serialize)));
+
+    const addressInterp = new ClientCommandInterpreter();
+    addressInterp.addKnownPreimage(serialize);
+    addressInterp.addKnownPreimage(new TextEncoder().encode(policy.descriptorTemplate));
+    addressInterp.addKnownList(policy.keysInfo.map((info) => new TextEncoder().encode(info)));
+    const query = [
+      0x00,
+      ...walletIdOf(serialize),
+      ...new Uint8Array(32),
+      0x00,
+      0x00, 0x00, 0x00, 0x00,
+    ];
+    const address = await continueUntilDone(
+      device,
+      addressInterp,
+      apdu([0xe1, 0x03, 0x00, 0x01, query.length, ...query]),
+    );
+    expect(swOf(address)).toBe(SW_OK);
+    const addrLen = address[0]!;
+    const text = Array.from(address.subarray(1, 1 + addrLen), (byte) => String.fromCharCode(byte)).join('');
+    expect(text.startsWith('bc1q')).toBe(true);
+  });
+
+  it('Bitcoin Client signs a merklized PSBT and YIELDs a signature', async () => {
+    const device = handler();
+    device.setApp('bitcoin');
+    const seed = mnemonicToSeedSync(FOUNDATION);
+    const master = HDKey.fromMasterSeed(seed);
+    const node = master.derive("m/84'/0'/0'/0/0");
+    const psbt = buildQrPsbt({
+      amount: 10000n,
+      pubkey: node.publicKey!,
+      fingerprint: master.fingerprint,
+      pathIndexes: [0x80000054, 0x80000000, 0x80000000, 0, 0],
+      outputScript: concatBytes(Uint8Array.of(0x00, 0x14), new Uint8Array(20).fill(0x33)),
+      outputAmount: 8000n,
+    });
+    const parsed = parsePsbt(psbt);
+    const global = psbtMapsToByteMaps([parsed.global])[0]!;
+    const inputs = psbtMapsToByteMaps(parsed.inputMaps);
+    const outputs = psbtMapsToByteMaps(parsed.outputMaps);
+    const policy = defaultWalletPolicy(seed);
+    const serialize = serializeWalletPolicy(policy);
+    const interpreter = new ClientCommandInterpreter();
+    prepareSignPsbtInterpreter(
+      interpreter,
+      global,
+      inputs,
+      outputs,
+      serialize,
+      policy.descriptorTemplate,
+      policy.keysInfo,
+    );
+    const command = encodeSignPsbtCommand(global, inputs, outputs, walletIdOf(serialize));
+    const done = await continueUntilDone(
+      device,
+      interpreter,
+      apdu([0xe1, 0x04, 0x00, 0x01, command.length, ...command]),
+    );
+    expect(swOf(done)).toBe(SW_OK);
+    expect(interpreter.yielded.length).toBeGreaterThan(0);
+    expect(interpreter.yielded[0]!.length).toBeGreaterThan(70);
   });
 });

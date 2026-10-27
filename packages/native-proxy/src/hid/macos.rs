@@ -69,8 +69,22 @@ impl MacHid {
     let vendor = CFNumber::from(vendor_id as i32);
     let product = CFNumber::from(product_id as i32);
     let product_name = CFString::new(name);
-    let manufacturer = CFString::from_static_string("CWS");
-    let serial = CFString::from_static_string("cws-proxy");
+    let manufacturer = CFString::new(if name.starts_with("Ledger") {
+      "Ledger"
+    } else if name.starts_with("Trezor") {
+      "SatoshiLabs"
+    } else if name.starts_with("OneKey") {
+      "OneKey"
+    } else {
+      "CWS"
+    });
+    let serial = CFString::new(&format!("cws-{product_id:x}"));
+    let transport = CFString::from_static_string("USB");
+    let vendor_source = CFNumber::from(2i32);
+    let version = CFNumber::from(0x0200i32);
+    let usage_page = CFNumber::from(if name.starts_with("Ledger") { 0xffa0i32 } else { 0xff00i32 });
+    let usage = CFNumber::from(1i32);
+    let location = CFNumber::from(0x0014_0000i32);
     let keys = [
       CFString::from_static_string("ReportDescriptor"),
       CFString::from_static_string("VendorID"),
@@ -78,6 +92,12 @@ impl MacHid {
       CFString::from_static_string("Product"),
       CFString::from_static_string("Manufacturer"),
       CFString::from_static_string("SerialNumber"),
+      CFString::from_static_string("Transport"),
+      CFString::from_static_string("VendorIDSource"),
+      CFString::from_static_string("VersionNumber"),
+      CFString::from_static_string("PrimaryUsagePage"),
+      CFString::from_static_string("PrimaryUsage"),
+      CFString::from_static_string("LocationID"),
     ];
     let values: Vec<core_foundation::base::CFType> = vec![
       desc.as_CFType(),
@@ -86,6 +106,12 @@ impl MacHid {
       product_name.as_CFType(),
       manufacturer.as_CFType(),
       serial.as_CFType(),
+      transport.as_CFType(),
+      vendor_source.as_CFType(),
+      version.as_CFType(),
+      usage_page.as_CFType(),
+      usage.as_CFType(),
+      location.as_CFType(),
     ];
     let props = CFDictionary::from_CFType_pairs(&[
       (keys[0].as_CFType(), values[0].clone()),
@@ -94,6 +120,12 @@ impl MacHid {
       (keys[3].as_CFType(), values[3].clone()),
       (keys[4].as_CFType(), values[4].clone()),
       (keys[5].as_CFType(), values[5].clone()),
+      (keys[6].as_CFType(), values[6].clone()),
+      (keys[7].as_CFType(), values[7].clone()),
+      (keys[8].as_CFType(), values[8].clone()),
+      (keys[9].as_CFType(), values[9].clone()),
+      (keys[10].as_CFType(), values[10].clone()),
+      (keys[11].as_CFType(), values[11].clone()),
     ]);
 
     let device = unsafe {

@@ -1,6 +1,7 @@
 import type { SigningRequest } from './signing';
 import type { ChainPathId, ChainPathMap } from './derivation';
 import type { UsbHidIdentity } from './usb';
+import type { LedgerApp } from './ledgerApps';
 
 export type Brand = 'ledger' | 'trezor' | 'onekey';
 
@@ -51,9 +52,12 @@ export {
 } from './signing';
 export type { EthTxInput, SigningDetail, SigningField, SigningStyle } from './signingPreview';
 export {
+  describeBtcPsbt,
   describeEthMessage,
   describeEthTransaction,
+  describeEthTypedData,
   describeSigning,
+  formatSatsBtc,
   formatWeiEth,
   hex0x,
   parseEthTx,
@@ -66,6 +70,9 @@ export interface ProtocolHandler {
   getServiceUUID(): string;
   getCharacteristics(): { write: string; notify: string; writeCmd?: string };
   replaceSeed?(seed: Uint8Array, icarusRoot?: Uint8Array): void;
+  setApp?(app: LedgerApp): void;
+  getApp?(): LedgerApp;
+  resetLink?(): void;
 }
 
 export interface ConfirmationPort {

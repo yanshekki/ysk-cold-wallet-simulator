@@ -1,6 +1,6 @@
 import { OneKeyUsbBleBridge } from '@cws/protocol-onekey';
-import type { AdapterHandle, BlePort, HidPort } from '../ports';
-import { serializeWrites } from '../ports';
+import type { AdapterHandle, BlePort, ExclusiveLock, HidPort } from '../ports';
+import { createExclusive, serializeWrites } from '../ports';
 import type { LogFn } from '../log';
 
 export function attachOneKey(
@@ -9,11 +9,13 @@ export function attachOneKey(
   protocol: 'onekey-v1' | 'onekey-v2',
   mtu: number,
   log: LogFn,
+  exclusive: ExclusiveLock = createExclusive(),
 ): AdapterHandle {
   const bridge = new OneKeyUsbBleBridge(protocol, mtu);
   const queue = serializeWrites((error) => log(`onekey write failed: ${String(error)}`));
   let hidCount = 0;
   let bleCount = 0;
+  let labAwaiting = false;
   const offHid = hid.onInput((report) => {
     hidCount += 1;
     let packets: Uint8Array[] | null;
@@ -26,13 +28,22 @@ export function attachOneKey(
     if (!packets) {
       return;
     }
-    queue.push(async () => {
-      for (const packet of packets) {
-        await ble.write(packet);
-      }
-    });
+    queue.push(() =>
+      exclusive.run(async () => {
+        if (labAwaiting) {
+          log('hid dropped, lab in flight');
+          return;
+        }
+        for (const packet of packets) {
+          await ble.write(packet);
+        }
+      }),
+    );
   });
   const offBle = ble.onNotify((packet) => {
+    if (labAwaiting) {
+      return;
+    }
     bleCount += 1;
     let reports: Uint8Array[] | null;
     try {
@@ -57,6 +68,9 @@ export function attachOneKey(
     },
     idle() {
       return queue.idle();
+    },
+    setLabAwaiting(active) {
+      labAwaiting = active;
     },
   };
 }

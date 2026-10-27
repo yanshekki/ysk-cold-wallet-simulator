@@ -4,6 +4,7 @@ export const SW_DENY = 0x6985;
 export const SW_WRONG_P1P2 = 0x6a86;
 export const SW_INS_NOT_SUPPORTED = 0x6d00;
 export const SW_CLA_NOT_SUPPORTED = 0x6e00;
+export const SW_INTERRUPTED = 0xe000;
 
 export type Apdu = {
   cla: number;

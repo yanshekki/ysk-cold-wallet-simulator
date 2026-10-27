@@ -10,7 +10,7 @@ export type SigningKind =
   | 'open-app';
 
 export interface SigningRequest {
-  brand: Brand;
+  brand?: Brand;
   kind: SigningKind;
   title: string;
   path: string;

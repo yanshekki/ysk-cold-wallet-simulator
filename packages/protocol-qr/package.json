@@ -1,0 +1,25 @@
+{
+  "name": "@cws/protocol-qr",
+  "version": "0.1.0",
+  "private": true,
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@ngraveio/bc-ur": "^1.1.13",
+    "@noble/curves": "^1.9.7",
+    "@noble/hashes": "^1.8.0",
+    "@scure/base": "^2.4.0",
+    "@scure/bip32": "^1.7.0",
+    "buffer": "^6.0.3",
+    "fflate": "^0.8.2"
+  },
+  "devDependencies": {
+    "@scure/bip39": "^2.4.0",
+    "typescript": "~5.9.2",
+    "vitest": "^3.2.4"
+  }
+}

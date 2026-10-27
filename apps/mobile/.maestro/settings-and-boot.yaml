@@ -47,6 +47,8 @@ appId: hk.ysk.coldwalletsimulator
 - tapOn:
     id: "settings-link-catalog"
 - assertVisible:
+    id: "settings-catalog-update"
+- assertVisible:
     id: "catalog-table"
 - tapOn:
     id: "screen-back"

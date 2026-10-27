@@ -55,7 +55,8 @@ const styles = StyleSheet.create({
   body: {
     flex: 1,
     minHeight: 0,
-    paddingHorizontal: space.md,
+    paddingLeft: space.md,
+    paddingRight: space.md,
     paddingTop: space.sm,
     gap: space.sm,
     backgroundColor: colors.bg,

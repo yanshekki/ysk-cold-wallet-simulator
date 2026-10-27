@@ -20,8 +20,38 @@ import type {
   SigningRequest,
 } from '@cws/contracts';
 import { ledgerCatalog } from '@cws/contracts';
-import { createHandler, getModel, isSimulatable, toBip32Seed } from '@cws/sdk';
-import { LedgerProtocolHandler } from '@cws/protocol-ledger';
+import {
+  BbqrDecoder,
+  FountainUrDecoder,
+  assertEthSignMatchesSeed,
+  decodeBtcSignRequest,
+  decodeCosmosSignRequest,
+  decodeEthSignRequest,
+  decodeSolSignRequest,
+  encodeBbqr,
+  encodeQrAccount,
+  isBbqrPart,
+  previewCryptoPsbt,
+  previewPsbt,
+  signBtcMessage,
+  signCosmosRequest,
+  signCryptoPsbt,
+  signEthRequest,
+  signPsbtBytes,
+  signSolRequest,
+  type EthAirgapQr,
+  type QrFormatId,
+  type QrProfile,
+  type QrUrKind,
+} from '@cws/protocol-qr';
+import {
+  btcMessageToSigningRequest,
+  cosmosSignToSigningRequest,
+  ethSignToSigningRequest,
+  psbtToSigningRequest,
+  solSignToSigningRequest,
+} from '../qr/signingRequest';
+import { createHandler, fetchManagerCatalog, getModel, isSimulatable, toBip32Seed } from '@cws/sdk';
 import { startAdvertising } from '../ble/peripheral';
 import type { PeripheralHandle } from '../ble/types';
 import { clearDisclaimerAcceptance, loadDisclaimerAccepted, saveDisclaimerAcceptance } from '../disclaimer/store';
@@ -37,9 +67,11 @@ import {
   clearCatalogOverlay,
   detectLanguage,
   loadActiveSlotId,
+  loadCatalogOverlay,
   loadSettings,
   resolveDefaultSlot,
   saveActiveSlotId,
+  saveCatalogOverlay,
   saveSettings,
   type AppSettings,
 } from '../settings/store';
@@ -48,6 +80,11 @@ type PendingConfirm = {
   request: SigningRequest;
   resolve: (ok: boolean) => void;
 };
+
+export type QrScanStatus =
+  | { status: 'progress'; received: number; expected: number }
+  | { status: 'complete'; qr: EthAirgapQr }
+  | { status: 'rejected' };
 
 type AppStateValue = {
   unlockedUntil: number | null;
@@ -79,7 +116,11 @@ type AppStateValue = {
   clearLogs: () => void;
   appendAppLog: (channel: LogChannel, note: string, hex?: string) => void;
   patchSettings: (patch: Partial<AppSettings>) => Promise<void>;
+  updateLedgerCatalog: () => Promise<number>;
   refreshNear: (slot: SeedSlot) => Promise<SeedSlot>;
+  exportQrAccount: (profile: QrProfile, format?: QrFormatId | QrUrKind) => Promise<EthAirgapQr>;
+  scanQrSign: (part: string) => Promise<QrScanStatus>;
+  resetQrScan: () => void;
   showToast: (message: string) => void;
   loading: string | null;
   hydrated: boolean;
@@ -114,8 +155,17 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   const peripheralRef = useRef<PeripheralHandle | null>(null);
   const handlerRef = useRef<ProtocolHandler | null>(null);
+  const currentAppRef = useRef<LedgerApp>('dashboard');
+  const connectedRef = useRef(false);
+  const entropyRef = useRef<Uint8Array | null>(null);
+  const spawnHandlerRef = useRef<() => ProtocolHandler>(() => {
+    throw new Error('handler factory not ready');
+  });
   const pendingRef = useRef<PendingConfirm | null>(null);
   const secretSession = useRef(new SecretSession());
+  const qrDecoder = useRef(new FountainUrDecoder());
+  const bbqrDecoder = useRef(new BbqrDecoder());
+  const qrScanBusy = useRef(false);
   const logSeq = useRef(0);
   const settingsRef = useRef(settings);
   const seedRef = useRef(seed);
@@ -229,6 +279,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         setSettings(loaded);
         setFaceIdEnabled(loaded.faceIdEnabled);
         setVaultAuthPrompt(translate(loaded.language, 'vault.authPrompt'));
+        await loadCatalogOverlay();
         setCatalog([...ledgerCatalog()]);
         const slots = await listSlots();
         const activeId = await loadActiveSlotId();
@@ -262,10 +313,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     await peripheralRef.current?.stop();
     peripheralRef.current = null;
     handlerRef.current = null;
+    entropyRef.current = null;
+    connectedRef.current = false;
+    currentAppRef.current = 'dashboard';
+    setCurrentApp('dashboard');
     setAdvertising(false);
     setConnected(false);
     setConnectedLabel('');
-    setCurrentApp('dashboard');
     if (pendingRef.current) {
       pendingRef.current.resolve(false);
       pendingRef.current = null;
@@ -347,13 +401,53 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setDisclaimerAccepted(false);
     setError(null);
     setUnlockedUntil(null);
+    currentAppRef.current = 'dashboard';
+    setCurrentApp('dashboard');
   }, [stopSimulation]);
+
+  const updateLedgerCatalog = useCallback(async () => {
+    const modelId = model?.brand === 'ledger' ? model.id : 'nano-x';
+    appendAppLog('manager', 'manager: fetch');
+    const apps = await fetchManagerCatalog(modelId);
+    await saveCatalogOverlay(apps);
+    setCatalog(apps);
+    await patchSettings({ catalogUpdatedAt: Date.now() });
+    appendAppLog('manager', `manager: updated ${apps.length} apps`);
+    return apps.length;
+  }, [appendAppLog, model, patchSettings]);
+
+  const spawnHandler = useCallback(() => {
+    const currentModel = model;
+    const active = seedRef.current;
+    const entropy = entropyRef.current;
+    if (!currentModel || !active || !entropy) {
+      throw new Error('handler spawn missing session');
+    }
+    const handler = createHandler({
+      model: currentModel,
+      confirmation,
+      slotId: active.id,
+      entropy,
+      backup: active.backup ?? 'bip39',
+      onAppChange: (app) => {
+        currentAppRef.current = app;
+        setCurrentApp(app);
+        appendAppLog('app', `OPEN_APP ${app}`);
+      },
+      rng: expoRng,
+      onTrace: (note) => appendAppLog('pair', note),
+    });
+    const seedBytes = secretSession.current.copySeed();
+    if (seedBytes) {
+      handler.replaceSeed?.(seedBytes, secretSession.current.copyIcarusRoot());
+    }
+    return handler;
+  }, [appendAppLog, confirmation, model]);
+  spawnHandlerRef.current = spawnHandler;
 
   const startSimulation = useCallback(async () => {
     if (!model || !isSimulatable(model)) {
-      throw new Error(
-        'This app advertises Ledger BLE models, OneKey Classic/Touch/Pro/Pro 2/Neo/Pure, and Trezor Safe 7',
-      );
+      throw new Error('errors.advertiseUnsupported');
     }
     let active = seedRef.current;
     if (!active) {
@@ -367,38 +461,35 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       throw new Error('errors.selectSeed');
     }
     setError(null);
+    await peripheralRef.current?.stop();
+    peripheralRef.current = null;
     secretSession.current.wipe();
     setSessionPassphraseApplied(false);
     setPassphraseFingerprint(null);
     try {
       const entropy = await loadEntropy(active.id);
+      entropyRef.current = entropy;
       secretSession.current.load(entropy, active.backup ?? 'bip39');
-      const handler = createHandler({
-        model,
-        confirmation,
-        slotId: active.id,
-        entropy,
-        backup: active.backup ?? 'bip39',
-        onAppChange: (app) => {
-          setCurrentApp(app);
-          appendAppLog('app', `OPEN_APP ${app}`);
-        },
-        rng: expoRng,
-        onTrace: (note) => appendAppLog('pair', note),
-      });
-      const seedBytes = secretSession.current.copySeed();
-      if (seedBytes) {
-        handler.replaceSeed?.(seedBytes, secretSession.current.copyIcarusRoot());
-      }
-      handlerRef.current = handler;
+      handlerRef.current = spawnHandlerRef.current();
+      currentAppRef.current = 'dashboard';
+      setCurrentApp('dashboard');
+      appendAppLog('app', 'handler ready (dashboard; HOT probes)');
       appendAppLog('ble', 'advertise start');
-      const handle = await startAdvertising(model, handler, {
+      const handle = await startAdvertising(model, () => handlerRef.current!, {
         onConnected: (id) => {
+          if (!connectedRef.current) {
+            handlerRef.current = spawnHandlerRef.current();
+            currentAppRef.current = 'dashboard';
+            setCurrentApp('dashboard');
+            appendAppLog('app', 'handler ready (dashboard; HOT probes)');
+          }
+          connectedRef.current = true;
           setConnected(true);
           setConnectedLabel(id);
           appendAppLog('ble', `host ${id}`);
         },
         onDisconnected: () => {
+          connectedRef.current = false;
           setConnected(false);
           setConnectedLabel('');
           appendAppLog('ble', 'host disconnected');
@@ -412,7 +503,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       }, { nameSuffix: settingsRef.current.bleNameSuffix });
       peripheralRef.current = handle;
       setAdvertising(true);
-      setCurrentApp(handler instanceof LedgerProtocolHandler ? handler.getApp() : 'dashboard');
+      setCurrentApp(handlerRef.current?.getApp?.() ?? currentAppRef.current);
     } catch (err) {
       secretSession.current.wipe();
       handlerRef.current = null;
@@ -423,13 +514,170 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     }
   }, [appendAppLog, appendLog, confirmation, model, selectSeed]);
 
-  const setApp = useCallback((app: LedgerApp) => {
-    const handler = handlerRef.current;
-    if (handler instanceof LedgerProtocolHandler) {
-      handler.setApp(app);
-      setCurrentApp(app);
-      appendAppLog('app', `OPEN_APP ${app}`);
+  const exportQrAccount = useCallback(async (profile: QrProfile, format?: QrFormatId | QrUrKind) => {
+    const active = seedRef.current;
+    if (!active) {
+      throw new Error('errors.selectSeed');
     }
+    let seedBytes = secretSession.current.copySeed();
+    if (!seedBytes) {
+      const entropy = await loadEntropy(active.id);
+      seedBytes = toBip32Seed(entropy, active.backup ?? 'bip39', '');
+    }
+    try {
+      return encodeQrAccount(seedBytes, profile, format ?? profile.defaultUr);
+    } finally {
+      seedBytes.fill(0);
+    }
+  }, []);
+
+  const resetQrScan = useCallback(() => {
+    qrDecoder.current.reset();
+    bbqrDecoder.current.reset();
+    qrScanBusy.current = false;
+  }, []);
+
+  const scanQrSign = useCallback(
+    async (part: string): Promise<QrScanStatus> => {
+      if (qrScanBusy.current) {
+        return { status: 'progress', received: 0, expected: 0 };
+      }
+      if (isBbqrPart(part)) {
+        const progress = bbqrDecoder.current.receive(part);
+        if (!progress.complete) {
+          return { status: 'progress', received: progress.received, expected: progress.expected };
+        }
+        qrScanBusy.current = true;
+        try {
+          if (!progress.success || !progress.payload || progress.type !== 'P') {
+            throw new Error(progress.error || 'errors.qrWrongType');
+          }
+          const active = seedRef.current;
+          if (!active) {
+            throw new Error('errors.selectSeed');
+          }
+          let seedBytes = secretSession.current.copySeed();
+          if (!seedBytes) {
+            const entropy = await loadEntropy(active.id);
+            seedBytes = toBip32Seed(entropy, active.backup ?? 'bip39', '');
+          }
+          try {
+            const preview = previewPsbt(seedBytes, progress.payload);
+            const ok = await confirmation.confirm(psbtToSigningRequest(preview));
+            if (!ok) {
+              return { status: 'rejected' };
+            }
+            const signed = signPsbtBytes(seedBytes, progress.payload);
+            const frames = encodeBbqr('P', signed.psbt).frames;
+            appendAppLog('sign', `qr bbqr-psbt ${preview.path}`);
+            return {
+              status: 'complete',
+              qr: {
+                ur: frames[0] ?? '',
+                parts: frames,
+                path: preview.path,
+                address: preview.address,
+                fingerprint: preview.fingerprint,
+                name: 'CWS',
+                urKind: 'bbqr',
+              },
+            };
+          } finally {
+            seedBytes.fill(0);
+          }
+        } finally {
+          bbqrDecoder.current.reset();
+          qrScanBusy.current = false;
+        }
+      }
+      const progress = qrDecoder.current.receive(part);
+      if (!progress.complete) {
+        return { status: 'progress', received: progress.received, expected: progress.expected };
+      }
+      qrScanBusy.current = true;
+      try {
+        if (!progress.success || !progress.cbor || !progress.type) {
+          throw new Error(progress.error || 'errors.qrBadUr');
+        }
+        const active = seedRef.current;
+        if (!active) {
+          throw new Error('errors.selectSeed');
+        }
+        let seedBytes = secretSession.current.copySeed();
+        if (!seedBytes) {
+          const entropy = await loadEntropy(active.id);
+          seedBytes = toBip32Seed(entropy, active.backup ?? 'bip39', '');
+        }
+        try {
+          if (progress.type === 'crypto-psbt') {
+            const preview = previewCryptoPsbt(seedBytes, progress.cbor);
+            const ok = await confirmation.confirm(psbtToSigningRequest(preview));
+            if (!ok) {
+              return { status: 'rejected' };
+            }
+            const qr = signCryptoPsbt(seedBytes, progress.cbor);
+            appendAppLog('sign', `qr crypto-psbt ${preview.path}`);
+            return { status: 'complete', qr };
+          }
+          if (progress.type === 'sol-sign-request') {
+            const request = decodeSolSignRequest(progress.cbor);
+            const ok = await confirmation.confirm(solSignToSigningRequest(request));
+            if (!ok) {
+              return { status: 'rejected' };
+            }
+            const qr = signSolRequest(seedBytes, request);
+            appendAppLog('sign', `qr sol ${request.path}`);
+            return { status: 'complete', qr };
+          }
+          if (progress.type === 'cosmos-sign-request') {
+            const request = decodeCosmosSignRequest(progress.cbor);
+            const ok = await confirmation.confirm(cosmosSignToSigningRequest(request));
+            if (!ok) {
+              return { status: 'rejected' };
+            }
+            const qr = signCosmosRequest(seedBytes, request);
+            appendAppLog('sign', `qr cosmos ${request.path}`);
+            return { status: 'complete', qr };
+          }
+          if (progress.type === 'btc-sign-request') {
+            const request = decodeBtcSignRequest(progress.cbor);
+            const ok = await confirmation.confirm(btcMessageToSigningRequest(request));
+            if (!ok) {
+              return { status: 'rejected' };
+            }
+            const qr = signBtcMessage(seedBytes, request);
+            appendAppLog('sign', `qr btc-msg ${request.path}`);
+            return { status: 'complete', qr };
+          }
+          if (progress.type !== 'eth-sign-request') {
+            throw new Error('errors.qrWrongType');
+          }
+          const request = decodeEthSignRequest(progress.cbor);
+          assertEthSignMatchesSeed(seedBytes, request);
+          const signing = ethSignToSigningRequest(request);
+          const ok = await confirmation.confirm(signing);
+          if (!ok) {
+            return { status: 'rejected' };
+          }
+          const signed = signEthRequest(seedBytes, request, request.origin ?? 'CWS');
+          appendAppLog('sign', `qr ${request.dataType} ${request.path}`);
+          return { status: 'complete', qr: signed.qr };
+        } finally {
+          seedBytes.fill(0);
+        }
+      } finally {
+        qrDecoder.current.reset();
+        qrScanBusy.current = false;
+      }
+    },
+    [appendAppLog, confirmation],
+  );
+
+  const setApp = useCallback((app: LedgerApp) => {
+    currentAppRef.current = app;
+    handlerRef.current?.setApp?.(app);
+    setCurrentApp(app);
+    appendAppLog('app', `OPEN_APP ${app}`);
   }, [appendAppLog]);
 
   const applySessionPassphrase = useCallback(async (value: string) => {
@@ -529,7 +777,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       clearLogs,
       appendAppLog,
       patchSettings,
+      updateLedgerCatalog,
       refreshNear,
+      exportQrAccount,
+      scanQrSign,
+      resetQrScan,
       showToast,
       loading,
       hydrated,
@@ -548,6 +800,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       connected,
       connectedLabel,
       currentApp,
+      exportQrAccount,
+      scanQrSign,
+      resetQrScan,
       disclaimerAccepted,
       error,
       hydrated,
@@ -574,6 +829,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       stopSimulation,
       toast,
       unlock,
+      updateLedgerCatalog,
       unlockedUntil,
     ],
   );

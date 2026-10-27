@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
-import { KeyboardAwareScrollView } from './keyboard';
+import { useSafeAreaInsets, type Edge } from 'react-native-safe-area-context';
+import { KeyboardAwareScrollView, KeyboardStickyView } from './keyboard';
 import { colors, fonts, hairline, space, typography } from './theme';
 
 type Props = {
@@ -29,6 +29,10 @@ export function Screen({
   backLabel = 'Back',
   backIcon,
 }: Props) {
+  const insets = useSafeAreaInsets();
+  const padTop = edges.includes('top') ? insets.top : 0;
+  const padBottom = edges.includes('bottom') ? insets.bottom : 0;
+
   const body = (
     <View style={[styles.body, !scroll && styles.bodyFill]}>
       {kicker && !onBack ? <Text style={styles.kicker}>{`/ ${kicker}`}</Text> : null}
@@ -58,23 +62,30 @@ export function Screen({
   );
 
   return (
-    <SafeAreaView style={styles.safe} edges={edges}>
+    <View style={[styles.safe, { paddingTop: padTop, paddingBottom: padBottom }]}>
       {scroll ? (
         <KeyboardAwareScrollView
           style={styles.fill}
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
           bottomOffset={24}
+          contentInsetAdjustmentBehavior="never"
+          automaticallyAdjustContentInsets={false}
+          automaticallyAdjustsScrollIndicatorInsets={false}
+          showsVerticalScrollIndicator={false}
+          showsHorizontalScrollIndicator={false}
         >
           {body}
         </KeyboardAwareScrollView>
       ) : (
         body
       )}
-      {footer ? <View style={styles.footer}>{footer}</View> : null}
-    </SafeAreaView>
+      {footer ? <KeyboardStickyView style={styles.footer}>{footer}</KeyboardStickyView> : null}
+    </View>
   );
 }
+
+const gutter = space.lg;
 
 const styles = StyleSheet.create({
   safe: {
@@ -88,7 +99,8 @@ const styles = StyleSheet.create({
     paddingBottom: 48,
   },
   body: {
-    paddingHorizontal: space.lg,
+    paddingLeft: gutter,
+    paddingRight: gutter,
     paddingTop: space.md,
     paddingBottom: space.lg,
   },
@@ -144,7 +156,9 @@ const styles = StyleSheet.create({
     minHeight: 0,
   },
   footer: {
-    padding: space.md,
+    paddingTop: space.md,
+    paddingLeft: gutter,
+    paddingRight: gutter,
     paddingBottom: space.lg,
     borderTopWidth: hairline,
     borderTopColor: colors.border,

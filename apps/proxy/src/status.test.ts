@@ -14,11 +14,15 @@ describe('status bus', () => {
     expect(bus.snapshot().radio).toBe('GATT');
     bus.patch({ hid: 'up', phase: 'hid' });
     expect(bus.snapshot().radio).toBe('HID');
+    bus.patch({ labReady: true });
+    expect(bus.snapshot().labReady).toBe(true);
     bus.log('hello');
     expect(bus.snapshot().logs[0].line).toBe('hello');
     bus.idle();
     expect(bus.snapshot().running).toBe(false);
     expect(bus.snapshot().radio).toBe('IDLE');
+    expect(bus.snapshot().hid).toBe('up');
+    expect(bus.snapshot().vendorId).toBeNull();
     expect(seen.includes('SCAN')).toBe(true);
     expect(bus.snapshot().logs[0].line).toBe('hello');
     bus.clearLogs();

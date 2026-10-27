@@ -1,6 +1,6 @@
-import { SW_DENY, SW_OK } from '@cws/protocol-ledger';
+import { CLA_FRAMEWORK, INS_CONTINUE, SW_DENY, SW_INTERRUPTED, SW_OK } from '@cws/protocol-ledger';
 
-export { SW_DENY, SW_OK };
+export { CLA_FRAMEWORK, INS_CONTINUE, SW_DENY, SW_INTERRUPTED, SW_OK };
 
 export function concatBytes(...parts: Uint8Array[]): Uint8Array {
   const total = parts.reduce((n, part) => n + part.length, 0);
@@ -134,6 +134,10 @@ export const PATH_TON = [hardened(44), hardened(607), hardened(0)];
 export const PATH_APT = [hardened(44), hardened(637), hardened(0), hardened(0), hardened(0)];
 export const PATH_SUI = [hardened(44), hardened(784), hardened(0), hardened(0), hardened(0)];
 export const PATH_DOT = [hardened(44), hardened(354), hardened(0), hardened(0), hardened(0)];
+export const PATH_XLM = [hardened(44), hardened(148), hardened(0)];
+export const PATH_XTZ = [hardened(44), hardened(1729), hardened(0)];
+export const PATH_BNB = [hardened(44), hardened(714), hardened(0), 0, 0];
+export const PATH_TAPROOT = [hardened(86), hardened(0), hardened(0), 0, 0];
 
 export function decodePubAndAddress(body: Uint8Array): { pub: string; address?: string } {
   if (body.length === 32) {

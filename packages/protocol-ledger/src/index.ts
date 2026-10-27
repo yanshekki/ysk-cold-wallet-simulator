@@ -46,6 +46,7 @@ export {
   SW_CLA_NOT_SUPPORTED,
   SW_DENY,
   SW_INS_NOT_SUPPORTED,
+  SW_INTERRUPTED,
   SW_OK,
   SW_WRONG_LENGTH,
   SW_WRONG_P1P2,
@@ -74,10 +75,30 @@ export {
 export {
   bitcoinAddressFor,
   bitcoinP2pkh,
+  bitcoinP2tr,
   bitcoinP2wpkh,
   BITCOIN_APP_VERSION,
   handleBitcoinApdu,
 } from './apps/bitcoin';
+export {
+  CLA_FRAMEWORK,
+  INS_CONTINUE,
+  handleBitcoinClientApdu,
+  handleBitcoinContinue,
+} from './apps/bitcoinClient';
+export {
+  ClientCommandInterpreter,
+  encodeSignPsbtCommand,
+  merklizedMapCommitment,
+  prepareSignPsbtInterpreter,
+  psbtMapsToByteMaps,
+} from './apps/merkle';
+export {
+  defaultWalletPolicy,
+  serializeWalletPolicy,
+  walletHmac,
+  walletIdOf,
+} from './apps/walletPolicy';
 export {
   attachPartialSig,
   bip143Sighash,
@@ -88,6 +109,17 @@ export {
   u32le,
 } from './apps/psbt';
 export { bytesToHex, hexToBytes } from './bytes';
+export {
+  completeAppAndVersion,
+  describeAppAndVersion,
+  encodeAppAndVersion,
+  ensureAppAndVersion,
+  getAppAndVersionFor,
+  getDeviceName,
+  getFirmwareVersion,
+  openAppName,
+  parseAppAndVersion,
+} from './apps/dashboard';
 export {
   FUJI_C_CHAIN_ID,
   FUJI_HRP,
@@ -100,6 +132,9 @@ export {
   cosmosBech32,
   encodeDerSignature,
   encodePubAndAddress,
+  hash160,
+  stellarAddress,
+  tezosTz1,
   ss58Encode,
   suiAddress,
   tonBounceable,

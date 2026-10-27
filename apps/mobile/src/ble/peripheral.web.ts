@@ -1,11 +1,11 @@
-import type { DeviceModel, ProtocolHandler } from '@cws/contracts';
-import type { PeripheralCallbacks, PeripheralHandle } from './types';
+import type { DeviceModel } from '@cws/contracts';
+import type { HandlerSource, PeripheralCallbacks, PeripheralHandle } from './types';
 
 export type { PeripheralCallbacks, PeripheralHandle };
 
 export async function startAdvertising(
   _model: DeviceModel,
-  _handler: ProtocolHandler,
+  _handler: HandlerSource,
   _callbacks: PeripheralCallbacks,
 ): Promise<PeripheralHandle> {
   throw new Error('BLE peripheral requires a physical Android/iOS device');

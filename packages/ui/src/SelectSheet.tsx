@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Button } from './Button';
+import { KeyboardAvoidingView } from './keyboard';
 import { colors, fonts, hairline, radius, space } from './theme';
 
 export type SelectSheetOption = {
@@ -52,17 +53,14 @@ export function SelectSheet({
   }, [options, query]);
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
-      <View style={styles.frame}>
+      <KeyboardAvoidingView behavior="padding" automaticOffset style={styles.frame}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={cancelLabel}
           onPress={onClose}
           style={[StyleSheet.absoluteFill, styles.backdrop]}
         />
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.sheet}
-        >
+        <View style={styles.sheet}>
           <Text style={styles.kicker}>{title}</Text>
           {options.length > 12 ? (
             <TextInput
@@ -100,8 +98,8 @@ export function SelectSheet({
             })}
           </ScrollView>
           <Button label={cancelLabel} variant="ghost" onPress={onClose} />
-        </KeyboardAvoidingView>
-      </View>
+        </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

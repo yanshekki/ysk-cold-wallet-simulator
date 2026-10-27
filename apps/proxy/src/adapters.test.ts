@@ -12,6 +12,10 @@ import {
   DEFAULT_MTU,
   LedgerProtocolHandler,
   SW_OK,
+  TAG_APDU,
+  encodeAppAndVersion,
+  encodeResponse,
+  framePayload,
   splitFramedPackets,
   unwrapHidReports,
   wrapHidApdu,
@@ -129,6 +133,55 @@ describe('attachLedger', () => {
     adapter.close();
   });
 
+  it('switches from Ethereum to Solana for empty GET_APP_CONFIGURATION', async () => {
+    const device = new LedgerProtocolHandler({
+      model: LEDGER_MODELS.find((item) => item.id === 'nano-x')!,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy: entropy(),
+    });
+    device.setApp('ethereum');
+    const { host, gadget } = memoryHidPair();
+    const ble = bleToHandler(device, (framed) => splitFramedPackets(framed, DEFAULT_MTU));
+    const adapter = attachLedger(gadget, ble, DEFAULT_MTU, () => undefined);
+    const replies: Uint8Array[] = [];
+    host.onInput((report) => replies.push(report));
+    for (const report of wrapHidApdu(Uint8Array.of(0xe0, 0x04, 0x00, 0x00, 0x00))) {
+      host.write(report);
+    }
+    await adapter.idle();
+    const payload = unwrapHidReports(replies).payload;
+    expect((payload[payload.length - 2] << 8) | payload[payload.length - 1]).toBe(SW_OK);
+    expect(payload[0]).toBe(0x01);
+    expect(device.getApp()).toBe('solana');
+    adapter.close();
+  });
+
+  it('forwards Solana GET_APP_CONFIGURATION instead of dropping it as GET_APP', async () => {
+    const device = new LedgerProtocolHandler({
+      model: LEDGER_MODELS.find((item) => item.id === 'nano-x')!,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy: entropy(),
+    });
+    device.setApp('solana');
+    const { host, gadget } = memoryHidPair();
+    const ble = bleToHandler(device, (framed) => splitFramedPackets(framed, DEFAULT_MTU));
+    const adapter = attachLedger(gadget, ble, DEFAULT_MTU, () => undefined);
+    const replies: Uint8Array[] = [];
+    host.onInput((report) => replies.push(report));
+    for (const report of wrapHidApdu(Uint8Array.of(0xe0, 0x04, 0x00, 0x00, 0x00))) {
+      host.write(report);
+    }
+    await adapter.idle();
+    const payload = unwrapHidReports(replies).payload;
+    const sw = (payload[payload.length - 2] << 8) | payload[payload.length - 1];
+    expect(sw).toBe(SW_OK);
+    expect(payload[0]).toBe(0x01);
+    expect(payload.length).toBe(7);
+    adapter.close();
+  });
+
   it('does not forward a BLE APDU before a HID command', async () => {
     const { host, gadget } = memoryHidPair();
     let notify: ((packet: Uint8Array) => void) | undefined;
@@ -167,8 +220,8 @@ describe('attachLedger', () => {
       },
     };
     const adapter = attachLedger(gadget, ble, DEFAULT_MTU, () => undefined);
-    const version = wrapHidApdu(Uint8Array.of(0xb0, 0x01, 0x00, 0x00, 0x00));
-    const config = wrapHidApdu(Uint8Array.of(0xe0, 0x06, 0x00, 0x00, 0x00));
+    const version = wrapHidApdu(Uint8Array.of(0xe0, 0x06, 0x00, 0x00, 0x00));
+    const config = wrapHidApdu(Uint8Array.of(0xe0, 0x02, 0x00, 0x00, 0x00));
     for (const report of version) {
       host.write(report);
     }
@@ -215,6 +268,624 @@ describe('attachLedger', () => {
     await adapter.idle();
     expect(replies.length).toBeGreaterThan(0);
     expect(replies[0]?.[7]).toBe(0x90);
+    adapter.close();
+  });
+
+  it('ignores a 6E00 that arrives before GET_XPUB payload', async () => {
+    const { host, gadget } = memoryHidPair();
+    let notify: ((packet: Uint8Array) => void) | undefined;
+    const ble = {
+      async write() {
+        return;
+      },
+      onNotify(callback: (packet: Uint8Array) => void) {
+        notify = callback;
+        return () => undefined;
+      },
+      async close() {
+        return;
+      },
+    };
+    const adapter = attachLedger(gadget, ble, DEFAULT_MTU, () => undefined);
+    const replies: Uint8Array[] = [];
+    host.onInput((report) => replies.push(report));
+    const xpub = Uint8Array.of(0x80, 0x03, 0x00, 0x00, 0x00);
+    for (const report of wrapHidApdu(xpub)) {
+      host.write(report);
+    }
+    await Promise.resolve();
+    await Promise.resolve();
+    notify?.(Uint8Array.of(0x05, 0x00, 0x00, 0x00, 0x02, 0x6e, 0x00));
+    notify?.(Uint8Array.of(0x05, 0x00, 0x00, 0x00, 0x02, 0x6e, 0x00));
+    await Promise.resolve();
+    expect(replies).toEqual([]);
+    const body = new Uint8Array(1 + 33 + 32);
+    body[0] = 0x21;
+    const framed = encodeResponse(body, SW_OK);
+    for (const piece of splitFramedPackets(framePayload(TAG_APDU, framed, DEFAULT_MTU), DEFAULT_MTU)) {
+      notify?.(piece);
+    }
+    await adapter.idle();
+    expect(unwrapHidReports(replies).payload).toEqual(framed);
+    adapter.close();
+  });
+
+  it('forwards an unarmed 6D00 so TON GET_VERSION does not stall the queue', async () => {
+    const { host, gadget } = memoryHidPair();
+    let notify: ((packet: Uint8Array) => void) | undefined;
+    const ble = {
+      async write() {
+        setTimeout(() => notify?.(Uint8Array.of(0x05, 0x00, 0x00, 0x00, 0x02, 0x6d, 0x00)), 0);
+      },
+      onNotify(callback: (packet: Uint8Array) => void) {
+        notify = callback;
+        return () => undefined;
+      },
+      async close() {
+        return;
+      },
+    };
+    const adapter = attachLedger(gadget, ble, DEFAULT_MTU, () => undefined);
+    const replies: Uint8Array[] = [];
+    host.onInput((report) => replies.push(report));
+    for (const report of wrapHidApdu(Uint8Array.of(0xe0, 0x03, 0x00, 0x00, 0x00))) {
+      host.write(report);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    await adapter.idle();
+    expect(replies[0]?.[7]).toBe(0x6d);
+    adapter.close();
+  });
+
+  it('forwards a 6D00 that arrives before BLE write resolves after a 9000', async () => {
+    const { host, gadget } = memoryHidPair();
+    let notify: ((packet: Uint8Array) => void) | undefined;
+    let writes = 0;
+    const ble = {
+      async write() {
+        writes += 1;
+        if (writes === 1) {
+          notify?.(Uint8Array.of(0x05, 0x00, 0x00, 0x00, 0x02, 0x90, 0x00));
+          return;
+        }
+        notify?.(Uint8Array.of(0x05, 0x00, 0x00, 0x00, 0x02, 0x6d, 0x00));
+      },
+      onNotify(callback: (packet: Uint8Array) => void) {
+        notify = callback;
+        return () => undefined;
+      },
+      async close() {
+        return;
+      },
+    };
+    const adapter = attachLedger(gadget, ble, DEFAULT_MTU, () => undefined);
+    const replies: Uint8Array[] = [];
+    host.onInput((report) => replies.push(report));
+    for (const report of wrapHidApdu(Uint8Array.of(0xe0, 0x05, 0x00, 0x00, 0x00))) {
+      host.write(report);
+    }
+    await adapter.idle();
+    replies.length = 0;
+    for (const report of wrapHidApdu(Uint8Array.of(0xe0, 0x03, 0x00, 0x00, 0x00))) {
+      host.write(report);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    await adapter.idle();
+    expect(replies[0]?.[7]).toBe(0x6d);
+    adapter.close();
+  });
+
+  it('forwards a second unarmed 6D00 instead of dropping it as leftover', async () => {
+    const { host, gadget } = memoryHidPair();
+    let notify: ((packet: Uint8Array) => void) | undefined;
+    const ble = {
+      async write() {
+        notify?.(Uint8Array.of(0x05, 0x00, 0x00, 0x00, 0x02, 0x6d, 0x00));
+      },
+      onNotify(callback: (packet: Uint8Array) => void) {
+        notify = callback;
+        return () => undefined;
+      },
+      async close() {
+        return;
+      },
+    };
+    const adapter = attachLedger(gadget, ble, DEFAULT_MTU, () => undefined);
+    const replies: Uint8Array[] = [];
+    host.onInput((report) => replies.push(report));
+    for (const report of wrapHidApdu(Uint8Array.of(0xe0, 0x06, 0x00, 0x00, 0x00))) {
+      host.write(report);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    await adapter.idle();
+    expect(replies[0]?.[7]).toBe(0x6d);
+    replies.length = 0;
+    for (const report of wrapHidApdu(Uint8Array.of(0xe0, 0x06, 0x00, 0x00, 0x00))) {
+      host.write(report);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    await adapter.idle();
+    expect(replies[0]?.[7]).toBe(0x6d);
+    adapter.close();
+  });
+
+  it('forwards a TON version 9000 that arrives before BLE write resolves', async () => {
+    const { host, gadget } = memoryHidPair();
+    let notify: ((packet: Uint8Array) => void) | undefined;
+    let writes = 0;
+    const ble = {
+      async write() {
+        writes += 1;
+        if (writes === 1) {
+          notify?.(Uint8Array.of(0x05, 0x00, 0x00, 0x00, 0x02, 0x90, 0x00));
+          return;
+        }
+        notify?.(Uint8Array.of(0x05, 0x00, 0x00, 0x00, 0x05, 0x02, 0x09, 0x01, 0x90, 0x00));
+      },
+      onNotify(callback: (packet: Uint8Array) => void) {
+        notify = callback;
+        return () => undefined;
+      },
+      async close() {
+        return;
+      },
+    };
+    const adapter = attachLedger(gadget, ble, DEFAULT_MTU, () => undefined);
+    const replies: Uint8Array[] = [];
+    host.onInput((report) => replies.push(report));
+    for (const report of wrapHidApdu(Uint8Array.of(0xe0, 0x05, 0x00, 0x00, 0x00))) {
+      host.write(report);
+    }
+    await adapter.idle();
+    replies.length = 0;
+    for (const report of wrapHidApdu(Uint8Array.of(0xe0, 0x03, 0x00, 0x00, 0x00))) {
+      host.write(report);
+    }
+    await adapter.idle();
+    expect(unwrapHidReports(replies).payload).toEqual(Uint8Array.of(0x02, 0x09, 0x01, 0x90, 0x00));
+    adapter.close();
+  });
+
+  it('forwards a lone 6E00 after a short hold so the host can OpenApp', async () => {
+    const { host, gadget } = memoryHidPair();
+    let notify: ((packet: Uint8Array) => void) | undefined;
+    const ble = {
+      async write() {
+        setTimeout(() => notify?.(Uint8Array.of(0x05, 0x00, 0x00, 0x00, 0x02, 0x6e, 0x00)), 0);
+      },
+      onNotify(callback: (packet: Uint8Array) => void) {
+        notify = callback;
+        return () => undefined;
+      },
+      async close() {
+        return;
+      },
+    };
+    const adapter = attachLedger(gadget, ble, DEFAULT_MTU, () => undefined);
+    const replies: Uint8Array[] = [];
+    host.onInput((report) => replies.push(report));
+    for (const report of wrapHidApdu(Uint8Array.of(0x80, 0x04, 0x00, 0x00, 0x00))) {
+      host.write(report);
+    }
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(replies).toEqual([]);
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    await adapter.idle();
+    expect(replies[0]?.[7]).toBe(0x6e);
+    replies.length = 0;
+    for (const report of wrapHidApdu(Uint8Array.of(0xb0, 0x01, 0x00, 0x00, 0x00))) {
+      host.write(report);
+    }
+    expect(unwrapHidReports(replies).payload[1]).toBe(5);
+    adapter.close();
+  });
+
+  it('answers GET_APP_AND_VERSION on another HID channel while an APDU is in flight', async () => {
+    const { host, gadget } = memoryHidPair();
+    const ble = {
+      async write() {
+        await new Promise(() => undefined);
+      },
+      onNotify() {
+        return () => undefined;
+      },
+      async close() {
+        return;
+      },
+    };
+    const adapter = attachLedger(gadget, ble, DEFAULT_MTU, () => undefined);
+    const replies: Uint8Array[] = [];
+    host.onInput((report) => replies.push(report));
+    for (const report of wrapHidApdu(Uint8Array.of(0x80, 0x04, 0x00, 0x00, 0x00), 0x1111)) {
+      host.write(report);
+    }
+    replies.length = 0;
+    for (const report of wrapHidApdu(Uint8Array.of(0xb0, 0x01, 0x00, 0x00, 0x00), 0x2222)) {
+      host.write(report);
+    }
+    expect(replies).toHaveLength(1);
+    expect((replies[0]![0] << 8) | replies[0]![1]).toBe(0x2222);
+    expect(unwrapHidReports(replies).payload).toEqual(encodeAppAndVersion('BOLOS', '2.7.1'));
+    adapter.close();
+  });
+
+  it('forwards GET_APP_AND_VERSION over BLE so the phone app name is used', async () => {
+    const device = new LedgerProtocolHandler({
+      model: LEDGER_MODELS.find((item) => item.id === 'nano-x')!,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy: entropy(),
+    });
+    const { host, gadget } = memoryHidPair();
+    const ble = bleToHandler(device, (framed) => splitFramedPackets(framed, DEFAULT_MTU));
+    const adapter = attachLedger(gadget, ble, DEFAULT_MTU, () => undefined);
+    const replies: Uint8Array[] = [];
+    host.onInput((report) => replies.push(report));
+    for (const report of wrapHidApdu(Uint8Array.of(0xb0, 0x01, 0x00, 0x00, 0x00))) {
+      host.write(report);
+    }
+    await adapter.idle();
+    const dashboard = unwrapHidReports(replies).payload;
+    expect(Array.from(dashboard, (b) => String.fromCharCode(b)).join('')).toContain('BOLOS');
+    expect(dashboard[0]).toBe(0x01);
+    expect(dashboard[7]).toBeGreaterThan(0);
+
+    replies.length = 0;
+    for (const report of wrapHidApdu(openEthereum())) {
+      host.write(report);
+    }
+    await adapter.idle();
+    replies.length = 0;
+    for (const report of wrapHidApdu(Uint8Array.of(0xb0, 0x01, 0x00, 0x00, 0x00))) {
+      host.write(report);
+    }
+    await adapter.idle();
+    const opened = Array.from(unwrapHidReports(replies).payload, (b) => String.fromCharCode(b)).join('');
+    expect(opened).toContain('Ethereum');
+    adapter.close();
+  });
+
+  it('reports Avalanche on GET_APP_AND_VERSION after the host opens that app', async () => {
+    const device = new LedgerProtocolHandler({
+      model: LEDGER_MODELS.find((item) => item.id === 'nano-x')!,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy: entropy(),
+    });
+    const { host, gadget } = memoryHidPair();
+    const ble = bleToHandler(device, (framed) => splitFramedPackets(framed, DEFAULT_MTU));
+    const adapter = attachLedger(gadget, ble, DEFAULT_MTU, () => undefined);
+    const replies: Uint8Array[] = [];
+    host.onInput((report) => replies.push(report));
+    const avaxName = Array.from('Avalanche', (c) => c.charCodeAt(0));
+    for (const report of wrapHidApdu(Uint8Array.of(0xe0, 0xd8, 0x00, 0x00, avaxName.length, ...avaxName))) {
+      host.write(report);
+    }
+    await adapter.idle();
+    replies.length = 0;
+    for (const report of wrapHidApdu(Uint8Array.of(0xb0, 0x01, 0x00, 0x00, 0x00))) {
+      host.write(report);
+    }
+    const text = Array.from(unwrapHidReports(replies).payload, (b) => String.fromCharCode(b)).join('');
+    expect(text).toContain('Avalanche');
+    expect(text).toContain('1.4.22');
+    adapter.close();
+  });
+
+  it('keeps GET_APP_AND_VERSION on the previous app until OpenApp returns 9000', async () => {
+    const { host, gadget } = memoryHidPair();
+    let notify: ((packet: Uint8Array) => void) | undefined;
+    let releaseWrite: (() => void) | undefined;
+    const stale9000 = Uint8Array.of(0x05, 0x00, 0x00, 0x00, 0x02, 0x90, 0x00);
+    const ble = {
+      async write() {
+        await new Promise<void>((resolve) => {
+          releaseWrite = resolve;
+        });
+        queueMicrotask(() => notify?.(stale9000));
+      },
+      onNotify(callback: (packet: Uint8Array) => void) {
+        notify = callback;
+        return () => undefined;
+      },
+      async close() {
+        return;
+      },
+    };
+    const adapter = attachLedger(gadget, ble, DEFAULT_MTU, () => undefined);
+    const replies: Uint8Array[] = [];
+    host.onInput((report) => replies.push(report));
+    const solName = Array.from('Solana', (c) => c.charCodeAt(0));
+    for (const report of wrapHidApdu(Uint8Array.of(0xe0, 0xd8, 0x00, 0x00, solName.length, ...solName))) {
+      host.write(report);
+    }
+    await Promise.resolve();
+    await Promise.resolve();
+    replies.length = 0;
+    for (const report of wrapHidApdu(Uint8Array.of(0xb0, 0x01, 0x00, 0x00, 0x00))) {
+      host.write(report);
+    }
+    expect(replies).toEqual([]);
+    releaseWrite?.();
+    await adapter.idle();
+    const flushed = replies.map((report) => unwrapHidReports([report]).payload);
+    expect(flushed.some((payload) => payload[0] === 0x90 && payload[1] === 0x00)).toBe(true);
+    expect(
+      flushed.some((payload) => Array.from(payload, (b) => String.fromCharCode(b)).join('').includes('Solana')),
+    ).toBe(true);
+    adapter.close();
+  });
+
+  it('does not treat a leftover QUIT 9000 as OpenApp success', async () => {
+    const { host, gadget } = memoryHidPair();
+    let notify: ((packet: Uint8Array) => void) | undefined;
+    let writes = 0;
+    const status9000 = Uint8Array.of(0x05, 0x00, 0x00, 0x00, 0x02, 0x90, 0x00);
+    const ble = {
+      async write() {
+        writes += 1;
+        if (writes === 1) {
+          notify?.(status9000);
+          return;
+        }
+        notify?.(status9000);
+      },
+      onNotify(callback: (packet: Uint8Array) => void) {
+        notify = callback;
+        return () => undefined;
+      },
+      async close() {
+        return;
+      },
+    };
+    const adapter = attachLedger(gadget, ble, DEFAULT_MTU, () => undefined);
+    const replies: Uint8Array[] = [];
+    host.onInput((report) => replies.push(report));
+    for (const report of wrapHidApdu(Uint8Array.of(0xb0, 0xa7, 0x00, 0x00, 0x00))) {
+      host.write(report);
+    }
+    await adapter.idle();
+    replies.length = 0;
+    const solName = Array.from('Solana', (c) => c.charCodeAt(0));
+    for (const report of wrapHidApdu(Uint8Array.of(0xe0, 0xd8, 0x00, 0x00, solName.length, ...solName))) {
+      host.write(report);
+    }
+    for (let i = 0; i < 20 && writes < 2; i += 1) {
+      await Promise.resolve();
+    }
+    expect(writes).toBe(2);
+    expect(replies).toEqual([]);
+    for (const report of wrapHidApdu(Uint8Array.of(0xb0, 0x01, 0x00, 0x00, 0x00))) {
+      host.write(report);
+    }
+    expect(replies).toEqual([]);
+    await Promise.resolve();
+    await Promise.resolve();
+    notify?.(status9000);
+    await adapter.idle();
+    const flushed = replies.map((report) => unwrapHidReports([report]).payload);
+    expect(flushed.some((payload) => payload[0] === 0x90 && payload[1] === 0x00)).toBe(true);
+    expect(
+      flushed.some((payload) => Array.from(payload, (b) => String.fromCharCode(b)).join('').includes('Solana')),
+    ).toBe(true);
+    adapter.close();
+  });
+
+  it('ignores an all-zero HID probe without forwarding BLE', async () => {
+    const { host, gadget } = memoryHidPair();
+    const writes: Uint8Array[] = [];
+    const ble = {
+      async write(packet: Uint8Array) {
+        writes.push(packet);
+      },
+      onNotify() {
+        return () => undefined;
+      },
+      async close() {
+        return;
+      },
+    };
+    const adapter = attachLedger(gadget, ble, DEFAULT_MTU, () => undefined);
+    const replies: Uint8Array[] = [];
+    host.onInput((report) => replies.push(report));
+    host.write(new Uint8Array(64));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(writes).toEqual([]);
+    expect(replies).toEqual([]);
+    adapter.close();
+  });
+
+  it('replaces an echoed GET_APP_AND_VERSION with a parseable BOLOS reply', async () => {
+    const { host, gadget } = memoryHidPair();
+    let notify: ((packet: Uint8Array) => void) | undefined;
+    const ble = {
+      async write() {
+        const echo = Uint8Array.of(0xb0, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+        notify?.(framePayload(TAG_APDU, echo, DEFAULT_MTU));
+      },
+      onNotify(callback: (packet: Uint8Array) => void) {
+        notify = callback;
+        return () => undefined;
+      },
+      async close() {
+        return;
+      },
+    };
+    const adapter = attachLedger(gadget, ble, DEFAULT_MTU, () => undefined);
+    const replies: Uint8Array[] = [];
+    host.onInput((report) => replies.push(report));
+    for (const report of wrapHidApdu(Uint8Array.of(0xb0, 0x01, 0x00, 0x00, 0x00))) {
+      host.write(report);
+    }
+    await adapter.idle();
+    expect(unwrapHidReports(replies).payload).toEqual(encodeAppAndVersion('BOLOS', '2.7.1'));
+    adapter.close();
+  });
+
+  it('pads a truncated GET_APP_AND_VERSION HID reply so the version LV is present', async () => {
+    const { host, gadget } = memoryHidPair();
+    let notify: ((packet: Uint8Array) => void) | undefined;
+    const ble = {
+      async write() {
+        const name = Array.from('BOLOS', (c) => c.charCodeAt(0));
+        const truncated = encodeResponse(Uint8Array.of(0x01, name.length, ...name), SW_OK);
+        expect(truncated.length).toBe(9);
+        notify?.(framePayload(TAG_APDU, truncated, DEFAULT_MTU));
+      },
+      onNotify(callback: (packet: Uint8Array) => void) {
+        notify = callback;
+        return () => undefined;
+      },
+      async close() {
+        return;
+      },
+    };
+    const adapter = attachLedger(gadget, ble, DEFAULT_MTU, () => undefined);
+    const replies: Uint8Array[] = [];
+    host.onInput((report) => replies.push(report));
+    for (const report of wrapHidApdu(Uint8Array.of(0xb0, 0x01, 0x00, 0x00, 0x00))) {
+      host.write(report);
+    }
+    await adapter.idle();
+    const payload = unwrapHidReports(replies).payload;
+    expect(payload).toEqual(encodeAppAndVersion('BOLOS', '2.7.1'));
+    expect((replies[0]![5] << 8) | replies[0]![6]).toBe(payload.length);
+    adapter.close();
+  });
+
+  it('forwards GET_ADDRESS even if a BLE sequence is duplicated', async () => {
+    const device = new LedgerProtocolHandler({
+      model: LEDGER_MODELS.find((item) => item.id === 'nano-x')!,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy: entropy(),
+    });
+    const { host, gadget } = memoryHidPair();
+    let notify: ((packet: Uint8Array) => void) | undefined;
+    const ble = {
+      async write(packet: Uint8Array) {
+        const framed = await device.handleWrite(packet);
+        if (!framed) {
+          return;
+        }
+        for (const piece of splitFramedPackets(framed, DEFAULT_MTU)) {
+          notify?.(piece);
+          if (piece.length >= 3 && piece[2] === 3) {
+            notify?.(piece);
+          }
+        }
+      },
+      onNotify(callback: (packet: Uint8Array) => void) {
+        notify = callback;
+        return () => undefined;
+      },
+      async close() {
+        return;
+      },
+    };
+    const adapter = attachLedger(gadget, ble, DEFAULT_MTU, () => undefined);
+    const replies: Uint8Array[] = [];
+    host.onInput((report) => replies.push(report));
+    for (const report of wrapHidApdu(openEthereum())) {
+      host.write(report);
+    }
+    await adapter.idle();
+    replies.length = 0;
+    for (const report of wrapHidApdu(getAddress())) {
+      host.write(report);
+    }
+    await adapter.idle();
+    const payload = unwrapHidReports(replies).payload;
+    const sw = (payload[payload.length - 2] << 8) | payload[payload.length - 1];
+    expect(sw).toBe(SW_OK);
+    adapter.close();
+  });
+
+  it('does not inject GET_APP_AND_VERSION while another APDU is in flight', async () => {
+    const { host, gadget } = memoryHidPair();
+    const ble = {
+      async write() {
+        await new Promise(() => undefined);
+      },
+      onNotify() {
+        return () => undefined;
+      },
+      async close() {
+        return;
+      },
+    };
+    const adapter = attachLedger(gadget, ble, DEFAULT_MTU, () => undefined);
+    const replies: Uint8Array[] = [];
+    host.onInput((report) => replies.push(report));
+    for (const report of wrapHidApdu(Uint8Array.of(0xe0, 0x01, 0x00, 0x00, 0x00))) {
+      host.write(report);
+    }
+    replies.length = 0;
+    for (const report of wrapHidApdu(Uint8Array.of(0xb0, 0x01, 0x00, 0x00, 0x00))) {
+      host.write(report);
+    }
+    expect(replies).toEqual([]);
+    adapter.close();
+  });
+
+  it('answers GET_APP_AND_VERSION on HID without waiting for BLE', async () => {
+    const { host, gadget } = memoryHidPair();
+    const writes: Uint8Array[] = [];
+    const ble = {
+      async write(packet: Uint8Array) {
+        writes.push(packet);
+        await new Promise(() => undefined);
+      },
+      onNotify() {
+        return () => undefined;
+      },
+      async close() {
+        return;
+      },
+    };
+    const adapter = attachLedger(gadget, ble, DEFAULT_MTU, () => undefined);
+    const replies: Uint8Array[] = [];
+    host.onInput((report) => replies.push(report));
+    for (const report of wrapHidApdu(Uint8Array.of(0xb0, 0x01, 0x00, 0x00, 0x00), 0x7c56)) {
+      host.write(report);
+    }
+    expect(writes).toEqual([]);
+    expect(unwrapHidReports(replies).payload).toEqual(encodeAppAndVersion('BOLOS', '2.7.1'));
+    expect((replies[0]![0] << 8) | replies[0]![1]).toBe(0x7c56);
+    adapter.close();
+  });
+
+  it('replies to each GET_APP_AND_VERSION retry on its HID channel', async () => {
+    const { host, gadget } = memoryHidPair();
+    const writes: Uint8Array[] = [];
+    const ble = {
+      async write(packet: Uint8Array) {
+        writes.push(packet);
+      },
+      onNotify() {
+        return () => undefined;
+      },
+      async close() {
+        return;
+      },
+    };
+    const adapter = attachLedger(gadget, ble, DEFAULT_MTU, () => undefined);
+    const replies: Uint8Array[] = [];
+    host.onInput((report) => replies.push(report));
+    for (const report of wrapHidApdu(Uint8Array.of(0xb0, 0x01, 0x00, 0x00, 0x00), 0xd56a)) {
+      host.write(report);
+    }
+    for (const report of wrapHidApdu(Uint8Array.of(0xb0, 0x01, 0x00, 0x00, 0x00), 0xfa6d)) {
+      host.write(report);
+    }
+    expect(writes).toEqual([]);
+    expect(replies).toHaveLength(2);
+    expect((replies[0]![0] << 8) | replies[0]![1]).toBe(0xd56a);
+    expect((replies[1]![0] << 8) | replies[1]![1]).toBe(0xfa6d);
+    expect(unwrapHidReports([replies[0]!]).payload).toEqual(encodeAppAndVersion('BOLOS', '2.7.1'));
+    expect(unwrapHidReports([replies[1]!]).payload).toEqual(encodeAppAndVersion('BOLOS', '2.7.1'));
     adapter.close();
   });
 });

@@ -1,6 +1,13 @@
 import { catalogVersion } from '@cws/contracts';
 import { sha256 } from '@noble/hashes/sha2';
-import { handleFamilyApdu, versionTriple, type FamilyContext, type FamilySession, type FamilySpec } from './generic';
+import {
+  handleFamilyApdu,
+  previewCosmosSignDoc,
+  versionTriple,
+  type FamilyContext,
+  type FamilySession,
+  type FamilySpec,
+} from './generic';
 import { cosmosBech32, encodePubAndAddress } from './addresses';
 import type { Apdu } from '../apdu';
 
@@ -17,6 +24,7 @@ function spec(): FamilySpec {
     versionBytes: () => versionTriple(catalogVersion('cosmos', '2.36.15')),
     encodePubkey: (publicKey) => encodePubAndAddress(publicKey, cosmosBech32(publicKey)),
     hashForSign: (message) => sha256(message),
+    preview: previewCosmosSignDoc,
   };
 }
 

@@ -11,9 +11,11 @@ export type PeripheralHandle = {
   stop: () => Promise<void>;
 };
 
+export type HandlerSource = ProtocolHandler | (() => ProtocolHandler);
+
 export type StartAdvertising = (
   model: DeviceModel,
-  handler: ProtocolHandler,
+  handler: HandlerSource,
   callbacks: PeripheralCallbacks,
   options?: { nameSuffix?: string },
 ) => Promise<PeripheralHandle>;

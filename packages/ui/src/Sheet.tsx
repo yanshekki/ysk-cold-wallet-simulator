@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView } from './keyboard';
 import { colors, fonts, hairline, radius, space } from './theme';
 
 type Props = {
@@ -25,18 +26,14 @@ export function Sheet({
 }: Props) {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
-      <View style={styles.frame}>
+      <KeyboardAvoidingView behavior="padding" automaticOffset style={styles.frame}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={closeLabel}
           onPress={onClose}
           style={[StyleSheet.absoluteFill, styles.backdrop]}
         />
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.sheet}
-          testID={testID}
-        >
+        <View style={styles.sheet} testID={testID}>
           <View style={styles.titleRow}>
             <Text style={styles.title} numberOfLines={1}>
               {title}
@@ -60,8 +57,8 @@ export function Sheet({
             {children}
           </ScrollView>
           {footer ? <View style={styles.footer}>{footer}</View> : null}
-        </KeyboardAvoidingView>
-      </View>
+        </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

@@ -34,6 +34,7 @@ final class BleServer {
   private var clientFd: Int32 = -1
   private var running = false
   private var incoming = Data()
+  private var scanSeq = 0
   private let central = BleCentral()
 
   init(socketPath: String) {
@@ -131,33 +132,37 @@ final class BleServer {
         continue
       }
       lock.lock()
-      if !running || clientFd >= 0 {
+      if !running {
         lock.unlock()
         Darwin.close(fd)
         continue
       }
+      let previous = clientFd
       clientFd = fd
       incoming.removeAll(keepingCapacity: true)
       lock.unlock()
+      if previous >= 0 && previous != fd {
+        Darwin.shutdown(previous, SHUT_RDWR)
+        Darwin.close(previous)
+      }
       Thread.detachNewThread { [weak self] in
-        self?.readLoop()
+        self?.readLoop(fd)
       }
     }
   }
 
-  private func readLoop() {
+  private func readLoop(_ fd: Int32) {
     while true {
       lock.lock()
-      let fd = clientFd
-      let alive = running
+      let alive = running && clientFd == fd
       lock.unlock()
-      if !alive || fd < 0 {
+      if !alive {
         return
       }
       var chunk = [UInt8](repeating: 0, count: 4096)
       let n = Darwin.recv(fd, &chunk, chunk.count, 0)
       if n <= 0 {
-        dropClient()
+        dropClient(fd)
         return
       }
       lock.lock()
@@ -171,7 +176,7 @@ final class BleServer {
       } catch {
         lock.unlock()
         send(BleFrame(op: .error, message: error.localizedDescription))
-        dropClient()
+        dropClient(fd)
         return
       }
     }
@@ -180,23 +185,37 @@ final class BleServer {
   private func handle(_ frame: BleFrame) {
     switch frame.op {
     case .scan:
+      lock.lock()
+      scanSeq += 1
+      let seq = scanSeq
+      lock.unlock()
       let timeout = frame.timeoutMs ?? 4_000
       Task { [weak self] in
         guard let self else {
           return
         }
-        let hits = await self.central.scan(timeoutMs: timeout)
-        for hit in hits {
-          self.send(
-            BleFrame(
-              op: .found,
-              id: hit.id,
-              name: hit.name,
-              services: hit.services
+        do {
+          let hits = try await self.central.scan(timeoutMs: timeout)
+          guard seq == self.scanSeq else {
+            return
+          }
+          for hit in hits {
+            self.send(
+              BleFrame(
+                op: .found,
+                id: hit.id,
+                name: hit.name,
+                services: hit.services
+              )
             )
-          )
+          }
+          self.send(BleFrame(op: .scanDone))
+        } catch {
+          guard seq == self.scanSeq else {
+            return
+          }
+          self.send(BleFrame(op: .error, message: error.localizedDescription))
         }
-        self.send(BleFrame(op: .scanDone))
       }
     case .connect:
       Task { [weak self] in
@@ -209,7 +228,7 @@ final class BleServer {
             writeUuid: frame.writeUuid ?? "",
             notifyUuid: frame.notifyUuid ?? ""
           )
-          self.send(BleFrame(op: .ok))
+          self.send(BleFrame(op: .ok, writeUuid: self.central.boundWriteUuid))
         } catch {
           self.send(BleFrame(op: .error, message: error.localizedDescription))
         }
@@ -219,8 +238,17 @@ final class BleServer {
         send(BleFrame(op: .error, message: "missing packet"))
         return
       }
-      central.write(data)
-      send(BleFrame(op: .ok))
+      Task { [weak self] in
+        guard let self else {
+          return
+        }
+        do {
+          try await self.central.write(data)
+          self.send(BleFrame(op: .ok))
+        } catch {
+          self.send(BleFrame(op: .error, message: error.localizedDescription))
+        }
+      }
     case .close:
       central.disconnect()
       send(BleFrame(op: .ok))
@@ -256,14 +284,17 @@ final class BleServer {
     }
   }
 
-  private func dropClient() {
+  private func dropClient(_ expected: Int32) {
     lock.lock()
-    let fd = clientFd
+    guard clientFd == expected else {
+      lock.unlock()
+      return
+    }
     clientFd = -1
     incoming.removeAll(keepingCapacity: false)
     lock.unlock()
-    if fd >= 0 {
-      Darwin.close(fd)
+    if expected >= 0 {
+      Darwin.close(expected)
     }
     central.disconnect()
   }

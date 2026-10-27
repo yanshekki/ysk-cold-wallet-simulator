@@ -28,6 +28,7 @@ import {
   stepMatchIndex,
   type LogFilter,
 } from './logQuery';
+import { KeyboardAvoidingView } from './keyboard';
 import { colors, fonts, hairline, radius, space } from './theme';
 
 export type LogEditorLabels = {
@@ -170,7 +171,7 @@ export function LogEditor({
   );
 
   return (
-    <View style={styles.root}>
+    <KeyboardAvoidingView behavior="padding" automaticOffset style={styles.root}>
       <View style={styles.instrument}>
       <View style={styles.chips}>
         <Chip testID="log-filter-all" label={L.all} active={filter === 'all'} onPress={() => setFilter('all')} />
@@ -314,7 +315,7 @@ export function LogEditor({
         }}
         ListEmptyComponent={<Text style={styles.empty}>{emptyLabel}</Text>}
       />
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 

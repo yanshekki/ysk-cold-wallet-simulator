@@ -21,6 +21,7 @@ import {
 import {
   encodeResponse,
   parseApdu,
+  parseBip32Path,
   SW_CLA_NOT_SUPPORTED,
   SW_DENY,
   SW_INS_NOT_SUPPORTED,
@@ -38,6 +39,7 @@ import {
 } from './apps/dashboard';
 import { handleAvalancheApdu, type AvaxSession } from './apps/avalanche';
 import { coinFromAppId, handleBitcoinApdu, type BtcSession } from './apps/bitcoin';
+import { CLA_FRAMEWORK, handleBitcoinClientApdu } from './apps/bitcoinClient';
 import { handleEthereumApdu, type EthSession } from './apps/ethereum';
 import { handleNearApdu, type NearSession } from './apps/near';
 import { handleSolanaApdu } from './apps/solana';
@@ -49,6 +51,7 @@ import { handleCosmosApdu } from './apps/cosmos';
 import { handleTonApdu } from './apps/ton';
 import { handleAptosApdu } from './apps/aptos';
 import { handleSuiApdu } from './apps/sui';
+import { handleStellarApdu } from './apps/stellar';
 import type { FamilySession } from './apps/generic';
 import { replaceSeedCache, wrapSeedPort, type SeedCache } from './crypto';
 
@@ -108,6 +111,10 @@ export class LedgerProtocolHandler implements ProtocolHandler {
 
   replaceSeed(seed: Uint8Array, icarusRoot?: Uint8Array): void {
     replaceSeedCache(this.seedCache, seed, icarusRoot);
+  }
+
+  resetLink(): void {
+    this.assembler.reset();
   }
 
   setApp(app: LedgerApp): void {
@@ -214,12 +221,20 @@ export class LedgerProtocolHandler implements ProtocolHandler {
     if (this.app === 'dashboard' && apdu.cla === 0xe0 && MANAGER_INS.has(apdu.ins)) {
       return this.allowManager();
     }
-    if (
-      this.app === 'dashboard' &&
-      apdu.cla === 0xe0 &&
-      (apdu.ins === 0x02 || apdu.ins === 0x04 || apdu.ins === 0x06 || apdu.ins === 0x08 || apdu.ins === 0x0c)
-    ) {
-      this.setApp('ethereum');
+    const inferred = inferAppFromApdu(this.app, apdu);
+    if (inferred) {
+      this.setApp(inferred);
+    }
+
+    // Official TON GET_PUBLIC_KEY is E0 05 (same INS as Solana). Never sign it.
+    if (apdu.cla === 0xe0 && apdu.ins === 0x05 && ledgerAppFamily(this.app) === 'ton') {
+      const ctx = {
+        confirmation: wrapSeedPort(this.confirmation, this.seedCache),
+        slotId: this.slotId,
+        entropy: this.entropy,
+        backup: this.backup,
+      };
+      return handleTonApdu(apdu, ctx, this.familySession);
     }
 
     return this.handleFamilyApdu(apdu);
@@ -260,14 +275,18 @@ export class LedgerProtocolHandler implements ProtocolHandler {
     }
 
     if (family === 'bitcoin') {
-      if (apdu.cla !== 0xe0) {
-        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
-      }
-      return handleBitcoinApdu(apdu, {
+      const btcCtx = {
         ...ctx,
         coin: coinFromAppId(this.app),
         session: this.btcSession,
-      });
+      };
+      if (apdu.cla === 0xe1 || apdu.cla === CLA_FRAMEWORK) {
+        return handleBitcoinClientApdu(apdu, btcCtx);
+      }
+      if (apdu.cla !== 0xe0) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleBitcoinApdu(apdu, btcCtx);
     }
 
     if (family === 'near') {
@@ -331,6 +350,12 @@ export class LedgerProtocolHandler implements ProtocolHandler {
       }
       return handleSuiApdu(apdu, ctx, this.familySession);
     }
+    if (family === 'stellar') {
+      if (apdu.cla !== 0xe0) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleStellarApdu(apdu, ctx, this.familySession);
+    }
 
     if (apdu.cla !== 0xe0 && apdu.cla !== 0xb0) {
       return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
@@ -377,4 +402,101 @@ export class LedgerProtocolHandler implements ProtocolHandler {
     this.managerAllowed = true;
     return encodeResponse(new Uint8Array(), SW_OK);
   }
+}
+
+function inferAppFromPath(apdu: ReturnType<typeof parseApdu>): LedgerApp | undefined {
+  if (apdu.data.length < 5) {
+    return undefined;
+  }
+  let path: string;
+  try {
+    path = parseBip32Path(apdu.data).path;
+  } catch {
+    return undefined;
+  }
+  if (path.includes("44'/501'")) {
+    return 'solana';
+  }
+  if (path.includes("44'/607'")) {
+    return 'ton';
+  }
+  if (path.includes("44'/195'")) {
+    return 'tron';
+  }
+  if (path.includes("44'/148'")) {
+    return 'stellar';
+  }
+  if (path.includes("44'/60'")) {
+    return 'ethereum';
+  }
+  if (path.includes("44'/397'") || path.includes("44'/396'")) {
+    return 'near';
+  }
+  if (/(^|\/)(44|49|84|86)'\/0'(\/|$)/.test(path)) {
+    return 'bitcoin';
+  }
+  return undefined;
+}
+
+function inferAppFromApdu(app: LedgerApp, apdu: ReturnType<typeof parseApdu>): LedgerApp | undefined {
+  const family = ledgerAppFamily(app);
+  const empty = apdu.data.length === 0;
+  const fromPath = inferAppFromPath(apdu);
+  if (fromPath && ledgerAppFamily(fromPath) !== family) {
+    return fromPath;
+  }
+
+  // HOT Wallet never sends OpenApp. Empty probes identify the next chain.
+  if (apdu.cla === 0xe0 && apdu.ins === 0x03 && empty) {
+    return family === 'ton' ? undefined : 'ton';
+  }
+  if (apdu.cla === 0xe0 && apdu.ins === 0x04 && empty) {
+    // TON GET_APP_NAME is also empty E0 04.
+    if (family === 'solana' || family === 'ton') {
+      return undefined;
+    }
+    return 'solana';
+  }
+  if (apdu.cla === 0xe0 && apdu.ins === 0x05) {
+    // TON GET_PUBLIC_KEY is E0 05 (32-byte ed25519), same INS as Solana.
+    if (family === 'solana' || family === 'ton') {
+      return undefined;
+    }
+    return 'solana';
+  }
+  if (apdu.cla === 0xe0 && apdu.ins === 0x06 && empty) {
+    if (family === 'ethereum' || family === 'xrp' || family === 'stellar') {
+      return undefined;
+    }
+    if (family === 'tron') {
+      return 'stellar';
+    }
+    return 'tron';
+  }
+  if (apdu.cla === 0xe0 && apdu.ins === 0x40) {
+    return family === 'bitcoin' ? undefined : 'bitcoin';
+  }
+  if (apdu.cla === 0x80 && (apdu.ins === 0x04 || apdu.ins === 0x05 || apdu.ins === 0x06) && family !== 'avalanche') {
+    return family === 'near' ? undefined : 'near';
+  }
+
+  if (app !== 'dashboard') {
+    return undefined;
+  }
+  if (
+    apdu.cla === 0xe0 &&
+    (apdu.ins === 0x02 || apdu.ins === 0x06 || apdu.ins === 0x08 || apdu.ins === 0x0c)
+  ) {
+    return 'ethereum';
+  }
+  if (apdu.cla === 0xe0 && apdu.ins === 0x04) {
+    return 'ethereum';
+  }
+  if (apdu.cla === 0xd7) {
+    return 'cardano';
+  }
+  if (apdu.cla === 0x80 && (apdu.ins === 0x00 || apdu.ins === 0x01 || apdu.ins === 0x02 || apdu.ins === 0x03)) {
+    return 'avalanche';
+  }
+  return undefined;
 }

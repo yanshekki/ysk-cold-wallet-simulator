@@ -49,8 +49,14 @@ fi
   --outfile="$RESOURCES/proxy/main.cjs" \
   --external:@cws/native-proxy
 
+# Node 26 walks parents for package.json. Stop inside the .app so a
+# sandboxed node binary never tries to read the repo (ERR_INVALID_PACKAGE_CONFIG).
+printf '%s\n' '{"name":"cws-proxy-bundle","private":true,"type":"commonjs"}' \
+  > "$RESOURCES/proxy/package.json"
+
 NATIVE="$ROOT/packages/native-proxy"
 cp "$NATIVE/index.js" "$RESOURCES/proxy/node_modules/@cws/native-proxy/index.js"
+cp "$NATIVE/package.json" "$RESOURCES/proxy/node_modules/@cws/native-proxy/package.json"
 if [ -f "$NATIVE/index.d.ts" ]; then
   cp "$NATIVE/index.d.ts" "$RESOURCES/proxy/node_modules/@cws/native-proxy/index.d.ts"
 fi

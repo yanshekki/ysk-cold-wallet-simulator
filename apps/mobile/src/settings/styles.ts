@@ -73,6 +73,9 @@ export const settingsStyles = StyleSheet.create({
     fontFamily: fonts.mono,
     fontSize: 12,
   },
+  inputInvalid: {
+    borderColor: colors.danger,
+  },
   card: {
     borderWidth: hairline,
     borderColor: colors.border,

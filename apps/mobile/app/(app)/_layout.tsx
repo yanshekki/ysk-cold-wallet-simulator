@@ -69,6 +69,8 @@ export default function AppShell() {
       <Tabs
         screenOptions={({ route }) => ({
           headerShown: false,
+          safeAreaInsets: { left: 0, right: 0 },
+          sceneStyle: styles.scene,
           tabBarStyle: [
             styles.tabBar,
             { paddingBottom: Math.max(insets.bottom, 6), height: 48 + Math.max(insets.bottom, 6) },
@@ -86,7 +88,6 @@ export default function AppShell() {
             const name = names[route.name as keyof typeof names] ?? 'ellipse-outline';
             return <Ionicons name={name} size={20} color={color} />;
           },
-          sceneStyle: { backgroundColor: colors.bg },
         })}
       >
         <Tabs.Screen name="index" options={{ title: t('tabs.device'), tabBarButtonTestID: 'tab-device' }} />
@@ -140,5 +141,10 @@ const styles = StyleSheet.create({
     fontFamily: fonts.monoMedium,
     fontSize: 10,
     letterSpacing: 0.6,
+  },
+  scene: {
+    backgroundColor: colors.bg,
+    paddingLeft: 0,
+    paddingRight: 0,
   },
 });

@@ -1,4 +1,4 @@
-import { bech32, base58, base58check as createBase58check } from '@scure/base';
+import { bech32, base32, base58, base58check as createBase58check } from '@scure/base';
 import { secp256k1 } from '@noble/curves/secp256k1';
 import { ripemd160 } from '@noble/hashes/ripemd160';
 import { sha256 } from '@noble/hashes/sha2';
@@ -81,6 +81,18 @@ export function aptosAuthKey(ed25519Pub: Uint8Array): string {
 export function suiAddress(ed25519Pub: Uint8Array): string {
   const hash = blake2b(concatBytes(Uint8Array.of(0x00), ed25519Pub), { dkLen: 32 });
   return `0x${Array.from(hash, (byte) => byte.toString(16).padStart(2, '0')).join('')}`;
+}
+
+export function stellarAddress(ed25519Pub: Uint8Array): string {
+  const versioned = concatBytes(Uint8Array.of(6 << 3), ed25519Pub);
+  const crc = crc16Xmodem(versioned);
+  const checksum = Uint8Array.of(crc & 0xff, (crc >> 8) & 0xff);
+  return base32.encode(concatBytes(versioned, checksum)).replace(/=+$/, '');
+}
+
+export function tezosTz1(ed25519Pub: Uint8Array): string {
+  const hashed = blake2b(ed25519Pub, { dkLen: 20 });
+  return b58c.encode(concatBytes(Uint8Array.of(6, 161, 159), hashed));
 }
 
 export function cardanoEnterprise(ed25519Pub: Uint8Array): string {

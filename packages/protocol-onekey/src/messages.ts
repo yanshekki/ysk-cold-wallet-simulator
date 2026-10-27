@@ -39,10 +39,24 @@ export const MessageType = {
   EthereumSignTxEIP1559: 452,
   EthereumGetPublicKey: 450,
   EthereumPublicKey: 451,
-  EthereumSignTypedHash: 470,
+  EthereumSignTypedData: 464,
+  EthereumTypedDataStructRequest: 465,
+  EthereumTypedDataStructAck: 466,
+  EthereumTypedDataValueRequest: 467,
+  EthereumTypedDataValueAck: 468,
   EthereumTypedDataSignature: 469,
+  EthereumSignTypedHash: 470,
   CardanoGetAddress: 307,
   CardanoAddress: 308,
+  CardanoTxItemAck: 313,
+  CardanoTxHostAck: 314,
+  CardanoTxWitnessRequest: 315,
+  CardanoTxWitnessResponse: 316,
+  CardanoSignTxFinished: 319,
+  CardanoSignTxInit: 320,
+  CardanoTxInput: 321,
+  CardanoTxOutput: 322,
+  CardanoTxCertificate: 325,
   RippleGetAddress: 400,
   RippleAddress: 401,
   RippleSignTx: 402,
@@ -103,6 +117,12 @@ export const MessageType = {
   EthereumSignTxEIP1559OneKey: 20105,
   EthereumSignMessageOneKey: 20108,
   EthereumMessageSignatureOneKey: 20110,
+  EthereumSignTypedDataOneKey: 20111,
+  EthereumTypedDataStructRequestOneKey: 20112,
+  EthereumTypedDataStructAckOneKey: 20113,
+  EthereumTypedDataValueRequestOneKey: 20114,
+  EthereumTypedDataValueAckOneKey: 20115,
+  EthereumTypedDataSignatureOneKey: 20116,
   EthereumSignTypedHashOneKey: 20117,
   ReadSEPublicCert: 10007,
   SEPublicCert: 10008,
@@ -656,4 +676,175 @@ export function ethSignReplyType(requestType: number): number {
   return requestType === MessageType.EthereumSignMessageOneKey
     ? MessageType.EthereumMessageSignatureOneKey
     : MessageType.EthereumMessageSignature;
+}
+
+export const EthereumDataType = {
+  UINT: 1,
+  INT: 2,
+  BYTES: 3,
+  STRING: 4,
+  BOOL: 5,
+  ADDRESS: 6,
+  ARRAY: 7,
+  STRUCT: 8,
+} as const;
+
+export function isEthSignTypedData(type: number): boolean {
+  return type === MessageType.EthereumSignTypedData || type === MessageType.EthereumSignTypedDataOneKey;
+}
+
+export function typedDataIds(requestType: number): {
+  structRequest: number;
+  structAck: number;
+  valueRequest: number;
+  valueAck: number;
+  signature: number;
+} {
+  if (requestType === MessageType.EthereumSignTypedDataOneKey) {
+    return {
+      structRequest: MessageType.EthereumTypedDataStructRequestOneKey,
+      structAck: MessageType.EthereumTypedDataStructAckOneKey,
+      valueRequest: MessageType.EthereumTypedDataValueRequestOneKey,
+      valueAck: MessageType.EthereumTypedDataValueAckOneKey,
+      signature: MessageType.EthereumTypedDataSignatureOneKey,
+    };
+  }
+  return {
+    structRequest: MessageType.EthereumTypedDataStructRequest,
+    structAck: MessageType.EthereumTypedDataStructAck,
+    valueRequest: MessageType.EthereumTypedDataValueRequest,
+    valueAck: MessageType.EthereumTypedDataValueAck,
+    signature: MessageType.EthereumTypedDataSignature,
+  };
+}
+
+export function decodeEthereumSignTypedData(payload: Uint8Array): {
+  addressN: number[];
+  primaryType: string;
+} {
+  const fields = decodeFields(payload);
+  return {
+    addressN: readPackedOrRepeatedUint32(fields, 1),
+    primaryType: readOptionalString(fields, 2) ?? '',
+  };
+}
+
+export function encodeTypedStructRequest(name: string): Uint8Array {
+  return encodeString(1, name);
+}
+
+export function encodeTypedValueRequest(memberPath: number[]): Uint8Array {
+  return encodePackedUint32(1, memberPath);
+}
+
+export function encodeTypedStructAck(
+  members: Array<{ name: string; dataType: number; size?: number; structName?: string }>,
+): Uint8Array {
+  return concatBytes(
+    ...members.map((member) => {
+      const typeFields = [encodeUint32(1, member.dataType)];
+      if (member.size != null) {
+        typeFields.push(encodeUint32(2, member.size));
+      }
+      if (member.structName) {
+        typeFields.push(encodeString(4, member.structName));
+      }
+      return encodeBytes(1, concatBytes(encodeBytes(1, concatBytes(...typeFields)), encodeString(2, member.name)));
+    }),
+  );
+}
+
+export function encodeTypedValueAck(value: Uint8Array): Uint8Array {
+  return encodeBytes(1, value);
+}
+
+export function decodeTypedStructAck(payload: Uint8Array): Array<{ name: string; type: string }> {
+  const fields = decodeFields(payload);
+  const members: Array<{ name: string; type: string }> = [];
+  for (const field of fields) {
+    if (field.field !== 1) {
+      continue;
+    }
+    const inner = decodeFields(field.bytes);
+    const typeBytes = inner.find((item) => item.field === 1)?.bytes ?? new Uint8Array();
+    const typeFields = decodeFields(typeBytes);
+    const dataType = typeFields.find((item) => item.field === 1)?.varint ?? EthereumDataType.STRING;
+    const size = typeFields.find((item) => item.field === 2)?.varint;
+    const structName = readOptionalString(typeFields, 4) ?? '';
+    const name = readOptionalString(inner, 2) ?? '';
+    if (name) {
+      members.push({ name, type: solidityTypeFromEth(dataType, size, structName) });
+    }
+  }
+  return members;
+}
+
+export function decodeTypedValueAck(payload: Uint8Array): Uint8Array {
+  const fields = decodeFields(payload);
+  return readOptionalBytes(fields, 1) ?? new Uint8Array();
+}
+
+function solidityTypeFromEth(dataType: number, size: number | undefined, structName: string): string {
+  if (dataType === EthereumDataType.STRING) {
+    return 'string';
+  }
+  if (dataType === EthereumDataType.ADDRESS) {
+    return 'address';
+  }
+  if (dataType === EthereumDataType.BOOL) {
+    return 'bool';
+  }
+  if (dataType === EthereumDataType.BYTES) {
+    return size ? `bytes${size}` : 'bytes';
+  }
+  if (dataType === EthereumDataType.UINT) {
+    return `uint${(size ?? 32) * 8}`;
+  }
+  if (dataType === EthereumDataType.INT) {
+    return `int${(size ?? 32) * 8}`;
+  }
+  if (dataType === EthereumDataType.STRUCT) {
+    return structName || 'Mail';
+  }
+  return 'string';
+}
+
+export function decodeCardanoSignTxInit(payload: Uint8Array): {
+  addressN: number[];
+  body: Uint8Array;
+  inputsCount: number;
+  outputsCount: number;
+  certificatesCount: number;
+  mintCount: number;
+} {
+  const fields = decodeFields(payload);
+  const field1 = fields.filter((field) => field.field === 1);
+  const looksLikePath = field1.length >= 2 || (field1[0]?.varint ?? 0) > 10;
+  if (looksLikePath) {
+    return {
+      addressN: readPackedOrRepeatedUint32(fields, 1),
+      body: readOptionalBytes(fields, 2) ?? new Uint8Array(),
+      inputsCount: fields.find((field) => field.field === 4)?.varint ?? 1,
+      outputsCount: fields.find((field) => field.field === 5)?.varint ?? 1,
+      certificatesCount: fields.find((field) => field.field === 8)?.varint ?? 0,
+      mintCount: fields.find((field) => field.field === 20)?.varint ?? 0,
+    };
+  }
+  return {
+    addressN: [],
+    body: readOptionalBytes(fields, 21) ?? new Uint8Array(),
+    inputsCount: fields.find((field) => field.field === 4)?.varint ?? 0,
+    outputsCount: fields.find((field) => field.field === 5)?.varint ?? 0,
+    certificatesCount: fields.find((field) => field.field === 8)?.varint ?? 0,
+    mintCount: fields.find((field) => field.field === 20)?.varint ?? 0,
+  };
+}
+
+export function decodeCardanoTxInput(payload: Uint8Array): { addressN: number[] } {
+  const fields = decodeFields(payload);
+  return { addressN: readPackedOrRepeatedUint32(fields, 1) };
+}
+
+export function encodeCardanoWitness(publicKey: Uint8Array, signature: Uint8Array): Uint8Array {
+  return concatBytes(encodeUint32(1, 1), encodeBytes(2, publicKey), encodeBytes(3, signature));
 }

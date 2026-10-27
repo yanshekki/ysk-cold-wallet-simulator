@@ -83,12 +83,16 @@ export class UsbBleProxy {
     return splitFramedPackets(framePayload(frame.tag, frame.payload, this.mtu), this.mtu);
   }
 
-  pushBle(packet: Uint8Array): Uint8Array[] | null {
+  pushBle(packet: Uint8Array, channel = this.channel): Uint8Array[] | null {
     const frame = this.ble.push(packet);
     if (!frame) {
       return null;
     }
-    return wrapHidFrame(frame.tag, frame.payload, this.channel);
+    return wrapHidFrame(frame.tag, frame.payload, channel);
+  }
+
+  replyHid(tag: number, payload: Uint8Array, channel = this.channel): Uint8Array[] {
+    return wrapHidFrame(tag, payload, channel);
   }
 }
 

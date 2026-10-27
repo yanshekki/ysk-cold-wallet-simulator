@@ -47,6 +47,8 @@ npx esbuild src/main.ts \
   --external:@cws/native-proxy \
   --banner:js="const __cwsNativeRoot=require('path').join(require('path').dirname(process.execPath),'../../../../Resources/proxy/node_modules');process.env.NODE_PATH=__cwsNativeRoot;require('module').Module._initPaths();" \
   --outfile="$CONTENTS/Resources/proxy/main.cjs"
+printf '%s\n' '{"name":"cws-proxy-bundle","private":true,"type":"commonjs"}' \
+  > "$CONTENTS/Resources/proxy/package.json"
 
 python3 - <<'PY' "$PROFILE"
 import os, plistlib, shutil, subprocess, sys

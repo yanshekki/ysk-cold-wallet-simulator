@@ -2,7 +2,7 @@ const COPY = {
   en: {
     kicker: '/ PROXY',
     title: 'CWS',
-    subtitle: 'This page starts the USB-to-BLE proxy. The phone is still the hardware wallet.',
+    subtitle: 'This page starts the USB-to-Bluetooth proxy. Signing still happens on the phone.',
     start: 'Start',
     stop: 'Stop',
     idle: 'Waiting to scan',
@@ -19,8 +19,26 @@ const COPY = {
     pairingSubmit: 'Pair',
     logs: 'Console',
     tabProxy: 'Proxy',
+    tabLab: 'Lab',
     tabConsole: 'Console',
-    waiting: 'Waiting for host… start the proxy.',
+    labNeedGatt: 'Start the proxy and wait for the phone before running cases.',
+    labWaitPhone: 'Proxy is up. Waiting for the phone Bluetooth link.',
+    labReady: 'Phone link is up. Cases talk to the phone over Bluetooth, not HID.',
+    labRun: 'Run',
+    labClose: 'Close',
+    labPath: 'Path',
+    labUtf8: 'UTF-8',
+    labHex: 'Hex',
+    dashboard: 'Dashboard',
+    ethereum: 'Ethereum · Sepolia',
+    solana: 'Solana · Devnet',
+    near: 'NEAR · Testnet',
+    bitcoin: 'Bitcoin family',
+    avalanche: 'Avalanche · Fuji',
+    family: 'Other apps',
+    onekey: 'OneKey',
+    trezor: 'Trezor Safe 7',
+    waiting: 'Waiting for the host. Start the proxy first.',
     search: 'Search',
     all: 'ALL',
     wrap: 'WRAP',
@@ -41,7 +59,7 @@ const COPY = {
     hidLabel: 'HID',
     trezord: 'trezord',
     noPhone: 'NO PHONE',
-    nativeMissing: 'Native radio is not built. Run yarn workspace @cws/native-proxy build.',
+    nativeMissing: 'Native Bluetooth support is not included in this build.',
   },
   'zh-HK': {
     kicker: '/ 代理',
@@ -49,7 +67,7 @@ const COPY = {
     subtitle: '此頁啟動 USB 至藍牙代理。簽署仍在電話確認。',
     start: '開始',
     stop: '停止',
-    idle: '尚未掃描',
+    idle: '尚未開始掃描',
     scanning: '正在掃描電話',
     connecting: '正在連接 GATT',
     gatt: 'BLE GATT 已連接',
@@ -63,8 +81,26 @@ const COPY = {
     pairingSubmit: '配對',
     logs: '紀錄',
     tabProxy: '代理',
+    tabLab: '實驗室',
     tabConsole: '紀錄',
-    waiting: '等緊 host… 撳 Start 開 proxy。',
+    labNeedGatt: '請先啟動代理，待電話連接後再執行案例。',
+    labWaitPhone: '代理已啟動。正在等候電話藍牙連線。',
+    labReady: '電話已連線。實驗室案例經電話藍牙傳送，不經 HID。',
+    labRun: '執行',
+    labClose: '關閉',
+    labPath: '路徑',
+    labUtf8: 'UTF-8',
+    labHex: 'Hex',
+    dashboard: '主畫面',
+    ethereum: 'Ethereum · Sepolia',
+    solana: 'Solana · Devnet',
+    near: 'NEAR · Testnet',
+    bitcoin: 'Bitcoin 系列',
+    avalanche: 'Avalanche · Fuji',
+    family: '其他鏈',
+    onekey: 'OneKey',
+    trezor: 'Trezor Safe 7',
+    waiting: '正在等候主機…請先啟動代理。',
     search: '搜尋',
     all: '全部',
     wrap: '換行',
@@ -85,7 +121,7 @@ const COPY = {
     hidLabel: 'HID',
     trezord: 'trezord',
     noPhone: '無電話',
-    nativeMissing: '尚未編譯原生模組。請執行 yarn workspace @cws/native-proxy build。',
+    nativeMissing: '此版本未包含原生藍牙支援。',
   },
 };
 
@@ -234,6 +270,13 @@ const state = {
   follow: true,
   fontSize: 12,
   matchIndex: 0,
+  lab: null,
+  labKey: '',
+  labSection: '',
+  labBusy: false,
+  labResult: '',
+  labError: false,
+  labEditor: null,
 };
 
 function t(key) {
@@ -255,13 +298,19 @@ function visibleLogs(status) {
 function setTab(tab) {
   state.tab = tab;
   $('tab-proxy').classList.toggle('on', tab === 'proxy');
+  $('tab-lab').classList.toggle('on', tab === 'lab');
   $('tab-console').classList.toggle('on', tab === 'console');
   $('tab-proxy').setAttribute('aria-selected', tab === 'proxy' ? 'true' : 'false');
+  $('tab-lab').setAttribute('aria-selected', tab === 'lab' ? 'true' : 'false');
   $('tab-console').setAttribute('aria-selected', tab === 'console' ? 'true' : 'false');
   $('pane-proxy').classList.toggle('hidden', tab !== 'proxy');
+  $('pane-lab').classList.toggle('hidden', tab !== 'lab');
   $('pane-console').classList.toggle('hidden', tab !== 'console');
   if (tab === 'console') {
     renderLogs();
+  }
+  if (tab === 'lab') {
+    void fetchLabCatalog();
   }
 }
 
@@ -269,12 +318,18 @@ function renderCopy() {
   $('kicker').textContent = t('kicker');
   $('title').textContent = t('title');
   $('subtitle').textContent = t('subtitle');
-  $('start').textContent = t('start');
-  $('stop').textContent = t('stop');
+  renderPower();
   $('pair').textContent = t('pairingSubmit');
   $('pairing-label').textContent = t('pairing');
   $('tab-proxy').textContent = t('tabProxy');
+  $('tab-lab').textContent = t('tabLab');
   $('tab-console-label').textContent = t('tabConsole');
+  $('lab-kicker').textContent = '/ LAB';
+  $('lab-run').textContent = t('labRun');
+  $('lab-close').textContent = t('labClose');
+  $('lab-label-path').textContent = t('labPath');
+  $('lab-label-utf8').textContent = t('labUtf8');
+  $('lab-label-hex').textContent = t('labHex');
   $('filter-all').textContent = t('all');
   $('log-wrap').textContent = t('wrap');
   $('log-follow').textContent = t('follow');
@@ -368,8 +423,8 @@ function renderStatus(status) {
   const pairing = $('pairing');
   pairing.classList.toggle('hidden', !status.pairing);
   pairing.hidden = !status.pairing;
-  $('start').disabled = false;
-  $('stop').disabled = false;
+  renderPower();
+  maybeRefreshLab(status);
   const badge = $('log-badge');
   badge.textContent = String(status.logs.length);
   badge.classList.toggle('hidden', status.logs.length === 0);
@@ -481,6 +536,183 @@ async function post(path, body) {
     const text = await response.text();
     throw new Error(text || response.statusText);
   }
+  const type = response.headers.get('content-type') ?? '';
+  if (type.includes('application/json')) {
+    return response.json();
+  }
+  return undefined;
+}
+
+function renderPower() {
+  const power = $('power');
+  const running = Boolean(state.status?.running);
+  power.textContent = running ? t('stop') : t('start');
+  power.classList.toggle('primary', !running);
+  power.classList.toggle('danger', running);
+}
+
+function bindPower() {
+  const button = $('power');
+  let last = 0;
+  const fire = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const now = Date.now();
+    if (event.type === 'click' && now - last < 300) {
+      return;
+    }
+    last = now;
+    void post(state.status?.running ? '/stop' : '/start');
+  };
+  button.addEventListener('pointerdown', fire);
+  button.addEventListener('click', fire);
+}
+
+function maybeRefreshLab(status) {
+  const key = `${status.brand ?? ''}:${status.phase}:${status.running}:${status.labReady ? 1 : 0}:${status.hid ?? ''}`;
+  if (key === state.labKey && state.lab) {
+    renderLab();
+    return;
+  }
+  state.labKey = key;
+  void fetchLabCatalog();
+}
+
+async function fetchLabCatalog() {
+  try {
+    const response = await fetch('/lab/catalog');
+    if (!response.ok) {
+      return;
+    }
+    state.lab = await response.json();
+  } catch {
+    return;
+  }
+  const sections = state.lab?.sections ?? [];
+  if (!sections.some((section) => section.id === state.labSection)) {
+    state.labSection = sections[0]?.id ?? '';
+  }
+  renderLab();
+}
+
+function renderLab() {
+  const catalog = state.lab;
+  const ready = Boolean(catalog?.ready);
+  const status = $('lab-status');
+  status.className = ready ? 'status' : 'status error';
+  const waitCopy = state.status?.running ? 'labWaitPhone' : 'labNeedGatt';
+  status.innerHTML = `<strong>${ready ? t('labReady') : t(waitCopy)}</strong>`;
+  const sections = catalog?.sections ?? [];
+  const nav = $('lab-sections');
+  nav.replaceChildren();
+  for (const section of sections) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = t(section.id) || section.id;
+    button.classList.toggle('on', section.id === state.labSection);
+    button.addEventListener('click', () => {
+      state.labSection = section.id;
+      renderLab();
+    });
+    nav.append(button);
+  }
+  const current = sections.find((section) => section.id === state.labSection) ?? sections[0];
+  $('lab-section-title').textContent = current ? t(current.id) || current.id : '';
+  const grid = $('lab-grid');
+  grid.replaceChildren();
+  for (const action of current?.actions ?? []) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.dataset.action = action.id;
+    button.textContent = state.lang === 'zh-HK' ? action.zh : action.en;
+    button.disabled = !ready || state.labBusy;
+    button.addEventListener('click', () => {
+      if (action.editor) {
+        openLabEditor(action);
+        return;
+      }
+      void runLabAction(action.id);
+    });
+    grid.append(button);
+  }
+  const result = $('lab-result');
+  if (state.labResult) {
+    result.classList.toggle('hidden', false);
+    result.classList.toggle('error', state.labError);
+    result.textContent = state.labResult;
+  } else {
+    result.classList.add('hidden');
+  }
+  renderLabEditor();
+}
+
+function openLabEditor(action) {
+  state.labEditor = {
+    id: action.id,
+    title: state.lang === 'zh-HK' ? action.zh : action.en,
+    editor: action.editor,
+  };
+  $('lab-input-path').value = action.editor.path ?? '';
+  $('lab-input-utf8').value = action.editor.utf8 ?? '';
+  $('lab-input-hex').value = action.editor.hex ?? '';
+  renderLabEditor();
+}
+
+function closeLabEditor() {
+  state.labEditor = null;
+  renderLabEditor();
+}
+
+function renderLabEditor() {
+  const modal = $('lab-modal');
+  const editor = state.labEditor;
+  if (!editor) {
+    modal.classList.add('hidden');
+    modal.hidden = true;
+    return;
+  }
+  modal.classList.remove('hidden');
+  modal.hidden = false;
+  $('lab-modal-title').textContent = editor.title;
+  $('lab-field-path').classList.toggle('hidden', editor.editor.path === undefined);
+  $('lab-field-utf8').classList.toggle('hidden', editor.editor.utf8 === undefined);
+  $('lab-field-hex').classList.toggle('hidden', editor.editor.hex === undefined);
+}
+
+async function runLabAction(actionId, draft) {
+  if (state.labBusy) {
+    return;
+  }
+  state.labBusy = true;
+  state.labError = false;
+  state.labResult = '';
+  closeLabEditor();
+  renderLab();
+  try {
+    const body = await post('/lab/run', { actionId, draft });
+    if (body && body.ok) {
+      state.labResult = body.result ?? '';
+      state.labError = false;
+    } else {
+      state.labResult = body?.error ?? 'lab failed';
+      state.labError = true;
+    }
+  } catch (error) {
+    let message = error instanceof Error ? error.message : String(error);
+    try {
+      const parsed = JSON.parse(message);
+      if (parsed && parsed.error) {
+        message = parsed.error;
+      }
+    } catch {
+      // keep raw
+    }
+    state.labResult = message;
+    state.labError = true;
+  } finally {
+    state.labBusy = false;
+    renderLab();
+  }
 }
 
 function connect() {
@@ -494,29 +726,27 @@ function connect() {
   };
 }
 
-function bindCommand(id, path) {
-  const button = $(id);
-  let last = 0;
-  const fire = (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    const now = Date.now();
-    if (event.type === 'click' && now - last < 300) {
-      return;
-    }
-    last = now;
-    void post(path);
-  };
-  button.addEventListener('pointerdown', fire);
-  button.addEventListener('click', fire);
-}
-
 if (new URLSearchParams(location.search).get('native') === '1') {
   document.documentElement.classList.add('native-shell');
 }
 
-bindCommand('start', '/start');
-bindCommand('stop', '/stop');
+bindPower();
+$('tab-lab').addEventListener('click', () => setTab('lab'));
+$('lab-run').addEventListener('click', () => {
+  if (state.labEditor) {
+    void runLabAction(state.labEditor.id, {
+      path: $('lab-input-path').value,
+      utf8: $('lab-input-utf8').value,
+      hex: $('lab-input-hex').value,
+    });
+  }
+});
+$('lab-close').addEventListener('click', closeLabEditor);
+$('lab-modal').addEventListener('click', (event) => {
+  if (event.target === $('lab-modal')) {
+    closeLabEditor();
+  }
+});
 $('pair').addEventListener('click', () => {
   void post('/pairing', { code: $('code').value });
 });

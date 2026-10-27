@@ -25,6 +25,7 @@ export type ProxyStatus = {
   mtu: number | null;
   hid: HidState;
   hidError: string | null;
+  labReady: boolean;
   trezord: string | null;
   error: string | null;
   pairing: boolean;
@@ -67,6 +68,7 @@ function emptyState(nativeOk = true): Omit<ProxyStatus, 'radio' | 'logs'> {
     mtu: null,
     hid: 'idle',
     hidError: null,
+    labReady: false,
     trezord: null,
     error: null,
     pairing: false,
@@ -123,7 +125,19 @@ export function createStatusBus(nativeOk = true): StatusBus {
     },
     idle() {
       const keepNative = state.nativeOk;
-      state = emptyState(keepNative);
+      const keepHid =
+        state.hid === 'up'
+          ? {
+              hid: 'up' as const,
+              hidError: null,
+              vendorId: state.vendorId,
+              productId: state.productId,
+              brand: state.brand,
+              modelId: state.modelId,
+              modelName: state.modelName,
+            }
+          : undefined;
+      state = { ...emptyState(keepNative), ...keepHid };
       emit();
     },
     clearLogs() {

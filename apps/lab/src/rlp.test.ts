@@ -1,20 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { describeSigning, parseEthTx } from '@cws/contracts';
 import { bytesToHex, encodePath, hardened } from './apdu';
-import { eip1559EthTx, eip1559Signed, eip2930EthTx, eip4844EthTx, garbageEthTx, legacyEthTx } from './rlp';
+import { eip1559EthTx, eip1559Signed, eip2930EthTx, eip4844EthTx, eip7702EthTx, garbageEthTx, legacyEthTx } from './rlp';
 
 describe('lab ETH fixtures', () => {
-  it('decodes legacy / 2930 / 1559 and fails garbage', () => {
+  it('decodes legacy / 2930 / 1559 / 4844 / 7702 and fails garbage', () => {
     expect(parseEthTx(legacyEthTx())?.type).toBe('legacy');
     expect(parseEthTx(eip2930EthTx())?.type).toBe('eip2930');
     expect(parseEthTx(eip1559EthTx())?.type).toBe('eip1559');
+    expect(parseEthTx(eip4844EthTx())?.type).toBe('eip4844');
+    expect(parseEthTx(eip7702EthTx())?.type).toBe('eip7702');
     expect(parseEthTx(garbageEthTx())).toBeNull();
     expect(garbageEthTx()[0]).toBe(0x03);
-    expect(garbageEthTx().length).toBeGreaterThan(4);
-    expect(eip4844EthTx()[0]).toBe(0x03);
   });
 
-  it('describeSigning labels 1559 and marks garbage as decodeFailed', () => {
+  it('describeSigning labels 1559 and 4844, and marks garbage as decodeFailed', () => {
     const ok = describeSigning({
       brand: 'ledger',
       kind: 'sign',
@@ -26,6 +26,17 @@ describe('lab ETH fixtures', () => {
     expect(ok.style).toBe('eth-tx');
     expect(ok.decodeFailed).toBeUndefined();
     expect(ok.fields.some((field) => field.label === 'TO')).toBe(true);
+
+    const blob = describeSigning({
+      brand: 'ledger',
+      kind: 'sign',
+      title: 'Sign Ethereum transaction',
+      path: "m/44'/60'/0'/0/0",
+      message: 'Sign Ethereum transaction',
+      rawPayload: eip4844EthTx(),
+    });
+    expect(blob.decodeFailed).toBeUndefined();
+    expect(blob.fields.find((field) => field.label === 'BLOBS')?.value).toBe('1');
 
     const bad = describeSigning({
       brand: 'ledger',

@@ -52,15 +52,36 @@ function padReport(report: Uint8Array): Buffer {
 }
 
 export function wrapNativeHid(device: InstanceType<typeof native.VirtualHid>): HidPort {
+  const listeners: Array<(report: Uint8Array) => void> = [];
+  const pending: Uint8Array[] = [];
+  device.onInput((report: unknown) => {
+    const bytes = asBytes(report);
+    if (listeners.length === 0) {
+      if (pending.length < 8) {
+        pending.push(bytes);
+      }
+      return;
+    }
+    for (const listener of listeners) {
+      listener(bytes);
+    }
+  });
   return {
     write(report) {
       device.write(padReport(report));
     },
     onInput(callback) {
-      device.onInput((report: unknown) => {
-        callback(asBytes(report));
-      });
-      const unsubscribe: Unsubscribe = () => undefined;
+      listeners.push(callback);
+      const queued = pending.splice(0);
+      for (const report of queued) {
+        callback(report);
+      }
+      const unsubscribe: Unsubscribe = () => {
+        const index = listeners.indexOf(callback);
+        if (index >= 0) {
+          listeners.splice(index, 1);
+        }
+      };
       return unsubscribe;
     },
     close() {

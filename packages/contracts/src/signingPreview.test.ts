@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SigningRequest } from './signing';
-import { describeSigning, hex0x, parseEthTx } from './signingPreview';
+import { describeBtcPsbt, describeEthTypedData, describeSigning, hex0x, parseEthTx } from './signingPreview';
 
 function concat(...parts: Uint8Array[]): Uint8Array {
   const total = parts.reduce((n, part) => n + part.length, 0);
@@ -113,6 +113,46 @@ describe('parseEthTx', () => {
     expect(parsed?.to).toEqual(to);
     expect(parsed?.data).toEqual(data);
   });
+
+  it('decodes EIP-4844 blob fields', () => {
+    const to = fromHex('0x1111111111111111111111111111111111111111');
+    const inner = rlp([
+      fromHex('0xaa36a7'),
+      new Uint8Array(),
+      fromHex('0x3b9aca00'),
+      fromHex('0x77359400'),
+      fromHex('0x5208'),
+      to,
+      new Uint8Array(),
+      new Uint8Array(),
+      [],
+      fromHex('0x3b9aca00'),
+      [new Uint8Array(32).fill(0x01)],
+    ]);
+    const parsed = parseEthTx(concat(Uint8Array.of(0x03), inner));
+    expect(parsed?.type).toBe('eip4844');
+    expect(parsed?.blobCount).toBe(1);
+    expect(parsed?.maxFeePerBlobGas).toEqual(fromHex('0x3b9aca00'));
+  });
+
+  it('decodes EIP-7702 authorization lists', () => {
+    const to = fromHex('0x1111111111111111111111111111111111111111');
+    const inner = rlp([
+      fromHex('0xaa36a7'),
+      new Uint8Array(),
+      fromHex('0x3b9aca00'),
+      fromHex('0x77359400'),
+      fromHex('0x5208'),
+      to,
+      new Uint8Array(),
+      new Uint8Array(),
+      [],
+      [[fromHex('0xaa36a7'), to, new Uint8Array(), Uint8Array.of(1), new Uint8Array(32).fill(0x11), new Uint8Array(32).fill(0x22)]],
+    ]);
+    const parsed = parseEthTx(concat(Uint8Array.of(0x04), inner));
+    expect(parsed?.type).toBe('eip7702');
+    expect(parsed?.authorizationCount).toBe(1);
+  });
 });
 
 describe('describeSigning', () => {
@@ -219,6 +259,42 @@ describe('describeSigning', () => {
     expect(detail.style).toBe('raw-sign');
     expect(detail.decodeFailed).toBeUndefined();
     expect(detail.hex).toBe('0x01020304');
+  });
+
+  it('summarises EIP-712 primaryType and domain name', () => {
+    const json = new TextEncoder().encode(
+      JSON.stringify({
+        primaryType: 'Mail',
+        domain: { name: 'Ether Mail' },
+        message: {},
+      }),
+    );
+    const detail = describeSigning(
+      request({
+        kind: 'sign',
+        title: 'Sign typed data',
+        rawPayload: json,
+        detail: describeEthTypedData("m/44'/60'/0'/0/0", json),
+      }),
+    );
+    expect(detail.headline).toBe('EIP-712 typed data');
+    expect(detail.fields.find((field) => field.label === 'TYPE')?.value).toBe('Mail');
+    expect(detail.fields.find((field) => field.label === 'DOMAIN')?.value).toBe('Ether Mail');
+  });
+
+  it('labels Bitcoin PSBT outputs', () => {
+    const detail = describeBtcPsbt({
+      path: "m/84'/0'/0'/0/0",
+      outputs: [{ address: 'bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4', amountSats: 100_000n }],
+      feeSats: 250n,
+    });
+    expect(detail.style).toBe('btc-hash');
+    expect(detail.fields.find((field) => field.label === 'CHAIN')?.value).toBe('Bitcoin');
+    expect(detail.fields.find((field) => field.label === 'TO')?.value).toBe(
+      'bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4',
+    );
+    expect(detail.fields.find((field) => field.label === 'VALUE')?.value).toBe('0.001 BTC');
+    expect(detail.fields.find((field) => field.label === 'FEE')?.value).toBe('0.0000025 BTC');
   });
 
   it('returns attached detail unchanged', () => {

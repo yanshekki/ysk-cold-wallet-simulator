@@ -208,9 +208,11 @@ export function bip143Sighash(input: {
   outputs: Uint8Array;
   locktime: number;
   sighash?: number;
+  prevouts?: Uint8Array;
+  sequences?: Uint8Array;
 }): Uint8Array {
-  const hashPrevouts = sha256d(input.prevout);
-  const hashSequence = sha256d(u32le(input.sequence));
+  const hashPrevouts = sha256d(input.prevouts ?? input.prevout);
+  const hashSequence = sha256d(input.sequences ?? u32le(input.sequence));
   const hashOutputs = sha256d(input.outputs);
   const preimage = concatBytes(
     u32le(input.version),

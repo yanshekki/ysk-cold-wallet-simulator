@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { LEDGER_MODELS } from '@cws/contracts';
 import type { ConnectedBle, ProxyIo } from './daemon';
 import { memoryHidPair } from './ports';
-import { createRuntime } from './runtime';
+import { createRuntime, teeLog } from './runtime';
 import { createStatusBus } from './status';
 
 function sleep(ms: number): Promise<void> {
@@ -10,6 +10,15 @@ function sleep(ms: number): Promise<void> {
 }
 
 describe('proxy runtime', () => {
+  it('keeps UI console lines even if stderr write throws', () => {
+    const bus = createStatusBus();
+    const teed = teeLog(() => {
+      throw new Error('EPIPE');
+    }, bus);
+    teed('hid vid=0x2c97');
+    expect(bus.snapshot().logs.map((entry) => entry.line)).toEqual(['hid vid=0x2c97']);
+  });
+
   it('does not scan until start, then stop returns idle', async () => {
     const model = LEDGER_MODELS.find((item) => item.id === 'nano-x')!;
     const { gadget } = memoryHidPair();
@@ -55,6 +64,9 @@ describe('proxy runtime', () => {
     expect(scans).toBeGreaterThan(0);
     expect(bus.snapshot().running).toBe(true);
     expect(['SCAN', 'GATT', 'HID']).toContain(bus.snapshot().radio);
+    await expect.poll(() => runtime.labCatalog().ready, { timeout: 1_000 }).toBe(true);
+    expect(bus.snapshot().labReady).toBe(true);
+    expect(runtime.labCatalog().sections.length).toBeGreaterThan(0);
     runtime.stop();
     await runtime.wait();
     expect(bus.snapshot().running).toBe(false);
@@ -156,6 +168,60 @@ describe('proxy runtime', () => {
       }),
     ]);
     expect(runtime.busy()).toBe(false);
+    parent.abort();
+  });
+
+  it('reuses virtual HID across stop and start', async () => {
+    const model = LEDGER_MODELS.find((item) => item.id === 'nano-x')!;
+    const { gadget } = memoryHidPair();
+    let creates = 0;
+    let live = true;
+    const connected: ConnectedBle = {
+      async write() {
+        return;
+      },
+      onNotify() {
+        return () => undefined;
+      },
+      async close() {
+        return;
+      },
+      async isConnected() {
+        return live;
+      },
+    };
+    const io: ProxyIo = {
+      async scan() {
+        return [{ id: 'phone', name: 'Nano X', services: [model.serviceUUID] }];
+      },
+      async openBle() {
+        return connected;
+      },
+      createHid() {
+        creates += 1;
+        return gadget;
+      },
+      async askPairingCode() {
+        return '000000';
+      },
+    };
+    const bus = createStatusBus();
+    const parent = new AbortController();
+    const runtime = createRuntime(io, () => undefined, bus, parent.signal, { scanMs: 20 });
+    runtime.start();
+    await expect.poll(() => bus.snapshot().hid, { timeout: 1_000 }).toBe('up');
+    expect(creates).toBe(1);
+    live = false;
+    runtime.stop();
+    await runtime.wait();
+    expect(bus.snapshot().hid).toBe('up');
+    live = true;
+    runtime.start();
+    await expect.poll(() => bus.snapshot().running, { timeout: 1_000 }).toBe(true);
+    expect(creates).toBe(1);
+    expect(bus.snapshot().hid).toBe('up');
+    runtime.stop();
+    await runtime.wait();
     parent.abort();
   });
 
