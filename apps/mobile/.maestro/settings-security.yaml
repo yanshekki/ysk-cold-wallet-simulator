@@ -21,8 +21,11 @@ tags:
     id: "security-sign-reauth"
 - assertVisible:
     id: "security-autolock"
-- assertVisible:
-    id: "security-hold-duration"
+- scrollUntilVisible:
+    element:
+      id: "security-hold-duration"
+    direction: DOWN
+    timeout: 8000
 - assertVisible:
     id: "hold-duration-3"
 - tapOn:

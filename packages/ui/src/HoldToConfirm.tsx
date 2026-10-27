@@ -165,6 +165,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.monoMedium,
     fontSize: 12,
     letterSpacing: 1.2,
+    paddingHorizontal: 36,
   },
   labelActive: {
     color: colors.text,
