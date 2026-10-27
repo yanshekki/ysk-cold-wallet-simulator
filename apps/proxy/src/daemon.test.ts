@@ -667,4 +667,241 @@ describe('runProxy', () => {
     expect(logs.some((line) => line.includes('hid retry'))).toBe(true);
     expect(bus.snapshot().hid).toBe('up');
   });
+
+  it('skips an iOS system GATT phantom and binds the Android CWS advertiser', async () => {
+    const pro2 = ONEKEY_MODELS.find((item) => item.id === 'pro2')!;
+    const opened: string[] = [];
+    const connected: ConnectedBle = {
+      async write() {
+        return;
+      },
+      onNotify() {
+        return () => undefined;
+      },
+      async close() {
+        return;
+      },
+      async isConnected() {
+        return false;
+      },
+      debugInfo() {
+        return 'write=00000002-0000-1000-8000-00805f9b34fb flags=swift-cb';
+      },
+    };
+    const bus = createStatusBus();
+    const logs: string[] = [];
+    await runProxy(
+      {
+        async scan() {
+          return [
+            {
+              id: 'iphone',
+              name: 'Shek Ki的iPhone [Pro 2 A1B2]',
+              services: ['180a', 'd0611e78-848c-4dd4-bbd0-91f57c6b9aca'],
+            },
+            {
+              id: 'android',
+              name: 'Pro 2 A1B2',
+              services: [pro2.serviceUUID],
+            },
+          ];
+        },
+        async openBle(id) {
+          opened.push(id);
+          if (id === 'iphone') {
+            throw new Error(
+              'missing write characteristic want=00000002-0000-1000-8000-00805f9b34fb have=180a/2a29,d0611e78-848c-4dd4-bbd0-91f57c6b9aca/0001',
+            );
+          }
+          return connected;
+        },
+        createHid() {
+          return memoryHidPair().gadget;
+        },
+        async askPairingCode() {
+          return '000000';
+        },
+      },
+      (line) => logs.push(line),
+      new AbortController().signal,
+      { once: true, scanMs: 10, status: bus },
+    );
+    expect(opened).toEqual(['android']);
+    expect(bus.snapshot().modelId).toBe('pro2');
+    expect(bus.snapshot().phoneName).toBe('Pro 2 A1B2');
+    expect(bus.snapshot().phase).not.toBe('error');
+    expect(logs.some((line) => /missing write/.test(line) && /iphone/i.test(line))).toBe(false);
+  });
+
+  it('tries the next same-name advertiser when the first is missing a write characteristic', async () => {
+    const opened: string[] = [];
+    const connected: ConnectedBle = {
+      async write() {
+        return;
+      },
+      onNotify() {
+        return () => undefined;
+      },
+      async close() {
+        return;
+      },
+      async isConnected() {
+        return false;
+      },
+      debugInfo() {
+        return 'write=00000002-0000-1000-8000-00805f9b34fb flags=swift-cb';
+      },
+    };
+    const bus = createStatusBus();
+    const logs: string[] = [];
+    await runProxy(
+      {
+        async scan() {
+          return [
+            {
+              id: 'aaa-iphone',
+              name: 'Pro 2 A1B2',
+              services: [],
+            },
+            {
+              id: 'zzz-android',
+              name: 'Pro 2 A1B2',
+              services: [],
+            },
+          ];
+        },
+        async openBle(id) {
+          opened.push(id);
+          if (id === 'aaa-iphone') {
+            throw new Error(
+              'missing write characteristic want=00000002-0000-1000-8000-00805f9b34fb have=180a/2a29',
+            );
+          }
+          return connected;
+        },
+        createHid() {
+          return memoryHidPair().gadget;
+        },
+        async askPairingCode() {
+          return '000000';
+        },
+      },
+      (line) => logs.push(line),
+      new AbortController().signal,
+      { once: true, scanMs: 10, status: bus },
+    );
+    expect(opened).toEqual(['aaa-iphone', 'zzz-android']);
+    expect(bus.snapshot().phoneName).toBe('Pro 2 A1B2');
+    expect(bus.snapshot().modelId).toBe('pro2');
+    expect(logs.some((line) => line.includes('skip Pro 2 A1B2 (aaa-iphone)'))).toBe(true);
+  });
+
+  it('does not stay connected to system-only GATT after a successful Android session', async () => {
+    const pro2 = ONEKEY_MODELS.find((item) => item.id === 'pro2')!;
+    const opened: string[] = [];
+    let live = false;
+    const bus = createStatusBus();
+    const controller = new AbortController();
+    const running = runProxy(
+      {
+        async scan() {
+          if (opened.length === 0) {
+            return [{ id: 'android', name: 'Pro 2 A1B2', services: [pro2.serviceUUID] }];
+          }
+          return [
+            {
+              id: 'iphone',
+              name: 'Shek Ki的iPhone [Pro 2 A1B2]',
+              services: ['180a'],
+            },
+            {
+              id: 'android',
+              name: 'Pro 2 A1B2',
+              services: [pro2.serviceUUID],
+            },
+          ];
+        },
+        async openBle(id) {
+          opened.push(id);
+          if (id === 'iphone') {
+            throw new Error(
+              'missing write characteristic want=00000002-0000-1000-8000-00805f9b34fb have=180a/2a29',
+            );
+          }
+          live = true;
+          return {
+            async write() {
+              return;
+            },
+            onNotify() {
+              return () => undefined;
+            },
+            async close() {
+              return;
+            },
+            async isConnected() {
+              return live;
+            },
+            debugInfo() {
+              return 'write=00000002-0000-1000-8000-00805f9b34fb flags=swift-cb';
+            },
+          };
+        },
+        createHid() {
+          return memoryHidPair().gadget;
+        },
+        async askPairingCode() {
+          return '000000';
+        },
+      },
+      () => undefined,
+      controller.signal,
+      { scanMs: 10, persistHid: true, holder: createHidHolder(), status: bus },
+    );
+    await expect.poll(() => bus.snapshot().phoneName, { timeout: 1_000 }).toBe('Pro 2 A1B2');
+    live = false;
+    await expect
+      .poll(() => opened.filter((id) => id === 'android').length, { timeout: 4_000 })
+      .toBeGreaterThan(1);
+    expect(opened.includes('iphone')).toBe(false);
+    expect(bus.snapshot().phoneName).toBe('Pro 2 A1B2');
+    expect(bus.snapshot().modelId).toBe('pro2');
+    controller.abort();
+    await running;
+  });
+
+  it('does not treat a lone iOS system GATT peripheral as a CWS session', async () => {
+    const opened: string[] = [];
+    const bus = createStatusBus();
+    await expect(
+      runProxy(
+        {
+          async scan() {
+            return [
+              {
+                id: 'iphone',
+                name: 'Shek Ki的iPhone [Pro 2 A1B2]',
+                services: ['180a', 'd0611e78-848c-4dd4-bbd0-91f57c6b9aca'],
+              },
+            ];
+          },
+          async openBle(id) {
+            opened.push(id);
+            throw new Error('missing write characteristic want=00000002 have=180a/2a29');
+          },
+          createHid() {
+            return memoryHidPair().gadget;
+          },
+          async askPairingCode() {
+            return '000000';
+          },
+        },
+        () => undefined,
+        new AbortController().signal,
+        { once: true, scanMs: 10, status: bus },
+      ),
+    ).rejects.toThrow(/no CWS device advertising/);
+    expect(opened).toEqual([]);
+    expect(bus.snapshot().modelId).toBeNull();
+  });
 });

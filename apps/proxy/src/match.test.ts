@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { pickModel, serviceFromWriteUuid, serviceUuids } from './match';
+import {
+  isPhantomGattError,
+  isSystemOnlyServices,
+  pickModel,
+  probeHit,
+  rankModels,
+  serviceFromWriteUuid,
+  serviceUuids,
+} from './match';
 
 describe('pickModel', () => {
   it('matches a Nano X by service UUID', () => {
@@ -150,5 +158,75 @@ describe('pickModel', () => {
     expect(serviceFromWriteUuid('13d63400-2c97-6004-0002-4c6564676572')).toBe(
       '13d63400-2c97-6004-0000-4c6564676572',
     );
+  });
+
+  it('does not pick iOS system GATT as OneKey when another phone advertises the same GAP name', () => {
+    const picked = pickModel([
+      {
+        id: 'iphone',
+        name: 'Shek Ki的iPhone [Pro 2 A1B2]',
+        services: ['180a', 'd0611e78-848c-4dd4-bbd0-91f57c6b9aca'],
+      },
+      {
+        id: 'android',
+        name: 'Pro 2 A1B2',
+        services: ['00000001-0000-1000-8000-00805f9b34fb'],
+      },
+    ]);
+    expect(picked?.hit.id).toBe('android');
+    expect(picked?.model.id).toBe('pro2');
+  });
+
+  it('ranks a bare OneKey GAP name ahead of an iPhone-wrapped leftover name', () => {
+    const ranked = rankModels([
+      {
+        id: 'iphone',
+        name: 'Shek Ki的iPhone [Pro 2 A1B2]',
+        services: [],
+      },
+      {
+        id: 'android',
+        name: 'Pro 2 A1B2',
+        services: [],
+      },
+    ]);
+    expect(ranked.map((item) => item.hit.id)).toEqual(['android', 'iphone']);
+    expect(ranked[0]?.model.id).toBe('pro2');
+  });
+
+  it('still matches an optional BLE name suffix on OneKey', () => {
+    const picked = pickModel([
+      {
+        id: 'android',
+        name: 'Pro 2 A1B2 X7K',
+        services: [],
+      },
+    ]);
+    expect(picked?.model.id).toBe('pro2');
+  });
+
+  it('does not probe a system-only iPhone as CWS', () => {
+    expect(isSystemOnlyServices(['180a', 'D0611E78-848C-4DD4-BBD0-91F57C6B9ACA'])).toBe(true);
+    expect(
+      probeHit([
+        {
+          id: 'iphone',
+          name: 'Shek Ki的iPhone',
+          services: ['180a'],
+        },
+      ]),
+    ).toBeUndefined();
+    expect(pickModel([{ id: 'iphone', name: 'Shek Ki的iPhone', services: ['180a'] }])).toBeNull();
+  });
+
+  it('treats missing write on 180a/Continuity as a phantom, not a CWS session', () => {
+    expect(
+      isPhantomGattError(
+        'missing write characteristic want=00000002-0000-1000-8000-00805f9b34fb have=180a/2a29,d0611e78-848c-4dd4-bbd0-91f57c6b9aca/0001',
+      ),
+    ).toBe(true);
+    expect(isPhantomGattError('missing write characteristic want=00000002 have=none')).toBe(true);
+    expect(isPhantomGattError('no GATT services')).toBe(true);
+    expect(isPhantomGattError('BLE connect timed out')).toBe(false);
   });
 });

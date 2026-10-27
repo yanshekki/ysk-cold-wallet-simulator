@@ -7,11 +7,17 @@ import { ThpClient } from './adapters/thp';
 import { attachTrezor } from './adapters/trezor';
 import type { LogFn } from './log';
 import {
+  gattFingerprint,
+  isCwsServiceUuid,
+  isPhantomGattError,
+  isSystemOnlyServices,
   pickModel,
   probeHit,
+  rankModels,
   serviceFromWriteUuid,
   serviceUuids,
   servicesFromGattError,
+  type RankedPick,
   type ScanHit,
 } from './match';
 import { createLabHandle, type LabHandle } from './lab';
@@ -104,10 +110,71 @@ function probeGuess(hit: ScanHit, holder: HidHolder): DeviceModel | undefined {
   if (picked) {
     return picked.model;
   }
+  // Generic iPhone/Pixel advertisements (Continuity, 180a) must not be guessed
+  // as Classic 1s. Leftover `… [Trezor Safe 7]` names still probe so GATT can
+  // confirm OneKey when the UUID was omitted.
   if (holder.model?.brand === 'onekey') {
     return holder.model;
   }
+  if (!probeHit([hit])) {
+    return undefined;
+  }
   return ALL_MODELS.find((item) => item.id === 'classic1s');
+}
+
+type PhantomBook = {
+  /** peripheral id → advertised-service fingerprint at the failed connect */
+  rejected: Map<string, string>;
+};
+
+function createPhantomBook(): PhantomBook {
+  return { rejected: new Map() };
+}
+
+function isRejected(book: PhantomBook, hit: ScanHit): boolean {
+  const prev = book.rejected.get(hit.id);
+  if (prev === undefined) {
+    return false;
+  }
+  const key = gattFingerprint(hit.services);
+  // Same CoreBluetooth id may become a real CWS advertiser later (app started).
+  // Only retry when the advertised services actually changed to include CWS.
+  if (
+    key !== prev &&
+    hit.services.some((item) => isCwsServiceUuid(item)) &&
+    !isSystemOnlyServices(hit.services)
+  ) {
+    book.rejected.delete(hit.id);
+    return false;
+  }
+  return true;
+}
+
+function rememberPhantom(book: PhantomBook, hit: ScanHit, message: string): void {
+  if (isPhantomGattError(message)) {
+    book.rejected.set(hit.id, gattFingerprint(hit.services));
+  }
+}
+
+function candidatesFor(
+  hits: ScanHit[],
+  preferredId: string | undefined,
+  holder: HidHolder,
+  book: PhantomBook,
+): RankedPick[] {
+  const ranked = rankModels(hits, preferredId).filter((item) => !isRejected(book, item.hit));
+  if (ranked.length > 0) {
+    return ranked;
+  }
+  if (preferredId) {
+    return [];
+  }
+  const hit = probeHit(hits.filter((item) => !isRejected(book, item)));
+  const model = hit ? probeGuess(hit, holder) : undefined;
+  if (!hit || !model) {
+    return [];
+  }
+  return [{ hit, model, score: 0 }];
 }
 
 function attachAdapter(
@@ -263,6 +330,7 @@ export async function runProxy(
     (options.modelId
       ? ALL_MODELS.find((item) => item.id === options.modelId)
       : undefined);
+  const phantoms = createPhantomBook();
   try {
     if (!options.skipHid && seed) {
       await ensureHid(io, log, signal, options, holder, seed);
@@ -288,10 +356,8 @@ export async function runProxy(
         scanError = error;
         log(`scan failed: ${String(error)}`);
       }
-      const picked = pickModel(hits, options.modelId);
-      const hit = picked?.hit ?? (options.modelId ? undefined : probeHit(hits));
-      const guessed = picked?.model ?? (hit && !options.modelId ? probeGuess(hit, holder) : undefined);
-      if (!hit || !guessed) {
+      const queue = candidatesFor(hits, options.modelId, holder, phantoms);
+      if (queue.length === 0) {
         const nearby = hits
           .slice(0, 3)
           .map((item) => item.name || item.id)
@@ -305,16 +371,16 @@ export async function runProxy(
         await wait(denied ? 5_000 : 1_000, signal);
         continue;
       }
-      if (picked) {
-        log(
-          `found ${guessed.brand} ${guessed.name} (${hit.name || hit.id}) services=${hit.services.join(',')}`,
-        );
-      } else {
-        log(`probe ${hit.name || hit.id} as ${guessed.brand} ${guessed.name} services=${hit.services.join(',')}`);
-      }
       try {
-        const opened = await openConfirmed(io, log, signal, hit, guessed);
-        const model = opened.model;
+        const opened = await openFirstViable(io, log, signal, queue, phantoms);
+        if (!opened) {
+          if (options.once) {
+            throw new Error(options.modelId ? `no BLE device for ${options.modelId}` : 'no CWS device advertising');
+          }
+          await wait(400, signal);
+          continue;
+        }
+        const { hit, model, ble } = opened;
         status?.patch({
           phoneName: hit.name || hit.id,
           brand: model.brand,
@@ -327,7 +393,7 @@ export async function runProxy(
           mtu: 20,
         });
         await ensureHid(io, log, signal, options, holder, model);
-        await session(io, log, signal, model, hit, options, holder, opened.ble);
+        await session(io, log, signal, model, hit, options, holder, ble, phantoms);
       } catch (error) {
         if (signal.aborted) {
           return;
@@ -359,6 +425,40 @@ export async function runProxy(
   }
 }
 
+async function openFirstViable(
+  io: ProxyIo,
+  log: LogFn,
+  signal: AbortSignal,
+  queue: RankedPick[],
+  book: PhantomBook,
+): Promise<{ hit: ScanHit; model: DeviceModel; ble: ConnectedBle } | undefined> {
+  for (const candidate of queue) {
+    const { hit, model: guessed } = candidate;
+    if (candidate.score > 0) {
+      log(
+        `found ${guessed.brand} ${guessed.name} (${hit.name || hit.id}) services=${hit.services.join(',')}`,
+      );
+    } else {
+      log(`probe ${hit.name || hit.id} as ${guessed.brand} ${guessed.name} services=${hit.services.join(',')}`);
+    }
+    try {
+      const opened = await openConfirmed(io, log, signal, hit, guessed);
+      return { hit, model: opened.model, ble: opened.ble };
+    } catch (error) {
+      if (signal.aborted) {
+        throw error;
+      }
+      const message = error instanceof Error ? error.message : String(error);
+      if (!isPhantomGattError(message)) {
+        throw error;
+      }
+      rememberPhantom(book, hit, message);
+      log(`skip ${hit.name || hit.id} (${hit.id}): not CWS GATT (${message})`);
+    }
+  }
+  return undefined;
+}
+
 async function openConfirmed(
   io: ProxyIo,
   log: LogFn,
@@ -372,12 +472,17 @@ async function openConfirmed(
   try {
     ble = await abortable(signal, io.openBle(hit.id, model));
   } catch (error) {
-    const gatt = servicesFromGattError(String(error));
+    const message = String(error);
+    // System-only GATT (180a / Continuity) is not a wrong-model rematch.
+    if (isPhantomGattError(message)) {
+      throw error;
+    }
+    const gatt = servicesFromGattError(message);
     const rematch = gatt.length > 0 ? pickModel([{ ...hit, services: gatt }]) : null;
     if (!rematch || rematch.model.id === model.id) {
       throw error;
     }
-    log(`gatt rematch ${rematch.model.brand} ${rematch.model.name} ${String(error)}`);
+    log(`gatt rematch ${rematch.model.brand} ${rematch.model.name} ${message}`);
     model = rematch.model;
     ble = await abortable(signal, io.openBle(hit.id, model));
   }
@@ -396,7 +501,8 @@ async function session(
   hit: ScanHit,
   options: ProxyOptions,
   holder: HidHolder,
-  opened?: ConnectedBle,
+  opened: ConnectedBle | undefined,
+  phantoms: PhantomBook,
 ): Promise<void> {
   const status = options.status;
   status?.patch({ phase: holder.hid ? 'hid' : 'connecting' });
@@ -482,7 +588,15 @@ async function session(
       route.release();
       await settle(ble.close(), 400);
       status?.patch({ phase: holder.hid ? 'hid' : 'connecting' });
-      const next = await reconnectBle(io, log, signal, model, hit, options.scanMs ?? 4_000);
+      const next = await reconnectBle(
+        io,
+        log,
+        signal,
+        model,
+        hit,
+        options.scanMs ?? 4_000,
+        phantoms,
+      );
       if (!next) {
         log(`phone left ${model.id}; rescanning`);
         break;
@@ -536,11 +650,14 @@ async function reconnectBle(
   model: DeviceModel,
   hit: ScanHit,
   scanMs: number,
+  book: PhantomBook,
 ): Promise<ConnectedBle | undefined> {
   try {
     return await abortable(signal, io.openBle(hit.id, model));
   } catch (error) {
-    log(`reconnect ${hit.id}: ${String(error)}`);
+    const message = String(error);
+    log(`reconnect ${hit.id}: ${message}`);
+    rememberPhantom(book, hit, message);
   }
   while (!signal.aborted) {
     log('scanning');
@@ -553,25 +670,38 @@ async function reconnectBle(
       }
       log(`scan failed: ${String(error)}`);
     }
-    const picked = pickModel(hits);
-    if (picked) {
-      if (picked.model.id !== model.id) {
-        log(`phone now ${picked.model.brand} ${picked.model.name}; dropping ${model.id} session`);
+    const ranked = rankModels(hits).filter((item) => !isRejected(book, item.hit));
+    const same = ranked.filter((item) => item.model.id === model.id);
+    const other = ranked.find((item) => item.model.id !== model.id);
+    if (same.length === 0) {
+      if (other) {
+        log(`phone now ${other.model.brand} ${other.model.name}; dropping ${model.id} session`);
         return undefined;
       }
-      hit.id = picked.hit.id;
-      hit.name = picked.hit.name;
-      hit.services = picked.hit.services;
+      await wait(1_000, signal);
+      continue;
+    }
+    for (const candidate of same) {
+      hit.id = candidate.hit.id;
+      hit.name = candidate.hit.name;
+      hit.services = candidate.hit.services;
       try {
         return await abortable(signal, io.openBle(hit.id, model));
       } catch (error) {
-        log(`reconnect ${hit.id}: ${String(error)}`);
-        if (/missing write/i.test(String(error))) {
-          return undefined;
+        const message = String(error);
+        log(`reconnect ${hit.id}: ${message}`);
+        rememberPhantom(book, candidate.hit, message);
+        if (!isPhantomGattError(message)) {
+          break;
         }
       }
     }
-    await wait(1_000, signal);
+    // Every same-model advertiser lacked CWS write chars. Drop so the outer
+    // loop can bind a different live phone without a Bluetooth power-cycle.
+    if (other) {
+      log(`phone now ${other.model.brand} ${other.model.name}; dropping ${model.id} session`);
+    }
+    return undefined;
   }
   return undefined;
 }

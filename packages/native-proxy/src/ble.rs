@@ -179,16 +179,33 @@ impl BleDevice {
       .await
       .map_err(|error| Error::from_reason(error.to_string()))?;
     let chars = peripheral.characteristics();
+    let have = if chars.is_empty() {
+      "none".to_string()
+    } else {
+      chars
+        .iter()
+        .map(|item| format!("{}/{}", item.service_uuid, item.uuid))
+        .collect::<Vec<_>>()
+        .join(",")
+    };
     let write_char = chars
       .iter()
       .find(|item| item.uuid == write)
       .cloned()
-      .ok_or_else(|| Error::from_reason(format!("missing write characteristic {write_uuid}")))?;
+      .ok_or_else(|| {
+        Error::from_reason(format!(
+          "missing write characteristic want={write_uuid} have={have}"
+        ))
+      })?;
     let notify_char = chars
       .iter()
       .find(|item| item.uuid == notify)
       .cloned()
-      .ok_or_else(|| Error::from_reason(format!("missing notify characteristic {notify_uuid}")))?;
+      .ok_or_else(|| {
+        Error::from_reason(format!(
+          "missing notify characteristic want={notify_uuid} have={have}"
+        ))
+      })?;
     // Subscribe to the broadcast *before* CCCD, on this task. Spawning
     // notifications() races subscribe() and btleplug drops those packets.
     let stream = peripheral
