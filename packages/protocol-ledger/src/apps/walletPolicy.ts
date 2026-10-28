@@ -5,7 +5,18 @@ import { concatBytes, encodeAscii } from '../bytes';
 import { bitcoinAddressFor, type BtcCoin } from './bitcoin';
 import { MerkleTree, elementHash, readVarint, writeVarint } from './merkle';
 
-export const DEFAULT_TEMPLATES = ['wpkh(@0/**)', 'sh(wpkh(@0/**))', 'tr(@0/**)', 'pkh(@0/**)'] as const;
+export const DEFAULT_TEMPLATES = [
+  'wpkh(@0/**)',
+  'sh(wpkh(@0/**))',
+  'tr(@0/**)',
+  'pkh(@0/**)',
+  // OKX's Bitcoin client puts the wildcard on the key (`xpub…/**`) and sends
+  // the template without it: `pkh(@0)`, `wpkh(@0)`, `sh(wpkh(@0))`, `tr(@0)`.
+  'wpkh(@0)',
+  'sh(wpkh(@0))',
+  'tr(@0)',
+  'pkh(@0)',
+] as const;
 
 export type WalletPolicy = {
   version: 1 | 2;

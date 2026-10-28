@@ -496,9 +496,44 @@ describe('Ledger family APDU bodies', () => {
       apdu([0xe1, 0x03, 0x00, 0x01, query.length, ...query]),
     );
     expect(swOf(address)).toBe(SW_OK);
-    const addrLen = address[0]!;
-    const text = Array.from(address.subarray(1, 1 + addrLen), (byte) => String.fromCharCode(byte)).join('');
+    const text = Array.from(address.subarray(0, address.length - 2), (byte) => String.fromCharCode(byte)).join('');
     expect(text.startsWith('bc1q')).toBe(true);
+  });
+
+  it('OKX Bitcoin client accepts shorthand templates whose wildcard is on the key', async () => {
+    const seed = mnemonicToSeedSync(FOUNDATION);
+    const cases = [
+      { template: 'pkh(@0)', account: "m/44'/0'/0'", prefix: '1' },
+      { template: 'sh(wpkh(@0))', account: "m/49'/0'/0'", prefix: '3' },
+      { template: 'wpkh(@0)', account: "m/84'/0'/0'", prefix: 'bc1q' },
+      { template: 'tr(@0)', account: "m/86'/0'/0'", prefix: 'bc1p' },
+    ] as const;
+    for (const item of cases) {
+      const device = handler();
+      device.setApp('bitcoin');
+      const base = defaultWalletPolicy(seed, item.template, item.account);
+      const policy = {
+        version: 1 as const,
+        name: '',
+        descriptorTemplate: item.template,
+        keysInfo: [`${base.keysInfo[0]}/**`],
+      };
+      const serialize = serializeWalletPolicy(policy);
+      const interpreter = new ClientCommandInterpreter();
+      interpreter.addKnownPreimage(serialize);
+      interpreter.addKnownList(policy.keysInfo.map((info) => new TextEncoder().encode(info)));
+      const walletId = walletIdOf(serialize);
+      const query = new Uint8Array(70);
+      query.set(walletId, 1);
+      const address = await continueUntilDone(
+        device,
+        interpreter,
+        apdu([0xe1, 0x03, 0x00, 0x00, query.length, ...query]),
+      );
+      expect(swOf(address)).toBe(SW_OK);
+      const text = Array.from(address.subarray(0, address.length - 2), (byte) => String.fromCharCode(byte)).join('');
+      expect(text.startsWith(item.prefix)).toBe(true);
+    }
   });
 
   it('Bitcoin Client signs a merklized PSBT and YIELDs a signature', async () => {
@@ -559,8 +594,8 @@ describe('Ledger family APDU bodies', () => {
   }
 
   function suiBlockOf(payload: Uint8Array): { ins: number; body: Uint8Array } {
-    const inner = payload.subarray(0, payload.length - 2);
-    return { ins: inner[0]!, body: inner.subarray(1, inner.length - 2) };
+    const data = payload.subarray(0, payload.length - 2);
+    return { ins: data[0]!, body: data.subarray(1) };
   }
 
   function mystenBlocks(payloads: Uint8Array[]): { start: number[]; chunks: Map<string, Uint8Array> } {
