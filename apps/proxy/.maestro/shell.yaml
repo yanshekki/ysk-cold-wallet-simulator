@@ -20,10 +20,11 @@ tags:
 - assertVisible:
     id: "log-filter-all"
 - tapOn:
-    id: "lang-zh"
-- assertVisible:
-    id: "tab-lab"
+    id: "lang-select"
+- tapOn: "繁 · 繁體中文（香港）"
+- assertVisible: "測試網主機"
 - tapOn:
-    id: "lang-en"
+    id: "lang-select"
+- tapOn: "EN · English"
 - tapOn:
     id: "tab-proxy"

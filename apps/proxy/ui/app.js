@@ -191,6 +191,10 @@ function renderCopy() {
   $('kicker').textContent = t('kicker');
   $('title').textContent = t('title');
   $('subtitle').textContent = t('subtitle');
+  const langLabelEl = document.querySelector('.lang-label');
+  if (langLabelEl) {
+    langLabelEl.textContent = t('lang');
+  }
   renderPower();
   $('pair').textContent = t('pairingSubmit');
   $('pairing-label').textContent = t('pairing');
@@ -225,6 +229,7 @@ function renderCopy() {
   const langSelect = $('lang-select');
   if (langSelect) {
     langSelect.value = state.lang;
+    langSelect.setAttribute('aria-label', t('lang'));
   }
   document.documentElement.lang = state.lang === 'zh-HK' ? 'zh-HK' : state.lang;
   document.documentElement.dir = state.lang === 'ar' ? 'rtl' : 'ltr';

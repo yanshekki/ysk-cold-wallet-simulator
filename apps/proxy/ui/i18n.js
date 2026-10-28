@@ -16,6 +16,7 @@ const COPY = {
   en: {
     kicker: "/ PROXY",
     title: "CWS",
+    lang: "Language",
     subtitle: "This page starts the USB-to-Bluetooth proxy. Signing still happens on the phone.",
     start: "Start",
     stop: "Stop",
@@ -81,6 +82,7 @@ const COPY = {
   "zh-HK": {
     kicker: "/ 代理",
     title: "CWS",
+    lang: "語言",
     subtitle: "此頁啟動 USB 至藍牙代理。簽署仍在電話確認。",
     start: "開始",
     stop: "停止",
@@ -146,6 +148,7 @@ const COPY = {
   es: {
     kicker: "/ PROXY",
     title: "CWS",
+    lang: "Idioma",
     subtitle: "Esta página inicia el proxy USB a Bluetooth. La firma se confirma en el teléfono.",
     start: "Iniciar",
     stop: "Detener",
@@ -211,6 +214,7 @@ const COPY = {
   ar: {
     kicker: "/ PROXY",
     title: "CWS",
+    lang: "اللغة",
     subtitle: "تبدأ هذه الصفحة وكيل USB إلى Bluetooth. التوقيع يتم على الهاتف.",
     start: "بدء",
     stop: "إيقاف",
@@ -276,6 +280,7 @@ const COPY = {
   pt: {
     kicker: "/ PROXY",
     title: "CWS",
+    lang: "Idioma",
     subtitle: "Esta página inicia o proxy USB para Bluetooth. A assinatura ocorre no telefone.",
     start: "Iniciar",
     stop: "Parar",
@@ -341,6 +346,7 @@ const COPY = {
   id: {
     kicker: "/ PROXY",
     title: "CWS",
+    lang: "Bahasa",
     subtitle: "Halaman ini memulai proksi USB ke Bluetooth. Penandatanganan tetap di ponsel.",
     start: "Mulai",
     stop: "Berhenti",
@@ -406,6 +412,7 @@ const COPY = {
   fr: {
     kicker: "/ PROXY",
     title: "CWS",
+    lang: "Langue",
     subtitle: "Cette page démarre le proxy USB vers Bluetooth. La signature se fait sur le téléphone.",
     start: "Démarrer",
     stop: "Arrêter",
@@ -471,6 +478,7 @@ const COPY = {
   ja: {
     kicker: "/ PROXY",
     title: "CWS",
+    lang: "言語",
     subtitle: "このページは USB から Bluetooth へのプロキシを起動します。署名は電話で確認します。",
     start: "開始",
     stop: "停止",
@@ -536,6 +544,7 @@ const COPY = {
   ru: {
     kicker: "/ PROXY",
     title: "CWS",
+    lang: "Язык",
     subtitle: "Эта страница запускает USB→Bluetooth прокси. Подпись подтверждается на телефоне.",
     start: "Старт",
     stop: "Стоп",
@@ -601,6 +610,7 @@ const COPY = {
   de: {
     kicker: "/ PROXY",
     title: "CWS",
+    lang: "Sprache",
     subtitle: "Diese Seite startet den USB-zu-Bluetooth-Proxy. Die Signatur erfolgt auf dem Telefon.",
     start: "Start",
     stop: "Stopp",
@@ -673,6 +683,15 @@ function isProxyLang(value) {
 
 function loadLang() {
   const stored = localStorage.getItem(LANG_KEY);
-  return isProxyLang(stored) ? stored : 'en';
+  if (isProxyLang(stored)) {
+    return stored;
+  }
+  const nav = (navigator.language || '').toLowerCase();
+  if (nav === 'zh-hk' || nav === 'zh-tw' || nav.startsWith('zh')) {
+    return 'zh-HK';
+  }
+  const short = nav.split('-')[0];
+  const hit = PROXY_LANGS.find((entry) => entry.id === short || entry.id.toLowerCase() === nav);
+  return hit ? hit.id : 'en';
 }
 

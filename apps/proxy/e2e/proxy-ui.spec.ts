@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { resetMock, startMockProxy, type MockProxy } from './harness';
+import { expectProxyTabs, setProxyLang } from './langs';
 
 let mock: MockProxy;
 
@@ -42,14 +43,13 @@ test.describe('CWS Proxy testnet host', () => {
     );
   });
 
-  test('given English UI, when 繁 is tapped, then the lab tab is 測試網主機', async ({ page }) => {
+  test('given English UI, when 繁 is chosen, then the lab tab is 測試網主機', async ({ page }) => {
     await page.goto(mock.server.url);
-    await expect(page.getByTestId('tab-lab')).toHaveText('Testnet host');
-    await page.getByTestId('lang-zh').click();
-    await expect(page.getByTestId('tab-lab')).toHaveText('測試網主機');
-    await expect(page.getByTestId('tab-proxy')).toHaveText('代理');
-    await page.getByTestId('lang-en').click();
-    await expect(page.getByTestId('tab-lab')).toHaveText('Testnet host');
+    await expectProxyTabs(page, 'en');
+    await setProxyLang(page, 'zh-HK');
+    await expectProxyTabs(page, 'zh-HK');
+    await setProxyLang(page, 'en');
+    await expectProxyTabs(page, 'en');
   });
 
   test('given a GATT-ready mock, when GET_VERSION is tapped, then the result is shown', async ({ page }) => {
