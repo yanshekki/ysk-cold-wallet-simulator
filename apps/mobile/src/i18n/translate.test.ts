@@ -66,4 +66,21 @@ describe('platform-aware authenticator copy', () => {
     }
     expect(translate('en', 'unlock.enrolled', undefined, 'web')).toBe('Biometrics or device passcode.');
   });
+
+  it('localizes pairing takeover and signing purpose fields', () => {
+    expect(translate('en', 'pairing.kicker')).toBe('/ Pairing');
+    expect(translate('zh-HK', 'pairing.kicker')).toContain('配對');
+    expect(translate('en', 'signing.purposeSign')).toMatch(/Review|sign/i);
+    expect(translate('zh-HK', 'signing.purposeSign')).toContain('簽署');
+    expect(translate('en', 'signing.field.chain')).toBe('Chain');
+    expect(translate('zh-HK', 'signing.field.to')).toBe('收款地址');
+    expect(translate('en', 'device.starting')).toMatch(/Bluetooth/);
+    expect(translate('zh-HK', 'device.qrDecoding')).toContain('解碼');
+    for (const language of LANGUAGES) {
+      expect(translate(language, 'pairing.hint')).not.toBe('pairing.hint');
+      expect(translate(language, 'signing.verifying')).not.toBe('signing.verifying');
+      expect(translate(language, 'signing.field.path')).not.toBe('signing.field.path');
+    }
+  });
+
 });

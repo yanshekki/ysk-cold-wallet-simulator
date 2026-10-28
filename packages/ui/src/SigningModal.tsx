@@ -1,4 +1,5 @@
-import { Dimensions, Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Dimensions, Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import {
   HOLD_CONFIRM_DEFAULT_SECONDS,
@@ -14,7 +15,7 @@ import { BRAND_LABEL, brandColor, colors, fonts, hairline, radius, space } from 
 type Props = {
   visible: boolean;
   request: SigningRequest | null;
-  onConfirm: () => void;
+  onConfirm: () => void | Promise<void>;
   onReject: () => void;
   holdLabel?: string;
   rejectLabel?: string;
@@ -24,6 +25,7 @@ type Props = {
   passphraseAppliedLabel?: string;
   passphraseIdleLabel?: string;
   passphraseHostLabel?: string;
+  verifyingLabel?: string;
   copy?: SigningCopy;
 };
 
@@ -40,8 +42,10 @@ export function SigningModal({
   passphraseAppliedLabel = 'Passphrase on',
   passphraseIdleLabel = 'No passphrase',
   passphraseHostLabel = 'Host passphrase',
+  verifyingLabel = 'Verifying…',
   copy,
 }: Props) {
+  const [verifying, setVerifying] = useState(false);
   const brand = request?.brand;
   const kind = request?.kind ?? 'sign';
   const sheetMax = Math.round(Dimensions.get('window').height * 0.8);
@@ -54,6 +58,23 @@ export function SigningModal({
   const resetKey = request
     ? `${request.kind}:${request.path}:${request.title}:${describeSigning(request).headline}`
     : '';
+
+  useEffect(() => {
+    if (!visible) {
+      setVerifying(false);
+    }
+  }, [visible]);
+
+  const handleConfirm = () => {
+    if (verifying) {
+      return;
+    }
+    setVerifying(true);
+    void Promise.resolve(onConfirm()).finally(() => {
+      setVerifying(false);
+    });
+  };
+
   return (
     <Modal visible={visible} transparent animationType="fade" statusBarTranslucent>
       <GestureHandlerRootView style={styles.flex}>
@@ -75,14 +96,27 @@ export function SigningModal({
             {showChip ? (
               <Text style={chipOn ? styles.chipOn : styles.chipOff}>{chipLabel}</Text>
             ) : null}
-            <HoldToConfirm
-              label={holdLabel}
-              onConfirm={onConfirm}
-              resetKey={resetKey}
-              durationSeconds={holdDurationSeconds}
-            />
+            {verifying ? (
+              <View style={styles.verifying} testID="signing-verifying">
+                <ActivityIndicator color={colors.ok} />
+                <Text style={styles.verifyingLabel}>{verifyingLabel}</Text>
+              </View>
+            ) : (
+              <HoldToConfirm
+                label={holdLabel}
+                onConfirm={handleConfirm}
+                resetKey={resetKey}
+                durationSeconds={holdDurationSeconds}
+              />
+            )}
             <View style={styles.actions}>
-              <Button testID="signing-reject" label={rejectLabel} variant="danger" onPress={onReject} />
+              <Button
+                testID="signing-reject"
+                label={rejectLabel}
+                variant="danger"
+                onPress={onReject}
+                disabled={verifying}
+              />
             </View>
           </View>
         </View>
@@ -140,6 +174,23 @@ const styles = StyleSheet.create({
     fontFamily: fonts.monoMedium,
     fontSize: 11,
     letterSpacing: 0.6,
+  },
+  verifying: {
+    height: 56,
+    borderRadius: radius.sm,
+    backgroundColor: colors.bg,
+    borderWidth: hairline,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: space.sm,
+  },
+  verifyingLabel: {
+    color: colors.text,
+    fontFamily: fonts.monoMedium,
+    fontSize: 12,
+    letterSpacing: 1.2,
   },
   actions: {
     marginTop: space.xs,

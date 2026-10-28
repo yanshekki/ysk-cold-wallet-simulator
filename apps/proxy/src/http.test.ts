@@ -86,13 +86,25 @@ describe('proxy ui http', () => {
     expect(html).toContain('id="lab-brands"');
     expect(html).toContain('data-testid="lab-faucet"');
     expect(html).toContain('id="tab-console"');
+    expect(html).toContain('id="lang-select"');
+    expect(html).toContain('/i18n.js');
     expect(html).toContain('id="logs"');
+
+    const i18n = await fetch(`${server.url}/i18n.js`);
+    const copy = await i18n.text();
+    expect(i18n.status).toBe(200);
+    expect(copy).toContain('Testnet host');
+    expect(copy).toContain('測試網主機');
+    expect(copy).toContain('Host de testnet');
+    expect(copy).toContain('テストネットホスト');
+    expect(copy).toContain('id: "es"');
+    expect(copy).toContain('id: "de"');
+    expect(copy).toContain('labRunning');
 
     const script = await fetch(`${server.url}/app.js`);
     const js = await script.text();
     expect(js).toContain('bindPower');
-    expect(js).toContain('Testnet host');
-    expect(js).toContain('測試網主機');
+    expect(js).toContain('lang-select');
     expect(js).toContain("post(state.status?.running ? '/stop' : '/start')");
     expect(js).not.toContain("$('clock').textContent = 'IDLE'");
 

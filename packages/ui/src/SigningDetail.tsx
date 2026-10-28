@@ -11,6 +11,20 @@ export type SigningCopy = {
   noticeManager?: string;
   noticePairing?: string;
   noticeVerify?: string;
+  payload?: string;
+  purposeSign?: string;
+  purposeAddress?: string;
+  purposeVerify?: string;
+  purposeOpenApp?: string;
+  purposeManager?: string;
+  purposePairing?: string;
+  purposeExportSeed?: string;
+  headlineBtcTx?: string;
+  headlineEthTx?: string;
+  headlineTokenTransfer?: string;
+  headlineTokenApprove?: string;
+  headlineEip712?: string;
+  fieldLabels?: Record<string, string>;
 };
 
 type Props = {
@@ -18,11 +32,59 @@ type Props = {
   copy?: SigningCopy;
 };
 
+const HEADLINE_MAP: Array<{ match: string; key: keyof SigningCopy }> = [
+  { match: 'Sign Bitcoin transaction', key: 'headlineBtcTx' },
+  { match: 'Ethereum transaction', key: 'headlineEthTx' },
+  { match: 'Token transfer', key: 'headlineTokenTransfer' },
+  { match: 'Token approve', key: 'headlineTokenApprove' },
+  { match: 'EIP-712 typed data', key: 'headlineEip712' },
+];
+
+function purposeFor(request: SigningRequest, copy?: SigningCopy): string | undefined {
+  switch (request.kind) {
+    case 'sign':
+      return copy?.purposeSign;
+    case 'address':
+      return copy?.purposeAddress;
+    case 'verify':
+      return copy?.purposeVerify;
+    case 'open-app':
+      return copy?.purposeOpenApp;
+    case 'allow-manager':
+      return copy?.purposeManager;
+    case 'pairing':
+      return copy?.purposePairing;
+    case 'export-seed':
+      return copy?.purposeExportSeed;
+    default:
+      return undefined;
+  }
+}
+
+function localizeHeadline(headline: string, copy?: SigningCopy): string {
+  for (const entry of HEADLINE_MAP) {
+    if (headline === entry.match) {
+      const next = copy?.[entry.key];
+      if (typeof next === 'string' && next) {
+        return next;
+      }
+    }
+  }
+  return headline;
+}
+
+function localizeFieldLabel(label: string, copy?: SigningCopy): string {
+  const mapped = copy?.fieldLabels?.[label];
+  return mapped ?? label;
+}
+
 function localize(detail: SigningDetail, request: SigningRequest, copy?: SigningCopy): SigningDetail {
   let headline = detail.headline;
   let warning = detail.warning;
   if (detail.decodeFailed && copy?.decodeFailed) {
     headline = copy.decodeFailed;
+  } else {
+    headline = localizeHeadline(headline, copy);
   }
   if (detail.style === 'eth-message') {
     if (detail.hex && copy?.rawMessage) {
@@ -40,13 +102,23 @@ function localize(detail: SigningDetail, request: SigningRequest, copy?: Signing
   } else if (request.kind === 'verify' && copy?.noticeVerify) {
     warning = copy.noticeVerify;
   }
-  return { ...detail, headline, warning };
+  return {
+    ...detail,
+    headline,
+    warning,
+    fields: detail.fields.map((field) => ({
+      ...field,
+      label: localizeFieldLabel(field.label, copy),
+    })),
+  };
 }
 
 export function SigningDetailView({ request, copy }: Props) {
   const detail = localize(describeSigning(request), request, copy);
+  const purpose = purposeFor(request, copy);
   return (
     <View style={styles.box}>
+      {purpose ? <Text style={styles.purpose}>{purpose}</Text> : null}
       <Text style={styles.headline}>{detail.headline}</Text>
       {detail.warning ? <Text style={styles.warning}>{detail.warning}</Text> : null}
       {detail.note ? <Text style={styles.note}>{detail.note}</Text> : null}
@@ -60,7 +132,7 @@ export function SigningDetailView({ request, copy }: Props) {
       ))}
       {detail.hex ? (
         <View style={styles.row}>
-          <Text style={styles.label}>PAYLOAD</Text>
+          <Text style={styles.label}>{copy?.payload ?? 'PAYLOAD'}</Text>
           <Text style={styles.hex} selectable>
             {formatHex(detail.hex)}
           </Text>
@@ -73,6 +145,13 @@ export function SigningDetailView({ request, copy }: Props) {
 const styles = StyleSheet.create({
   box: {
     gap: space.sm,
+  },
+  purpose: {
+    color: colors.ok,
+    fontFamily: fonts.monoMedium,
+    fontSize: 11,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
   },
   headline: {
     color: colors.text,

@@ -82,6 +82,7 @@ export default function DeviceScreen() {
   const [qrRefreshing, setQrRefreshing] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
   const [scanProgress, setScanProgress] = useState<{ received: number; expected: number } | null>(null);
+  const [scanBusy, setScanBusy] = useState(false);
   const lastPart = useRef('');
 
   useEffect(() => {
@@ -128,7 +129,7 @@ export default function DeviceScreen() {
     setBusy(true);
     setLocalError(null);
     try {
-      await startSimulation();
+      await runWithLoading(t('device.starting'), () => startSimulation());
     } catch (err) {
       setLocalError(err instanceof Error ? t(err.message) : t('errors.advertiseFailed'));
     } finally {
@@ -180,6 +181,7 @@ export default function DeviceScreen() {
   const closeScan = () => {
     setScanOpen(false);
     setScanProgress(null);
+    setScanBusy(false);
     lastPart.current = '';
     resetQrScan();
   };
@@ -201,12 +203,15 @@ export default function DeviceScreen() {
       return;
     }
     lastPart.current = part;
+    setScanBusy(true);
     void scanQrSign(part)
       .then((result) => {
         if (result.status === 'progress') {
           setScanProgress({ received: result.received, expected: result.expected });
+          setScanBusy(false);
           return;
         }
+        setScanBusy(false);
         closeScan();
         if (result.status === 'complete') {
           setQr(result.qr);
@@ -216,6 +221,7 @@ export default function DeviceScreen() {
         }
       })
       .catch((err) => {
+        setScanBusy(false);
         closeScan();
         setLocalError(err instanceof Error ? t(err.message) : t('errors.qrBadUr'));
       });
@@ -542,6 +548,8 @@ export default function DeviceScreen() {
             })
           : undefined
       }
+      busy={scanBusy}
+      busyLabel={t('device.qrDecoding')}
       deniedLabel={t('device.qrCameraDenied')}
       allowLabel={t('device.qrAllowCamera')}
       closeLabel={t('common.close')}

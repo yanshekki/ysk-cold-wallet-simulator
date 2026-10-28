@@ -195,17 +195,28 @@ body {
 
 .langs {
   display: flex;
-  gap: 2px;
+  align-items: center;
+  gap: 6px;
   padding-top: 2px;
+  max-width: 160px;
 }
 
-.lang {
-  min-height: 22px;
-  padding: 0 6px;
+.lang-label {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.lang-select {
+  min-height: 24px;
+  max-width: 132px;
+  padding: 0 4px;
   border: 1px solid var(--border);
   border-radius: 2px;
   background: var(--elevated);
-  color: var(--muted);
+  color: var(--text);
   font-family: var(--mono);
   font-size: 10px;
   font-weight: 500;
@@ -213,9 +224,38 @@ body {
   -webkit-app-region: no-drag;
 }
 
-.lang.on {
-  color: var(--text);
-  border-color: var(--text);
+.lang-select:focus {
+  outline: 1px solid var(--ok);
+  outline-offset: 1px;
+}
+
+#lab-run.busy,
+button.busy {
+  opacity: 0.72;
+  cursor: wait;
+}
+
+#lab-run.busy::before {
+  content: '';
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 8px;
+  border: 1.5px solid var(--muted);
+  border-top-color: var(--ok);
+  border-radius: 50%;
+  vertical-align: -1px;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.status.busy strong {
+  color: var(--ok);
 }
 
 .screen {

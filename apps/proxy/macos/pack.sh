@@ -32,7 +32,7 @@ cp "$NODE_BIN" "$INNER_CONTENTS/MacOS/CWSNode"
 cp "$MACOS/Info.plist" "$CONTENTS/Info.plist"
 cp "$MACOS/NodeInfo.plist" "$INNER_CONTENTS/Info.plist"
 cp "$PROFILE" "$INNER_CONTENTS/embedded.provisionprofile"
-cp "$PROXY/ui/index.html" "$PROXY/ui/styles.css" "$PROXY/ui/app.js" "$CONTENTS/Resources/ui/"
+cp "$PROXY/ui/index.html" "$PROXY/ui/styles.css" "$PROXY/ui/i18n.js" "$PROXY/ui/app.js" "$CONTENTS/Resources/ui/"
 
 NATIVE="$ROOT/packages/native-proxy"
 cp "$NATIVE/index.js" "$NATIVE/package.json" "$CONTENTS/Resources/proxy/node_modules/@cws/native-proxy/"

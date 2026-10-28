@@ -1,134 +1,3 @@
-const COPY = {
-  en: {
-    kicker: '/ PROXY',
-    title: 'CWS',
-    subtitle: 'This page starts the USB-to-Bluetooth proxy. Signing still happens on the phone.',
-    start: 'Start',
-    stop: 'Stop',
-    idle: 'Waiting to scan',
-    scanning: 'Scanning for the phone',
-    connecting: 'Connecting GATT',
-    gatt: 'BLE GATT up',
-    hid: 'Virtual HID up',
-    error: 'Error',
-    hidIdle: 'idle',
-    hidUp: 'up',
-    hidSkipped: 'skipped',
-    hidFailed: 'failed',
-    pairing: 'Enter the 6-digit pairing code shown on the phone',
-    pairingSubmit: 'Pair',
-    logs: 'Console',
-    tabProxy: 'Proxy',
-    tabLab: 'Testnet host',
-    tabConsole: 'Console',
-    labKicker: '/ TESTNET',
-    labFaucet: 'NEAR testnet faucet',
-    labNeedGatt: 'Start the proxy and wait for the phone before running cases.',
-    labWaitPhone: 'Proxy is up. Waiting for the phone Bluetooth link.',
-    labReady: 'Phone link is up. Cases talk to the phone over Bluetooth, not HID.',
-    labRun: 'Run',
-    labClose: 'Close',
-    labPath: 'Path',
-    labUtf8: 'UTF-8',
-    labHex: 'Hex',
-    dashboard: 'Dashboard',
-    ethereum: 'Ethereum · Sepolia',
-    solana: 'Solana · Devnet',
-    near: 'NEAR · Testnet',
-    bitcoin: 'Bitcoin family',
-    avalanche: 'Avalanche · Fuji',
-    family: 'Other apps',
-    onekey: 'OneKey',
-    trezor: 'Trezor Safe 7',
-    waiting: 'Waiting for the host. Start the proxy first.',
-    search: 'Search',
-    all: 'ALL',
-    wrap: 'WRAP',
-    follow: 'FOLLOW',
-    prev: 'Prev',
-    next: 'Next',
-    copyLine: 'Copy line',
-    copyMatch: 'Copy match',
-    copyAll: 'Copy all',
-    export: 'Export',
-    clear: 'Clear',
-    latest: 'Latest',
-    copied: 'Copied',
-    phone: 'GAP name',
-    uuid: 'Service UUID',
-    vid: 'VID / PID',
-    mtu: 'MTU',
-    hidLabel: 'HID',
-    trezord: 'trezord',
-    noPhone: 'NO PHONE',
-    nativeMissing: 'Native Bluetooth support is not included in this build.',
-  },
-  'zh-HK': {
-    kicker: '/ 代理',
-    title: 'CWS',
-    subtitle: '此頁啟動 USB 至藍牙代理。簽署仍在電話確認。',
-    start: '開始',
-    stop: '停止',
-    idle: '尚未開始掃描',
-    scanning: '正在掃描電話',
-    connecting: '正在連接 GATT',
-    gatt: 'BLE GATT 已連接',
-    hid: '虛擬 HID 已就緒',
-    error: '錯誤',
-    hidIdle: '閒置',
-    hidUp: '已就緒',
-    hidSkipped: '已跳過',
-    hidFailed: '失敗',
-    pairing: '輸入電話顯示的 6 位配對碼',
-    pairingSubmit: '配對',
-    logs: '紀錄',
-    tabProxy: '代理',
-    tabLab: '測試網主機',
-    tabConsole: '紀錄',
-    labKicker: '/ 測試網主機',
-    labFaucet: 'NEAR 測試網水龍頭',
-    labNeedGatt: '請先啟動代理，待電話連接後再執行案例。',
-    labWaitPhone: '代理已啟動。正在等候電話藍牙連線。',
-    labReady: '電話已連線。實驗室案例經電話藍牙傳送，不經 HID。',
-    labRun: '執行',
-    labClose: '關閉',
-    labPath: '路徑',
-    labUtf8: 'UTF-8',
-    labHex: 'Hex',
-    dashboard: '主畫面',
-    ethereum: 'Ethereum · Sepolia',
-    solana: 'Solana · Devnet',
-    near: 'NEAR · Testnet',
-    bitcoin: 'Bitcoin 系列',
-    avalanche: 'Avalanche · Fuji',
-    family: '其他鏈',
-    onekey: 'OneKey',
-    trezor: 'Trezor Safe 7',
-    waiting: '正在等候主機…請先啟動代理。',
-    search: '搜尋',
-    all: '全部',
-    wrap: '換行',
-    follow: '跟隨',
-    prev: '上一筆',
-    next: '下一筆',
-    copyLine: '複製行',
-    copyMatch: '複製符合',
-    copyAll: '複製全部',
-    export: '匯出',
-    clear: '清除',
-    latest: '最新',
-    copied: '已複製',
-    phone: '廣播名稱',
-    uuid: 'Service UUID',
-    vid: 'VID / PID',
-    mtu: 'MTU',
-    hidLabel: 'HID',
-    trezord: 'trezord',
-    noPhone: '無電話',
-    nativeMissing: '此版本未包含原生藍牙支援。',
-  },
-};
-
 const BRAND_LABEL = {
   ledger: 'Ledger',
   trezor: 'Trezor',
@@ -151,7 +20,6 @@ const PHASE_COPY = {
   error: 'error',
 };
 
-const LANG_KEY = 'cws-proxy-lang';
 const LOG_FONT_MIN = 10;
 const LOG_FONT_MAX = 16;
 
@@ -180,10 +48,6 @@ function formatTime(at) {
   return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}.${pad(date.getMilliseconds(), 3)}`;
 }
 
-function loadLang() {
-  const stored = localStorage.getItem(LANG_KEY);
-  return stored === 'zh-HK' ? 'zh-HK' : 'en';
-}
 
 function inferChannel(line) {
   const text = line.toLowerCase();
@@ -285,7 +149,11 @@ const state = {
 };
 
 function t(key) {
-  return COPY[state.lang][key];
+  return (COPY[state.lang] ?? COPY.en)[key] ?? COPY.en[key] ?? key;
+}
+
+function labActionTitle(action) {
+  return state.lang === 'zh-HK' ? action.zh : action.en;
 }
 
 function visibleLogs(status) {
@@ -354,11 +222,16 @@ function renderCopy() {
   $('label-mtu').textContent = t('mtu');
   $('label-hid').textContent = t('hidLabel');
   $('label-trezord').textContent = t('trezord');
-  $('lang-en')?.classList.toggle('on', state.lang === 'en');
-  $('lang-zh')?.classList.toggle('on', state.lang === 'zh-HK');
+  const langSelect = $('lang-select');
+  if (langSelect) {
+    langSelect.value = state.lang;
+  }
+  document.documentElement.lang = state.lang === 'zh-HK' ? 'zh-HK' : state.lang;
+  document.documentElement.dir = state.lang === 'ar' ? 'rtl' : 'ltr';
   if (state.status) {
     renderStatus(state.status);
   }
+  renderLab();
 }
 
 function renderStatus(status) {
@@ -613,9 +486,10 @@ function renderLab() {
   const ready = Boolean(catalog?.ready);
   const locked = Boolean(catalog?.connectedBrand);
   const status = $('lab-status');
-  status.className = ready ? 'status' : 'status error';
+  status.className = state.labBusy ? 'status busy' : ready ? 'status' : 'status error';
   const waitCopy = state.status?.running ? 'labWaitPhone' : 'labNeedGatt';
-  status.innerHTML = `<strong>${ready ? t('labReady') : t(waitCopy)}</strong>`;
+  const statusCopy = state.labBusy ? 'labRunning' : ready ? 'labReady' : waitCopy;
+  status.innerHTML = `<strong>${t(statusCopy)}</strong>`;
   const brands = $('lab-brands');
   brands.replaceChildren();
   for (const brand of ['ledger', 'onekey', 'trezor']) {
@@ -665,7 +539,7 @@ function renderLab() {
     button.type = 'button';
     button.dataset.action = action.id;
     button.dataset.testid = `lab-action-${action.id}`;
-    button.textContent = state.lang === 'zh-HK' ? action.zh : action.en;
+    button.textContent = labActionTitle(action);
     button.disabled = !ready || state.labBusy;
     button.addEventListener('click', () => {
       if (action.editor) {
@@ -690,7 +564,7 @@ function renderLab() {
 function openLabEditor(action) {
   state.labEditor = {
     id: action.id,
-    title: state.lang === 'zh-HK' ? action.zh : action.en,
+    title: labActionTitle(action),
     editor: action.editor,
   };
   $('lab-input-path').value = action.editor.path ?? '';
@@ -718,6 +592,10 @@ function renderLabEditor() {
   $('lab-field-path').classList.toggle('hidden', editor.editor.path === undefined);
   $('lab-field-utf8').classList.toggle('hidden', editor.editor.utf8 === undefined);
   $('lab-field-hex').classList.toggle('hidden', editor.editor.hex === undefined);
+  const run = $('lab-run');
+  run.textContent = state.labBusy ? t('labRunning') : t('labRun');
+  run.disabled = state.labBusy;
+  run.classList.toggle('busy', state.labBusy);
 }
 
 async function runLabAction(actionId, draft) {
@@ -796,14 +674,13 @@ $('code').addEventListener('keydown', (event) => {
     void post('/pairing', { code: $('code').value });
   }
 });
-$('lang-en')?.addEventListener('click', () => {
-  state.lang = 'en';
-  localStorage.setItem(LANG_KEY, 'en');
-  renderCopy();
-});
-$('lang-zh')?.addEventListener('click', () => {
-  state.lang = 'zh-HK';
-  localStorage.setItem(LANG_KEY, 'zh-HK');
+$('lang-select')?.addEventListener('change', (event) => {
+  const next = event.target.value;
+  if (!isProxyLang(next)) {
+    return;
+  }
+  state.lang = next;
+  localStorage.setItem(LANG_KEY, next);
   renderCopy();
 });
 $('tab-proxy').addEventListener('click', () => setTab('proxy'));
