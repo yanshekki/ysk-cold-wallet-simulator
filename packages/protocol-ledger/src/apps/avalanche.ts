@@ -246,13 +246,17 @@ async function handleSignHash(apdu: Apdu, ctx: AvaxContext): Promise<Uint8Array>
   if (!hash || !root) {
     return encodeResponse(new Uint8Array(), SW_WRONG_LENGTH);
   }
-  let suffix;
-  try {
-    suffix = parseBip32Path(apdu.data);
-  } catch {
-    return encodeResponse(new Uint8Array(), SW_WRONG_LENGTH);
+  // Ledger hosts (and Proxy LAB) often send a zero-length BIP32 suffix on HASH_LAST
+  // meaning "sign with the path from HASH_FIRST". parseBip32Path rejects count=0.
+  let suffixPath = '';
+  if (!(apdu.data.length === 0 || (apdu.data.length >= 1 && apdu.data[0] === 0 && apdu.data.length === 1))) {
+    try {
+      suffixPath = parseBip32Path(apdu.data).path;
+    } catch {
+      return encodeResponse(new Uint8Array(), SW_WRONG_LENGTH);
+    }
   }
-  const path = joinPath(root, suffix.path);
+  const path = joinPath(root, suffixPath);
   if (apdu.p1 === P1_HASH_LAST) {
     ctx.session.pendingHash = undefined;
     ctx.session.rootPath = undefined;
@@ -299,10 +303,15 @@ async function handleSignPayload(apdu: Apdu, ctx: AvaxContext, title: string): P
   const ok = await ctx.confirmation.confirm(request);
   if (!ok) {
     ctx.session.pendingHash = undefined;
+    ctx.session.rootPath = undefined;
     return encodeResponse(new Uint8Array(), SW_DENY);
   }
-  ctx.session.pendingHash = sha256(payload);
-  return encodeResponse(new Uint8Array(), SW_OK);
+  const digest = sha256(payload);
+  // Keep pendingHash so a follow-up SIGN_HASH can still sign alternate paths.
+  ctx.session.pendingHash = digest;
+  const seed = await seedFor(ctx.confirmation, ctx.slotId, ctx.entropy, ctx.backup ?? 'bip39');
+  const node = deriveHdNodeFromSeed(seed, path);
+  return encodeResponse(signSecp256k1Recoverable(node.privateKey, digest), SW_OK);
 }
 
 function parseHrChainPath(data: Uint8Array): { hrp: string; path: string; chain: AvaxChain } {
