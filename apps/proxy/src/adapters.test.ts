@@ -573,6 +573,31 @@ describe('attachLedger', () => {
     adapter.close();
   });
 
+  it('setOpenAppName updates local GET_APP_AND_VERSION without OpenApp APDU', async () => {
+    const { host, gadget } = memoryHidPair();
+    const ble = {
+      async write() {
+        return;
+      },
+      onNotify() {
+        return () => undefined;
+      },
+      async close() {
+        return;
+      },
+    };
+    const adapter = attachLedger(gadget, ble, DEFAULT_MTU, () => undefined);
+    const replies: Uint8Array[] = [];
+    host.onInput((report) => replies.push(report));
+    adapter.setOpenAppName('Avalanche');
+    for (const report of wrapHidApdu(Uint8Array.of(0xb0, 0x01, 0x00, 0x00, 0x00))) {
+      host.write(report);
+    }
+    const body = Array.from(unwrapHidReports(replies).payload, (b) => String.fromCharCode(b)).join('');
+    expect(body).toContain('Avalanche');
+    adapter.close();
+  });
+
   it('keeps GET_APP_AND_VERSION on the previous app until OpenApp returns 9000', async () => {
     const { host, gadget } = memoryHidPair();
     let notify: ((packet: Uint8Array) => void) | undefined;

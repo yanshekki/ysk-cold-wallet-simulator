@@ -28,6 +28,7 @@ export type UiCommands = {
   stop(): void;
   labCatalog(requested?: Brand): LabCatalog;
   runLab(actionId: string, draft?: LabDraftInput): Promise<string>;
+  setOpenAppName(name: string): void;
 };
 
 export type UiServer = {
@@ -125,7 +126,25 @@ export function startUiServer(opts: {
       json(res, 200, { ok: true, running: true });
       return;
     }
-    if (method === 'POST' && url.pathname === '/stop') {
+    if (method === 'POST' && url.pathname === '/ledger/app-name') {
+      void readBody(req).then((body) => {
+        try {
+          const parsed = body ? (JSON.parse(body) as { name?: unknown }) : {};
+          const name = typeof parsed.name === 'string' ? parsed.name.trim() : '';
+          if (!name) {
+            json(res, 400, { ok: false, error: 'name required' });
+            return;
+          }
+          opts.commands.setOpenAppName(name);
+          json(res, 200, { ok: true, name });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          json(res, 409, { ok: false, error: message });
+        }
+      });
+      return;
+    }
+        if (method === 'POST' && url.pathname === '/stop') {
       opts.commands.stop();
       json(res, 200, { ok: true, running: false });
       return;

@@ -57,5 +57,8 @@ export function attachTrezor(
     setLabAwaiting(active) {
       labAwaiting = active;
     },
+    setOpenAppName() {
+      // HID app cache is Ledger-only
+    },
   };
 }

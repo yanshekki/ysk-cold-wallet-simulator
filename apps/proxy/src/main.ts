@@ -125,6 +125,7 @@ async function main(): Promise<void> {
       stop: () => runtime.stop(),
       labCatalog: (brand) => runtime.labCatalog(brand),
       runLab: (actionId, draft) => runtime.runLab(actionId, draft),
+      setOpenAppName: (name) => runtime.setOpenAppName(name),
     },
     port: uiPort,
   });

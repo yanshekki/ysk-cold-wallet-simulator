@@ -374,5 +374,13 @@ export function attachLedger(
     setLabAwaiting(active) {
       labAwaiting = active;
     },
+    setOpenAppName(name) {
+      const next = name.trim() || 'BOLOS';
+      if (next !== lastAppName) {
+        log(`app cache => ${next}`);
+      }
+      lastAppName = next;
+      pendingOpenName = undefined;
+    },
   };
 }
