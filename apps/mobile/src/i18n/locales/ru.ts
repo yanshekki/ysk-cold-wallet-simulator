@@ -343,6 +343,7 @@ export const ru: MessageTree = {
       message: 'Сообщение',
       hash: 'Хеш',
       bytes: 'Байты',
+      payload: 'Полезная нагрузка',
       spender: 'Тратящий',
     },
   },

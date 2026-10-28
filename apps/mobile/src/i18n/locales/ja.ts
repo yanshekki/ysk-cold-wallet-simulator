@@ -343,6 +343,7 @@ export const ja: MessageTree = {
       message: 'メッセージ',
       hash: 'ハッシュ',
       bytes: 'バイト',
+      payload: 'ペイロード',
       spender: '支出者',
     },
   },
