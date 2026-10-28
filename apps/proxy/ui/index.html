@@ -41,9 +41,20 @@
               <p class="kicker" id="kicker">/ PROXY</p>
               <h1 id="title">CWS</h1>
             </div>
-            <div class="langs" role="group" aria-label="Language">
-              <button type="button" id="lang-en" class="lang on" data-lang="en" data-testid="lang-en">EN</button>
-              <button type="button" id="lang-zh" class="lang" data-lang="zh-HK" data-testid="lang-zh">繁</button>
+            <div class="langs">
+              <label class="lang-label" for="lang-select">Lang</label>
+              <select id="lang-select" class="lang-select" data-testid="lang-select" aria-label="Language">
+                <option value="en">EN · English</option>
+                <option value="zh-HK">繁 · 繁體中文（香港）</option>
+                <option value="es">ES · Español</option>
+                <option value="ar">AR · العربية</option>
+                <option value="pt">PT · Português</option>
+                <option value="id">ID · Bahasa Indonesia</option>
+                <option value="fr">FR · Français</option>
+                <option value="ja">JA · 日本語</option>
+                <option value="ru">RU · Русский</option>
+                <option value="de">DE · Deutsch</option>
+              </select>
             </div>
           </div>
           <p class="subtitle" id="subtitle"></p>
@@ -160,6 +171,7 @@
         </footer>
       </div>
     </div>
+    <script src="/i18n.js"></script>
     <script src="/app.js"></script>
   </body>
 </html>

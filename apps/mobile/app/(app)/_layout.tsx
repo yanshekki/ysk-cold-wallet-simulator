@@ -96,7 +96,11 @@ export default function AppShell() {
         <Tabs.Screen name="console" options={{ title: t('tabs.console'), tabBarButtonTestID: 'tab-console' }} />
         <Tabs.Screen name="settings" options={{ title: t('tabs.settings'), tabBarButtonTestID: 'tab-settings' }} />
       </Tabs>
-      <PairingTakeover code={pairingCode} />
+      <PairingTakeover
+        code={pairingCode}
+        kicker={t('pairing.kicker')}
+        hint={t('pairing.hint')}
+      />
       <SigningModal
         visible={!!pending}
         request={pending}
@@ -106,6 +110,7 @@ export default function AppShell() {
         holdDurationSeconds={settings.holdDurationSeconds}
         rejectLabel={t('signing.reject')}
         confirmTitle={t('signing.title')}
+        verifyingLabel={t('signing.verifying')}
         sessionPassphraseApplied={sessionPassphraseApplied}
         passphraseAppliedLabel={
           passphraseFingerprint
@@ -122,6 +127,50 @@ export default function AppShell() {
           noticeManager: t('signing.noticeManager'),
           noticePairing: t('signing.noticePairing'),
           noticeVerify: t('signing.noticeVerify'),
+          payload: t('signing.payload'),
+          purposeSign: t('signing.purposeSign'),
+          purposeAddress: t('signing.purposeAddress'),
+          purposeVerify: t('signing.purposeVerify'),
+          purposeOpenApp: t('signing.purposeOpenApp'),
+          purposeManager: t('signing.purposeManager'),
+          purposePairing: t('signing.purposePairing'),
+          purposeExportSeed: t('signing.purposeExportSeed'),
+          headlineBtcTx: t('signing.headlineBtcTx'),
+          headlineEthTx: t('signing.headlineEthTx'),
+          headlineTokenTransfer: t('signing.headlineTokenTransfer'),
+          headlineTokenApprove: t('signing.headlineTokenApprove'),
+          headlineEip712: t('signing.headlineEip712'),
+          fieldLabels: {
+            CHAIN: t('signing.field.chain'),
+            'CHAIN ID': t('signing.field.chainId'),
+            PATH: t('signing.field.path'),
+            TO: t('signing.field.to'),
+            VALUE: t('signing.field.value'),
+            FEE: t('signing.field.fee'),
+            WEI: t('signing.field.wei'),
+            NONCE: t('signing.field.nonce'),
+            GAS: t('signing.field.gas'),
+            'GAS PRICE': t('signing.field.gasPrice'),
+            'MAX FEE': t('signing.field.maxFee'),
+            'MAX PRIORITY': t('signing.field.maxPriority'),
+            'ACCESS LIST': t('signing.field.accessList'),
+            'BLOB FEE': t('signing.field.blobFee'),
+            BLOBS: t('signing.field.blobs'),
+            AUTHORIZATIONS: t('signing.field.authorizations'),
+            SELECTOR: t('signing.field.selector'),
+            DATA: t('signing.field.data'),
+            METHOD: t('signing.field.method'),
+            CONTRACT: t('signing.field.contract'),
+            'AMOUNT RAW': t('signing.field.amountRaw'),
+            AMOUNT: t('signing.field.amount'),
+            TICKER: t('signing.field.ticker'),
+            TYPE: t('signing.field.type'),
+            DOMAIN: t('signing.field.domain'),
+            MESSAGE: t('signing.field.message'),
+            HASH: t('signing.field.hash'),
+            BYTES: t('signing.field.bytes'),
+            SPENDER: t('signing.field.spender'),
+          },
         }}
       />
       <Toast message={toast} />

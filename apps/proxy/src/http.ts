@@ -19,6 +19,7 @@ const FILES: Record<string, string> = {
   '/': 'index.html',
   '/index.html': 'index.html',
   '/styles.css': 'styles.css',
+  '/i18n.js': 'i18n.js',
   '/app.js': 'app.js',
 };
 

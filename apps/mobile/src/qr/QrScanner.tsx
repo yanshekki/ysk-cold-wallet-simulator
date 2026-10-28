@@ -1,5 +1,5 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, colors, fonts, space } from '@cws/ui';
 
@@ -7,6 +7,8 @@ type Props = {
   visible: boolean;
   hint: string;
   progressLabel?: string;
+  busy?: boolean;
+  busyLabel?: string;
   deniedLabel: string;
   allowLabel: string;
   closeLabel: string;
@@ -18,6 +20,8 @@ export function QrScanner({
   visible,
   hint,
   progressLabel,
+  busy = false,
+  busyLabel,
   deniedLabel,
   allowLabel,
   closeLabel,
@@ -51,6 +55,12 @@ export function QrScanner({
         <View style={[styles.top, { paddingTop: insets.top + space.md }]}>
           <Text style={styles.hint}>{hint}</Text>
           {progressLabel ? <Text style={styles.progress}>{progressLabel}</Text> : null}
+          {busy ? (
+            <View style={styles.busyRow} testID="device-qr-decoding">
+              <ActivityIndicator color={colors.ok} />
+              {busyLabel ? <Text style={styles.progress}>{busyLabel}</Text> : null}
+            </View>
+          ) : null}
         </View>
         <Pressable
           accessibilityRole="button"
@@ -102,6 +112,11 @@ const styles = StyleSheet.create({
     fontFamily: fonts.monoMedium,
     fontSize: 13,
     textAlign: 'center',
+  },
+  busyRow: {
+    marginTop: space.sm,
+    alignItems: 'center',
+    gap: space.sm,
   },
   close: {
     position: 'absolute',

@@ -4,9 +4,15 @@ import { colors, fonts, hairline, motion, radius, space } from './theme';
 
 type Props = {
   code: string | null;
+  kicker?: string;
+  hint?: string;
 };
 
-export function PairingTakeover({ code }: Props) {
+export function PairingTakeover({
+  code,
+  kicker = '/ Pairing',
+  hint = 'Enter this code on the host. Pairing waits until the host confirms.',
+}: Props) {
   const scale = useRef(new Animated.Value(0.92)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
@@ -36,11 +42,9 @@ export function PairingTakeover({ code }: Props) {
     <Modal visible={!!code} transparent animationType="fade" statusBarTranslucent>
       <View style={styles.backdrop} accessibilityViewIsModal>
         <Animated.View style={[styles.panel, { opacity, transform: [{ scale }] }]}>
-          <Text style={styles.kicker}>/ Pairing</Text>
+          <Text style={styles.kicker}>{kicker}</Text>
           <Text style={styles.code}>{code ?? ''}</Text>
-          <Text style={styles.hint}>
-            Type this on the host. Pairing holds until the host confirms. This screen does not loop the digits.
-          </Text>
+          <Text style={styles.hint}>{hint}</Text>
         </Animated.View>
       </View>
     </Modal>
