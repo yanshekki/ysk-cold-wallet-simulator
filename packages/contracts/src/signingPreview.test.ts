@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { SigningRequest } from './signing';
-import { describeBtcPsbt, describeEthTransaction, describeEthTypedData, describeSigning, hex0x, parseEthTx } from './signingPreview';
+import {
+  describeBtcPsbt,
+  describeEthTransaction,
+  describeEthTypedData,
+  describeHostSuppliedHash,
+  describeSigning,
+  hex0x,
+  parseEthTx,
+} from './signingPreview';
 
 function concat(...parts: Uint8Array[]): Uint8Array {
   const total = parts.reduce((n, part) => n + part.length, 0);
@@ -280,6 +288,20 @@ describe('describeSigning', () => {
     expect(detail.headline).toBe('EIP-712 typed data');
     expect(detail.fields.find((field) => field.label === 'TYPE')?.value).toBe('Mail');
     expect(detail.fields.find((field) => field.label === 'DOMAIN')?.value).toBe('Ether Mail');
+  });
+
+  it('labels a host-supplied EIP-712 hash instead of typed data', () => {
+    const detail = describeHostSuppliedHash({
+      path: "m/44'/60'/0'/0/0",
+      domainHash: new Uint8Array(32).fill(0x11),
+      messageHash: new Uint8Array(32).fill(0x22),
+    });
+    expect(detail.headline).toBe('Host-supplied hash');
+    expect(detail.headline).not.toMatch(/typed data|transaction/i);
+    expect(detail.warning).toMatch(/host supplied this hash/i);
+    expect(detail.warning).toMatch(/not a decoded transaction/i);
+    expect(detail.fields.find((field) => field.label === 'DOMAIN HASH')?.value).toBe(`0x${'11'.repeat(32)}`);
+    expect(detail.fields.find((field) => field.label === 'MESSAGE HASH')?.value).toBe(`0x${'22'.repeat(32)}`);
   });
 
   it('labels Bitcoin PSBT outputs', () => {

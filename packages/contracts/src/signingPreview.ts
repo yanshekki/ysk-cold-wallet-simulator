@@ -345,6 +345,27 @@ function describeErc20(
   };
 }
 
+/** Shown when the host sent EIP-712 domain and message hashes instead of typed data. */
+export const HOST_SUPPLIED_HASH_WARNING =
+  'The host supplied this hash. It is not a decoded transaction.';
+
+export function describeHostSuppliedHash(input: {
+  path: string;
+  domainHash: Uint8Array;
+  messageHash: Uint8Array;
+}): SigningDetail {
+  return {
+    style: 'raw-sign',
+    headline: 'Host-supplied hash',
+    warning: HOST_SUPPLIED_HASH_WARNING,
+    fields: [
+      { label: 'PATH', value: input.path, mono: true },
+      { label: 'DOMAIN HASH', value: hex0x(input.domainHash), mono: true },
+      { label: 'MESSAGE HASH', value: hex0x(input.messageHash), mono: true },
+    ],
+  };
+}
+
 export function describeEthTypedData(path: string, json: Uint8Array): SigningDetail {
   const text = asPrintable(json);
   let primary = '';

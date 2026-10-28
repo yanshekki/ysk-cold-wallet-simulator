@@ -1,5 +1,11 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { BTC_ZERO_HMAC_WARNING, describeSigning, type SigningDetail, type SigningRequest } from '@cws/contracts';
+import {
+  BTC_ZERO_HMAC_WARNING,
+  HOST_SUPPLIED_HASH_WARNING,
+  describeSigning,
+  type SigningDetail,
+  type SigningRequest,
+} from '@cws/contracts';
 import { formatHex } from './logFormat';
 import { colors, fonts, space } from './theme';
 
@@ -27,6 +33,8 @@ export type SigningCopy = {
   headlineEip7702?: string;
   notice7702?: string;
   noticeZeroHmac?: string;
+  noticeHostHash?: string;
+  headlineHostHash?: string;
   fieldLabels?: Record<string, string>;
 };
 
@@ -42,6 +50,7 @@ const HEADLINE_MAP: Array<{ match: string; key: keyof SigningCopy }> = [
   { match: 'Token approve', key: 'headlineTokenApprove' },
   { match: 'EIP-712 typed data', key: 'headlineEip712' },
   { match: 'EIP-7702 authorization', key: 'headlineEip7702' },
+  { match: 'Host-supplied hash', key: 'headlineHostHash' },
 ];
 
 function purposeFor(request: SigningRequest, copy?: SigningCopy): string | undefined {
@@ -90,6 +99,9 @@ function localize(detail: SigningDetail, request: SigningRequest, copy?: Signing
   }
   if (warning === BTC_ZERO_HMAC_WARNING && copy?.noticeZeroHmac) {
     warning = copy.noticeZeroHmac;
+  }
+  if (warning === HOST_SUPPLIED_HASH_WARNING && copy?.noticeHostHash) {
+    warning = copy.noticeHostHash;
   }
   if (detail.decodeFailed && copy?.decodeFailed) {
     headline = copy.decodeFailed;

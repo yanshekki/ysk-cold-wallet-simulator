@@ -2,7 +2,7 @@ import { sha256 } from '@noble/hashes/sha2';
 import { mnemonicToEntropy, mnemonicToSeedSync } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
 import { describe, expect, it } from 'vitest';
-import { LEDGER_MODELS, catalogVersion, overlayDerivationPath, type ConfirmationPort } from '@cws/contracts';
+import { LEDGER_MODELS, catalogVersion, overlayDerivationPath, type ConfirmationPort, type SigningRequest } from '@cws/contracts';
 import { encodeResponse, SW_DENY, SW_OK } from './apdu';
 import { FUJI_HRP, FUJI_X_CHAIN_ID, avalancheBech32Address } from './apps/avalanche';
 import {
@@ -1182,6 +1182,42 @@ describe('LedgerProtocolHandler', () => {
     expect(sw).toBe(SW_OK);
     expect(payload.length).toBe(1 + 64 + 2);
     expect(payload[0] === 27 || payload[0] === 28).toBe(true);
+  });
+
+  it('shows a host-supplied hash for hashed EIP-712 and deny returns 6985', async () => {
+    const requests: SigningRequest[] = [];
+    const handler = new LedgerProtocolHandler({
+      model: nanoX,
+      confirmation: {
+        async confirm(request) {
+          requests.push(request);
+          return false;
+        },
+        async getPassphrase() {
+          return undefined;
+        },
+      },
+      slotId: 'slot',
+      entropy,
+    });
+    handler.setApp('ethereum');
+    const domain = new Array(32).fill(0x11);
+    const message = new Array(32).fill(0x22);
+    const pathBytes = [
+      0x05, 0x80, 0x00, 0x00, 0x2c, 0x80, 0x00, 0x00, 0x3c, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+      0x00, 0x00, 0x00, 0x00, ...domain, ...message,
+    ];
+    const payload = await exchange(handler, apdu([0xe0, 0x0c, 0x00, 0x00, pathBytes.length, ...pathBytes]));
+    const sw = (payload[payload.length - 2] << 8) | payload[payload.length - 1];
+    expect(sw).toBe(SW_DENY);
+    expect(payload.length).toBe(2);
+    expect(requests).toHaveLength(1);
+    expect(requests[0]?.title).toBe('Sign host-supplied hash');
+    expect(requests[0]?.detail?.headline).toBe('Host-supplied hash');
+    expect(requests[0]?.detail?.warning).toMatch(/not a decoded transaction/i);
+    expect(requests[0]?.detail?.fields.find((field) => field.label === 'DOMAIN HASH')?.value).toBe(`0x${'11'.repeat(32)}`);
+    expect(requests[0]?.detail?.fields.find((field) => field.label === 'MESSAGE HASH')?.value).toBe(`0x${'22'.repeat(32)}`);
+    expect(requests[0]?.detail?.headline).not.toMatch(/typed data/i);
   });
 
   it('signs an EIP-1559 payload as v||r||s with v in {0,1}', async () => {

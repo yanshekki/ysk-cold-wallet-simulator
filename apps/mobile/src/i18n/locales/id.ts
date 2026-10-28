@@ -322,6 +322,8 @@ export const id: MessageTree = {
     headlineEip7702: 'Otorisasi EIP-7702',
     notice7702: 'Ini mengizinkan kontrak bertindak sebagai akun ini.',
     noticeZeroHmac: 'HMAC kebijakan semuanya nol dan tidak diperiksa.',
+    noticeHostHash: 'Host yang memasok hash ini. Ini bukan transaksi yang sudah didekode.',
+    headlineHostHash: 'Hash dari host',
     field: {
       chain: 'Rantai',
       chainId: 'ID rantai',
@@ -351,6 +353,8 @@ export const id: MessageTree = {
       message: 'Pesan',
       hash: 'Hash',
       policy: 'Kebijakan',
+      domainHash: 'Hash domain',
+      messageHash: 'Hash pesan',
       bytes: 'Byte',
       payload: 'Payload',
       spender: 'Pengguna kuasa',

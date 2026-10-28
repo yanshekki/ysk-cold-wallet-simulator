@@ -62,6 +62,8 @@ export type { EthTxInput, SigningDetail, SigningField, SigningStyle } from './si
 export {
   BTC_ZERO_HMAC_WARNING,
   describeBtcPsbt,
+  describeHostSuppliedHash,
+  HOST_SUPPLIED_HASH_WARNING,
   describeEthMessage,
   describeEthTransaction,
   describeEthTypedData,

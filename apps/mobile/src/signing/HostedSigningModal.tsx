@@ -64,6 +64,8 @@ export function HostedSigningModal({ embedded = false }: Props) {
         headlineEip7702: t('signing.headlineEip7702'),
         notice7702: t('signing.notice7702'),
         noticeZeroHmac: t('signing.noticeZeroHmac'),
+        noticeHostHash: t('signing.noticeHostHash'),
+        headlineHostHash: t('signing.headlineHostHash'),
         fieldLabels: {
           CHAIN: t('signing.field.chain'),
           'CHAIN ID': t('signing.field.chainId'),
@@ -93,6 +95,8 @@ export function HostedSigningModal({ embedded = false }: Props) {
           MESSAGE: t('signing.field.message'),
           HASH: t('signing.field.hash'),
           POLICY: t('signing.field.policy'),
+          'DOMAIN HASH': t('signing.field.domainHash'),
+          'MESSAGE HASH': t('signing.field.messageHash'),
           BYTES: t('signing.field.bytes'),
           PAYLOAD: t('signing.field.payload'),
           SPENDER: t('signing.field.spender'),

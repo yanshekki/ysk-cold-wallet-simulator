@@ -24,6 +24,7 @@ import {
   describeEthMessage,
   describeEthTransaction,
   describeEthTypedData,
+  describeHostSuppliedHash,
   hashTypedData,
   parseEip712,
   parseEthTx,
@@ -299,7 +300,10 @@ async function handleEip712Sign(apdu: Apdu, ctx: EthContext): Promise<Uint8Array
   const domain = rest.subarray(0, 32);
   const structHash = rest.subarray(32, 64);
   const digest = keccak_256(concatBytes(Uint8Array.of(0x19, 0x01), domain, structHash));
-  return finishTypedSign(ctx, path, digest, rest.subarray(0, 64), `Sign EIP-712 hashed message\n${path}`);
+  return finishTypedSign(ctx, path, digest, rest.subarray(0, 64), `Sign EIP-712 hashed message\n${path}`, {
+    title: 'Sign host-supplied hash',
+    detail: describeHostSuppliedHash({ path, domainHash: domain, messageHash: structHash }),
+  });
 }
 
 function typedStream(ctx: EthContext): TypedStream {
@@ -400,15 +404,16 @@ async function finishTypedSign(
   digest: Uint8Array,
   raw: Uint8Array,
   message: string,
+  review?: { title: string; detail: SigningRequest['detail'] },
 ): Promise<Uint8Array> {
   const request: SigningRequest = {
     brand: 'ledger',
     kind: 'sign',
-    title: 'Sign EIP-712 typed data',
+    title: review?.title ?? 'Sign EIP-712 typed data',
     path,
     message,
     rawPayload: raw,
-    detail: describeEthTypedData(path, raw),
+    detail: review?.detail ?? describeEthTypedData(path, raw),
   };
   const ok = await ctx.confirmation.confirm(request);
   if (!ok) {

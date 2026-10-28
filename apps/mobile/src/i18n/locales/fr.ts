@@ -322,6 +322,8 @@ export const fr: MessageTree = {
     headlineEip7702: 'Autorisation EIP-7702',
     notice7702: 'Cela permet au contrat d’agir comme ce compte.',
     noticeZeroHmac: 'Le HMAC de la politique est entièrement nul et n’a pas été vérifié.',
+    noticeHostHash: 'L’hôte a fourni ce hash. Ce n’est pas une transaction décodée.',
+    headlineHostHash: 'Hash fourni par l’hôte',
     field: {
       chain: 'Chaîne',
       chainId: 'ID de chaîne',
@@ -351,6 +353,8 @@ export const fr: MessageTree = {
       message: 'Message',
       hash: 'Hash',
       policy: 'Politique',
+      domainHash: 'Hash du domaine',
+      messageHash: 'Hash du message',
       bytes: 'Octets',
       payload: 'Charge utile',
       spender: 'Dépensier',
