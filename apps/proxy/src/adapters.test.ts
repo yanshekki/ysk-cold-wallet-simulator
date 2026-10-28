@@ -449,9 +449,15 @@ describe('attachLedger', () => {
   it('forwards a lone 6E00 after a short hold so the host can OpenApp', async () => {
     const { host, gadget } = memoryHidPair();
     let notify: ((packet: Uint8Array) => void) | undefined;
+    let writes = 0;
     const ble = {
       async write() {
-        setTimeout(() => notify?.(Uint8Array.of(0x05, 0x00, 0x00, 0x00, 0x02, 0x6e, 0x00)), 0);
+        writes += 1;
+        if (writes === 1) {
+          setTimeout(() => notify?.(Uint8Array.of(0x05, 0x00, 0x00, 0x00, 0x02, 0x6e, 0x00)), 0);
+          return;
+        }
+        notify?.(framePayload(TAG_APDU, encodeAppAndVersion('BOLOS', '2.7.1'), DEFAULT_MTU));
       },
       onNotify(callback: (packet: Uint8Array) => void) {
         notify = callback;
@@ -477,6 +483,7 @@ describe('attachLedger', () => {
     for (const report of wrapHidApdu(Uint8Array.of(0xb0, 0x01, 0x00, 0x00, 0x00))) {
       host.write(report);
     }
+    await adapter.idle();
     expect(unwrapHidReports(replies).payload[1]).toBe(5);
     adapter.close();
   });
@@ -567,17 +574,18 @@ describe('attachLedger', () => {
     for (const report of wrapHidApdu(Uint8Array.of(0xb0, 0x01, 0x00, 0x00, 0x00))) {
       host.write(report);
     }
+    await adapter.idle();
     const text = Array.from(unwrapHidReports(replies).payload, (b) => String.fromCharCode(b)).join('');
     expect(text).toContain('Avalanche');
     expect(text).toContain('1.4.22');
     adapter.close();
   });
 
-  it('setOpenAppName updates local GET_APP_AND_VERSION without OpenApp APDU', async () => {
+  it('setOpenAppName updates cached GET_APP_AND_VERSION used while BLE is busy', async () => {
     const { host, gadget } = memoryHidPair();
     const ble = {
       async write() {
-        return;
+        await new Promise(() => undefined);
       },
       onNotify() {
         return () => undefined;
@@ -587,12 +595,90 @@ describe('attachLedger', () => {
       },
     };
     const adapter = attachLedger(gadget, ble, DEFAULT_MTU, () => undefined);
+    adapter.setOpenAppName('Avalanche');
     const replies: Uint8Array[] = [];
     host.onInput((report) => replies.push(report));
-    adapter.setOpenAppName('Avalanche');
+    for (const report of wrapHidApdu(Uint8Array.of(0xe0, 0x01, 0x00, 0x00, 0x00), 0x1111)) {
+      host.write(report);
+    }
+    replies.length = 0;
+    for (const report of wrapHidApdu(Uint8Array.of(0xb0, 0x01, 0x00, 0x00, 0x00), 0x2222)) {
+      host.write(report);
+    }
+    const body = Array.from(unwrapHidReports(replies).payload, (b) => String.fromCharCode(b)).join('');
+    expect(body).toContain('Avalanche');
+    adapter.close();
+  });
+
+  it('forwards idle GET_APP_AND_VERSION so phone Select app Bitcoin is visible', async () => {
+    const device = new LedgerProtocolHandler({
+      model: LEDGER_MODELS.find((item) => item.id === 'nano-x')!,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy: entropy(),
+    });
+    device.setApp('bitcoin');
+    const { host, gadget } = memoryHidPair();
+    const ble = bleToHandler(device, (framed) => splitFramedPackets(framed, DEFAULT_MTU));
+    const adapter = attachLedger(gadget, ble, DEFAULT_MTU, () => undefined);
+    const replies: Uint8Array[] = [];
+    host.onInput((report) => replies.push(report));
     for (const report of wrapHidApdu(Uint8Array.of(0xb0, 0x01, 0x00, 0x00, 0x00))) {
       host.write(report);
     }
+    await adapter.idle();
+    const body = Array.from(unwrapHidReports(replies).payload, (b) => String.fromCharCode(b)).join('');
+    expect(body).toContain('Bitcoin');
+    adapter.close();
+  });
+
+  it('forwards idle GET_APP_AND_VERSION so Core sees phone Select app Avalanche', async () => {
+    const device = new LedgerProtocolHandler({
+      model: LEDGER_MODELS.find((item) => item.id === 'nano-x')!,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy: entropy(),
+    });
+    device.setApp('avalanche');
+    const { host, gadget } = memoryHidPair();
+    const ble = bleToHandler(device, (framed) => splitFramedPackets(framed, DEFAULT_MTU));
+    const adapter = attachLedger(gadget, ble, DEFAULT_MTU, () => undefined);
+    const replies: Uint8Array[] = [];
+    host.onInput((report) => replies.push(report));
+    for (const report of wrapHidApdu(Uint8Array.of(0xb0, 0x01, 0x00, 0x00, 0x00))) {
+      host.write(report);
+    }
+    await adapter.idle();
+    const body = Array.from(unwrapHidReports(replies).payload, (b) => String.fromCharCode(b)).join('');
+    expect(body).toContain('Avalanche');
+    expect(body).toContain('1.4.22');
+    adapter.close();
+  });
+
+  it('opens Avalanche when Core GET_VERSION arrives on the dashboard HID link', async () => {
+    const device = new LedgerProtocolHandler({
+      model: LEDGER_MODELS.find((item) => item.id === 'nano-x')!,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy: entropy(),
+    });
+    const { host, gadget } = memoryHidPair();
+    const ble = bleToHandler(device, (framed) => splitFramedPackets(framed, DEFAULT_MTU));
+    const adapter = attachLedger(gadget, ble, DEFAULT_MTU, () => undefined);
+    const replies: Uint8Array[] = [];
+    host.onInput((report) => replies.push(report));
+    for (const report of wrapHidApdu(Uint8Array.of(0x80, 0x00, 0x00, 0x00, 0x00))) {
+      host.write(report);
+    }
+    await adapter.idle();
+    const version = unwrapHidReports(replies).payload;
+    expect((version[version.length - 2] << 8) | version[version.length - 1]).toBe(SW_OK);
+    expect(device.getApp()).toBe('avalanche');
+    replies.length = 0;
+    for (const report of wrapHidApdu(Uint8Array.of(0xb0, 0x01, 0x00, 0x00, 0x00))) {
+      host.write(report);
+    }
+    await adapter.idle();
     const body = Array.from(unwrapHidReports(replies).payload, (b) => String.fromCharCode(b)).join('');
     expect(body).toContain('Avalanche');
     adapter.close();
@@ -855,7 +941,7 @@ describe('attachLedger', () => {
     adapter.close();
   });
 
-  it('answers GET_APP_AND_VERSION on HID without waiting for BLE', async () => {
+  it('answers GET_APP_AND_VERSION from cache on another channel while BLE is busy', async () => {
     const { host, gadget } = memoryHidPair();
     const writes: Uint8Array[] = [];
     const ble = {
@@ -871,23 +957,30 @@ describe('attachLedger', () => {
       },
     };
     const adapter = attachLedger(gadget, ble, DEFAULT_MTU, () => undefined);
+    adapter.setOpenAppName('Bitcoin');
     const replies: Uint8Array[] = [];
     host.onInput((report) => replies.push(report));
+    for (const report of wrapHidApdu(Uint8Array.of(0xe0, 0x01, 0x00, 0x00, 0x00), 0x1111)) {
+      host.write(report);
+    }
+    const bleWrites = writes.length;
+    replies.length = 0;
     for (const report of wrapHidApdu(Uint8Array.of(0xb0, 0x01, 0x00, 0x00, 0x00), 0x7c56)) {
       host.write(report);
     }
-    expect(writes).toEqual([]);
-    expect(unwrapHidReports(replies).payload).toEqual(encodeAppAndVersion('BOLOS', '2.7.1'));
+    expect(writes.length).toBe(bleWrites);
+    expect(unwrapHidReports(replies).payload).toEqual(encodeAppAndVersion('Bitcoin', '2.5.1'));
     expect((replies[0]![0] << 8) | replies[0]![1]).toBe(0x7c56);
     adapter.close();
   });
 
-  it('replies to each GET_APP_AND_VERSION retry on its HID channel', async () => {
+  it('replies to each concurrent GET_APP_AND_VERSION from cache while BLE is busy', async () => {
     const { host, gadget } = memoryHidPair();
     const writes: Uint8Array[] = [];
     const ble = {
       async write(packet: Uint8Array) {
         writes.push(packet);
+        await new Promise(() => undefined);
       },
       onNotify() {
         return () => undefined;
@@ -897,20 +990,24 @@ describe('attachLedger', () => {
       },
     };
     const adapter = attachLedger(gadget, ble, DEFAULT_MTU, () => undefined);
+    adapter.setOpenAppName('Avalanche');
     const replies: Uint8Array[] = [];
     host.onInput((report) => replies.push(report));
+    for (const report of wrapHidApdu(Uint8Array.of(0xe0, 0x01, 0x00, 0x00, 0x00), 0x1111)) {
+      host.write(report);
+    }
+    replies.length = 0;
     for (const report of wrapHidApdu(Uint8Array.of(0xb0, 0x01, 0x00, 0x00, 0x00), 0xd56a)) {
       host.write(report);
     }
     for (const report of wrapHidApdu(Uint8Array.of(0xb0, 0x01, 0x00, 0x00, 0x00), 0xfa6d)) {
       host.write(report);
     }
-    expect(writes).toEqual([]);
     expect(replies).toHaveLength(2);
     expect((replies[0]![0] << 8) | replies[0]![1]).toBe(0xd56a);
     expect((replies[1]![0] << 8) | replies[1]![1]).toBe(0xfa6d);
-    expect(unwrapHidReports([replies[0]!]).payload).toEqual(encodeAppAndVersion('BOLOS', '2.7.1'));
-    expect(unwrapHidReports([replies[1]!]).payload).toEqual(encodeAppAndVersion('BOLOS', '2.7.1'));
+    expect(unwrapHidReports([replies[0]!]).payload).toEqual(encodeAppAndVersion('Avalanche', '1.4.22'));
+    expect(unwrapHidReports([replies[1]!]).payload).toEqual(encodeAppAndVersion('Avalanche', '1.4.22'));
     adapter.close();
   });
 });

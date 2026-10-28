@@ -239,10 +239,16 @@ export function attachLedger(
         log('hid <= deferred GET_APP_AND_VERSION (apdu in flight)');
         return;
       }
-      replyGetApp(channel);
-      return;
-    }
-    if (head?.cla === 0xe0 && head.ins === 0xd8 && frame?.payload) {
+      // Concurrent poll on another channel (Core/DMK): answer from cache so
+      // we do not interrupt the in-flight BLE APDU.
+      if (awaiting || hidBusy > 0) {
+        replyGetApp(channel);
+        return;
+      }
+      // Idle: fall through to BLE. Ledger Live Bitcoin and Core Avalanche poll
+      // GET_APP every ~1s and wait for the device app name; they often never
+      // send OpenApp. Local BOLOS cache made both hosts spin forever.
+    } else if (head?.cla === 0xe0 && head.ins === 0xd8 && frame?.payload) {
       try {
         const name = openAppName(parseApdu(frame.payload).data).trim();
         pendingOpenName = name.length > 0 ? name : undefined;
