@@ -322,6 +322,8 @@ export const ru: MessageTree = {
     headlineEip7702: 'Авторизация EIP-7702',
     notice7702: 'Это позволяет контракту действовать от имени этого счёта.',
     noticeZeroHmac: 'HMAC политики состоит из нулей и не проверялся.',
+    noticeHostHash: 'Этот хеш передал хост. Это не разобранная транзакция.',
+    headlineHostHash: 'Хеш от хоста',
     field: {
       chain: 'Сеть',
       chainId: 'ID сети',
@@ -351,6 +353,8 @@ export const ru: MessageTree = {
       message: 'Сообщение',
       hash: 'Хеш',
       policy: 'Политика',
+      domainHash: 'Хеш домена',
+      messageHash: 'Хеш сообщения',
       bytes: 'Байты',
       payload: 'Полезная нагрузка',
       spender: 'Тратящий',

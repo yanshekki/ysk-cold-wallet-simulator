@@ -322,6 +322,8 @@ export const ar: MessageTree = {
     headlineEip7702: 'تفويض EIP-7702',
     notice7702: 'يسمح هذا التفويض للعقد بالتصرف نيابة عن هذا الحساب.',
     noticeZeroHmac: 'HMAC الخاص بالسياسة أصفار بالكامل ولم يُفحص.',
+    noticeHostHash: 'قدّم المضيف هذه التجزئة. ليست معاملة مفكوكة.',
+    headlineHostHash: 'تجزئة قدّمها المضيف',
     field: {
       chain: 'السلسلة',
       chainId: 'معرّف السلسلة',
@@ -351,6 +353,8 @@ export const ar: MessageTree = {
       message: 'الرسالة',
       hash: 'التجزئة',
       policy: 'السياسة',
+      domainHash: 'تجزئة النطاق',
+      messageHash: 'تجزئة الرسالة',
       bytes: 'بايت',
       payload: 'الحمولة',
       spender: 'المنفق',

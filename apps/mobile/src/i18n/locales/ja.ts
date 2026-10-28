@@ -322,6 +322,8 @@ export const ja: MessageTree = {
     headlineEip7702: 'EIP-7702 認可',
     notice7702: 'この認可により、コントラクトがこの口座として動作できます。',
     noticeZeroHmac: 'ポリシー HMAC はすべてゼロで、検証されていません。',
+    noticeHostHash: 'このハッシュはホストが渡したものです。復号した取引ではありません。',
+    headlineHostHash: 'ホスト提供のハッシュ',
     field: {
       chain: 'チェーン',
       chainId: 'チェーン ID',
@@ -351,6 +353,8 @@ export const ja: MessageTree = {
       message: 'メッセージ',
       hash: 'ハッシュ',
       policy: 'ポリシー',
+      domainHash: 'ドメインハッシュ',
+      messageHash: 'メッセージハッシュ',
       bytes: 'バイト',
       payload: 'ペイロード',
       spender: '支出者',

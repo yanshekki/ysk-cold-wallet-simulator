@@ -320,6 +320,8 @@ export const en = {
     headlineEip7702: 'EIP-7702 authorization',
     notice7702: 'This lets the contract act as this account.',
     noticeZeroHmac: 'Policy HMAC is all zeros and was not checked.',
+    noticeHostHash: 'The host supplied this hash. It is not a decoded transaction.',
+    headlineHostHash: 'Host-supplied hash',
     field: {
       chain: 'Chain',
       chainId: 'Chain ID',
@@ -349,6 +351,8 @@ export const en = {
       message: 'Message',
       hash: 'Hash',
       policy: 'Policy',
+      domainHash: 'Domain hash',
+      messageHash: 'Message hash',
       bytes: 'Bytes',
       payload: 'Payload',
       spender: 'Spender',
