@@ -24,6 +24,8 @@ export type SigningCopy = {
   headlineTokenTransfer?: string;
   headlineTokenApprove?: string;
   headlineEip712?: string;
+  headlineEip7702?: string;
+  notice7702?: string;
   fieldLabels?: Record<string, string>;
 };
 
@@ -38,6 +40,7 @@ const HEADLINE_MAP: Array<{ match: string; key: keyof SigningCopy }> = [
   { match: 'Token transfer', key: 'headlineTokenTransfer' },
   { match: 'Token approve', key: 'headlineTokenApprove' },
   { match: 'EIP-712 typed data', key: 'headlineEip712' },
+  { match: 'EIP-7702 authorization', key: 'headlineEip7702' },
 ];
 
 function purposeFor(request: SigningRequest, copy?: SigningCopy): string | undefined {
@@ -81,6 +84,9 @@ function localizeFieldLabel(label: string, copy?: SigningCopy): string {
 function localize(detail: SigningDetail, request: SigningRequest, copy?: SigningCopy): SigningDetail {
   let headline = detail.headline;
   let warning = detail.warning;
+  if (detail.headline === 'EIP-7702 authorization' && copy?.notice7702) {
+    warning = copy.notice7702;
+  }
   if (detail.decodeFailed && copy?.decodeFailed) {
     headline = copy.decodeFailed;
   } else {

@@ -413,7 +413,10 @@ function downloadText(name, text) {
 async function post(path, body) {
   const response = await fetch(path, {
     method: 'POST',
-    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    headers: {
+      'X-CWS-Proxy': '1',
+      ...(body ? { 'Content-Type': 'application/json' } : {}),
+    },
     body: body ? JSON.stringify(body) : undefined,
   });
   if (!response.ok) {

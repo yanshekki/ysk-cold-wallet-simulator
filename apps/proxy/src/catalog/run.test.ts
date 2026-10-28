@@ -137,10 +137,9 @@ describe('in-process lab actions', () => {
     expect(result.toLowerCase()).toContain('f39fd6e51aad88f6f4ce6ab8827279cfffb92266');
   });
 
-  it('runs eth-garbage and still returns a signature', async () => {
+  it('refuses eth-garbage instead of signing undecodable bytes', async () => {
     const { host } = ledgerHost();
-    const result = await action('eth-garbage').run(host, EMPTY_DRAFT);
-    expect(result.startsWith('sig 0x')).toBe(true);
+    await expect(action('eth-garbage').run(host, EMPTY_DRAFT)).rejects.toThrow(/6d00/);
   });
 
   it('answers malformed APDU with 6D00 without hanging', async () => {

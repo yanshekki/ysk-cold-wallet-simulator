@@ -27,6 +27,8 @@ type Props = {
   passphraseHostLabel?: string;
   verifyingLabel?: string;
   copy?: SigningCopy;
+  /** Draw inside an already-presented modal. A second iOS Modal stays behind the first. */
+  embedded?: boolean;
 };
 
 export function SigningModal({
@@ -44,6 +46,7 @@ export function SigningModal({
   passphraseHostLabel = 'Host passphrase',
   verifyingLabel = 'Verifying…',
   copy,
+  embedded = false,
 }: Props) {
   const [verifying, setVerifying] = useState(false);
   const brand = request?.brand;
@@ -75,9 +78,11 @@ export function SigningModal({
     });
   };
 
-  return (
-    <Modal visible={visible} transparent animationType="fade" statusBarTranslucent>
-      <GestureHandlerRootView style={styles.flex}>
+  if (embedded && !visible) {
+    return null;
+  }
+
+  const sheet = (
         <View style={styles.backdrop}>
           <View style={[styles.sheet, { maxHeight: sheetMax }]}>
             <Text style={styles.kicker}>{request?.title ?? confirmTitle}</Text>
@@ -120,7 +125,19 @@ export function SigningModal({
             </View>
           </View>
         </View>
-      </GestureHandlerRootView>
+  );
+
+  if (embedded) {
+    return (
+      <View style={styles.embeddedHost} testID="signing-embedded">
+        {sheet}
+      </View>
+    );
+  }
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" statusBarTranslucent>
+      <GestureHandlerRootView style={styles.flex}>{sheet}</GestureHandlerRootView>
     </Modal>
   );
 }
@@ -128,6 +145,10 @@ export function SigningModal({
 const styles = StyleSheet.create({
   flex: {
     flex: 1,
+  },
+  embeddedHost: {
+    ...StyleSheet.absoluteFill,
+    zIndex: 30,
   },
   backdrop: {
     flex: 1,

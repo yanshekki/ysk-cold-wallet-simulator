@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   QR_PROFILES,
@@ -36,6 +36,7 @@ import {
   space,
 } from '@cws/ui';
 import { copyText } from '../../src/lab/copy';
+import { HostedSigningModal } from '../../src/signing/HostedSigningModal';
 import { QrMatrix } from '../../src/qr/QrMatrix';
 import { QrScanner } from '../../src/qr/QrScanner';
 import { useT } from '../../src/i18n';
@@ -67,6 +68,7 @@ export default function DeviceScreen() {
     resetQrScan,
     runWithLoading,
     pending,
+    setSigningHosted,
   } = useAppState();
   const [busy, setBusy] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
@@ -84,6 +86,11 @@ export default function DeviceScreen() {
   const [scanProgress, setScanProgress] = useState<{ received: number; expected: number } | null>(null);
   const [scanBusy, setScanBusy] = useState(false);
   const lastPart = useRef('');
+
+  useLayoutEffect(() => {
+    setSigningHosted(qrSheet);
+    return () => setSigningHosted(false);
+  }, [qrSheet, setSigningHosted]);
 
   useEffect(() => {
     if (!advertising) {
@@ -582,7 +589,9 @@ export default function DeviceScreen() {
       closeIcon={<Ionicons name="close" size={22} color={colors.text} />}
       testID="device-qr-sheet"
       overlay={
-        showFormatPicker && qrProfile && formatSheet ? (
+        pending ? (
+          <HostedSigningModal embedded />
+        ) : showFormatPicker && qrProfile && formatSheet ? (
           <GroupedSelectSheet
             embedded
             visible={formatSheet}

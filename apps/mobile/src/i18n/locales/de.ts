@@ -314,6 +314,8 @@ export const de: MessageTree = {
     headlineTokenTransfer: 'Token-Transfer',
     headlineTokenApprove: 'Token-Freigabe',
     headlineEip712: 'Typisierte Daten (EIP-712)',
+    headlineEip7702: 'EIP-7702-Autorisierung',
+    notice7702: 'Damit darf der Vertrag als dieses Konto handeln.',
     field: {
       chain: 'Kette',
       chainId: 'Ketten-ID',

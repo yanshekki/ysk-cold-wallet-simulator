@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Brand } from '@cws/contracts';
 import { parseLabBrand, type LabCatalog, type LabDraftInput } from './lab';
+import { loopbackHost, mutationAllowed } from './origin';
 import type { PairingGate } from './pairing';
 import type { StatusBus } from './status';
 
@@ -81,6 +82,26 @@ export function startUiServer(opts: {
   const server = http.createServer((req, res) => {
     const method = req.method ?? 'GET';
     const url = new URL(req.url ?? '/', 'http://127.0.0.1');
+    const host = typeof req.headers.host === 'string' ? req.headers.host : undefined;
+    if (!loopbackHost(host)) {
+      res.statusCode = 403;
+      res.end('forbidden');
+      return;
+    }
+    if (
+      method === 'POST' &&
+      !mutationAllowed({
+        host,
+        origin: typeof req.headers.origin === 'string' ? req.headers.origin : undefined,
+        'sec-fetch-site':
+          typeof req.headers['sec-fetch-site'] === 'string' ? req.headers['sec-fetch-site'] : undefined,
+        'x-cws-proxy': typeof req.headers['x-cws-proxy'] === 'string' ? req.headers['x-cws-proxy'] : undefined,
+      })
+    ) {
+      res.statusCode = 403;
+      res.end('forbidden');
+      return;
+    }
     if (method === 'GET' && url.pathname === '/events') {
       writeSse(res, opts.bus, clients);
       return;

@@ -51,6 +51,8 @@ export const MAINNET_C_CHAIN_ID = hexToBytes('0427d4b22a2a78bcddd456742caf91b56b
 
 export type AvaxSession = {
   pendingHash?: Uint8Array;
+  /** True only after the user confirmed this hash for rootPath. */
+  hashConfirmed?: boolean;
   rootPath?: string;
   signChunks?: Uint8Array;
 };
@@ -232,18 +234,20 @@ async function handleSignHash(apdu: Apdu, ctx: AvaxContext): Promise<Uint8Array>
     if (!ok) {
       ctx.session.pendingHash = undefined;
       ctx.session.rootPath = undefined;
+      ctx.session.hashConfirmed = false;
       return encodeResponse(new Uint8Array(), SW_DENY);
     }
     ctx.session.rootPath = path;
     ctx.session.pendingHash = hash;
+    ctx.session.hashConfirmed = true;
     return encodeResponse(new Uint8Array(), SW_OK);
   }
-  if (apdu.p1 !== P1_HASH_NEXT && apdu.p1 !== P1_HASH_LAST) {
+  if (apdu.p1 === P1_HASH_NEXT || apdu.p1 !== P1_HASH_LAST) {
     return encodeResponse(new Uint8Array(), SW_INS_NOT_SUPPORTED);
   }
   const hash = ctx.session.pendingHash;
   const root = ctx.session.rootPath;
-  if (!hash || !root) {
+  if (!ctx.session.hashConfirmed || !hash || !root) {
     return encodeResponse(new Uint8Array(), SW_WRONG_LENGTH);
   }
   // Ledger hosts (and Proxy LAB) often send a zero-length BIP32 suffix on HASH_LAST
@@ -257,10 +261,12 @@ async function handleSignHash(apdu: Apdu, ctx: AvaxContext): Promise<Uint8Array>
     }
   }
   const path = joinPath(root, suffixPath);
-  if (apdu.p1 === P1_HASH_LAST) {
-    ctx.session.pendingHash = undefined;
-    ctx.session.rootPath = undefined;
+  if (path !== root) {
+    return encodeResponse(new Uint8Array(), SW_DENY);
   }
+  ctx.session.pendingHash = undefined;
+  ctx.session.rootPath = undefined;
+  ctx.session.hashConfirmed = false;
   const seed = await seedFor(ctx.confirmation, ctx.slotId, ctx.entropy, ctx.backup ?? 'bip39');
   if (ed25519) {
     const secret = deriveEd25519PrivateKeyFromSeed(seed, path);
@@ -304,11 +310,12 @@ async function handleSignPayload(apdu: Apdu, ctx: AvaxContext, title: string): P
   if (!ok) {
     ctx.session.pendingHash = undefined;
     ctx.session.rootPath = undefined;
+    ctx.session.hashConfirmed = false;
     return encodeResponse(new Uint8Array(), SW_DENY);
   }
   const digest = sha256(payload);
-  // Keep pendingHash so a follow-up SIGN_HASH can still sign alternate paths.
-  ctx.session.pendingHash = digest;
+  ctx.session.pendingHash = undefined;
+  ctx.session.hashConfirmed = false;
   const seed = await seedFor(ctx.confirmation, ctx.slotId, ctx.entropy, ctx.backup ?? 'bip39');
   const node = deriveHdNodeFromSeed(seed, path);
   return encodeResponse(signSecp256k1Recoverable(node.privateKey, digest), SW_OK);

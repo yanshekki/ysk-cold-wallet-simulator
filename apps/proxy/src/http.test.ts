@@ -1,7 +1,20 @@
+import http from 'node:http';
 import { afterEach, describe, expect, it } from 'vitest';
 import { startUiServer, type UiServer } from './http';
 import { createPairingGate } from './pairing';
 import { createStatusBus } from './status';
+
+function controlPost(url: string, body?: unknown, headers?: Record<string, string>): Promise<Response> {
+  return fetch(url, {
+    method: 'POST',
+    headers: {
+      'X-CWS-Proxy': '1',
+      ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+      ...headers,
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+}
 
 async function readSseFrame(url: string): Promise<string> {
   const controller = new AbortController();
@@ -118,6 +131,7 @@ describe('proxy ui http', () => {
     expect(js).toContain('bindPower');
     expect(js).toContain('lang-select');
     expect(js).toContain("post(state.status?.running ? '/stop' : '/start')");
+    expect(js).toContain("'X-CWS-Proxy': '1'");
     expect(js).not.toContain("$('clock').textContent = 'IDLE'");
 
     const css = await fetch(`${server.url}/styles.css`);
@@ -143,7 +157,17 @@ describe('proxy ui http', () => {
     const onekeyCatalog = await fetch(`${server.url}/lab/catalog?brand=onekey`);
     expect(await onekeyCatalog.json()).toMatchObject({ brand: 'onekey' });
 
-    const start = await fetch(`${server.url}/start`, { method: 'POST' });
+    const blocked = await fetch(`${server.url}/start`, { method: 'POST' });
+    expect(blocked.status).toBe(403);
+    expect(started).toBe(0);
+
+    const crossSite = await controlPost(`${server.url}/lab/run`, { actionId: 'dash-version' }, {
+      'Sec-Fetch-Site': 'cross-site',
+      Origin: 'https://evil.example',
+    });
+    expect(crossSite.status).toBe(403);
+
+    const start = await controlPost(`${server.url}/start`);
     expect(start.status).toBe(200);
     expect(started).toBe(1);
     expect(bus.snapshot().running).toBe(true);
@@ -156,38 +180,86 @@ describe('proxy ui http', () => {
     expect(frame).toContain('data:');
     expect(frame).toContain('"running":true');
 
-    const stop = await fetch(`${server.url}/stop`, { method: 'POST' });
+    const stop = await controlPost(`${server.url}/stop`);
     expect(stop.status).toBe(200);
     expect(stopped).toBe(1);
     expect(bus.snapshot().running).toBe(false);
 
     bus.log('keep me');
-    const cleared = await fetch(`${server.url}/logs/clear`, { method: 'POST' });
+    const cleared = await controlPost(`${server.url}/logs/clear`);
     expect(cleared.status).toBe(200);
     expect(bus.snapshot().logs).toEqual([]);
 
-    const labRun = await fetch(`${server.url}/lab/run`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ actionId: 'dash-version' }),
-    });
+    const labRun = await controlPost(`${server.url}/lab/run`, { actionId: 'dash-version' });
     expect(labRun.status).toBe(200);
     expect(await labRun.json()).toEqual({ ok: true, result: '0x3300' });
 
-    const labMissing = await fetch(`${server.url}/lab/run`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({}),
-    });
+    const labMissing = await controlPost(`${server.url}/lab/run`, {});
     expect(labMissing.status).toBe(400);
 
-    const pair = await fetch(`${server.url}/pairing`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: '123456' }),
-    });
+    const pair = await controlPost(`${server.url}/pairing`, { code: '123456' });
     expect(pair.status).toBe(200);
     await pending;
     expect(codes).toEqual(['123456']);
   });
+
+  it('rejects a rebinding Host before it can read status or start a scan', async () => {
+    const bus = createStatusBus();
+    let started = 0;
+    server = await startUiServer({
+      bus,
+      pairing: createPairingGate(),
+      commands: {
+        start() {
+          started += 1;
+        },
+        stop() {
+          return;
+        },
+        labCatalog() {
+          return {
+            ready: false,
+            brand: 'ledger',
+            connectedBrand: null,
+            nearFaucet: '',
+            sections: [],
+          };
+        },
+        setOpenAppName() {
+          return;
+        },
+        async runLab() {
+          return '';
+        },
+      },
+      port: 0,
+    });
+    const status = await rawRequest(server.port, 'GET', '/status', { host: 'evil.example:8788' });
+    expect(status.status).toBe(403);
+    const start = await rawRequest(server.port, 'POST', '/start', {
+      host: 'evil.example',
+      'x-cws-proxy': '1',
+    });
+    expect(start.status).toBe(403);
+    expect(started).toBe(0);
+  });
 });
+
+function rawRequest(
+  port: number,
+  method: string,
+  path: string,
+  headers: Record<string, string>,
+): Promise<{ status: number; body: string }> {
+  return new Promise((resolve, reject) => {
+    const req = http.request({ hostname: '127.0.0.1', port, method, path, headers }, (res) => {
+      const chunks: Buffer[] = [];
+      res.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
+      res.on('end', () => {
+        resolve({ status: res.statusCode ?? 0, body: Buffer.concat(chunks).toString('utf8') });
+      });
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}

@@ -38,10 +38,6 @@ export async function handleSolanaApdu(
   if (apdu.ins === 0x04) {
     return encodeResponse(spec().versionBytes(), SW_OK);
   }
-  // HOT Wallet lists accounts with GET_PUBKEY P1=1 (display). A simulator
-  // should not require a slide-to-sign for every derivation index.
-  if (apdu.ins === 0x05) {
-    return handleFamilyApdu({ ...apdu, p1: 0x00 }, spec(), ctx, session);
-  }
+  // P1=0 lists a public key. P1=1 is Phantom's on-device verify and must confirm.
   return handleFamilyApdu(apdu, spec(), ctx, session);
 }

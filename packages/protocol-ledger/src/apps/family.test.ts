@@ -262,6 +262,35 @@ describe('Ledger family APDU bodies', () => {
     ]);
   });
 
+  it('Solana GET_PUBKEY P1=1 confirms and P1=0 stays silent', async () => {
+    const nanoX = LEDGER_MODELS.find((model) => model.id === 'nano-x')!;
+    let confirms = 0;
+    const device = new LedgerProtocolHandler({
+      model: nanoX,
+      confirmation: {
+        async confirm() {
+          confirms += 1;
+          return true;
+        },
+        async getPassphrase() {
+          return undefined;
+        },
+      },
+      slotId: 'slot',
+      entropy: entropyFromMnemonic(FOUNDATION),
+    });
+    device.setApp('solana');
+    const pathBytes = encodePath([0x8000002c, 0x800001f5, 0x80000000]);
+    const silent = await exchange(device, apdu([0xe0, 0x05, 0x00, 0x00, pathBytes.length, ...pathBytes]));
+    expect(swOf(silent)).toBe(SW_OK);
+    expect(confirms).toBe(0);
+    expect(silent.length).toBe(34);
+    const shown = await exchange(device, apdu([0xe0, 0x05, 0x01, 0x00, pathBytes.length, ...pathBytes]));
+    expect(swOf(shown)).toBe(SW_OK);
+    expect(confirms).toBe(1);
+    expect(Array.from(shown.subarray(0, 32))).toEqual(Array.from(silent.subarray(0, 32)));
+  });
+
   it('Solana chunked SIGN ACKs MORE with empty 9000 then returns 64-byte ed25519', async () => {
     const device = handler();
     device.setApp('solana');
