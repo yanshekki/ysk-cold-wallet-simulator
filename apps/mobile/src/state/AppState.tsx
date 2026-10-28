@@ -31,8 +31,10 @@ import {
   type QrScanStatus,
 } from '@cws/sdk';
 import { appendLogEntry, clearLogEntries } from './logStore';
+import { bleSignHostGate, centralHasLinkKey } from '../ble/bleSignGate';
 import { startAdvertising } from '../ble/peripheral';
 import type { PeripheralHandle } from '../ble/types';
+import { BleHostSheet } from '../signing/BleHostSheet';
 import { clearDisclaimerAcceptance, loadDisclaimerAccepted, saveDisclaimerAcceptance } from '../disclaimer/store';
 import { I18nProvider, translate } from '../i18n';
 import { describeBlePayload, redactLogHex } from '../lab/apduNote';
@@ -122,6 +124,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [connectedLabel, setConnectedLabel] = useState('');
   const [currentApp, setCurrentApp] = useState<LedgerApp>('dashboard');
   const [pending, setPending] = useState<SigningRequest | null>(null);
+  const [bleHostCentral, setBleHostCentral] = useState<string | null>(null);
   const [signingHosted, setSigningHosted] = useState(false);
   const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [sessionPassphraseApplied, setSessionPassphraseApplied] = useState(false);
@@ -143,6 +146,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     throw new Error('handler factory not ready');
   });
   const pendingRef = useRef<PendingConfirm | null>(null);
+  const bleHostResolveRef = useRef<((ok: boolean) => void) | null>(null);
   const secretSession = useRef(new SecretSession());
   const qrSession = useRef(new QrAirgapSession());
   const logSeq = useRef(0);
@@ -222,9 +226,34 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     () => ({
       confirm(request) {
         return new Promise<boolean>((resolve) => {
-          pendingRef.current = { request, resolve };
-          setPending(request);
-          appendLog('out', '', `${request.kind} ${request.title}`, request.kind === 'open-app' ? 'app' : 'sign');
+          void (async () => {
+            if (bleSignHostGate.needsConfirm(request.kind, false)) {
+              const centralId = bleSignHostGate.currentCentral();
+              const linked = await centralHasLinkKey(centralId, async (id) => {
+                const ble = await import('munim-bluetooth');
+                return ble.getBondState(id);
+              });
+              if (linked) {
+                bleSignHostGate.allowCurrent();
+              } else if (bleSignHostGate.needsConfirm(request.kind, false)) {
+                const allowed = await new Promise<boolean>((allowResolve) => {
+                  bleHostResolveRef.current = allowResolve;
+                  setBleHostCentral(centralId ?? '');
+                });
+                if (!allowed) {
+                  appendLog('out', '', `ble host reject ${request.kind}`, 'sign');
+                  resolve(false);
+                  return;
+                }
+                bleSignHostGate.allowCurrent();
+              }
+            }
+            pendingRef.current = { request, resolve };
+            setPending(request);
+            appendLog('out', '', `${request.kind} ${request.title}`, request.kind === 'open-app' ? 'app' : 'sign');
+          })().catch(() => {
+            resolve(false);
+          });
         });
       },
       async getPassphrase() {
@@ -295,6 +324,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setAdvertising(false);
     setConnected(false);
     setConnectedLabel('');
+    if (bleHostResolveRef.current) {
+      bleHostResolveRef.current(false);
+      bleHostResolveRef.current = null;
+      setBleHostCentral(null);
+    }
+    bleSignHostGate.reset();
     if (pendingRef.current) {
       pendingRef.current.resolve(false);
       pendingRef.current = null;
@@ -712,7 +747,26 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   return (
     <AppStateContext.Provider value={value}>
-      <I18nProvider language={settings.language}>{children}</I18nProvider>
+      <I18nProvider language={settings.language}>
+        {children}
+        {bleHostCentral != null ? (
+          <BleHostSheet
+            centralId={bleHostCentral}
+            onAllow={() => {
+              const allowResolve = bleHostResolveRef.current;
+              bleHostResolveRef.current = null;
+              setBleHostCentral(null);
+              allowResolve?.(true);
+            }}
+            onReject={() => {
+              const allowResolve = bleHostResolveRef.current;
+              bleHostResolveRef.current = null;
+              setBleHostCentral(null);
+              allowResolve?.(false);
+            }}
+          />
+        ) : null}
+      </I18nProvider>
     </AppStateContext.Provider>
   );
 }
