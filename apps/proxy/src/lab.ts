@@ -107,10 +107,12 @@ export function createLabHandle(opts: {
             `OPEN_APP ${name}`,
           );
           lastApp = name;
+          opts.adapter()?.setOpenAppName(name);
         },
         quitApp: async () => {
           await assertOk(await sendLedger(0xb0, 0xa7, 0x00, 0x00), 'QUIT_APP');
           lastApp = 'BOLOS';
+          opts.adapter()?.setOpenAppName('BOLOS');
         },
       };
     },

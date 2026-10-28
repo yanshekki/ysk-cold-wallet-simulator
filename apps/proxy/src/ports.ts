@@ -134,6 +134,8 @@ export type AdapterHandle = {
   close(): void;
   idle(): Promise<void>;
   setLabAwaiting(active: boolean): void;
+  /** Keep WebHID GET_APP_AND_VERSION cache in sync (lab OpenApp / phone Select app). */
+  setOpenAppName(name: string): void;
 };
 
 export type ExclusiveLock = {

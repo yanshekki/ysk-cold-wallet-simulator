@@ -66,6 +66,9 @@ describe('proxy ui http', () => {
             ],
           };
         },
+        setOpenAppName() {
+          return;
+        },
         async runLab(actionId) {
           if (actionId === 'dash-version') {
             return '0x3300';

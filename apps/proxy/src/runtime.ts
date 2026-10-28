@@ -16,6 +16,7 @@ export type ProxyRuntime = {
   busy(): boolean;
   labCatalog(requested?: Brand): LabCatalog;
   runLab(actionId: string, draft?: LabDraftInput): Promise<string>;
+  setOpenAppName(name: string): void;
 };
 
 export function teeLog(log: LogFn, bus: StatusBus): LogFn {
@@ -139,6 +140,13 @@ export function createRuntime(
         throw new Error('Start the proxy and wait for GATT');
       }
       return lab.run(actionId, draft);
+    },
+    setOpenAppName(name) {
+      const adapter = holder.adapter;
+      if (!adapter) {
+        throw new Error('HID adapter is not up');
+      }
+      adapter.setOpenAppName(name);
     },
   };
   return runtime;
