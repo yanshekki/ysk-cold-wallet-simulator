@@ -38,6 +38,7 @@ import { I18nProvider, translate } from '../i18n';
 import { describeBlePayload, redactLogHex } from '../lab/apduNote';
 import { expoRng } from '../lab/polyfillCrypto';
 import { ensureNearAccount } from '../near/service';
+import { isDevBuild } from '../passkeys/devFlag';
 import { setFaceIdEnabled, unlock as requestUnlock } from '../passkeys';
 import { SecretSession } from '../seeds/secretSession';
 import { listSlots, loadEntropy, setVaultAuthPrompt, updateSlotMeta, wipeAllSlots } from '../seeds/vault';
@@ -582,11 +583,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   const resolveSigning = useCallback(async (ok: boolean) => {
     const request = pendingRef.current?.request;
-    if (
-      ok &&
-      request?.kind === 'sign' &&
-      settingsRef.current.signReauth
-    ) {
+    // Release always re-auths after HoldToConfirm for signatures (Hold alone is
+    // insufficient if automation can drive the press). Debug honors the toggle;
+    // unlock() itself still skips the OS prompt when isDevBuild().
+    const needsSignReauth =
+      request?.kind === 'sign' && (settingsRef.current.signReauth || !isDevBuild());
+    if (ok && needsSignReauth) {
       try {
         if (!(await requestUnlock(translate(settingsRef.current.language, 'unlock.prompt')))) {
           pendingRef.current?.resolve(false);

@@ -212,7 +212,7 @@ export const ar: MessageTree = {
       default: 'أكّد بالمقاييس الحيوية أو رمز الجهاز بعد الضغط المستمر وقبل إصدار التوقيع.',
     },
     holdDuration: 'الضغط للتأكيد (ثوانٍ)',
-    holdDurationHelp: 'اضغط باستمرار لتأكيد الطلب. من 1 إلى 10 ثوانٍ.',
+    holdDurationHelp: 'اضغط باستمرار لتأكيد الطلب. من 3 إلى 10 ثوانٍ.',
     autoLock: 'القفل التلقائي (دقائق)',
     bleSuffix: 'لاحقة اسم BLE',
     blePreview: '{{name}}',

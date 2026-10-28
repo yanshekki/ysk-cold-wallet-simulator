@@ -212,7 +212,7 @@ export const zhHK: MessageTree = {
       default: '長按確認後須通過生物識別或裝置密碼，方會產生簽名。',
     },
     holdDuration: '長按確認（秒）',
-    holdDurationHelp: '確認請求時需長按的時間。範圍 1 至 10 秒。',
+    holdDurationHelp: '確認請求時需長按的時間。範圍 3 至 10 秒。',
     autoLock: '自動鎖定（分鐘）',
     bleSuffix: '藍牙名稱後綴',
     blePreview: '{{name}}',

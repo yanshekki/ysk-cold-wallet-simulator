@@ -212,7 +212,7 @@ export const id: MessageTree = {
       default: 'Konfirmasi dengan biometrik atau kode perangkat setelah menahan, sebelum tanda tangan dirilis.',
     },
     holdDuration: 'Tahan untuk konfirmasi (detik)',
-    holdDurationHelp: 'Tekan dan tahan untuk mengonfirmasi permintaan. Dari 1 sampai 10 detik.',
+    holdDurationHelp: 'Tekan dan tahan untuk mengonfirmasi permintaan. Dari 3 sampai 10 detik.',
     autoLock: 'Kunci otomatis (menit)',
     bleSuffix: 'Akhiran nama BLE',
     blePreview: '{{name}}',

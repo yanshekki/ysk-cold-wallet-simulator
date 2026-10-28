@@ -29,7 +29,9 @@ describe('settings hold duration', () => {
     expect(DEFAULT_SETTINGS.holdDurationSeconds).toBe(3);
     expect(normalizeSettings({}, 'en').holdDurationSeconds).toBe(3);
     expect(normalizeSettings({ holdDurationSeconds: 99 }, 'zh-HK').holdDurationSeconds).toBe(10);
-    expect(normalizeSettings({ holdDurationSeconds: 0 }, 'en').holdDurationSeconds).toBe(1);
+    expect(normalizeSettings({ holdDurationSeconds: 0 }, 'en').holdDurationSeconds).toBe(3);
+    expect(normalizeSettings({ holdDurationSeconds: 1 }, 'en').holdDurationSeconds).toBe(3);
+    expect(DEFAULT_SETTINGS.signReauth).toBe(true);
 
     getItemAsync.mockResolvedValueOnce(JSON.stringify({ language: 'en', autoLockMinutes: 15 }));
     const loaded = await loadSettings();

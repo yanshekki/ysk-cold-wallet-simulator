@@ -212,7 +212,7 @@ export const pt: MessageTree = {
       default: 'Confirme com biometria ou a senha do dispositivo após manter premido, antes de a assinatura ser libertada.',
     },
     holdDuration: 'Manter para confirmar (segundos)',
-    holdDurationHelp: 'Mantenha premido para confirmar um pedido. De 1 a 10 segundos.',
+    holdDurationHelp: 'Mantenha premido para confirmar um pedido. De 3 a 10 segundos.',
     autoLock: 'Bloqueio automático (minutos)',
     bleSuffix: 'Sufixo BLE',
     blePreview: '{{name}}',

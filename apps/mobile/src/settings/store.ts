@@ -37,7 +37,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   confirmClearLogs: true,
   bleNameSuffix: '',
   faceIdEnabled: true,
-  signReauth: false,
+  signReauth: true,
   autoLockMinutes: 15,
   holdDurationSeconds: HOLD_CONFIRM_DEFAULT_SECONDS,
   catalogUpdatedAt: null,
