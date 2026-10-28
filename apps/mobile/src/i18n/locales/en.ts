@@ -210,7 +210,7 @@ export const en = {
       default: 'Confirm with biometrics or device passcode after you hold, before the signature is released.',
     },
     holdDuration: 'Hold to confirm (seconds)',
-    holdDurationHelp: 'Press and hold to confirm a request. From 1 to 10 seconds.',
+    holdDurationHelp: 'Press and hold to confirm a request. From 3 to 10 seconds.',
     autoLock: 'Auto-lock (minutes)',
     bleSuffix: 'BLE name suffix',
     blePreview: '{{name}}',

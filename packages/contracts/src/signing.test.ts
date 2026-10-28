@@ -13,19 +13,21 @@ import {
 } from './signing';
 
 describe('hold-to-confirm math', () => {
-  it('defaults to 3 seconds and stays within 1–10', () => {
+  it('defaults to 3 seconds and stays within 3–10', () => {
     expect(HOLD_CONFIRM_DEFAULT_SECONDS).toBe(3);
-    expect(HOLD_CONFIRM_MIN_SECONDS).toBe(1);
+    expect(HOLD_CONFIRM_MIN_SECONDS).toBe(3);
     expect(HOLD_CONFIRM_MAX_SECONDS).toBe(10);
-    expect(HOLD_CONFIRM_SECONDS).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    expect(HOLD_CONFIRM_SECONDS).toEqual([3, 4, 5, 6, 7, 8, 9, 10]);
     expect(clampHoldDuration(undefined)).toBe(3);
     expect(clampHoldDuration('nope')).toBe(3);
-    expect(clampHoldDuration(0)).toBe(1);
+    expect(clampHoldDuration(0)).toBe(3);
+    expect(clampHoldDuration(1)).toBe(3);
+    expect(clampHoldDuration(2)).toBe(3);
     expect(clampHoldDuration(3.2)).toBe(3);
     expect(clampHoldDuration(3.7)).toBe(4);
     expect(clampHoldDuration(99)).toBe(10);
     expect(holdDurationMs(3)).toBe(3000);
-    expect(holdDurationMs(-4)).toBe(1000);
+    expect(holdDurationMs(-4)).toBe(3000);
   });
 
   it('commits only after the full duration', () => {

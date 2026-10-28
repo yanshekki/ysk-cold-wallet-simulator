@@ -47,7 +47,7 @@ export function signingHoldLabel(kind: SigningKind): string {
   }
 }
 
-export const HOLD_CONFIRM_MIN_SECONDS = 1;
+export const HOLD_CONFIRM_MIN_SECONDS = 3;
 export const HOLD_CONFIRM_MAX_SECONDS = 10;
 export const HOLD_CONFIRM_DEFAULT_SECONDS = 3;
 

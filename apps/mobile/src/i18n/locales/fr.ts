@@ -212,7 +212,7 @@ export const fr: MessageTree = {
       default: 'Confirmez avec la biométrie ou le code de l’appareil après le maintien, avant la signature.',
     },
     holdDuration: 'Maintenir pour confirmer (secondes)',
-    holdDurationHelp: 'Maintenez appuyé pour confirmer une demande. De 1 à 10 secondes.',
+    holdDurationHelp: 'Maintenez appuyé pour confirmer une demande. De 3 à 10 secondes.',
     autoLock: 'Verrouillage auto (minutes)',
     bleSuffix: 'Suffixe BLE',
     blePreview: '{{name}}',

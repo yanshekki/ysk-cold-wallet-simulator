@@ -37,12 +37,26 @@ describe('passkeys session', () => {
     session.setFaceIdEnabled(true);
   });
 
-  it('skips OS authentication when the production toggle is off', async () => {
+  it('still requires device credential when biometrics preference is off', async () => {
     getEnrolledLevelAsync.mockResolvedValue(1);
+    authenticateAsync.mockResolvedValue({ success: true });
     const { unlock, setFaceIdEnabled } = await import('./session');
     setFaceIdEnabled(false);
     await expect(unlock()).resolves.toBe(true);
-    expect(authenticateAsync).not.toHaveBeenCalled();
+    expect(authenticateAsync).toHaveBeenCalledTimes(1);
+    expect(authenticateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ disableDeviceFallback: false }),
+    );
+    setFaceIdEnabled(true);
+  });
+
+  it('does not unlock when device credential fails with biometrics preference off', async () => {
+    getEnrolledLevelAsync.mockResolvedValue(1);
+    authenticateAsync.mockResolvedValue({ success: false, error: 'user_cancel' });
+    const { unlock, setFaceIdEnabled } = await import('./session');
+    setFaceIdEnabled(false);
+    await expect(unlock()).resolves.toBe(false);
+    expect(authenticateAsync).toHaveBeenCalledTimes(1);
     setFaceIdEnabled(true);
   });
 

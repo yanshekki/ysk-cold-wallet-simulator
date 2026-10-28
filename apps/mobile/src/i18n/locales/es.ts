@@ -212,7 +212,7 @@ export const es: MessageTree = {
       default: 'Confirme con biometría o el código del dispositivo después de mantener pulsado, antes de que se libere la firma.',
     },
     holdDuration: 'Mantener para confirmar (segundos)',
-    holdDurationHelp: 'Mantén pulsado para confirmar una solicitud. De 1 a 10 segundos.',
+    holdDurationHelp: 'Mantén pulsado para confirmar una solicitud. De 3 a 10 segundos.',
     autoLock: 'Bloqueo automático (minutos)',
     bleSuffix: 'Sufijo BLE',
     blePreview: '{{name}}',

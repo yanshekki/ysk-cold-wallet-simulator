@@ -212,7 +212,7 @@ export const ja: MessageTree = {
       default: '長押し後、署名の前に生体認証またはデバイスパスコードで確認します。',
     },
     holdDuration: '長押しで確認（秒）',
-    holdDurationHelp: 'リクエストを確認するには押し続けます。1〜10秒。',
+    holdDurationHelp: 'リクエストを確認するには押し続けます。3〜10秒。',
     autoLock: '自動ロック（分）',
     bleSuffix: 'BLE 名の接尾辞',
     blePreview: '{{name}}',

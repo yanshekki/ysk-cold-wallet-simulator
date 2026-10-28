@@ -67,7 +67,10 @@ export function setFaceIdEnabled(value: boolean): void {
 }
 
 export async function unlock(promptMessage = 'Unlock'): Promise<boolean> {
-  if (Platform.OS === 'web' || isDevBuild() || !faceIdEnabled) {
+  // Web and __DEV__ / isDevBuild may skip the OS prompt for lab QA.
+  // Release must never treat "biometrics off" as an unlock bypass — cold
+  // wallet seed reveal / sign still requires device passcode (or biometrics).
+  if (Platform.OS === 'web' || isDevBuild()) {
     return true;
   }
   const level = await LocalAuthentication.getEnrolledLevelAsync();
@@ -80,6 +83,15 @@ export async function unlock(promptMessage = 'Unlock'): Promise<boolean> {
   };
 
   try {
+    // faceIdEnabled=false means prefer device credential / passcode, not skip auth.
+    if (!faceIdEnabled) {
+      const passcode = await LocalAuthentication.authenticateAsync({
+        ...prompt,
+        disableDeviceFallback: false,
+      });
+      return passcode.success;
+    }
+
     const biometric = await LocalAuthentication.authenticateAsync({
       ...prompt,
       disableDeviceFallback: true,

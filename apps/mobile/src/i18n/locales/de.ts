@@ -212,7 +212,7 @@ export const de: MessageTree = {
       default: 'Nach dem Halten mit Biometrie oder Gerätecode bestätigen, bevor die Signatur erstellt wird.',
     },
     holdDuration: 'Halten zum Bestätigen (Sekunden)',
-    holdDurationHelp: 'Zum Bestätigen gedrückt halten. Von 1 bis 10 Sekunden.',
+    holdDurationHelp: 'Zum Bestätigen gedrückt halten. Von 3 bis 10 Sekunden.',
     autoLock: 'Autosperre (Minuten)',
     bleSuffix: 'BLE-Namenssuffix',
     blePreview: '{{name}}',
