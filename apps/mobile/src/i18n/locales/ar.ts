@@ -314,6 +314,8 @@ export const ar: MessageTree = {
     headlineTokenTransfer: 'تحويل رمز',
     headlineTokenApprove: 'موافقة على رمز',
     headlineEip712: 'بيانات مكتوبة (EIP-712)',
+    headlineEip7702: 'تفويض EIP-7702',
+    notice7702: 'يسمح هذا التفويض للعقد بالتصرف نيابة عن هذا الحساب.',
     field: {
       chain: 'السلسلة',
       chainId: 'معرّف السلسلة',

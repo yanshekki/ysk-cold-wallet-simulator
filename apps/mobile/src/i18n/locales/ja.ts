@@ -314,6 +314,8 @@ export const ja: MessageTree = {
     headlineTokenTransfer: 'トークン送金',
     headlineTokenApprove: 'トークン承認',
     headlineEip712: '型付きデータ（EIP-712）',
+    headlineEip7702: 'EIP-7702 認可',
+    notice7702: 'この認可により、コントラクトがこの口座として動作できます。',
     field: {
       chain: 'チェーン',
       chainId: 'チェーン ID',

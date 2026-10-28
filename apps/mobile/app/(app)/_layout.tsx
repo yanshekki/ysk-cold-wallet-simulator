@@ -140,6 +140,8 @@ export default function AppShell() {
           headlineTokenTransfer: t('signing.headlineTokenTransfer'),
           headlineTokenApprove: t('signing.headlineTokenApprove'),
           headlineEip712: t('signing.headlineEip712'),
+          headlineEip7702: t('signing.headlineEip7702'),
+          notice7702: t('signing.notice7702'),
           fieldLabels: {
             CHAIN: t('signing.field.chain'),
             'CHAIN ID': t('signing.field.chainId'),

@@ -209,9 +209,9 @@ export const zhHK: MessageTree = {
     },
     signReauth: '簽署再認證',
     signReauthHelp: {
-      ios: '長按確認後須通過 Face ID、Touch ID 或裝置密碼，方會產生簽名。',
-      android: '長按確認後須通過指紋或裝置密碼，方會產生簽名。',
-      default: '長按確認後須通過生物識別或裝置密碼，方會產生簽名。',
+      ios: '長按確認後，須通過 Face ID、Touch ID 或裝置密碼，簽名或種子匯出才會放出。',
+      android: '長按確認後，須通過指紋或裝置密碼，簽名或種子匯出才會放出。',
+      default: '長按確認後，須通過生物識別或裝置密碼，簽名或種子匯出才會放出。',
     },
     holdDuration: '長按確認（秒）',
     holdDurationHelp: '確認請求時需長按的時間。範圍 3 至 10 秒。',
@@ -314,6 +314,8 @@ export const zhHK: MessageTree = {
     headlineTokenTransfer: '代幣轉帳',
     headlineTokenApprove: '代幣授權',
     headlineEip712: '類型資料（EIP-712）',
+    headlineEip7702: 'EIP-7702 授權',
+    notice7702: '此授權會讓該合約代此帳戶行事。',
     field: {
       chain: '鏈',
       chainId: '鏈 ID',

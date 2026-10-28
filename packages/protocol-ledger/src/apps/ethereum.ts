@@ -24,7 +24,6 @@ import {
   describeEthMessage,
   describeEthTransaction,
   describeEthTypedData,
-  describeSigning,
   hashTypedData,
   parseEip712,
   parseEthTx,
@@ -256,6 +255,9 @@ async function handleSignTx(apdu: Apdu, ctx: EthContext): Promise<Uint8Array | n
   const raw = needed != null ? pending.payload.slice(0, needed) : pending.payload;
   ctx.session.pendingTx = undefined;
   const parsed = parseEthTx(raw);
+  if (!parsed) {
+    return encodeResponse(new Uint8Array(), SW_INS_NOT_SUPPORTED);
+  }
   const request: SigningRequest = {
     brand: 'ledger',
     kind: 'sign',
@@ -263,16 +265,7 @@ async function handleSignTx(apdu: Apdu, ctx: EthContext): Promise<Uint8Array | n
     path: pending.path,
     message: `Sign Ethereum transaction\n${pending.path}\n0x${Array.from(raw, (b) => b.toString(16).padStart(2, '0')).join('').slice(0, 96)}`,
     rawPayload: raw,
-    detail: parsed
-      ? describeEthTransaction({ ...parsed, path: pending.path, token: ctx.session.token })
-      : describeSigning({
-          brand: 'ledger',
-          kind: 'sign',
-          title: 'Sign Ethereum transaction',
-          path: pending.path,
-          message: 'Sign Ethereum transaction',
-          rawPayload: raw,
-        }),
+    detail: describeEthTransaction({ ...parsed, path: pending.path, token: ctx.session.token }),
   };
   const ok = await ctx.confirmation.confirm(request);
   if (!ok) {
@@ -557,6 +550,38 @@ function handleProvideNetwork(apdu: Apdu, ctx: EthContext): Uint8Array {
   return encodeResponse(new Uint8Array(), SW_OK);
 }
 
+const EIP7702_HEADLINE = 'EIP-7702 authorization';
+
+function parseTlv(data: Uint8Array): Map<number, Uint8Array> | null {
+  const fields = new Map<number, Uint8Array>();
+  let offset = 0;
+  while (offset < data.length) {
+    if (offset + 2 > data.length) {
+      return null;
+    }
+    const tag = data[offset]!;
+    const len = data[offset + 1]!;
+    offset += 2;
+    if (offset + len > data.length) {
+      return null;
+    }
+    fields.set(tag, data.subarray(offset, offset + len));
+    offset += len;
+  }
+  return fields;
+}
+
+function readU64(bytes: Uint8Array): bigint | null {
+  if (bytes.length === 0 || bytes.length > 8) {
+    return null;
+  }
+  return readBig(bytes, 0, bytes.length);
+}
+
+function hex0x(bytes: Uint8Array): string {
+  return `0x${Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')}`;
+}
+
 async function handleSign7702(apdu: Apdu, ctx: EthContext): Promise<Uint8Array> {
   let path: string;
   let rest: Uint8Array;
@@ -567,13 +592,26 @@ async function handleSign7702(apdu: Apdu, ctx: EthContext): Promise<Uint8Array> 
   } catch {
     return encodeResponse(new Uint8Array(), SW_WRONG_LENGTH);
   }
-  if (rest.length < 32) {
+  if (rest.length < 2) {
     return encodeResponse(new Uint8Array(), SW_WRONG_LENGTH);
   }
-  const digest =
-    rest.length === 32
-      ? rest
-      : keccak_256(concatBytes(Uint8Array.of(0x05), rlpList([rlpInt(readBig(rest, 20, 8)), rlpBytes(rest.subarray(0, 20)), rlpInt(readBig(rest, 28, 8))])));
+  const structLen = (rest[0]! << 8) | rest[1]!;
+  if (structLen < 1 || rest.length !== 2 + structLen) {
+    return encodeResponse(new Uint8Array(), SW_WRONG_LENGTH);
+  }
+  const fields = parseTlv(rest.subarray(2));
+  const version = fields?.get(0x00);
+  const delegate = fields?.get(0x01);
+  const chainRaw = fields?.get(0x02);
+  const nonceRaw = fields?.get(0x03);
+  const chainId = chainRaw ? readU64(chainRaw) : null;
+  const nonce = nonceRaw ? readU64(nonceRaw) : null;
+  if (!fields || !version || version.length !== 1 || version[0] !== 1 || !delegate || delegate.length !== 20 || chainId == null || nonce == null) {
+    return encodeResponse(new Uint8Array(), SW_WRONG_LENGTH);
+  }
+  const digest = keccak_256(
+    concatBytes(Uint8Array.of(0x05), rlpList([rlpInt(chainId), rlpBytes(delegate), rlpInt(nonce)])),
+  );
   const request: SigningRequest = {
     brand: 'ledger',
     kind: 'sign',
@@ -581,6 +619,17 @@ async function handleSign7702(apdu: Apdu, ctx: EthContext): Promise<Uint8Array> 
     path,
     message: `Sign EIP-7702 authorization\n${path}`,
     rawPayload: rest,
+    detail: {
+      style: 'eth-tx',
+      headline: EIP7702_HEADLINE,
+      warning: 'This lets the contract act as this account.',
+      fields: [
+        { label: 'PATH', value: path, mono: true },
+        { label: 'TO', value: hex0x(delegate), mono: true },
+        { label: 'CHAIN ID', value: chainId.toString() },
+        { label: 'NONCE', value: nonce.toString() },
+      ],
+    },
   };
   const ok = await ctx.confirmation.confirm(request);
   if (!ok) {

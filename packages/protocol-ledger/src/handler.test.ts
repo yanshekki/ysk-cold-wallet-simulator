@@ -2,7 +2,7 @@ import { sha256 } from '@noble/hashes/sha2';
 import { mnemonicToEntropy, mnemonicToSeedSync } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
 import { describe, expect, it } from 'vitest';
-import { LEDGER_MODELS, catalogVersion, describeSigning, overlayDerivationPath, type ConfirmationPort } from '@cws/contracts';
+import { LEDGER_MODELS, catalogVersion, overlayDerivationPath, type ConfirmationPort } from '@cws/contracts';
 import { encodeResponse, SW_DENY, SW_OK } from './apdu';
 import { FUJI_HRP, FUJI_X_CHAIN_ID, avalancheBech32Address } from './apps/avalanche';
 import {
@@ -805,6 +805,81 @@ describe('LedgerProtocolHandler', () => {
     expect(Array.from(sig)).toEqual(Array.from(expected));
   });
 
+  it('does not sign an Avalanche hash for a path the user did not confirm', async () => {
+    let confirms = 0;
+    const handler = new LedgerProtocolHandler({
+      model: nanoX,
+      confirmation: {
+        async confirm() {
+          confirms += 1;
+          return true;
+        },
+        async getPassphrase() {
+          return undefined;
+        },
+      },
+      slotId: 'slot',
+      entropy,
+    });
+    handler.setApp('avalanche');
+    const path = [0x8000002c, 0x80002328, 0x80000000, 0x00000000, 0x00000000];
+    const hash = new Uint8Array(32).fill(0x22);
+    const first: number[] = [path.length];
+    for (const component of path) {
+      first.push((component >>> 24) & 0xff, (component >>> 16) & 0xff, (component >>> 8) & 0xff, component & 0xff);
+    }
+    first.push(...Array.from(hash));
+    const firstReply = await exchange(handler, apdu([0x80, 0x04, 0x01, 0x00, first.length, ...first]));
+    expect((firstReply[firstReply.length - 2] << 8) | firstReply[firstReply.length - 1]).toBe(SW_OK);
+    expect(confirms).toBe(1);
+    const other = [0x00000001];
+    const otherBytes: number[] = [other.length];
+    for (const component of other) {
+      otherBytes.push((component >>> 24) & 0xff, (component >>> 16) & 0xff, (component >>> 8) & 0xff, component & 0xff);
+    }
+    const swapped = await exchange(handler, apdu([0x80, 0x04, 0x02, 0x00, otherBytes.length, ...otherBytes]));
+    expect((swapped[swapped.length - 2] << 8) | swapped[swapped.length - 1]).toBe(SW_DENY);
+    expect(swapped.length).toBe(2);
+    expect(confirms).toBe(1);
+    const lastReply = await exchange(handler, apdu([0x80, 0x04, 0x02, 0x00, 0x01, 0x00]));
+    expect((lastReply[lastReply.length - 2] << 8) | lastReply[lastReply.length - 1]).toBe(SW_OK);
+    expect(confirms).toBe(1);
+  });
+
+  it('does not mint a second Avalanche signature after SIGN_MSG', async () => {
+    let confirms = 0;
+    const handler = new LedgerProtocolHandler({
+      model: nanoX,
+      confirmation: {
+        async confirm() {
+          confirms += 1;
+          return true;
+        },
+        async getPassphrase() {
+          return undefined;
+        },
+      },
+      slotId: 'slot',
+      entropy,
+    });
+    handler.setApp('avalanche');
+    const path = [0x8000002c, 0x80002328, 0x80000000, 0x00000000, 0x00000000];
+    const msg = Array.from(new TextEncoder().encode('fuji lab'));
+    const init: number[] = [path.length];
+    for (const component of path) {
+      init.push((component >>> 24) & 0xff, (component >>> 16) & 0xff, (component >>> 8) & 0xff, component & 0xff);
+    }
+    init.push(...msg);
+    await exchange(handler, apdu([0x80, 0x06, 0x00, 0x00, init.length, ...init]));
+    const lastReply = await exchange(handler, apdu([0x80, 0x06, 0x02, 0x00, 0x00]));
+    expect((lastReply[lastReply.length - 2] << 8) | lastReply[lastReply.length - 1]).toBe(SW_OK);
+    expect(confirms).toBe(1);
+    const extra = await exchange(handler, apdu([0x80, 0x04, 0x02, 0x00, 0x01, 0x00]));
+    expect((extra[extra.length - 2] << 8) | extra[extra.length - 1]).not.toBe(SW_OK);
+    expect(extra.length).toBe(2);
+    expect(confirms).toBe(1);
+  });
+
   it('returns a secp256k1 signature on Avalanche SIGN_MSG last', async () => {
     const handler = new LedgerProtocolHandler({
       model: nanoX,
@@ -1054,7 +1129,7 @@ describe('LedgerProtocolHandler', () => {
     expect(Array.from(payload.slice(0, 32))).toEqual(Array.from(expected));
   });
 
-  it('signs a complete Ethereum RLP payload', async () => {
+  it('refuses an empty Ethereum RLP list instead of signing it', async () => {
     const handler = new LedgerProtocolHandler({
       model: nanoX,
       confirmation: autoConfirm(),
@@ -1065,9 +1140,8 @@ describe('LedgerProtocolHandler', () => {
     const pathBytes = [0x05, 0x80, 0x00, 0x00, 0x2c, 0x80, 0x00, 0x00, 0x3c, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc0];
     const payload = await exchange(handler, apdu([0xe0, 0x04, 0x00, 0x00, pathBytes.length, ...pathBytes]));
     const sw = (payload[payload.length - 2] << 8) | payload[payload.length - 1];
-    expect(sw).toBe(SW_OK);
-    expect(payload.length).toBe(1 + 64 + 2);
-    expect(payload[0] === 27 || payload[0] === 28).toBe(true);
+    expect(sw).toBe(0x6d00);
+    expect(payload.length).toBe(2);
   });
 
   it('signs a legacy Ethereum transaction as v||r||s with v in {27,28}', async () => {
@@ -1129,12 +1203,11 @@ describe('LedgerProtocolHandler', () => {
     expect(payload[0] === 0 || payload[0] === 1).toBe(true);
   });
 
-  it('completes a 0x03 envelope and still marks decodeFailed', async () => {
-    const seen: string[] = [];
+  it('refuses a short type-3 envelope instead of blind-signing it', async () => {
+    let confirms = 0;
     const confirmation: ConfirmationPort = {
-      async confirm(request) {
-        seen.push(request.path);
-        expect(request.detail?.decodeFailed ?? describeSigning(request).decodeFailed).toBe(true);
+      async confirm() {
+        confirms += 1;
         return true;
       },
       async getPassphrase() {
@@ -1155,9 +1228,9 @@ describe('LedgerProtocolHandler', () => {
     ];
     const payload = await exchange(handler, apdu([0xe0, 0x04, 0x00, 0x00, pathBytes.length, ...pathBytes]));
     const sw = (payload[payload.length - 2] << 8) | payload[payload.length - 1];
-    expect(sw).toBe(SW_OK);
-    expect(payload.length).toBe(1 + 64 + 2);
-    expect(seen).toEqual([PATH]);
+    expect(sw).toBe(0x6d00);
+    expect(payload.length).toBe(2);
+    expect(confirms).toBe(0);
   });
 
   it('uses a session path overlay when the ETH family matches', async () => {
@@ -1215,7 +1288,8 @@ describe('LedgerProtocolHandler', () => {
     expect((silent[silent.length - 2] << 8) | silent[silent.length - 1]).toBe(SW_OK);
     expect(silent.length).toBe(32 + 2);
     const shown = await exchange(handler, apdu([0xe0, 0x05, 0x01, 0x00, pathBytes.length, ...pathBytes]));
-    expect((shown[shown.length - 2] << 8) | shown[shown.length - 1]).toBe(SW_OK);
+    expect((shown[shown.length - 2] << 8) | shown[shown.length - 1]).toBe(SW_DENY);
+    expect(shown.length).toBe(2);
   });
 
   it('uses a cached seed from replaceSeed instead of getPassphrase', async () => {

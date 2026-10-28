@@ -207,9 +207,9 @@ export const en = {
     },
     signReauth: 'Re-authenticate to sign',
     signReauthHelp: {
-      ios: 'Confirm with Face ID or Touch ID after you hold, before the signature is released.',
-      android: 'Confirm with fingerprint or device passcode after you hold, before the signature is released.',
-      default: 'Confirm with biometrics or device passcode after you hold, before the signature is released.',
+      ios: 'Confirm with Face ID or Touch ID after you hold, before a signature or seed export is released.',
+      android: 'Confirm with fingerprint or device passcode after you hold, before a signature or seed export is released.',
+      default: 'Confirm with biometrics or device passcode after you hold, before a signature or seed export is released.',
     },
     holdDuration: 'Hold to confirm (seconds)',
     holdDurationHelp: 'Press and hold to confirm a request. From 3 to 10 seconds.',
@@ -312,6 +312,8 @@ export const en = {
     headlineTokenTransfer: 'Token transfer',
     headlineTokenApprove: 'Token approval',
     headlineEip712: 'Typed data (EIP-712)',
+    headlineEip7702: 'EIP-7702 authorization',
+    notice7702: 'This lets the contract act as this account.',
     field: {
       chain: 'Chain',
       chainId: 'Chain ID',

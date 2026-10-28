@@ -314,6 +314,8 @@ export const id: MessageTree = {
     headlineTokenTransfer: 'Transfer token',
     headlineTokenApprove: 'Persetujuan token',
     headlineEip712: 'Data bertipe (EIP-712)',
+    headlineEip7702: 'Otorisasi EIP-7702',
+    notice7702: 'Ini mengizinkan kontrak bertindak sebagai akun ini.',
     field: {
       chain: 'Rantai',
       chainId: 'ID rantai',

@@ -314,6 +314,8 @@ export const es: MessageTree = {
     headlineTokenTransfer: 'Transferencia de token',
     headlineTokenApprove: 'Aprobación de token',
     headlineEip712: 'Datos tipados (EIP-712)',
+    headlineEip7702: 'Autorización EIP-7702',
+    notice7702: 'Esto permite que el contrato actúe como esta cuenta.',
     field: {
       chain: 'Cadena',
       chainId: 'ID de cadena',

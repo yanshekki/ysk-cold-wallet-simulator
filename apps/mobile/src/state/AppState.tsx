@@ -39,6 +39,7 @@ import { describeBlePayload, redactLogHex } from '../lab/apduNote';
 import { expoRng } from '../lab/polyfillCrypto';
 import { ensureNearAccount } from '../near/service';
 import { isDevBuild } from '../passkeys/devFlag';
+import { needsSignReauth } from '../passkeys/signGate';
 import { setFaceIdEnabled, unlock as requestUnlock } from '../passkeys';
 import { SecretSession } from '../seeds/secretSession';
 import { listSlots, loadEntropy, setVaultAuthPrompt, updateSlotMeta, wipeAllSlots } from '../seeds/vault';
@@ -583,12 +584,15 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   const resolveSigning = useCallback(async (ok: boolean) => {
     const request = pendingRef.current?.request;
-    // Release always re-auths after HoldToConfirm for signatures (Hold alone is
-    // insufficient if automation can drive the press). Debug honors the toggle;
-    // unlock() itself still skips the OS prompt when isDevBuild().
-    const needsSignReauth =
-      request?.kind === 'sign' && (settingsRef.current.signReauth || !isDevBuild());
-    if (ok && needsSignReauth) {
+    // Release always re-auths after HoldToConfirm for signatures and seed
+    // export. Hold alone is not enough if another app can drive the press.
+    // Debug honors the toggle; unlock() still skips the OS prompt in dev.
+    const reauth = needsSignReauth({
+      kind: request?.kind,
+      signReauth: settingsRef.current.signReauth,
+      devBuild: isDevBuild(),
+    });
+    if (ok && reauth) {
       try {
         if (!(await requestUnlock(translate(settingsRef.current.language, 'unlock.prompt')))) {
           pendingRef.current?.resolve(false);

@@ -314,6 +314,8 @@ export const ru: MessageTree = {
     headlineTokenTransfer: 'Перевод токена',
     headlineTokenApprove: 'Одобрение токена',
     headlineEip712: 'Типизированные данные (EIP-712)',
+    headlineEip7702: 'Авторизация EIP-7702',
+    notice7702: 'Это позволяет контракту действовать от имени этого счёта.',
     field: {
       chain: 'Сеть',
       chainId: 'ID сети',

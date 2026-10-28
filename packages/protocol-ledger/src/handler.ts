@@ -125,6 +125,7 @@ export class LedgerProtocolHandler implements ProtocolHandler {
     this.ethSession.challenge = undefined;
     this.nearSession.pendingSign = undefined;
     this.avaxSession.pendingHash = undefined;
+    this.avaxSession.hashConfirmed = false;
     this.avaxSession.rootPath = undefined;
     this.avaxSession.signChunks = undefined;
     this.familySession.pendingSign = undefined;
@@ -147,6 +148,7 @@ export class LedgerProtocolHandler implements ProtocolHandler {
     this.ethSession.pendingTx = undefined;
     this.nearSession.pendingSign = undefined;
     this.avaxSession.pendingHash = undefined;
+    this.avaxSession.hashConfirmed = false;
     this.avaxSession.rootPath = undefined;
     this.avaxSession.signChunks = undefined;
     this.familySession.pendingSign = undefined;
@@ -191,6 +193,7 @@ export class LedgerProtocolHandler implements ProtocolHandler {
         this.ethSession.pendingTx = undefined;
         this.nearSession.pendingSign = undefined;
         this.avaxSession.pendingHash = undefined;
+    this.avaxSession.hashConfirmed = false;
         this.avaxSession.rootPath = undefined;
         this.avaxSession.signChunks = undefined;
         this.familySession.pendingSign = undefined;
