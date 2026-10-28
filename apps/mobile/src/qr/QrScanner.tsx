@@ -1,7 +1,9 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, colors, fonts, space } from '@cws/ui';
+import { shouldMountCameraPreview, shouldPromptCameraPermission } from './cameraPreview';
 
 type Props = {
   visible: boolean;
@@ -31,14 +33,46 @@ export function QrScanner({
   const insets = useSafeAreaInsets();
   const [permission, requestPermission] = useCameraPermissions();
   const granted = permission?.granted === true;
+  const statusKnown = permission != null;
+  const [presented, setPresented] = useState(false);
+  const mountPreview = shouldMountCameraPreview({ visible, granted, presented });
+
+  useEffect(() => {
+    if (!visible) {
+      setPresented(false);
+    }
+  }, [visible]);
+
+  useEffect(() => {
+    if (
+      shouldPromptCameraPermission({
+        visible,
+        granted,
+        canAskAgain: permission?.canAskAgain !== false,
+        statusKnown,
+      })
+    ) {
+      void requestPermission();
+    }
+  }, [visible, granted, permission?.canAskAgain, requestPermission, statusKnown]);
 
   return (
-    <Modal visible={visible} animationType="fade" onRequestClose={onClose} statusBarTranslucent>
-      <View style={styles.root} testID="device-qr-scanner">
-        {granted ? (
+    <Modal
+      visible={visible}
+      animationType="fade"
+      presentationStyle="overFullScreen"
+      statusBarTranslucent
+      onShow={() => setPresented(true)}
+      onDismiss={() => setPresented(false)}
+      onRequestClose={onClose}
+    >
+      <View style={styles.root} testID="device-qr-scanner" collapsable={false}>
+        {mountPreview ? (
           <CameraView
-            style={StyleSheet.absoluteFill}
+            key={`preview-${presented ? 'on' : 'off'}`}
+            style={styles.preview}
             facing="back"
+            active
             barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
             onBarcodeScanned={({ data }) => {
               if (data) {
@@ -46,10 +80,20 @@ export function QrScanner({
               }
             }}
           />
+        ) : granted ? (
+          <View style={styles.waiting} testID="device-qr-scanner-waiting">
+            <ActivityIndicator color={colors.ok} />
+          </View>
         ) : (
           <View style={styles.denied}>
-            <Text style={styles.deniedText}>{deniedLabel}</Text>
-            <Button label={allowLabel} onPress={() => void requestPermission()} />
+            {statusKnown ? (
+              <>
+                <Text style={styles.deniedText}>{deniedLabel}</Text>
+                <Button label={allowLabel} onPress={() => void requestPermission()} />
+              </>
+            ) : (
+              <ActivityIndicator color={colors.ok} />
+            )}
           </View>
         )}
         <View style={[styles.top, { paddingTop: insets.top + space.md }]}>
@@ -79,6 +123,18 @@ export function QrScanner({
 const styles = StyleSheet.create({
   root: {
     flex: 1,
+    backgroundColor: '#000000',
+  },
+  preview: {
+    flex: 1,
+    width: '100%',
+    alignSelf: 'stretch',
+    backgroundColor: '#000000',
+  },
+  waiting: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#000000',
   },
   denied: {
