@@ -321,6 +321,7 @@ export const zhHK: MessageTree = {
     headlineEip712: '類型資料（EIP-712）',
     headlineEip7702: 'EIP-7702 授權',
     notice7702: '此授權會讓該合約代此帳戶行事。',
+    noticeZeroHmac: '政策 HMAC 全為零，未核對。',
     field: {
       chain: '鏈',
       chainId: '鏈 ID',
@@ -349,6 +350,7 @@ export const zhHK: MessageTree = {
       domain: '網域',
       message: '訊息',
       hash: '雜湊',
+      policy: '政策',
       bytes: '位元組',
       payload: '資料負載',
       spender: '授權對象',

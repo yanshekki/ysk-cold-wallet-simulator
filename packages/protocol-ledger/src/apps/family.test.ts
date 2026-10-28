@@ -16,6 +16,7 @@ import {
   prepareSignPsbtInterpreter,
   psbtMapsToByteMaps,
   serializeWalletPolicy,
+  walletHmac,
   walletIdOf,
 } from '../index';
 import { deriveEd25519PrivateKey, ed25519PublicKey, signEd25519 } from '../crypto';
@@ -664,6 +665,96 @@ describe('Ledger family APDU bodies', () => {
     expect(swOf(done)).toBe(SW_OK);
     expect(interpreter.yielded.length).toBeGreaterThan(0);
     expect(interpreter.yielded[0]!.length).toBeGreaterThan(70);
+  });
+
+  async function signMerklized(template: string, hmac?: Uint8Array): Promise<{ done: Uint8Array; requests: SigningRequest[] }> {
+    const requests: SigningRequest[] = [];
+    const nanoX = LEDGER_MODELS.find((model) => model.id === 'nano-x')!;
+    const device = new LedgerProtocolHandler({
+      model: nanoX,
+      confirmation: {
+        async confirm(request) {
+          requests.push(request);
+          return true;
+        },
+        async getPassphrase() {
+          return undefined;
+        },
+      },
+      slotId: 'slot',
+      entropy: entropyFromMnemonic(FOUNDATION),
+    });
+    device.setApp('bitcoin');
+    const seed = mnemonicToSeedSync(FOUNDATION);
+    const master = HDKey.fromMasterSeed(seed);
+    const node = master.derive("m/84'/0'/0'/0/0");
+    const psbt = buildQrPsbt({
+      amount: 10000n,
+      pubkey: node.publicKey!,
+      fingerprint: master.fingerprint,
+      pathIndexes: [0x80000054, 0x80000000, 0x80000000, 0, 0],
+      outputScript: concatBytes(Uint8Array.of(0x00, 0x14), new Uint8Array(20).fill(0x33)),
+      outputAmount: 8000n,
+    });
+    const parsed = parsePsbt(psbt);
+    const global = psbtMapsToByteMaps([parsed.global])[0]!;
+    const inputs = psbtMapsToByteMaps(parsed.inputMaps);
+    const outputs = psbtMapsToByteMaps(parsed.outputMaps);
+    const policy = defaultWalletPolicy(seed, template);
+    const serialize = serializeWalletPolicy(policy);
+    const interpreter = new ClientCommandInterpreter();
+    prepareSignPsbtInterpreter(
+      interpreter,
+      global,
+      inputs,
+      outputs,
+      serialize,
+      policy.descriptorTemplate,
+      policy.keysInfo,
+    );
+    const command = encodeSignPsbtCommand(
+      global,
+      inputs,
+      outputs,
+      walletIdOf(serialize),
+      hmac ? Uint8Array.from(hmac) : undefined,
+    );
+    const done = await continueUntilDone(
+      device,
+      interpreter,
+      apdu([0xe1, 0x04, 0x00, 0x01, command.length, ...command]),
+    );
+    return { done, requests };
+  }
+
+  it('names the policy on the sign sheet when the policy HMAC is all zeros', async () => {
+    for (const template of ['wpkh(@0/**)', 'wpkh(@0)'] as const) {
+      const { done, requests } = await signMerklized(template);
+      expect(swOf(done)).toBe(SW_OK);
+      expect(requests).toHaveLength(1);
+      expect(requests[0]?.detail?.warning).toMatch(/all zeros/i);
+      expect(requests[0]?.detail?.fields.find((field) => field.label === 'POLICY')?.value).toBe(template);
+      expect(requests[0]?.detail?.fields.find((field) => field.label === 'TO')).toBeDefined();
+    }
+  });
+
+  it('keeps a matching policy HMAC off the extra policy warning', async () => {
+    const seed = mnemonicToSeedSync(FOUNDATION);
+    const policy = defaultWalletPolicy(seed);
+    const hmac = walletHmac(seed, serializeWalletPolicy(policy));
+    const { done, requests } = await signMerklized(policy.descriptorTemplate, hmac);
+    expect(swOf(done)).toBe(SW_OK);
+    expect(requests[0]?.detail?.warning).toBeUndefined();
+    expect(requests[0]?.detail?.fields.find((field) => field.label === 'POLICY')).toBeUndefined();
+    expect(requests[0]?.detail?.fields.find((field) => field.label === 'FEE')).toBeDefined();
+  });
+
+  it('rejects a non-zero policy HMAC that does not match', async () => {
+    const hmac = new Uint8Array(32);
+    hmac[31] = 1;
+    const { done, requests } = await signMerklized('wpkh(@0/**)', hmac);
+    expect(swOf(done)).toBe(SW_INS_NOT_SUPPORTED);
+    expect(requests).toHaveLength(0);
   });
 
   const SUI_PATH = [0x8000002c, 0x80000310, 0x80000000, 0x80000000, 0x80000000];
