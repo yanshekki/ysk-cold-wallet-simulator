@@ -343,6 +343,7 @@ export const de: MessageTree = {
       message: 'Nachricht',
       hash: 'Hash',
       bytes: 'Bytes',
+      payload: 'Nutzlast',
       spender: 'Freigegebener',
     },
   },

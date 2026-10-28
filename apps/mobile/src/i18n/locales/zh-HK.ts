@@ -343,6 +343,7 @@ export const zhHK: MessageTree = {
       message: '訊息',
       hash: '雜湊',
       bytes: '位元組',
+      payload: '資料負載',
       spender: '授權對象',
     },
   },

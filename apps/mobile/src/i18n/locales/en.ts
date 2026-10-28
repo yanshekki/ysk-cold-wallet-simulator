@@ -341,6 +341,7 @@ export const en = {
       message: 'Message',
       hash: 'Hash',
       bytes: 'Bytes',
+      payload: 'Payload',
       spender: 'Spender',
     },
   },

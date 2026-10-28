@@ -169,6 +169,7 @@ export default function AppShell() {
             MESSAGE: t('signing.field.message'),
             HASH: t('signing.field.hash'),
             BYTES: t('signing.field.bytes'),
+            PAYLOAD: t('signing.field.payload'),
             SPENDER: t('signing.field.spender'),
           },
         }}

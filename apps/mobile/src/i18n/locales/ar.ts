@@ -343,6 +343,7 @@ export const ar: MessageTree = {
       message: 'الرسالة',
       hash: 'التجزئة',
       bytes: 'بايت',
+      payload: 'الحمولة',
       spender: 'المنفق',
     },
   },
