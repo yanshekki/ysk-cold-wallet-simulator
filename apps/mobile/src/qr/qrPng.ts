@@ -4,6 +4,16 @@ import QRCode from 'qrcode';
 /** ISO/IEC 18004 quiet zone: four modules of white on every side. */
 export const QR_QUIET_MODULES = 4;
 const DEFAULT_MODULE_PX = 8;
+const ALPHANUMERIC = /^[0-9A-Z $%*+\-./:]+$/;
+
+/**
+ * BC-UR (BCR-2020-005) is case-insensitive. QR alphanumeric mode is uppercase-only
+ * and packs denser than byte mode, which lowercase `ur:…` would force.
+ */
+export function payloadForQr(value: string): string {
+  const upper = value.toUpperCase();
+  return ALPHANUMERIC.test(upper) ? upper : value;
+}
 
 const PNG_CRC_TABLE = (() => {
   const table = new Uint32Array(256);
@@ -89,6 +99,7 @@ export type QrPng = {
  * Encode a QR as an opaque PNG data URI.
  * `QRCode.toDataURL` needs a DOM canvas and blanks on React Native / iOS.
  * A View-per-module matrix can also paint as a black square on a dark sheet.
+ * BitMatrix.get is (row, col); swapping them transposes the symbol so ZXing never decodes.
  */
 export function encodeQrPng(
   value: string,
@@ -96,7 +107,7 @@ export function encodeQrPng(
 ): QrPng {
   const modulePx = options?.modulePx ?? DEFAULT_MODULE_PX;
   const quiet = options?.quietModules ?? QR_QUIET_MODULES;
-  const qr = QRCode.create(value, { errorCorrectionLevel: 'M' });
+  const qr = QRCode.create(payloadForQr(value), { errorCorrectionLevel: 'M' });
   const n = qr.modules.size;
   const width = (n + quiet * 2) * modulePx;
   const raw = new Uint8Array(width * (width + 1));
@@ -111,7 +122,7 @@ export function encodeQrPng(
       const moduleX = Math.floor(x / modulePx) - quiet;
       const on =
         moduleX >= 0 && moduleY >= 0 && moduleX < n && moduleY < n
-          ? Boolean(qr.modules.get(moduleX, moduleY))
+          ? Boolean(qr.modules.get(moduleY, moduleX))
           : false;
       const pixel = on ? 0x00 : 0xff;
       raw[offset] = pixel;
