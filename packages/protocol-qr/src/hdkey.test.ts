@@ -35,6 +35,33 @@ describe('encodeEthHdkeyUr', () => {
     expect(asMap(coin.value).get(1)).toBe(60);
     const origin = asTag(map.get(6)!);
     expect(origin.tag).toBe(304);
+    const originMap = asMap(origin.value);
+    expect(typeof originMap.get(2)).toBe('number');
+    const children = asTag(map.get(7)!);
+    expect(children.tag).toBe(304);
+    const childMap = asMap(children.value);
+    expect(childMap.has(2)).toBe(false);
+    expect(childMap.has(3)).toBe(false);
+    expect(asArray(childMap.get(1)!)).toHaveLength(4);
+  });
+
+  it('exports a single-frame OneKey crypto-hdkey Rabby can finish in one scan', () => {
+    const seed = mnemonicToSeedSync(FOUNDATION);
+    const encoded = encodeQrAccount(seed, qrProfile('onekey'));
+    expect(encoded.name).toBe('OneKey');
+    expect(encoded.address).toBe(EXPECTED);
+    expect(encoded.urKind).toBe('crypto-hdkey');
+    expect(encoded.parts).toEqual([encoded.ur]);
+    expect(encoded.ur.startsWith('ur:crypto-hdkey/')).toBe(true);
+    expect(/\/\d+-\d+\//.test(encoded.ur)).toBe(false);
+
+    const ur = decodeUr(encoded.ur);
+    expect(ur.type).toBe('crypto-hdkey');
+    const map = asMap(decodeCbor(ur.cbor));
+    expect(map.get(9)).toBe('OneKey');
+    expect(map.get(10)).toBe('account.standard');
+    const coin = asTag(map.get(5)!);
+    expect(asMap(coin.value).get(1)).toBe(60);
   });
 });
 

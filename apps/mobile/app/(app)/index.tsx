@@ -783,10 +783,13 @@ const styles = StyleSheet.create({
     height: 280,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#ffffff',
+    overflow: 'hidden',
   },
   qrMatrixWrap: {
     width: 280,
     height: 280,
+    backgroundColor: '#ffffff',
   },
   qrMatrixDimmed: {
     opacity: 0.22,

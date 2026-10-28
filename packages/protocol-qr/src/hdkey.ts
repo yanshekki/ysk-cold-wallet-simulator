@@ -211,16 +211,20 @@ function pathComponent(index: number | undefined, hardened: boolean): Uint8Array
   return [cborUint(index), cborBool(hardened)];
 }
 
-function encodeKeypath(indexes: Array<{ index?: number; hardened: boolean }>, source: number, depth: number): Uint8Array {
+function encodeKeypath(
+  indexes: Array<{ index?: number; hardened: boolean }>,
+  source?: number,
+  depth?: number,
+): Uint8Array {
   const components = indexes.flatMap((item) => pathComponent(item.index, item.hardened));
-  return cborTag(
-    CRYPTO_KEYPATH,
-    cborMap([
-      [1, cborArray(components)],
-      [2, cborUint(source)],
-      [3, cborUint(depth)],
-    ]),
-  );
+  const entries: Array<[number, Uint8Array]> = [[1, cborArray(components)]];
+  if (source != null) {
+    entries.push([2, cborUint(source)]);
+  }
+  if (depth != null) {
+    entries.push([3, cborUint(depth)]);
+  }
+  return cborTag(CRYPTO_KEYPATH, cborMap(entries));
 }
 
 function encodeCoinInfo(type: number, network?: number): Uint8Array {
@@ -233,7 +237,9 @@ function encodeCoinInfo(type: number, network?: number): Uint8Array {
 
 function wrapEncoded(built: BuiltHdkey, type: string, cbor: Uint8Array, urKind: EthAirgapQr['urKind']): EthAirgapQr {
   const ur = encodeUr(type, cbor);
-  const parts = encodeFountainParts(type, cbor);
+  // Host wallets (Rabby OneKey QR) take one camera snapshot. Keep account
+  // export as a single static UR, not an animated fountain sequence.
+  const parts = encodeFountainParts(type, cbor, Math.max(cbor.byteLength, 1024));
   return {
     ur,
     parts: parts.length > 1 ? parts : [ur],
@@ -269,14 +275,10 @@ function buildEthHdkey(seed: Uint8Array, name: string): BuiltHdkey {
     masterFp,
     3,
   );
-  const children = encodeKeypath(
-    [
-      { index: 0, hardened: false },
-      { hardened: false },
-    ],
-    masterFp,
-    2,
-  );
+  const children = encodeKeypath([
+    { index: 0, hardened: false },
+    { hardened: false },
+  ]);
   const cbor = cborMap([
     [3, cborBytes(account.publicKey)],
     [4, cborBytes(account.chainCode)],
@@ -339,14 +341,10 @@ function buildBtcHdkey(seed: Uint8Array, name: string, format: BtcScript['format
     masterFp,
     3,
   );
-  const children = encodeKeypath(
-    [
-      { index: 0, hardened: false },
-      { hardened: false },
-    ],
-    masterFp,
-    2,
-  );
+  const children = encodeKeypath([
+    { index: 0, hardened: false },
+    { hardened: false },
+  ]);
   const cbor = cborMap([
     [3, cborBytes(account.publicKey)],
     [4, cborBytes(account.chainCode)],
