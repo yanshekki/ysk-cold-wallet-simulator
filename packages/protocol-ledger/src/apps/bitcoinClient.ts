@@ -349,8 +349,9 @@ function* getWalletAddressJob(
       throw new Error('denied');
     }
   }
-  const address = encodeAscii(derived.address);
-  return concatBytes(Uint8Array.of(address.length), address);
+  // Ledger's Bitcoin client returns the address as raw ASCII. A length prefix
+  // becomes the first character (`"` / `*` / `>`) and OKX rejects it as 地址格式錯誤.
+  return encodeAscii(derived.address);
 }
 
 function* signMessageJob(

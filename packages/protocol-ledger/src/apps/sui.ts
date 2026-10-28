@@ -44,9 +44,6 @@ const INS = {
   SIGN: 0x03,
 } as const;
 
-/** Mysten `transport.send` already dropped ISO 9000, then slices another 2 bytes as an inner SW. */
-const INNER_SW = Uint8Array.of(0x90, 0x00);
-
 function spec(): FamilySpec {
   return {
     name: 'Sui',
@@ -62,7 +59,11 @@ function spec(): FamilySpec {
 }
 
 function encodeSuiBlock(instruction: number, payload: Uint8Array): Uint8Array {
-  return encodeResponse(concatBytes(Uint8Array.of(instruction), payload, INNER_SW), SW_OK);
+  // OKX's WebHID transport returns the APDU status word. Its Mysten client then
+  // slices those last 2 bytes off (`reply.slice(1, -2)`) and uses the middle as
+  // the block body. An extra inner 9000 makes the GET_CHUNK hash miss the
+  // client's map, so OKX sends a chunk-failure and shows "open the Sui app".
+  return encodeResponse(concatBytes(Uint8Array.of(instruction), payload), SW_OK);
 }
 
 function isStart(data: Uint8Array): boolean {

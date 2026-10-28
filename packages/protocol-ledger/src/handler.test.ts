@@ -1304,7 +1304,7 @@ describe('LedgerProtocolHandler', () => {
     const reply = [0x01, ...linked];
     const payload = await exchange(handler, apdu([0x00, 0x02, 0x00, 0x00, reply.length, ...reply]));
     expect((payload[payload.length - 2] << 8) | payload[payload.length - 1]).toBe(SW_OK);
-    const body = payload.subarray(1, payload.length - 4);
+    const body = payload.subarray(1, payload.length - 2);
     expect(body[0]).toBe(32);
     const pub = body.subarray(1, 33);
     expect(Array.from(pub)).toEqual(
