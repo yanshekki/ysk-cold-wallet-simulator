@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { labCatalogFor } from '../src/lab';
 import { resetMock, startMockProxy, type MockProxy } from './harness';
+import { expectProxyTabs, setProxyLang } from './langs';
 
 let mock: MockProxy;
 
@@ -96,8 +97,8 @@ test.describe('CWS Proxy catalog', () => {
 
   test('given 繁 UI, when dashboard is shown, then GET_VERSION is 讀取版本', async ({ page }) => {
     await page.goto(mock.server.url);
-    await page.getByTestId('lang-zh').click();
-    await expect(page.getByTestId('tab-lab')).toHaveText('測試網主機');
+    await setProxyLang(page, 'zh-HK');
+    await expectProxyTabs(page, 'zh-HK');
     await page.getByTestId('tab-lab').click();
     await expect(page.getByTestId('lab-action-dash-version')).toContainText('讀取版本');
   });

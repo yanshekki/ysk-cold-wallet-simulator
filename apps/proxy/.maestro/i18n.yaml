@@ -3,13 +3,18 @@ tags:
   - proxy
   - i18n
 ---
-# Given English Proxy UI
-# When 繁 is tapped
-# Then the lab tab is 測試網主機
+# Given Proxy UI language select
+# When 繁體中文（香港） is chosen
+# Then tabs show 代理 / 測試網主機 / 紀錄
 - launchApp
 - tapOn:
-    id: "lang-zh"
+    id: "lang-select"
+- tapOn: "繁 · 繁體中文（香港）"
 - assertVisible: "測試網主機"
+- assertVisible: "代理"
+- assertVisible: "紀錄"
+- assertVisible: "語言"
 - tapOn:
-    id: "lang-en"
+    id: "lang-select"
+- tapOn: "EN · English"
 - assertVisible: "Testnet host"

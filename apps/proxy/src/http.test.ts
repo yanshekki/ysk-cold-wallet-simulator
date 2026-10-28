@@ -100,8 +100,17 @@ describe('proxy ui http', () => {
     expect(copy).toContain('測試網主機');
     expect(copy).toContain('Host de testnet');
     expect(copy).toContain('テストネットホスト');
+    expect(copy).toContain('id: "zh-HK"');
     expect(copy).toContain('id: "es"');
+    expect(copy).toContain('id: "ar"');
+    expect(copy).toContain('id: "pt"');
+    expect(copy).toContain('id: "id"');
+    expect(copy).toContain('id: "fr"');
+    expect(copy).toContain('id: "ja"');
+    expect(copy).toContain('id: "ru"');
     expect(copy).toContain('id: "de"');
+    expect(copy).toContain('lang: "Language"');
+    expect(copy).toContain('lang: "語言"');
     expect(copy).toContain('labRunning');
 
     const script = await fetch(`${server.url}/app.js`);

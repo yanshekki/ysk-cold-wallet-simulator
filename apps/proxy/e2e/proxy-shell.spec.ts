@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { resetMock, startMockProxy, type MockProxy } from './harness';
+import { expectProxyTabs, PROXY_TAB_COPY, setProxyLang } from './langs';
 
 let mock: MockProxy;
 
@@ -66,10 +67,23 @@ test.describe('CWS Proxy shell', () => {
 
   test('given English UI, when 繁 is set and the page reloads, then language persists', async ({ page }) => {
     await page.goto(mock.server.url);
-    await page.getByTestId('lang-zh').click();
+    await setProxyLang(page, 'zh-HK');
     await page.reload();
-    await expect(page.getByTestId('tab-lab')).toHaveText('測試網主機');
-    await page.getByTestId('lang-en').click();
+    await expectProxyTabs(page, 'zh-HK');
+    await setProxyLang(page, 'en');
+    await expectProxyTabs(page, 'en');
+  });
+
+  test('given the language select, when every mobile locale is chosen, then chrome copy is complete', async ({
+    page,
+  }) => {
+    await page.goto(mock.server.url);
+    for (const id of Object.keys(PROXY_TAB_COPY) as Array<keyof typeof PROXY_TAB_COPY>) {
+      await setProxyLang(page, id);
+      await expectProxyTabs(page, id);
+      await expect(page.getByTestId('lang-label')).not.toHaveText('Lang');
+      await expect(page.getByTestId('lang-label')).not.toHaveText('lang');
+    }
   });
 
   test('given native=1, when the page loads, then the native-shell class is applied', async ({ page }) => {
