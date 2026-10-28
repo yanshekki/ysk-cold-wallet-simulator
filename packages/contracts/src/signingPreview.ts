@@ -345,7 +345,7 @@ function describeErc20(
   };
 }
 
-/** Shown when the host sent EIP-712 domain and message hashes instead of typed data. */
+/** Shown when the host sent a hash instead of a decoded transaction or typed data. */
 export const HOST_SUPPLIED_HASH_WARNING =
   'The host supplied this hash. It is not a decoded transaction.';
 
@@ -362,6 +362,24 @@ export function describeHostSuppliedHash(input: {
       { label: 'PATH', value: input.path, mono: true },
       { label: 'DOMAIN HASH', value: hex0x(input.domainHash), mono: true },
       { label: 'MESSAGE HASH', value: hex0x(input.messageHash), mono: true },
+    ],
+  };
+}
+
+/** Review for a raw 32-byte hash the host asked the Bitcoin app to sign. */
+export function describeHostSuppliedDigest(input: {
+  chain: string;
+  path: string;
+  hash: Uint8Array;
+}): SigningDetail {
+  return {
+    style: 'raw-sign',
+    headline: 'Host-supplied hash',
+    warning: HOST_SUPPLIED_HASH_WARNING,
+    fields: [
+      { label: 'CHAIN', value: input.chain },
+      { label: 'PATH', value: input.path, mono: true },
+      { label: 'HASH', value: hex0x(input.hash), mono: true },
     ],
   };
 }

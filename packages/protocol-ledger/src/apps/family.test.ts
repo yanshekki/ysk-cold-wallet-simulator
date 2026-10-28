@@ -247,6 +247,40 @@ describe('Ledger family APDU bodies', () => {
     expect(payload[payload.length - 3]).toBe(0x01);
   });
 
+  it('Bitcoin UNTRUSTED_HASH_SIGN reject returns 6985 and shows the host hash', async () => {
+    const seen: SigningRequest[] = [];
+    const nanoX = LEDGER_MODELS.find((model) => model.id === 'nano-x')!;
+    const device = new LedgerProtocolHandler({
+      model: nanoX,
+      confirmation: {
+        confirm: async (request) => {
+          seen.push(request);
+          return false;
+        },
+        async getPassphrase() {
+          return undefined;
+        },
+      },
+      slotId: 'slot',
+      entropy: entropyFromMnemonic(FOUNDATION),
+    });
+    device.setApp('bitcoin');
+    const pathBytes = encodePath([0x8000002c, 0x80000000, 0x80000000, 0, 0]);
+    const hash = new Array(32).fill(0x11);
+    const payload = await exchange(
+      device,
+      apdu([0xe0, 0x48, 0x00, 0x00, pathBytes.length + hash.length, ...pathBytes, ...hash]),
+    );
+    expect(swOf(payload)).toBe(SW_DENY);
+    expect(payload.length).toBe(2);
+    expect(seen).toHaveLength(1);
+    expect(seen[0]?.title).toBe('Sign host-supplied hash');
+    expect(seen[0]?.detail?.warning).toMatch(/host supplied this hash/i);
+    expect(seen[0]?.detail?.warning).toMatch(/not a decoded transaction/i);
+    expect(seen[0]?.detail?.fields.find((field) => field.label === 'HASH')?.value).toBe(`0x${'11'.repeat(32)}`);
+    expect(seen[0]?.detail?.fields.find((field) => field.label === 'CHAIN')?.value).toBe('Bitcoin');
+  });
+
   it('Solana GET_APP_CONFIGURATION reports blind signing on', async () => {
     const device = handler();
     device.setApp('solana');

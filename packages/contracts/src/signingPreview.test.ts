@@ -4,6 +4,7 @@ import {
   describeBtcPsbt,
   describeEthTransaction,
   describeEthTypedData,
+  describeHostSuppliedDigest,
   describeHostSuppliedHash,
   describeSigning,
   hex0x,
@@ -302,6 +303,19 @@ describe('describeSigning', () => {
     expect(detail.warning).toMatch(/not a decoded transaction/i);
     expect(detail.fields.find((field) => field.label === 'DOMAIN HASH')?.value).toBe(`0x${'11'.repeat(32)}`);
     expect(detail.fields.find((field) => field.label === 'MESSAGE HASH')?.value).toBe(`0x${'22'.repeat(32)}`);
+  });
+
+  it('labels a Bitcoin untrusted hash as host-supplied', () => {
+    const detail = describeHostSuppliedDigest({
+      chain: 'Bitcoin',
+      path: "m/44'/0'/0'/0/0",
+      hash: new Uint8Array(32).fill(0x11),
+    });
+    expect(detail.headline).toBe('Host-supplied hash');
+    expect(detail.warning).toMatch(/host supplied this hash/i);
+    expect(detail.warning).toMatch(/not a decoded transaction/i);
+    expect(detail.fields.find((field) => field.label === 'CHAIN')?.value).toBe('Bitcoin');
+    expect(detail.fields.find((field) => field.label === 'HASH')?.value).toBe(`0x${'11'.repeat(32)}`);
   });
 
   it('labels Bitcoin PSBT outputs', () => {
