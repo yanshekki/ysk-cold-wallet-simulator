@@ -76,15 +76,23 @@ export function formatSatsBtc(sats: bigint): string {
   return `${sign}${whole}.${frac.toString().padStart(8, '0').replace(/0+$/, '')} BTC`;
 }
 
+/** Shown when a default policy is signed with an all-zero HMAC that was not checked. */
+export const BTC_ZERO_HMAC_WARNING = 'Policy HMAC is all zeros and was not checked.';
+
 export function describeBtcPsbt(input: {
   path: string;
   outputs: Array<{ address: string; amountSats: bigint }>;
   feeSats?: bigint;
+  /** Default-policy template accepted because the policy HMAC was 32 zero bytes. */
+  uncheckedPolicy?: string;
 }): SigningDetail {
   const fields: SigningField[] = [
     { label: 'CHAIN', value: 'Bitcoin' },
     { label: 'PATH', value: input.path, mono: true },
   ];
+  if (input.uncheckedPolicy) {
+    fields.unshift({ label: 'POLICY', value: input.uncheckedPolicy, mono: true });
+  }
   for (const output of input.outputs) {
     fields.push({ label: 'TO', value: output.address, mono: true });
     fields.push({ label: 'VALUE', value: formatSatsBtc(output.amountSats) });
@@ -95,6 +103,7 @@ export function describeBtcPsbt(input: {
   return {
     style: 'btc-hash',
     headline: 'Sign Bitcoin transaction',
+    warning: input.uncheckedPolicy ? BTC_ZERO_HMAC_WARNING : undefined,
     fields,
   };
 }

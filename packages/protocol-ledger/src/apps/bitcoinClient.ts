@@ -262,23 +262,28 @@ function* signPsbtJob(
   if (!isDefaultTemplate(wallet.template)) {
     throw new Error('unsupported wallet policy');
   }
-  if (!hmacZeros(walletHmacBytes) && !bytesEqual(walletHmacBytes, walletHmac(seed, wallet.serialize))) {
+  const hmacUnchecked = hmacZeros(walletHmacBytes);
+  if (!hmacUnchecked && !bytesEqual(walletHmacBytes, walletHmac(seed, wallet.serialize))) {
     throw new Error('bad wallet hmac');
   }
   const psbt = mapsToPsbt(global, inputs, outputs);
   const preview = previewPsbt(seed, psbt);
+  const uncheckedPolicy = hmacUnchecked ? wallet.template : undefined;
   const ok = yield {
     confirm: {
       brand: 'ledger',
       kind: 'sign',
       title: 'Sign Bitcoin transaction',
       path: preview.path,
-      message: `Sign Bitcoin transaction\n${preview.path}`,
+      message: uncheckedPolicy
+        ? `Sign Bitcoin transaction\n${preview.path}\n${uncheckedPolicy}`
+        : `Sign Bitcoin transaction\n${preview.path}`,
       rawPayload: psbt,
       detail: describeBtcPsbt({
         path: preview.path,
         outputs: preview.outputs,
         feeSats: preview.feeSats,
+        uncheckedPolicy,
       }),
     },
   };

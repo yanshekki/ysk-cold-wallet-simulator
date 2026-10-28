@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { describeSigning, type SigningDetail, type SigningRequest } from '@cws/contracts';
+import { BTC_ZERO_HMAC_WARNING, describeSigning, type SigningDetail, type SigningRequest } from '@cws/contracts';
 import { formatHex } from './logFormat';
 import { colors, fonts, space } from './theme';
 
@@ -26,6 +26,7 @@ export type SigningCopy = {
   headlineEip712?: string;
   headlineEip7702?: string;
   notice7702?: string;
+  noticeZeroHmac?: string;
   fieldLabels?: Record<string, string>;
 };
 
@@ -86,6 +87,9 @@ function localize(detail: SigningDetail, request: SigningRequest, copy?: Signing
   let warning = detail.warning;
   if (detail.headline === 'EIP-7702 authorization' && copy?.notice7702) {
     warning = copy.notice7702;
+  }
+  if (warning === BTC_ZERO_HMAC_WARNING && copy?.noticeZeroHmac) {
+    warning = copy.noticeZeroHmac;
   }
   if (detail.decodeFailed && copy?.decodeFailed) {
     headline = copy.decodeFailed;

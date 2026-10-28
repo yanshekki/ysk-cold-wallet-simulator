@@ -319,6 +319,7 @@ export const en = {
     headlineEip712: 'Typed data (EIP-712)',
     headlineEip7702: 'EIP-7702 authorization',
     notice7702: 'This lets the contract act as this account.',
+    noticeZeroHmac: 'Policy HMAC is all zeros and was not checked.',
     field: {
       chain: 'Chain',
       chainId: 'Chain ID',
@@ -347,6 +348,7 @@ export const en = {
       domain: 'Domain',
       message: 'Message',
       hash: 'Hash',
+      policy: 'Policy',
       bytes: 'Bytes',
       payload: 'Payload',
       spender: 'Spender',

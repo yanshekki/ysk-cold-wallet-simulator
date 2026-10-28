@@ -60,6 +60,7 @@ export { bytesToHex, concatBytes, hexToBytes } from './bytes';
 export { hashTypedData, parseEip712, type Eip712TypedData } from './eip712';
 export type { EthTxInput, SigningDetail, SigningField, SigningStyle } from './signingPreview';
 export {
+  BTC_ZERO_HMAC_WARNING,
   describeBtcPsbt,
   describeEthMessage,
   describeEthTransaction,

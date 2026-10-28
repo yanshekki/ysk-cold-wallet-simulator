@@ -295,6 +295,21 @@ describe('describeSigning', () => {
     );
     expect(detail.fields.find((field) => field.label === 'VALUE')?.value).toBe('0.001 BTC');
     expect(detail.fields.find((field) => field.label === 'FEE')?.value).toBe('0.0000025 BTC');
+    expect(detail.warning).toBeUndefined();
+    expect(detail.fields.find((field) => field.label === 'POLICY')).toBeUndefined();
+  });
+
+  it('names an unchecked zero-HMAC policy ahead of the outputs', () => {
+    const detail = describeBtcPsbt({
+      path: "m/84'/0'/0'/0/0",
+      outputs: [{ address: 'bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4', amountSats: 100_000n }],
+      uncheckedPolicy: 'wpkh(@0)',
+    });
+    expect(detail.warning).toMatch(/all zeros/i);
+    expect(detail.fields[0]).toEqual({ label: 'POLICY', value: 'wpkh(@0)', mono: true });
+    expect(detail.fields.find((field) => field.label === 'TO')?.value).toBe(
+      'bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4',
+    );
   });
 
   it('marks host-provided ERC-20 tickers untrusted and always shows the contract', () => {

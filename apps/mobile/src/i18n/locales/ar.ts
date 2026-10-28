@@ -321,6 +321,7 @@ export const ar: MessageTree = {
     headlineEip712: 'بيانات مكتوبة (EIP-712)',
     headlineEip7702: 'تفويض EIP-7702',
     notice7702: 'يسمح هذا التفويض للعقد بالتصرف نيابة عن هذا الحساب.',
+    noticeZeroHmac: 'HMAC الخاص بالسياسة أصفار بالكامل ولم يُفحص.',
     field: {
       chain: 'السلسلة',
       chainId: 'معرّف السلسلة',
@@ -349,6 +350,7 @@ export const ar: MessageTree = {
       domain: 'النطاق',
       message: 'الرسالة',
       hash: 'التجزئة',
+      policy: 'السياسة',
       bytes: 'بايت',
       payload: 'الحمولة',
       spender: 'المنفق',
