@@ -66,11 +66,17 @@ export function setFaceIdEnabled(value: boolean): void {
   faceIdEnabled = value;
 }
 
-export async function unlock(promptMessage = 'Unlock'): Promise<boolean> {
+export type UnlockOptions = {
+  /** Post-hold re-check. Debug session unlock still skips; this does not. */
+  requireOsPrompt?: boolean;
+};
+
+export async function unlock(promptMessage = 'Unlock', options?: UnlockOptions): Promise<boolean> {
   // Web and __DEV__ / isDevBuild may skip the OS prompt for lab QA.
   // Release must never treat "biometrics off" as an unlock bypass — cold
   // wallet seed reveal / sign still requires device passcode (or biometrics).
-  if (Platform.OS === 'web' || isDevBuild()) {
+  // requireOsPrompt is the hold re-check: a debug bundle must still show it.
+  if (Platform.OS === 'web' || (isDevBuild() && !options?.requireOsPrompt)) {
     return true;
   }
   const level = await LocalAuthentication.getEnrolledLevelAsync();

@@ -91,6 +91,9 @@ type AppStateValue = {
   applySessionPassphrase: (value: string) => Promise<boolean>;
   clearSessionPassphrase: () => void;
   resolveSigning: (ok: boolean) => void;
+  /** True while a screen modal is already up and hosts the signing sheet itself. */
+  signingHosted: boolean;
+  setSigningHosted: (hosted: boolean) => void;
   clearLogs: () => void;
   appendAppLog: (channel: LogChannel, note: string, hex?: string) => void;
   patchSettings: (patch: Partial<AppSettings>) => Promise<void>;
@@ -119,6 +122,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [connectedLabel, setConnectedLabel] = useState('');
   const [currentApp, setCurrentApp] = useState<LedgerApp>('dashboard');
   const [pending, setPending] = useState<SigningRequest | null>(null);
+  const [signingHosted, setSigningHosted] = useState(false);
   const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [sessionPassphraseApplied, setSessionPassphraseApplied] = useState(false);
   const [passphraseFingerprint, setPassphraseFingerprint] = useState<string | null>(null);
@@ -586,7 +590,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     const request = pendingRef.current?.request;
     // Release always re-auths after HoldToConfirm for signatures and seed
     // export. Hold alone is not enough if another app can drive the press.
-    // Debug honors the toggle; unlock() still skips the OS prompt in dev.
+    // Debug session unlock still skips the OS prompt. This re-check does not:
+    // a seed QR sitting under another modal must still show the authenticator.
     const reauth = needsSignReauth({
       kind: request?.kind,
       signReauth: settingsRef.current.signReauth,
@@ -594,7 +599,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     });
     if (ok && reauth) {
       try {
-        if (!(await requestUnlock(translate(settingsRef.current.language, 'unlock.prompt')))) {
+        if (!(await requestUnlock(translate(settingsRef.current.language, 'unlock.prompt'), { requireOsPrompt: true }))) {
           pendingRef.current?.resolve(false);
           pendingRef.current = null;
           setPending(null);
@@ -626,6 +631,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       connectedLabel,
       currentApp,
       pending,
+      signingHosted,
+      setSigningHosted,
       pairingCode,
       sessionPassphraseApplied,
       passphraseFingerprint,
@@ -681,6 +688,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       pairingCode,
       patchSettings,
       pending,
+      signingHosted,
       refreshNear,
       resolveSigning,
       runWithLoading,

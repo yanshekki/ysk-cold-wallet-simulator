@@ -60,6 +60,15 @@ describe('passkeys session', () => {
     setFaceIdEnabled(true);
   });
 
+  it('shows the OS prompt after hold even in a DEV build', async () => {
+    isDevBuild.mockReturnValue(true);
+    getEnrolledLevelAsync.mockResolvedValue(1);
+    authenticateAsync.mockResolvedValue({ success: true });
+    const { unlock } = await import('./session');
+    await expect(unlock('Unlock', { requireOsPrompt: true })).resolves.toBe(true);
+    expect(authenticateAsync).toHaveBeenCalledTimes(1);
+  });
+
   it('skips OS authentication in a DEV build without calling the platform authenticator', async () => {
     isDevBuild.mockReturnValue(true);
     const { unlock, describeUnlock, DEV_SKIP_MESSAGE } = await import('./session');
