@@ -1,6 +1,6 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { resetMock, startMockProxy, type MockProxy } from './harness';
-import { expectProxyTabs, PROXY_TAB_COPY, setProxyLang } from './langs';
+import { expectProxyTabs, PROXY_TAB_COPY, setProxyLang, type ProxyE2eLang } from './langs';
 
 let mock: MockProxy;
 
@@ -15,6 +15,60 @@ test.afterEach(() => {
 test.afterAll(async () => {
   await mock.server.close();
 });
+
+async function langControlFit(page: Page): Promise<{
+  pastContent: number;
+  pastPhone: number;
+  selectWidth: number;
+  textWidth: number;
+  titleGap: number;
+  edgesHitSelect: boolean;
+}> {
+  return page.evaluate(() => {
+    const phone = document.querySelector('.phone')!.getBoundingClientRect();
+    const screen = document.querySelector('#pane-proxy')!;
+    const screenBox = screen.getBoundingClientRect();
+    const style = getComputedStyle(screen);
+    const contentLeft = screenBox.left + parseFloat(style.paddingLeft);
+    const contentRight = screenBox.right - parseFloat(style.paddingRight);
+    const select = document.querySelector('#lang-select') as HTMLSelectElement;
+    const selectBox = select.getBoundingClientRect();
+    const label = document.querySelector('.lang-label')!.getBoundingClientRect();
+    const title = document.querySelector('.top > div')!.getBoundingClientRect();
+    const probe = document.createElement('span');
+    probe.style.font = getComputedStyle(select).font;
+    probe.style.whiteSpace = 'nowrap';
+    probe.textContent = select.selectedOptions[0]?.textContent ?? '';
+    document.body.appendChild(probe);
+    const textWidth = probe.getBoundingClientRect().width;
+    probe.remove();
+    const midY = selectBox.top + selectBox.height / 2;
+    const edgesHitSelect = [selectBox.left + 2, selectBox.right - 2].every((x) => {
+      const hit = document.elementFromPoint(x, midY);
+      return hit === select || (!!hit && select.contains(hit));
+    });
+    const titleGap =
+      document.documentElement.dir === 'rtl' ? title.left - label.right : label.left - title.right;
+    return {
+      pastContent: Math.max(
+        contentLeft - selectBox.left,
+        selectBox.right - contentRight,
+        contentLeft - label.left,
+        label.right - contentRight,
+      ),
+      pastPhone: Math.max(
+        phone.left - selectBox.left,
+        selectBox.right - phone.right,
+        phone.left - label.left,
+        label.right - phone.right,
+      ),
+      selectWidth: selectBox.width,
+      textWidth,
+      titleGap,
+      edgesHitSelect,
+    };
+  });
+}
 
 test.describe('CWS Proxy shell', () => {
   test('given idle proxy, when the page loads, then HUD is idle and pairing is hidden', async ({ page }) => {
@@ -89,6 +143,28 @@ test.describe('CWS Proxy shell', () => {
   test('given native=1, when the page loads, then the native-shell class is applied', async ({ page }) => {
     await page.goto(`${mock.server.url}/?native=1`);
     await expect(page.locator('html')).toHaveClass(/native-shell/);
+  });
+
+  test('given desktop and phone widths, when each locale is selected, then the language control stays inside the panel', async ({
+    page,
+  }) => {
+    for (const viewport of [
+      { width: 1280, height: 800 },
+      { width: 390, height: 844 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await page.goto(mock.server.url);
+      await expect(page.getByTestId('lang-select').locator('option')).toHaveCount(10);
+      for (const id of Object.keys(PROXY_TAB_COPY) as ProxyE2eLang[]) {
+        await setProxyLang(page, id);
+        const fit = await langControlFit(page);
+        expect(fit.pastContent, `${viewport.width}px ${id}`).toBeLessThanOrEqual(0.5);
+        expect(fit.pastPhone, `${viewport.width}px ${id}`).toBeLessThanOrEqual(0.5);
+        expect(fit.titleGap, `${viewport.width}px ${id}`).toBeGreaterThanOrEqual(0);
+        expect(fit.selectWidth, `${viewport.width}px ${id}`).toBeGreaterThanOrEqual(fit.textWidth + 20);
+        expect(fit.edgesHitSelect, `${viewport.width}px ${id}`).toBe(true);
+      }
+    }
   });
 
   test('given a phone viewport, when tabs are tapped, then Proxy / Testnet host / Console remain reachable', async ({
