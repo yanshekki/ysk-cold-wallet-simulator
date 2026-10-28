@@ -2,7 +2,7 @@ import { bech32, bech32m, base58check as createBase58check } from '@scure/base';
 import { ripemd160 } from '@noble/hashes/ripemd160';
 import { sha256 } from '@noble/hashes/sha2';
 import type { BackupKind, ChainPathId, ConfirmationPort, SigningRequest } from '@cws/contracts';
-import { catalogVersion, describeBtcPsbt } from '@cws/contracts';
+import { catalogVersion, describeBtcPsbt, describeHostSuppliedDigest } from '@cws/contracts';
 import { concatBytes, encodeAscii } from '../bytes';
 import { schnorr, secp256k1 } from '@noble/curves/secp256k1';
 import { scriptToAddress } from '@cws/protocol-qr';
@@ -316,6 +316,10 @@ async function handleUntrustedHashSign(apdu: Apdu, ctx: BtcContext): Promise<Uin
       ? [{ prevout: session.prevout, amount: session.amount, sequence: session.sequence ?? 0xffffffff }]
       : [];
   const assembled = prevouts.length > 0 && session?.outputs && session.version != null;
+  const supplied = assembled ? null : extractHash32(rest);
+  if (!assembled && !supplied) {
+    return encodeResponse(new Uint8Array(), SW_WRONG_LENGTH);
+  }
   let hash: Uint8Array | null = null;
   if (assembled && session) {
     session.locktime = rest.length >= 4 ? readU32le(rest, 0) : 0;
@@ -323,12 +327,12 @@ async function handleUntrustedHashSign(apdu: Apdu, ctx: BtcContext): Promise<Uin
   const request: SigningRequest = {
     brand: 'ledger',
     kind: 'sign',
-    title: assembled ? `Sign ${COIN[coin].name} transaction` : `Sign ${COIN[coin].name} hash`,
+    title: assembled ? `Sign ${COIN[coin].name} transaction` : 'Sign host-supplied hash',
     path,
     message: assembled
       ? `Sign ${COIN[coin].name} transaction\n${path}`
-      : `Sign ${COIN[coin].name} 32-byte hash\n${path}`,
-    rawPayload: assembled ? prevouts[0]!.prevout : rest,
+      : `Sign host-supplied hash\n${path}`,
+    rawPayload: assembled ? prevouts[0]!.prevout : supplied!,
     detail:
       assembled && session?.outputs
         ? describeBtcPsbt({
@@ -336,7 +340,9 @@ async function handleUntrustedHashSign(apdu: Apdu, ctx: BtcContext): Promise<Uin
             outputs: parseOutputBodies(session.outputs),
             feeSats: prevouts.reduce((sum, item) => sum + item.amount, 0n) - parseOutputBodies(session.outputs).reduce((sum, item) => sum + item.amountSats, 0n),
           })
-        : undefined,
+        : supplied
+          ? describeHostSuppliedDigest({ chain: COIN[coin].name, path, hash: supplied })
+          : undefined,
   };
   const ok = await ctx.confirmation.confirm(request);
   if (!ok) {
@@ -367,7 +373,7 @@ async function handleUntrustedHashSign(apdu: Apdu, ctx: BtcContext): Promise<Uin
       session.signIndex = 0;
     }
   } else {
-    hash = extractHash32(rest);
+    hash = supplied;
   }
   if (!hash) {
     return encodeResponse(new Uint8Array(), SW_WRONG_LENGTH);
