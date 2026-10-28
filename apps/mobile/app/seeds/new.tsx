@@ -26,7 +26,6 @@ import { pickVerify, type VerifyPick } from '../../src/seeds/pickVerify';
 import { useSecretScreen } from '../../src/seeds/screenGuard';
 import { saveSlot } from '../../src/seeds/vault';
 import { useAppState } from '../../src/state/AppState';
-import { copyText } from '../../src/lab/copy';
 
 const BIP39_COUNTS: Bip39WordCount[] = [12, 15, 18, 21, 24];
 
@@ -40,7 +39,7 @@ type RevealMeta = {
 export default function NewSeedScreen() {
   const t = useT();
   const router = useRouter();
-  const { model, settings, selectSeed, showToast, runWithLoading } = useAppState();
+  const { model, settings, selectSeed, runWithLoading } = useAppState();
   const [label, setLabel] = useState('Personal');
   const [backup, setBackup] = useState<BackupKind>('bip39');
   const [wordCount, setWordCount] = useState<Bip39WordCount>(24);
@@ -58,6 +57,7 @@ export default function NewSeedScreen() {
   const [customKind, setCustomKind] = useState<CustomEntropyKind>('hex');
   const [customDraft, setCustomDraft] = useState('');
   const [revealMeta, setRevealMeta] = useState<RevealMeta | null>(null);
+  const [hexRefused, setHexRefused] = useState(false);
   const revealing = Boolean(mnemonic || shares.length);
   useSecretScreen(() => undefined);
 
@@ -309,27 +309,23 @@ export default function NewSeedScreen() {
                     : t('generate.sourceCsprng')}
               </Text>
               <Text style={styles.proofLabel}>{t('generate.hex')}</Text>
-              <Text
-                style={styles.hex}
-                selectable
-                onPress={() => {
-                  void copyText(revealMeta.hex).then(() => showToast(t('common.copied')));
-                }}
-              >
+              <Text selectable={false} style={styles.hex} onPress={() => setHexRefused(true)}>
                 {revealMeta.hex}
               </Text>
+              {hexRefused ? (
+                <Text selectable={false} style={styles.warn}>
+                  {t('generate.copyTitle')}. {t('generate.copyBody')}
+                </Text>
+              ) : null}
             </View>
           ) : null}
           <MnemonicGrid
             phrase={mnemonic}
-            onCopy={(value) => {
-              void copyText(value).then(() => showToast(t('common.copied')));
-            }}
             labels={{
               copy: t('generate.copy'),
               copyTitle: t('generate.copyTitle'),
               copyBody: t('generate.copyBody'),
-              confirm: t('common.confirm'),
+              confirm: t('common.close'),
               cancel: t('common.cancel'),
             }}
           />
@@ -360,7 +356,7 @@ export default function NewSeedScreen() {
         <View style={styles.words} testID="generate-shares">
           <Text style={styles.warn}>{t('generate.revealShares')}</Text>
           {shares.map((share, index) => (
-            <Text key={index} style={styles.mnemonic}>
+            <Text key={index} selectable={false} style={styles.mnemonic}>
               {index + 1}. {share}
             </Text>
           ))}

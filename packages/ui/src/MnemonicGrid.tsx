@@ -1,4 +1,5 @@
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import { Button } from './Button';
 import { colors, fonts, hairline, radius, space } from './theme';
 
@@ -13,33 +14,36 @@ export type MnemonicGridLabels = {
 type Props = {
   phrase: string;
   labels: MnemonicGridLabels;
-  onCopy: (text: string) => void;
 };
 
-export function MnemonicGrid({ phrase, labels, onCopy }: Props) {
+export function MnemonicGrid({ phrase, labels }: Props) {
   const words = phrase.trim().split(/\s+/).filter(Boolean);
+  const [refused, setRefused] = useState(false);
   return (
     <View style={styles.wrap}>
       <View style={styles.grid}>
         {words.map((word, index) => (
           <View key={`${index}-${word}`} style={styles.cell}>
-            <Text style={styles.index}>{index + 1}</Text>
-            <Text style={styles.word} selectable>
+            <Text selectable={false} style={styles.index}>
+              {index + 1}
+            </Text>
+            <Text selectable={false} style={styles.word}>
               {word}
             </Text>
           </View>
         ))}
       </View>
-      <Button
-        label={labels.copy}
-        variant="ghost"
-        onPress={() => {
-          Alert.alert(labels.copyTitle, labels.copyBody, [
-            { text: labels.cancel, style: 'cancel' },
-            { text: labels.confirm, onPress: () => onCopy(phrase) },
-          ]);
-        }}
-      />
+      <Button label={labels.copy} variant="ghost" onPress={() => setRefused(true)} />
+      {refused ? (
+        <View accessibilityLiveRegion="polite" style={styles.notice}>
+          <Text selectable={false} style={styles.noticeTitle}>
+            {labels.copyTitle}
+          </Text>
+          <Text selectable={false} style={styles.noticeBody}>
+            {labels.copyBody}
+          </Text>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -75,5 +79,19 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontFamily: fonts.monoMedium,
     fontSize: 13,
+  },
+  notice: {
+    gap: space.xs,
+  },
+  noticeTitle: {
+    color: colors.danger,
+    fontFamily: fonts.sansSemi,
+    fontSize: 15,
+  },
+  noticeBody: {
+    color: colors.text,
+    fontFamily: fonts.sans,
+    fontSize: 14,
+    lineHeight: 20,
   },
 });

@@ -269,14 +269,11 @@ export default function VaultScreen() {
         {backupWords ? (
           <MnemonicGrid
             phrase={backupWords}
-            onCopy={(value) => {
-              void copyText(value).then(() => showToast(t('common.copied')));
-            }}
             labels={{
               copy: t('vault.copyPhrase'),
               copyTitle: t('vault.copyPhraseTitle'),
               copyBody: t('vault.copyPhraseBody'),
-              confirm: t('common.confirm'),
+              confirm: t('common.close'),
               cancel: t('common.cancel'),
             }}
           />
@@ -296,14 +293,11 @@ export default function VaultScreen() {
             <Text style={styles.shareTitle}>{t('import.shareN', { n: index + 1 })}</Text>
             <MnemonicGrid
               phrase={share}
-              onCopy={(value) => {
-                void copyText(value).then(() => showToast(t('common.copied')));
-              }}
               labels={{
                 copy: t('vault.copyShare'),
                 copyTitle: t('vault.copyShareTitle'),
                 copyBody: t('vault.copyShareBody'),
-                confirm: t('common.confirm'),
+                confirm: t('common.close'),
                 cancel: t('common.cancel'),
               }}
             />
