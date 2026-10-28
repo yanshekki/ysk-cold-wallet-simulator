@@ -1,3 +1,4 @@
+import { sha256 } from '@noble/hashes/sha2';
 import { mnemonicToEntropy, mnemonicToSeedSync } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
 import { describe, expect, it } from 'vitest';
@@ -11,6 +12,7 @@ import {
   ethereumAddressFromPrivateKey,
   derivePrivateKey,
   signEd25519,
+  signSecp256k1Recoverable,
 } from './crypto';
 import { BleReassembler, DEFAULT_MTU, framePayload, splitFramedPackets, TAG_APDU, TAG_MTU } from './framing';
 import { LedgerProtocolHandler } from './handler';
@@ -766,6 +768,75 @@ describe('LedgerProtocolHandler', () => {
     ).join('');
     expect(addr).toBe(avalancheBech32Address(pub, FUJI_HRP));
     expect(addr.startsWith('fuji1')).toBe(true);
+  });
+
+  it('signs Avalanche HASH_LAST with an empty BIP32 suffix from HASH_FIRST', async () => {
+    const handler = new LedgerProtocolHandler({
+      model: nanoX,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy,
+    });
+    handler.setApp('avalanche');
+    const path = [0x8000002c, 0x80002328, 0x80000000, 0x00000000, 0x00000000];
+    const hash = new Uint8Array(32).fill(0x22);
+    const first: number[] = [path.length];
+    for (const component of path) {
+      first.push(
+        (component >>> 24) & 0xff,
+        (component >>> 16) & 0xff,
+        (component >>> 8) & 0xff,
+        component & 0xff,
+      );
+    }
+    first.push(...Array.from(hash));
+    const firstReply = await exchange(handler, apdu([0x80, 0x04, 0x01, 0x00, first.length, ...first]));
+    expect((firstReply[firstReply.length - 2] << 8) | firstReply[firstReply.length - 1]).toBe(SW_OK);
+    expect(firstReply.length).toBe(2);
+    const lastReply = await exchange(handler, apdu([0x80, 0x04, 0x02, 0x00, 0x01, 0x00]));
+    const lastSw = (lastReply[lastReply.length - 2] << 8) | lastReply[lastReply.length - 1];
+    expect(lastSw).toBe(SW_OK);
+    const sig = lastReply.slice(0, lastReply.length - 2);
+    expect(sig.length).toBe(65);
+    const expected = signSecp256k1Recoverable(
+      deriveHdNode(entropy, "m/44'/9000'/0'/0/0").privateKey,
+      hash,
+    );
+    expect(Array.from(sig)).toEqual(Array.from(expected));
+  });
+
+  it('returns a secp256k1 signature on Avalanche SIGN_MSG last', async () => {
+    const handler = new LedgerProtocolHandler({
+      model: nanoX,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy,
+    });
+    handler.setApp('avalanche');
+    const path = [0x8000002c, 0x80002328, 0x80000000, 0x00000000, 0x00000000];
+    const msg = Array.from(new TextEncoder().encode('fuji lab'));
+    const init: number[] = [path.length];
+    for (const component of path) {
+      init.push(
+        (component >>> 24) & 0xff,
+        (component >>> 16) & 0xff,
+        (component >>> 8) & 0xff,
+        component & 0xff,
+      );
+    }
+    init.push(...msg);
+    const initReply = await exchange(handler, apdu([0x80, 0x06, 0x00, 0x00, init.length, ...init]));
+    expect((initReply[initReply.length - 2] << 8) | initReply[initReply.length - 1]).toBe(SW_OK);
+    const lastReply = await exchange(handler, apdu([0x80, 0x06, 0x02, 0x00, 0x00]));
+    const lastSw = (lastReply[lastReply.length - 2] << 8) | lastReply[lastReply.length - 1];
+    expect(lastSw).toBe(SW_OK);
+    const sig = lastReply.slice(0, lastReply.length - 2);
+    expect(sig.length).toBe(65);
+    const expected = signSecp256k1Recoverable(
+      deriveHdNode(entropy, "m/44'/9000'/0'/0/0").privateKey,
+      sha256(new TextEncoder().encode('fuji lab')),
+    );
+    expect(Array.from(sig)).toEqual(Array.from(expected));
   });
 
   it('answers ETH GET_ADDRESS while the Avalanche app is open', async () => {
