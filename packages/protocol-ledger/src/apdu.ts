@@ -83,3 +83,30 @@ export function parseBip32Path(data: Uint8Array): { path: string; rest: Uint8Arr
   }
   return { path: pathToString(components), rest: data.slice(needed) };
 }
+
+/** Mysten / Ledger Sui `buildBip32KeyPayload` writes each component as little-endian u32. */
+export function parseBip32PathLE(data: Uint8Array): { path: string; rest: Uint8Array } {
+  if (data.length < 1) {
+    throw new Error('missing BIP32 path');
+  }
+  const count = data[0];
+  if (count < 1) {
+    throw new Error('empty BIP32 path');
+  }
+  const needed = 1 + count * 4;
+  if (data.length < needed) {
+    throw new Error('truncated BIP32 path');
+  }
+  const components: number[] = [];
+  for (let i = 0; i < count; i++) {
+    const offset = 1 + i * 4;
+    components.push(
+      (data[offset] |
+        (data[offset + 1] << 8) |
+        (data[offset + 2] << 16) |
+        (data[offset + 3] << 24)) >>>
+        0,
+    );
+  }
+  return { path: pathToString(components), rest: data.slice(needed) };
+}

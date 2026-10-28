@@ -128,6 +128,7 @@ export class LedgerProtocolHandler implements ProtocolHandler {
     this.avaxSession.rootPath = undefined;
     this.avaxSession.signChunks = undefined;
     this.familySession.pendingSign = undefined;
+    this.familySession.suiBlocks = undefined;
     this.btcSession.version = undefined;
     this.btcSession.prevouts = undefined;
     this.btcSession.prevout = undefined;
@@ -149,6 +150,7 @@ export class LedgerProtocolHandler implements ProtocolHandler {
     this.avaxSession.rootPath = undefined;
     this.avaxSession.signChunks = undefined;
     this.familySession.pendingSign = undefined;
+    this.familySession.suiBlocks = undefined;
     this.onAppChange?.(app);
   }
 
@@ -192,6 +194,7 @@ export class LedgerProtocolHandler implements ProtocolHandler {
         this.avaxSession.rootPath = undefined;
         this.avaxSession.signChunks = undefined;
         this.familySession.pendingSign = undefined;
+        this.familySession.suiBlocks = undefined;
         return framePayload(TAG_INIT, new Uint8Array(), this.mtu);
       case TAG_APDU: {
         const response = await this.handleApdu(payload);
@@ -452,6 +455,9 @@ function inferAppFromPath(apdu: ReturnType<typeof parseApdu>): LedgerApp | undef
   if (path.includes("44'/60'")) {
     return 'ethereum';
   }
+  if (path.includes("44'/784'")) {
+    return 'sui';
+  }
   if (path.includes("44'/397'") || path.includes("44'/396'")) {
     return 'near';
   }
@@ -498,6 +504,15 @@ function inferAppFromApdu(app: LedgerApp, apdu: ReturnType<typeof parseApdu>): L
   }
   if (apdu.cla === 0xe0 && apdu.ins === 0x40) {
     return family === 'bitcoin' ? undefined : 'bitcoin';
+  }
+  if (apdu.cla === 0xe1 || (apdu.cla === 0xf8 && apdu.ins === 0x01)) {
+    return family === 'bitcoin' ? undefined : 'bitcoin';
+  }
+  if (
+    apdu.cla === 0x00 &&
+    (apdu.ins === 0x00 || apdu.ins === 0x01 || apdu.ins === 0x02 || apdu.ins === 0x03)
+  ) {
+    return family === 'sui' ? undefined : 'sui';
   }
   if (apdu.cla === 0x80 && (apdu.ins === 0x04 || apdu.ins === 0x05 || apdu.ins === 0x06) && family !== 'avalanche') {
     return family === 'near' ? undefined : 'near';

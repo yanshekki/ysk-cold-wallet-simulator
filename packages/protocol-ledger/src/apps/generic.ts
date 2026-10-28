@@ -29,8 +29,17 @@ export type FamilyContext = {
   backup?: BackupKind;
 };
 
+export type SuiBlocksSession = {
+  ins: number;
+  pendingHash: Uint8Array;
+  remainingHashes: Uint8Array[];
+  currentPayload: Uint8Array;
+  payloads: Uint8Array[];
+};
+
 export type FamilySession = {
   pendingSign?: { path: string; payload: Uint8Array };
+  suiBlocks?: SuiBlocksSession;
 };
 
 export type FamilySpec = {

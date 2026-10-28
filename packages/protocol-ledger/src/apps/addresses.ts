@@ -78,9 +78,12 @@ export function aptosAuthKey(ed25519Pub: Uint8Array): string {
   return `0x${Array.from(auth, (byte) => byte.toString(16).padStart(2, '0')).join('')}`;
 }
 
+export function suiAddressBytes(ed25519Pub: Uint8Array): Uint8Array {
+  return blake2b(concatBytes(Uint8Array.of(0x00), ed25519Pub), { dkLen: 32 });
+}
+
 export function suiAddress(ed25519Pub: Uint8Array): string {
-  const hash = blake2b(concatBytes(Uint8Array.of(0x00), ed25519Pub), { dkLen: 32 });
-  return `0x${Array.from(hash, (byte) => byte.toString(16).padStart(2, '0')).join('')}`;
+  return `0x${Array.from(suiAddressBytes(ed25519Pub), (byte) => byte.toString(16).padStart(2, '0')).join('')}`;
 }
 
 export function stellarAddress(ed25519Pub: Uint8Array): string {

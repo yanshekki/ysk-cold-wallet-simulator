@@ -27,6 +27,16 @@ export function writeU32BE(value: number): Uint8Array {
   );
 }
 
+export function readU32LE(bytes: Uint8Array, offset: number): number {
+  return (
+    (bytes[offset] |
+      (bytes[offset + 1] << 8) |
+      (bytes[offset + 2] << 16) |
+      (bytes[offset + 3] << 24)) >>>
+    0
+  );
+}
+
 export function encodeAscii(text: string): Uint8Array {
   const out = new Uint8Array(text.length);
   for (let i = 0; i < text.length; i++) {

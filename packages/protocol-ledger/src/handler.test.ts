@@ -1253,6 +1253,64 @@ describe('LedgerProtocolHandler', () => {
       ethereumAddressFromPrivateKey(derivePrivateKey(entropy, PATH, 'TREZOR')).toLowerCase(),
     );
   });
+
+  it('exports a Bitcoin xpub over CLA E1 while Ethereum is open (OKX BtcNew)', async () => {
+    const handler = new LedgerProtocolHandler({
+      model: nanoX,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy,
+    });
+    handler.setApp('ethereum');
+    const path = [0x80000054, 0x80000000, 0x80000000];
+    const data: number[] = [0x00, path.length];
+    for (const component of path) {
+      data.push((component >>> 24) & 0xff, (component >>> 16) & 0xff, (component >>> 8) & 0xff, component & 0xff);
+    }
+    const payload = await exchange(handler, apdu([0xe1, 0x00, 0x00, 0x00, data.length, ...data]));
+    expect((payload[payload.length - 2] << 8) | payload[payload.length - 1]).toBe(SW_OK);
+    expect(handler.getApp()).toBe('bitcoin');
+    const xpub = Array.from(payload.subarray(0, payload.length - 2), (byte) => String.fromCharCode(byte)).join('');
+    expect(xpub.startsWith('xpub')).toBe(true);
+  });
+
+  it('exports a Sui address over Mysten silent INS 0x02 while Ethereum is open (OKX)', async () => {
+    const handler = new LedgerProtocolHandler({
+      model: nanoX,
+      confirmation: autoConfirm(false),
+      slotId: 'slot',
+      entropy,
+    });
+    handler.setApp('ethereum');
+    const path = [0x8000002c, 0x80000310, 0x80000000, 0x80000000, 0x80000000];
+    const packed = new Uint8Array(1 + path.length * 4);
+    packed[0] = path.length;
+    path.forEach((component, index) => {
+      const offset = 1 + index * 4;
+      packed[offset] = component & 0xff;
+      packed[offset + 1] = (component >>> 8) & 0xff;
+      packed[offset + 2] = (component >>> 16) & 0xff;
+      packed[offset + 3] = (component >>> 24) & 0xff;
+    });
+    const linked = new Uint8Array(32 + packed.length);
+    linked.set(packed, 32);
+    const hash = sha256(linked);
+    const start = [0x00, ...hash];
+    const ask = await exchange(handler, apdu([0x00, 0x02, 0x00, 0x00, start.length, ...start]));
+    expect((ask[ask.length - 2] << 8) | ask[ask.length - 1]).toBe(SW_OK);
+    expect(handler.getApp()).toBe('sui');
+    const inner = ask.subarray(0, ask.length - 2);
+    expect(inner[0]).toBe(0x02);
+    const reply = [0x01, ...linked];
+    const payload = await exchange(handler, apdu([0x00, 0x02, 0x00, 0x00, reply.length, ...reply]));
+    expect((payload[payload.length - 2] << 8) | payload[payload.length - 1]).toBe(SW_OK);
+    const body = payload.subarray(1, payload.length - 4);
+    expect(body[0]).toBe(32);
+    const pub = body.subarray(1, 33);
+    expect(Array.from(pub)).toEqual(
+      Array.from(ed25519PublicKey(deriveEd25519PrivateKey(entropy, "m/44'/784'/0'/0'/0'"))),
+    );
+  });
 });
 
 describe('encodeResponse', () => {
