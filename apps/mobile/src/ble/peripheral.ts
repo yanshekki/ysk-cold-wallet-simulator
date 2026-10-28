@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import type { GATTCharacteristicPermission } from 'munim-bluetooth';
 import { bleAdvertiseName, type DeviceModel, type ProtocolHandler } from '@cws/contracts';
 import { DEFAULT_MTU, splitNotify } from '@cws/sdk';
+import { bleSignHostGate } from './bleSignGate';
 import { bytesToHex, hexToBytes } from './hex';
 import type { HandlerSource, PeripheralCallbacks, PeripheralHandle } from './types';
 
@@ -192,6 +193,7 @@ export async function startAdvertising(
   subscriptions.push(
     ble.addEventListener('peripheralUnsubscribed', () => {
       writeEpoch += 1;
+      bleSignHostGate.setCentral(null);
       resolveHandler(handler).resetLink?.();
       callbacks.onDisconnected();
     }),
@@ -212,11 +214,19 @@ export async function startAdvertising(
           if (!event.value) {
             return;
           }
-          callbacks.onConnected(event.centralId ?? 'host');
+          const centralId = event.centralId ?? 'host';
+          bleSignHostGate.setCentral(centralId);
+          callbacks.onConnected(centralId);
           const incoming = hexToBytes(event.value);
           const hex = bytesToHex(incoming);
           callbacks.onLog('in', hex, `GATT write ${event.characteristicUUID ?? ''}`.trim());
-          const outgoing = await resolveHandler(handler).handleWrite(incoming);
+          bleSignHostGate.beginWrite();
+          let outgoing: Uint8Array | null;
+          try {
+            outgoing = await resolveHandler(handler).handleWrite(incoming);
+          } finally {
+            bleSignHostGate.endWrite();
+          }
           if (epoch !== writeEpoch || !outgoing || outgoing.length === 0) {
             return;
           }
