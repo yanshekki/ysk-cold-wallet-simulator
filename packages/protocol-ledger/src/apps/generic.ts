@@ -1,4 +1,4 @@
-import type { BackupKind, ChainPathId, ConfirmationPort, SigningRequest } from '@cws/contracts';
+import type { BackupKind, ChainPathId, ConfirmationPort, SigningDetail, SigningRequest } from '@cws/contracts';
 import { base58 } from '@scure/base';
 import { concatBytes, bytesToHex } from '../bytes';
 import {
@@ -98,45 +98,165 @@ function compactU16(bytes: Uint8Array, offset: number): { value: number; next: n
   return { value: (b0 & 0x7f) | ((b1 & 0x7f) << 7) | (bytes[offset + 2]! << 14), next: offset + 3 };
 }
 
-export function previewSolanaMessage(message: Uint8Array): string {
+const SOL_LAMPORTS = 1_000_000_000n;
+const SYSTEM_TRANSFER = 2;
+
+type SolanaTransfer = {
+  to: string;
+  lamports: bigint;
+};
+
+type SolanaPreview = {
+  versioned: boolean;
+  feePayer: string;
+  instructionCount: number;
+  lookupCount: number;
+  transfers: SolanaTransfer[];
+};
+
+export function formatLamports(lamports: bigint): string {
+  const whole = lamports / SOL_LAMPORTS;
+  const fraction = lamports % SOL_LAMPORTS;
+  const sol =
+    fraction === 0n
+      ? `${whole} SOL`
+      : `${whole}.${fraction.toString().padStart(9, '0').replace(/0+$/, '')} SOL`;
+  return `${sol} (${lamports} lamports)`;
+}
+
+function readU32LE(bytes: Uint8Array, offset: number): number {
+  return (
+    bytes[offset]! |
+    (bytes[offset + 1]! << 8) |
+    (bytes[offset + 2]! << 16) |
+    (bytes[offset + 3]! << 24)
+  ) >>> 0;
+}
+
+function readU64LE(bytes: Uint8Array, offset: number): bigint {
+  let value = 0n;
+  for (let index = 0; index < 8; index += 1) {
+    value |= BigInt(bytes[offset + index]!) << BigInt(index * 8);
+  }
+  return value;
+}
+
+function isSystemProgram(key: Uint8Array): boolean {
+  return key.length === 32 && key.every((byte) => byte === 0);
+}
+
+function parseSolanaMessage(message: Uint8Array): SolanaPreview | null {
   if (message.length < 4) {
-    return hexPreview(message);
+    return null;
   }
   const versioned = (message[0]! & 0x80) !== 0;
   let offset = versioned ? 1 : 0;
   if (offset + 3 > message.length) {
-    return hexPreview(message);
+    return null;
   }
   offset += 3;
   const accounts = compactU16(message, offset);
-  if (!accounts || accounts.next + 32 > message.length) {
-    return hexPreview(message);
+  if (!accounts || accounts.value < 1 || accounts.next + accounts.value * 32 > message.length) {
+    return null;
   }
-  const feePayer = base58.encode(message.subarray(accounts.next, accounts.next + 32));
-  const afterAccounts = accounts.next + accounts.value * 32;
-  const afterBlockhash = afterAccounts + 32;
+  const keys: Uint8Array[] = [];
+  for (let index = 0; index < accounts.value; index += 1) {
+    const start = accounts.next + index * 32;
+    keys.push(message.subarray(start, start + 32));
+  }
+  const feePayer = base58.encode(keys[0]!);
+  const afterBlockhash = accounts.next + accounts.value * 32 + 32;
+  if (afterBlockhash > message.length) {
+    return null;
+  }
   const instructions = compactU16(message, afterBlockhash);
   if (!instructions) {
-    return hexPreview(message);
+    return null;
   }
+  const transfers: SolanaTransfer[] = [];
   let cursor = instructions.next;
+  let intact = true;
   for (let index = 0; index < instructions.value; index += 1) {
+    if (cursor >= message.length) {
+      intact = false;
+      break;
+    }
+    const programIndex = message[cursor]!;
     cursor += 1;
-    const accountsLen = compactU16(message, cursor);
-    if (!accountsLen) {
+    const accountIndexes = compactU16(message, cursor);
+    if (!accountIndexes || accountIndexes.next + accountIndexes.value > message.length) {
+      intact = false;
       break;
     }
-    cursor = accountsLen.next + accountsLen.value;
+    const indexes = message.subarray(accountIndexes.next, accountIndexes.next + accountIndexes.value);
+    cursor = accountIndexes.next + accountIndexes.value;
     const dataLen = compactU16(message, cursor);
-    if (!dataLen) {
+    if (!dataLen || dataLen.next + dataLen.value > message.length) {
+      intact = false;
       break;
     }
+    const data = message.subarray(dataLen.next, dataLen.next + dataLen.value);
     cursor = dataLen.next + dataLen.value;
+    const program = keys[programIndex];
+    if (
+      program &&
+      isSystemProgram(program) &&
+      data.length === 12 &&
+      readU32LE(data, 0) === SYSTEM_TRANSFER &&
+      indexes.length >= 2
+    ) {
+      const recipient = keys[indexes[1]!];
+      if (recipient) {
+        transfers.push({ to: base58.encode(recipient), lamports: readU64LE(data, 4) });
+      }
+    }
+  }
+  if (!intact) {
+    return null;
   }
   const lookups = versioned ? compactU16(message, cursor) : null;
-  const count = instructions.value;
-  const lookupText = lookups && lookups.value ? ` · ${lookups.value} lookup table${lookups.value === 1 ? '' : 's'}` : '';
-  return `${versioned ? 'v0 · ' : ''}fee payer ${feePayer} · ${count} instruction${count === 1 ? '' : 's'}${lookupText}`;
+  return {
+    versioned,
+    feePayer,
+    instructionCount: instructions.value,
+    lookupCount: lookups?.value ?? 0,
+    transfers,
+  };
+}
+
+function formatSolanaPreview(parsed: SolanaPreview): string {
+  const lookupText = parsed.lookupCount
+    ? ` · ${parsed.lookupCount} lookup table${parsed.lookupCount === 1 ? '' : 's'}`
+    : '';
+  const transferText = parsed.transfers
+    .map((transfer) => ` · to ${transfer.to} · ${formatLamports(transfer.lamports)}`)
+    .join('');
+  const count = parsed.instructionCount;
+  return `${parsed.versioned ? 'v0 · ' : ''}fee payer ${parsed.feePayer} · ${count} instruction${count === 1 ? '' : 's'}${lookupText}${transferText}`;
+}
+
+export function previewSolanaMessage(message: Uint8Array): string {
+  const parsed = parseSolanaMessage(message);
+  return parsed ? formatSolanaPreview(parsed) : hexPreview(message);
+}
+
+export function solanaTransferDetail(path: string, message: Uint8Array): SigningDetail | null {
+  const parsed = parseSolanaMessage(message);
+  if (!parsed || parsed.transfers.length === 0) {
+    return null;
+  }
+  return {
+    style: 'raw-sign',
+    headline: 'Sign Solana',
+    note: formatSolanaPreview(parsed),
+    fields: [
+      { label: 'PATH', value: path, mono: true },
+      ...parsed.transfers.flatMap((transfer) => [
+        { label: 'TO', value: transfer.to, mono: true },
+        { label: 'AMOUNT', value: formatLamports(transfer.lamports) },
+      ]),
+    ],
+  };
 }
 
 function readProtoString(bytes: Uint8Array, field: number): string | null {
@@ -417,13 +537,15 @@ async function signPayload(
   if (pending.payload.length === 0) {
     return encodeResponse(new Uint8Array(), SW_WRONG_LENGTH);
   }
+  const summary = preview(pending.payload, spec);
   const request: SigningRequest = {
     brand: 'ledger',
     kind: 'sign',
     title: `Sign ${spec.name}`,
     path: pending.path,
-    message: `Sign ${spec.name}\n${pending.path}\n${preview(pending.payload, spec)}`,
+    message: `Sign ${spec.name}\n${pending.path}\n${summary}`,
     rawPayload: pending.payload,
+    detail: spec.name === 'Solana' ? solanaTransferDetail(pending.path, pending.payload) ?? undefined : undefined,
   };
   const ok = await ctx.confirmation.confirm(request);
   if (!ok) {

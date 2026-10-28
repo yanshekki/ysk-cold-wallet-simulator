@@ -1,9 +1,10 @@
 import { sha256 } from '@noble/hashes/sha2';
+import { base58 } from '@scure/base';
 import { mnemonicToEntropy, mnemonicToSeedSync } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
 import { HDKey } from '@scure/bip32';
 import { describe, expect, it } from 'vitest';
-import { LEDGER_MODELS, catalogVersion, type ConfirmationPort, type LedgerApp } from '@cws/contracts';
+import { LEDGER_MODELS, catalogVersion, type ConfirmationPort, type LedgerApp, type SigningRequest } from '@cws/contracts';
 import { buildP2wpkhPsbt as buildQrPsbt, parsePsbt } from '@cws/protocol-qr';
 import { SW_DENY, SW_INS_NOT_SUPPORTED, SW_INTERRUPTED, SW_OK } from '../apdu';
 import {
@@ -291,6 +292,47 @@ describe('Ledger family APDU bodies', () => {
     expect(Array.from(shown.subarray(0, 32))).toEqual(Array.from(silent.subarray(0, 32)));
   });
 
+  it('Solana system transfer review names the recipient and lamports', async () => {
+    const from = new Uint8Array(32);
+    from[0] = 1;
+    const to = new Uint8Array(32);
+    to[0] = 2;
+    const message = concatBytes(
+      Uint8Array.of(1, 0, 1, 3),
+      from,
+      to,
+      new Uint8Array(32),
+      new Uint8Array(32),
+      Uint8Array.of(1, 2, 2, 0, 1, 12, 2, 0, 0, 0, 0x00, 0xca, 0x9a, 0x3b, 0, 0, 0, 0),
+    );
+    const path = [0x8000002c, 0x800001f5, 0x80000000];
+    const pathBytes = encodePath(path);
+    const data = [...pathBytes, ...message];
+    const seen: SigningRequest[] = [];
+    const nanoX = LEDGER_MODELS.find((model) => model.id === 'nano-x')!;
+    const device = new LedgerProtocolHandler({
+      model: nanoX,
+      confirmation: {
+        async confirm(next) {
+          seen.push(next);
+          return false;
+        },
+        async getPassphrase() {
+          return undefined;
+        },
+      },
+      slotId: 'slot',
+      entropy: entropyFromMnemonic(FOUNDATION),
+    });
+    device.setApp('solana');
+    const payload = await exchange(device, apdu([0xe0, 0x06, 0x00, 0x00, data.length, ...data]));
+    expect(swOf(payload)).toBe(SW_DENY);
+    const fields = seen[0]?.detail?.fields ?? [];
+    expect(fields.find((field) => field.label === 'TO')?.value).toBe(base58.encode(to));
+    expect(fields.find((field) => field.label === 'AMOUNT')?.value).toBe('1 SOL (1000000000 lamports)');
+    expect(fields.find((field) => field.label === 'PATH')?.value).toBe("m/44'/501'/0'");
+  });
+
   it('Solana chunked SIGN ACKs MORE with empty 9000 then returns 64-byte ed25519', async () => {
     const device = handler();
     device.setApp('solana');
@@ -440,6 +482,24 @@ describe('Ledger family APDU bodies', () => {
     );
     expect(previewSolanaMessage(solV0)).toMatch(/v0 · fee payer /);
     expect(previewSolanaMessage(solV0)).toMatch(/1 lookup table/);
+    expect(previewSolanaMessage(solV0)).not.toMatch(/lamports/);
+
+    const from = new Uint8Array(32);
+    from[0] = 1;
+    const recipient = new Uint8Array(32);
+    recipient[0] = 2;
+    const transfer = concatBytes(
+      Uint8Array.of(1, 0, 1, 3),
+      from,
+      recipient,
+      new Uint8Array(32),
+      new Uint8Array(32),
+      Uint8Array.of(1, 2, 2, 0, 1, 12, 2, 0, 0, 0, 0x00, 0xca, 0x9a, 0x3b, 0, 0, 0, 0),
+    );
+    const preview = previewSolanaMessage(transfer);
+    expect(preview).toContain(`to ${base58.encode(recipient)}`);
+    expect(preview).toContain('1 SOL (1000000000 lamports)');
+    expect(preview).toContain('1 instruction');
 
     const cosmos = Uint8Array.from([0x1a, 11, ...new TextEncoder().encode('cosmoshub-4'), 0x20, 0x01]);
     expect(previewCosmosSignDoc(cosmos)).toBe('chain cosmoshub-4 · account 1');
