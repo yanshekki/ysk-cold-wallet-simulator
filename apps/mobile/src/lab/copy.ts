@@ -1,8 +1,13 @@
 import { Platform, Share } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
+import { clipboardWriteAllowed, type ClipboardKind } from './secretClipboard';
 
-export async function copyText(value: string): Promise<void> {
+export async function copyText(value: string, kind: ClipboardKind = 'public'): Promise<boolean> {
+  if (!clipboardWriteAllowed(kind)) {
+    return false;
+  }
   await Clipboard.setStringAsync(value);
+  return true;
 }
 
 export async function readClipboard(): Promise<string> {
