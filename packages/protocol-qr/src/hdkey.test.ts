@@ -63,6 +63,15 @@ describe('encodeEthHdkeyUr', () => {
     const coin = asTag(map.get(5)!);
     expect(asMap(coin.value).get(1)).toBe(60);
   });
+
+  it('decodes OneKey crypto-hdkey when the QR payload is uppercase alphanumeric', () => {
+    const seed = mnemonicToSeedSync(FOUNDATION);
+    const encoded = encodeQrAccount(seed, qrProfile('onekey'));
+    expect(encoded.name).toBe('OneKey');
+    const ur = decodeUr(encoded.ur.toUpperCase());
+    expect(ur.type).toBe('crypto-hdkey');
+    expect(asMap(decodeCbor(ur.cbor)).get(9)).toBe('OneKey');
+  });
 });
 
 describe('encodeQrAccount', () => {
