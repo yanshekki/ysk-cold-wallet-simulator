@@ -1,9 +1,19 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, AppState, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, colors, fonts, space } from '@cws/ui';
-import { shouldMountCameraPreview, shouldPromptCameraPermission } from './cameraPreview';
+import {
+  cameraPreviewKey,
+  cameraSettleMs,
+  cameraSettleReason,
+  isCameraAppActive,
+  nextCameraGeneration,
+  shouldMountCameraPreview,
+  shouldPromptCameraPermission,
+  shouldRemountAfterFailure,
+  shouldRunCameraSession,
+} from './cameraPreview';
 
 type Props = {
   visible: boolean;
@@ -35,13 +45,70 @@ export function QrScanner({
   const granted = permission?.granted === true;
   const statusKnown = permission != null;
   const [presented, setPresented] = useState(false);
-  const mountPreview = shouldMountCameraPreview({ visible, granted, presented });
+  const [appPhase, setAppPhase] = useState(() => AppState.currentState);
+  const [settled, setSettled] = useState(false);
+  const [generation, setGeneration] = useState(0);
+  const [retryNonce, setRetryNonce] = useState(0);
+  const remountsRef = useRef(0);
+  const appActiveRef = useRef(isCameraAppActive(AppState.currentState));
+  const retryNonceRef = useRef(0);
+  const appActive = isCameraAppActive(appPhase);
+  const mountPreview = shouldMountCameraPreview({
+    visible,
+    granted,
+    presented,
+    appActive,
+    settled,
+  });
+
+  useEffect(() => {
+    setAppPhase(AppState.currentState);
+    const sub = AppState.addEventListener('change', (next) => {
+      setAppPhase(next);
+    });
+    return () => sub.remove();
+  }, []);
 
   useEffect(() => {
     if (!visible) {
       setPresented(false);
+      setSettled(false);
+      remountsRef.current = 0;
+      setRetryNonce(0);
     }
   }, [visible]);
+
+  useEffect(() => {
+    if (visible && presented) {
+      setGeneration((current) => nextCameraGeneration(current, 'presented'));
+      remountsRef.current = 0;
+      setRetryNonce(0);
+    }
+  }, [visible, presented]);
+
+  useEffect(() => {
+    const becameAppActive = appActive && !appActiveRef.current;
+    appActiveRef.current = appActive;
+    const isRetry = retryNonce !== retryNonceRef.current;
+    retryNonceRef.current = retryNonce;
+
+    if (!visible || !presented || !appActive) {
+      setSettled(false);
+      return;
+    }
+
+    if (becameAppActive) {
+      setGeneration((current) => nextCameraGeneration(current, 'app-focus'));
+      remountsRef.current = 0;
+    }
+
+    const reason = cameraSettleReason({ presented: true, becameAppActive, isRetry });
+    const timer = setTimeout(() => setSettled(true), cameraSettleMs(reason ?? 'present'));
+    return () => {
+      clearTimeout(timer);
+      setSettled(false);
+    };
+  }, [visible, presented, appActive, retryNonce]);
 
   useEffect(() => {
     if (
@@ -69,11 +136,19 @@ export function QrScanner({
       <View style={styles.root} testID="device-qr-scanner" collapsable={false}>
         {mountPreview ? (
           <CameraView
-            key={`preview-${presented ? 'on' : 'off'}`}
+            key={cameraPreviewKey(generation)}
             style={styles.preview}
             facing="back"
-            active
+            active={shouldRunCameraSession({ appActive })}
             barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+            onMountError={() => {
+              if (!shouldRemountAfterFailure({ remountsThisPresentation: remountsRef.current })) {
+                return;
+              }
+              remountsRef.current += 1;
+              setGeneration((current) => nextCameraGeneration(current, 'mount-error'));
+              setRetryNonce((nonce) => nonce + 1);
+            }}
             onBarcodeScanned={({ data }) => {
               if (data) {
                 onPart(data);
