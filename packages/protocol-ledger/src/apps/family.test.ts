@@ -1,10 +1,11 @@
+import { sha256 } from '@noble/hashes/sha2';
 import { mnemonicToEntropy, mnemonicToSeedSync } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
 import { HDKey } from '@scure/bip32';
 import { describe, expect, it } from 'vitest';
 import { LEDGER_MODELS, catalogVersion, type ConfirmationPort, type LedgerApp } from '@cws/contracts';
 import { buildP2wpkhPsbt as buildQrPsbt, parsePsbt } from '@cws/protocol-qr';
-import { SW_INS_NOT_SUPPORTED, SW_INTERRUPTED, SW_OK } from '../apdu';
+import { SW_DENY, SW_INS_NOT_SUPPORTED, SW_INTERRUPTED, SW_OK } from '../apdu';
 import {
   CLA_FRAMEWORK,
   ClientCommandInterpreter,
@@ -16,10 +17,11 @@ import {
   serializeWalletPolicy,
   walletIdOf,
 } from '../index';
-import { deriveEd25519PrivateKey, signEd25519 } from '../crypto';
+import { deriveEd25519PrivateKey, ed25519PublicKey, signEd25519 } from '../crypto';
 import { BleReassembler, DEFAULT_MTU, framePayload, splitFramedPackets, TAG_APDU } from '../framing';
 import { LedgerProtocolHandler } from '../handler';
-import { concatBytes } from '../bytes';
+import { bytesToHex, concatBytes } from '../bytes';
+import { suiAddress, suiAddressBytes } from './addresses';
 import {
   previewCosmosSignDoc,
   previewSolanaMessage,
@@ -34,10 +36,10 @@ function entropyFromMnemonic(mnemonic: string): Uint8Array {
   return mnemonicToEntropy(mnemonic, wordlist);
 }
 
-function autoConfirm(): ConfirmationPort {
+function autoConfirm(accept = true): ConfirmationPort {
   return {
     async confirm() {
-      return true;
+      return accept;
     },
     async getPassphrase() {
       return undefined;
@@ -538,5 +540,122 @@ describe('Ledger family APDU bodies', () => {
     expect(swOf(done)).toBe(SW_OK);
     expect(interpreter.yielded.length).toBeGreaterThan(0);
     expect(interpreter.yielded[0]!.length).toBeGreaterThan(70);
+  });
+
+  const SUI_PATH = [0x8000002c, 0x80000310, 0x80000000, 0x80000000, 0x80000000];
+
+  function encodePathLE(components: number[]): Uint8Array {
+    const out = new Uint8Array(1 + components.length * 4);
+    out[0] = components.length;
+    for (let i = 0; i < components.length; i++) {
+      const value = components[i]!;
+      const offset = 1 + i * 4;
+      out[offset] = value & 0xff;
+      out[offset + 1] = (value >>> 8) & 0xff;
+      out[offset + 2] = (value >>> 16) & 0xff;
+      out[offset + 3] = (value >>> 24) & 0xff;
+    }
+    return out;
+  }
+
+  function suiBlockOf(payload: Uint8Array): { ins: number; body: Uint8Array } {
+    const inner = payload.subarray(0, payload.length - 2);
+    return { ins: inner[0]!, body: inner.subarray(1, inner.length - 2) };
+  }
+
+  function mystenBlocks(payloads: Uint8Array[]): { start: number[]; chunks: Map<string, Uint8Array> } {
+    const chunks = new Map<string, Uint8Array>();
+    const hashes: number[] = [];
+    for (const payload of payloads) {
+      const linked = concatBytes(new Uint8Array(32), payload);
+      const hash = sha256(linked);
+      chunks.set(bytesToHex(hash), linked);
+      hashes.push(...hash);
+    }
+    return { start: [0x00, ...hashes], chunks };
+  }
+
+  async function mystenExchange(
+    device: LedgerProtocolHandler,
+    ins: number,
+    payloads: Uint8Array[],
+  ): Promise<Uint8Array> {
+    const { start, chunks } = mystenBlocks(payloads);
+    let payload = await exchange(device, apdu([0x00, ins, 0x00, 0x00, start.length, ...start]));
+    let guard = 0;
+    while (suiBlockOf(payload).ins === 0x02) {
+      guard += 1;
+      expect(guard).toBeLessThan(16);
+      expect(swOf(payload)).toBe(SW_OK);
+      const hash = suiBlockOf(payload).body;
+      const linked = chunks.get(bytesToHex(hash));
+      expect(linked).toBeDefined();
+      const reply = [0x01, ...linked!];
+      payload = await exchange(device, apdu([0x00, ins, 0x00, 0x00, reply.length, ...reply]));
+    }
+    return payload;
+  }
+
+  it('Sui Mysten GET_VERSION uses the blocks protocol and returns the catalog triple', async () => {
+    const device = handler();
+    device.setApp('sui');
+    const payload = await mystenExchange(device, 0x00, [new Uint8Array(1)]);
+    expect(swOf(payload)).toBe(SW_OK);
+    const block = suiBlockOf(payload);
+    expect(block.ins).toBe(0x01);
+    const [major, minor, patch] = catalogVersion('sui', '1.5.13')
+      .split('.')
+      .map((part) => Number.parseInt(part, 10) || 0);
+    expect(Array.from(block.body)).toEqual([major & 0xff, minor & 0xff, patch & 0xff]);
+  });
+
+  it('Sui Mysten silent INS 0x02 exports raw pubkey+address and is not a sign', async () => {
+    const confirms: string[] = [];
+    const nanoX = LEDGER_MODELS.find((model) => model.id === 'nano-x')!;
+    const device = new LedgerProtocolHandler({
+      model: nanoX,
+      confirmation: {
+        async confirm(request) {
+          confirms.push(request.kind);
+          return true;
+        },
+        async getPassphrase() {
+          return undefined;
+        },
+      },
+      slotId: 'slot',
+      entropy: entropyFromMnemonic(FOUNDATION),
+    });
+    device.setApp('sui');
+    const payload = await mystenExchange(device, 0x02, [encodePathLE(SUI_PATH)]);
+    expect(swOf(payload)).toBe(SW_OK);
+    expect(confirms).toEqual([]);
+    const block = suiBlockOf(payload);
+    expect(block.ins).toBe(0x01);
+    expect(block.body[0]).toBe(32);
+    const pub = block.body.subarray(1, 33);
+    expect(block.body[33]).toBe(32);
+    const address = block.body.subarray(34, 66);
+    const expectedPub = ed25519PublicKey(deriveEd25519PrivateKey(entropyFromMnemonic(FOUNDATION), "m/44'/784'/0'/0'/0'"));
+    expect(Array.from(pub)).toEqual(Array.from(expectedPub));
+    expect(Array.from(address)).toEqual(Array.from(suiAddressBytes(expectedPub)));
+    expect(suiAddress(pub).startsWith('0x')).toBe(true);
+    expect(suiAddress(pub).length).toBe(66);
+  });
+
+  it('Sui Mysten display INS 0x01 confirms; silent INS 0x02 still works if confirm would deny', async () => {
+    const nanoX = LEDGER_MODELS.find((model) => model.id === 'nano-x')!;
+    const deny = new LedgerProtocolHandler({
+      model: nanoX,
+      confirmation: autoConfirm(false),
+      slotId: 'slot',
+      entropy: entropyFromMnemonic(FOUNDATION),
+    });
+    deny.setApp('sui');
+    const shown = await mystenExchange(deny, 0x01, [encodePathLE(SUI_PATH)]);
+    expect(swOf(shown)).toBe(SW_DENY);
+    const silent = await mystenExchange(deny, 0x02, [encodePathLE(SUI_PATH)]);
+    expect(swOf(silent)).toBe(SW_OK);
+    expect(suiBlockOf(silent).body[0]).toBe(32);
   });
 });

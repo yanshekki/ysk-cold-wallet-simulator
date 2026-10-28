@@ -1134,7 +1134,7 @@ function otherFamilies(): LabAction[] {
       app: 'Sui',
       cla: 0x00,
       pub: 0x01,
-      sign: 0x02,
+      sign: 0x03,
       path: PATH_SUI,
       addrEn: 'Sui export key',
       addrZh: 'Sui 匯出金鑰',
