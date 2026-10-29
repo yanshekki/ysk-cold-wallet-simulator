@@ -39,7 +39,7 @@ describe('pickModel', () => {
     const picked = pickModel([
       {
         id: 'dd',
-        name: 'Shek Ki的iPhone [Trezor Safe 7]',
+        name: 'Sample的iPhone [Trezor Safe 7]',
         services: [
           '13d63400-2c97-3004-0000-4c6564676572',
           '8c000001-a59b-4d58-a9ad-073df69fa1b1',
@@ -54,7 +54,7 @@ describe('pickModel', () => {
       pickModel([
         {
           id: 'ee',
-          name: 'Shek Ki的iPhone [Trezor Safe 7]',
+          name: 'Sample的iPhone [Trezor Safe 7]',
           services: [],
         },
       ]),
@@ -63,7 +63,7 @@ describe('pickModel', () => {
       pickModel([
         {
           id: 'ee2',
-          name: 'Shek Ki的iPhone [Nano X]',
+          name: 'Sample的iPhone [Nano X]',
           services: [],
         },
       ]),
@@ -74,7 +74,7 @@ describe('pickModel', () => {
     const picked = pickModel([
       {
         id: 'ee3',
-        name: 'Shek Ki的iPhone [1S A1B2]',
+        name: 'Sample的iPhone [1S A1B2]',
         services: [],
       },
     ]);
@@ -85,7 +85,7 @@ describe('pickModel', () => {
     const picked = pickModel([
       {
         id: 'ff',
-        name: 'Shek Ki的iPhone',
+        name: 'Sample的iPhone',
         services: [],
       },
     ]);
@@ -114,7 +114,7 @@ describe('pickModel', () => {
     const picked = pickModel([
       {
         id: 'gg',
-        name: 'Shek Ki的iPhone [Pro 2 A1B2]',
+        name: 'Sample的iPhone [Pro 2 A1B2]',
         services: [
           '13d63400-2c97-6004-0000-4c6564676572',
           '00000001-0000-1000-8000-00805f9b34fb',
@@ -129,7 +129,7 @@ describe('pickModel', () => {
     const picked = pickModel([
       {
         id: 'hh',
-        name: 'Shek Ki的iPhone [Pro 2 A1B2]',
+        name: 'Sample的iPhone [Pro 2 A1B2]',
         services: ['00000001-0000-1000-8000-00805f9b34fb'],
       },
     ]);
@@ -140,7 +140,7 @@ describe('pickModel', () => {
     const picked = pickModel([
       {
         id: 'ii',
-        name: 'Shek Ki的iPhone [Trezor Safe 7]',
+        name: 'Sample的iPhone [Trezor Safe 7]',
         services: ['00000001-0000-1000-8000-00805f9b34fb'],
       },
     ]);
@@ -164,7 +164,7 @@ describe('pickModel', () => {
     const picked = pickModel([
       {
         id: 'iphone',
-        name: 'Shek Ki的iPhone [Pro 2 A1B2]',
+        name: 'Sample的iPhone [Pro 2 A1B2]',
         services: ['180a', 'd0611e78-848c-4dd4-bbd0-91f57c6b9aca'],
       },
       {
@@ -181,7 +181,7 @@ describe('pickModel', () => {
     const ranked = rankModels([
       {
         id: 'iphone',
-        name: 'Shek Ki的iPhone [Pro 2 A1B2]',
+        name: 'Sample的iPhone [Pro 2 A1B2]',
         services: [],
       },
       {
@@ -211,12 +211,12 @@ describe('pickModel', () => {
       probeHit([
         {
           id: 'iphone',
-          name: 'Shek Ki的iPhone',
+          name: 'Sample的iPhone',
           services: ['180a'],
         },
       ]),
     ).toBeUndefined();
-    expect(pickModel([{ id: 'iphone', name: 'Shek Ki的iPhone', services: ['180a'] }])).toBeNull();
+    expect(pickModel([{ id: 'iphone', name: 'Sample的iPhone', services: ['180a'] }])).toBeNull();
   });
 
   it('treats missing write on 180a/Continuity as a phantom, not a CWS session', () => {

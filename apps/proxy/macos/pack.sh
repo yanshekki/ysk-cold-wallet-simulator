@@ -9,14 +9,10 @@ APP="$DIST/CWS Proxy.app"
 CONTENTS="$APP/Contents"
 INNER="$CONTENTS/Helpers/CWS Node.app"
 INNER_CONTENTS="$INNER/Contents"
-IDENT="Apple Development: Shek Ki Yan (G8P899XYGC)"
-PROFILE="${CWS_PROFILE:-$HOME/Downloads/CWS_Proxy_Dev (1).provisionprofile}"
-
+IDENT="${CWS_CODESIGN_IDENTITY:?Set CWS_CODESIGN_IDENTITY to your Apple Development certificate name.}"
+PROFILE="${CWS_PROFILE:?Set CWS_PROFILE to the path of a .provisionprofile.}"
 if [[ ! -f "$PROFILE" ]]; then
-  PROFILE="$HOME/Downloads/CWS_Proxy_Dev.provisionprofile"
-fi
-if [[ ! -f "$PROFILE" ]]; then
-  echo "missing provisioning profile in Downloads" >&2
+  echo "provisioning profile not found: $PROFILE" >&2
   exit 1
 fi
 

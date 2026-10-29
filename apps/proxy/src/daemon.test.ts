@@ -536,7 +536,7 @@ describe('runProxy', () => {
           return [
             {
               id: 'phone',
-              name: 'Shek Ki的iPhone [Trezor Safe 7]',
+              name: 'Sample的iPhone [Trezor Safe 7]',
               services: [],
             },
           ];
@@ -696,7 +696,7 @@ describe('runProxy', () => {
           return [
             {
               id: 'iphone',
-              name: 'Shek Ki的iPhone [Pro 2 A1B2]',
+              name: 'Sample的iPhone [Pro 2 A1B2]',
               services: ['180a', 'd0611e78-848c-4dd4-bbd0-91f57c6b9aca'],
             },
             {
@@ -811,7 +811,7 @@ describe('runProxy', () => {
           return [
             {
               id: 'iphone',
-              name: 'Shek Ki的iPhone [Pro 2 A1B2]',
+              name: 'Sample的iPhone [Pro 2 A1B2]',
               services: ['180a'],
             },
             {
@@ -880,7 +880,7 @@ describe('runProxy', () => {
             return [
               {
                 id: 'iphone',
-                name: 'Shek Ki的iPhone [Pro 2 A1B2]',
+                name: 'Sample的iPhone [Pro 2 A1B2]',
                 services: ['180a', 'd0611e78-848c-4dd4-bbd0-91f57c6b9aca'],
               },
             ];

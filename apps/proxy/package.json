@@ -1,6 +1,6 @@
 {
   "name": "@cws/proxy",
-  "version": "0.1.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "bin": {
@@ -8,7 +8,7 @@
   },
   "scripts": {
     "start": "tsx src/main.ts",
-    "app": "DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project macos/CWSProxy/CWSProxy.xcodeproj -scheme 'CWS Proxy' -configuration Debug -destination 'generic/platform=macOS' -derivedDataPath macos/CWSProxy/DerivedData ARCHS=arm64 ONLY_ACTIVE_ARCH=YES ENABLE_DEBUG_DYLIB=NO ENABLE_PREVIEWS=NO CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY='Apple Development: Shek Ki Yan (G8P899XYGC)' DEVELOPMENT_TEAM=K897VVZW77 PROVISIONING_PROFILE_SPECIFIER='CWS Proxy Dev'",
+    "app": "bash macos/xcode-app.sh",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "test:e2e": "playwright test"

@@ -42,7 +42,7 @@ function BootGate({ fontsReady }: { fontsReady: boolean }) {
       <View style={frame}>
         <BootSplash
           label={t('common.loading')}
-          version={Constants.expoConfig?.version ?? '1.0.0'}
+          version={Constants.expoConfig?.version ?? '1.1.0'}
         />
       </View>
     );
