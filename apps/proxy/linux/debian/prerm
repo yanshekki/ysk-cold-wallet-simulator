@@ -1,0 +1,4 @@
+#!/bin/sh
+# cws-proxy is a user session process. Package removal does not kill it.
+set -e
+exit 0

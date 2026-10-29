@@ -15,12 +15,15 @@ function usage(): string {
   return `cws-proxy — USB HID gadget that pipes to the phone over BLE
 
 Usage:
-  yarn proxy [--model <id>] [--scan-ms 4000] [--pairing-code 123456] [--trezord-port 21325] [--ui-port 8788] [--no-hid] [--no-ui]
+  cws-proxy [--model <id>] [--scan-ms 4000] [--pairing-code 123456] [--trezord-port 21325] [--ui-port 8788] [--no-hid] [--no-ui]
+  yarn proxy [same flags]
 
 Opens http://127.0.0.1:8788 and waits for Start. --no-ui scans immediately (headless).
 
-Linux: copy apps/proxy/udev/99-cws-uhid.rules to /etc/udev/rules.d and re-login.
+Ubuntu: package hk.ysk.cws.proxy installs this command and the uhid udev rule.
+From a git checkout on Linux, copy apps/proxy/udev/99-cws-uhid.rules to /etc/udev/rules.d and log in again.
 macOS HID: open the signed CWS Proxy app (apps/proxy/macos/CWSProxy), not yarn proxy.
+Windows: virtual HID is not implemented. yarn proxy does not create a USB HID device.
 
 Models: ${ALL_MODELS.map((model) => model.id).join(', ')}
 Env: CWS_PAIRING_CODE`;

@@ -1,0 +1,29 @@
+CWS Proxy for Ubuntu
+====================
+
+Package: hk.ysk.cws.proxy
+Command: cws-proxy
+Page: http://127.0.0.1:8788
+
+This package installs a private Node.js runtime, the proxy program, and
+/usr/lib/udev/rules.d/99-cws-uhid.rules. It needs glibc 2.34 or newer
+(Ubuntu 22.04 and 24.04). That rule is the file
+apps/proxy/udev/99-cws-uhid.rules from the source tree. It sets /dev/uhid
+to group plugdev and mode 0660. postinst loads the uhid module and reloads
+udev. If your account is not in plugdev, add it and log in again:
+
+  sudo usermod -aG plugdev "$USER"
+
+Virtual HID needs Linux /dev/uhid. It is not implemented on Windows.
+This package does not run on Windows, and this repository does not publish
+a Windows installer.
+
+The phone link uses BlueZ. Install still succeeds when no phone is nearby.
+Press Start in the local page after the phone is advertising.
+
+Seeds are not absolutely safe. This is a simulator for interoperability
+tests. Do not hold real digital assets with it. The package does not
+contain a seed, a keystore, or a provisioning profile.
+
+GitHub Release v1.1.0 does not attach this .deb. Build it from the
+repository with apps/proxy/linux/build-deb.sh.

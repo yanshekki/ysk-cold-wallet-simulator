@@ -1,0 +1,15 @@
+#!/bin/sh
+# Drop the modules-load snippet after the packaged udev rule is gone, then reload.
+set -e
+
+case "$1" in
+  remove|purge|disappear)
+    rm -f /etc/modules-load.d/cws-proxy.conf
+    if command -v udevadm >/dev/null 2>&1; then
+      udevadm control --reload-rules || true
+      udevadm trigger --sysname-match=uhid || true
+    fi
+    ;;
+esac
+
+exit 0

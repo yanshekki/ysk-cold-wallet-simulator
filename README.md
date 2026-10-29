@@ -20,17 +20,18 @@ CWS is a simulator. It is not a secure element. Ledger, Trezor, and OneKey do no
 
 ## Downloads
 
-Version 1.1.0 (build 6). This repository does not publish installers. [GitHub Release v1.1.0](https://github.com/yanshekki/ysk-cold-wallet-simulator/releases/tag/v1.1.0) is notes only: no APK, IPA, or desktop package is attached.
+Version 1.1.0 (build 6). [GitHub Release v1.1.0](https://github.com/yanshekki/ysk-cold-wallet-simulator/releases/tag/v1.1.0) is notes only: no APK, IPA, or desktop package is attached. Ubuntu can build a `.deb` from this tree. macOS and Windows still have no installable package on that release.
 
 | Product | Where to get it |
 | --- | --- |
 | Android phone | [Google Play](https://play.google.com/store/apps/details?id=hk.ysk.cws) (`hk.ysk.cws`) |
 | iOS phone | App Store: Coming soon |
 | CWS Proxy, macOS | Mac App Store: Coming soon. The HID Virtual Device App Store entitlement is still **Submitted**. |
-| CWS Proxy, Linux | No packaged download. From source: `yarn proxy`, after the `uhid` rule in Quick start. |
+| CWS Proxy, Ubuntu | Package `hk.ysk.cws.proxy` (amd64 and arm64). Build it on Ubuntu with `bash apps/proxy/linux/build-deb.sh`, then install the `.deb`. It installs `cws-proxy` and the `uhid` udev rule. The GitHub Release does not attach the `.deb`. See [Ubuntu package](#ubuntu-package). |
+| CWS Proxy, other Linux | No package. From source: `yarn proxy`, after the `uhid` rule in Quick start. |
 | CWS Proxy, Windows | No packaged download. From source: `yarn proxy` after building `@cws/native-proxy`. Virtual HID is not implemented on Windows, so this does not create a USB HID device. The local page is `http://127.0.0.1:8788`. |
 
-Virtual HID exists for Linux (`/dev/uhid`) and for the macOS CWS Proxy app. It is not implemented for Windows.
+Virtual HID exists for Linux (`/dev/uhid`, including the Ubuntu package) and for the macOS CWS Proxy app. It is not implemented for Windows.
 
 Until the Mac App Store build ships, build the macOS app from source with `yarn workspace @cws/proxy app`. That script uses the team already set in the Xcode project. Do not commit provisioning profiles.
 
@@ -41,7 +42,7 @@ Use a physical Android or iOS phone. A simulator and Expo Go cannot advertise Bl
 1. Install the Android app from Google Play, or build the phone app from source.
 2. Accept the warning, unlock, choose a model, and use a secret that does not control real assets.
 3. Start advertising, then connect the third-party wallet over Bluetooth.
-4. For desktop WebHID, start CWS Proxy (macOS app, or `yarn proxy` on Linux) and press Start. Chrome can then open the virtual USB device. The local page is `http://127.0.0.1:8788`.
+4. For desktop WebHID, start CWS Proxy (macOS app, Ubuntu `cws-proxy` from the `.deb`, or `yarn proxy` on Linux) and press Start. Chrome can then open the virtual USB device. The local page is `http://127.0.0.1:8788`.
 
 From source you need Node.js, Yarn 1.22.22, and Xcode or Android Studio for the native phone build. The proxy’s HID library also needs Rust.
 
@@ -53,14 +54,57 @@ npx expo prebuild
 npx expo run:android   # or run:ios
 ```
 
-Linux proxy, from the repository root:
+Linux proxy from source, from the repository root:
 
 ```bash
 yarn workspace @cws/native-proxy build   # once
 yarn proxy                               # http://127.0.0.1:8788
 ```
 
-Linux HID needs `apps/proxy/udev/99-cws-uhid.rules`. Copy it to `/etc/udev/rules.d/` and log in again. The rule sets group `plugdev` and mode `0660` on `/dev/uhid`.
+That path does not install a package. Copy `apps/proxy/udev/99-cws-uhid.rules` to `/etc/udev/rules.d/` and log in again. The rule sets group `plugdev` and mode `0660` on `/dev/uhid`. Ubuntu can install the same rule with the package below.
+
+### Ubuntu package
+
+The package name is `hk.ysk.cws.proxy`. It is a `.deb` for Ubuntu amd64 and arm64 (glibc 2.34 or newer: Ubuntu 22.04 and 24.04). It installs:
+
+- `/usr/bin/cws-proxy`
+- a private Node.js 24 runtime and the proxy program under `/usr/lib/hk.ysk.cws.proxy`
+- `/usr/lib/udev/rules.d/99-cws-uhid.rules`, byte-for-byte the same file as `apps/proxy/udev/99-cws-uhid.rules`
+
+`postinst` creates the `plugdev` group if it is missing, writes `/etc/modules-load.d/cws-proxy.conf` so the kernel loads `uhid`, and runs `udevadm control --reload-rules`. `/dev/uhid` is group `plugdev`, mode `0660`. If your account is not in `plugdev`, add it and log in again before virtual HID works.
+
+GitHub Release v1.1.0 does not attach this `.deb`. Build it on Ubuntu. [`.github/workflows/cws-proxy-deb.yml`](.github/workflows/cws-proxy-deb.yml) builds amd64 (`ubuntu-24.04`) and arm64 (`ubuntu-24.04-arm`) and uploads each `.deb` as a workflow artifact. That artifact is not a GitHub Release asset.
+
+```bash
+sudo apt-get install -y build-essential pkg-config libdbus-1-dev curl ca-certificates python3 xz-utils
+# Node.js 22 or newer, Yarn 1.22.22, and Rust (rustup)
+corepack enable && corepack prepare yarn@1.22.22 --activate
+yarn
+yarn workspace @cws/native-proxy build
+bash apps/proxy/linux/build-deb.sh
+bash apps/proxy/linux/check-deb.sh apps/proxy/dist/linux/hk.ysk.cws.proxy_*.deb
+sudo apt-get install -y ./apps/proxy/dist/linux/hk.ysk.cws.proxy_*.deb
+sudo usermod -aG plugdev "$USER"   # then log in again
+cws-proxy                          # http://127.0.0.1:8788
+```
+
+On arm64 Ubuntu the script selects arm64 from `uname -m`. Pass `--arch amd64` or `--arch arm64` to override. `yarn workspace @cws/proxy deb` is the same build script.
+
+Check the archive without installing:
+
+```bash
+dpkg-deb -I apps/proxy/dist/linux/hk.ysk.cws.proxy_*.deb
+dpkg-deb -c apps/proxy/dist/linux/hk.ysk.cws.proxy_*.deb
+bash apps/proxy/linux/check-deb.sh apps/proxy/dist/linux/hk.ysk.cws.proxy_*.deb
+```
+
+After install, `cws-proxy --help` should print usage, and `/usr/lib/udev/rules.d/99-cws-uhid.rules` should match the source rule. Opening `/dev/uhid` still needs membership in `plugdev` and a new login. A full HID session also needs the phone advertising over Bluetooth. Checking the archive does not by itself prove that a desktop login can open `/dev/uhid`.
+
+`bash apps/proxy/linux/check-deb.sh` with no arguments builds a layout-check `.deb` whose Node binary and native addon are ELF stubs. Use that only to inspect the archive on a machine that cannot compile the Linux addon. Do not install it.
+
+The package does not contain a seed, a keystore, or a provisioning profile. Seeds are not absolutely safe.
+
+Windows still has no package. Virtual HID is not implemented on Windows.
 
 On macOS, virtual HID is the signed CWS Proxy app, not `yarn proxy`:
 
@@ -86,7 +130,7 @@ OneKey Mini has no BLE radio and is not simulated.
 
 | Transport | What this version does |
 | --- | --- |
-| USB HID | macOS CWS Proxy (virtual HID) or Linux `yarn proxy` (`uhid`) forwards reports to the phone over BLE. There is no APDU allowlist. A Chrome site you connect can send any command the phone implements. Phantom may still fail to finish unlock. |
+| USB HID | macOS CWS Proxy (virtual HID), or Linux `cws-proxy` from the Ubuntu package or `yarn proxy` (`uhid`), forwards reports to the phone over BLE. There is no APDU allowlist. A Chrome site you connect can send any command the phone implements. Phantom may still fail to finish unlock. |
 | Trezor Bridge | The proxy can answer `http://127.0.0.1:21325` so a Trezor-compatible host can enumerate a device. The bridge reflects the request `Origin`. |
 | QR | UR and BBQr for account keys and output descriptors. A backup-seed QR is produced only after on-device confirmation. |
 
