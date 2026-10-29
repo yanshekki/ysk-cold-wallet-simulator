@@ -4,7 +4,8 @@ import { wordlist } from '@scure/bip39/wordlists/english';
 import { describe, expect, it } from 'vitest';
 import { LEDGER_MODELS, catalogVersion, overlayDerivationPath, type ConfirmationPort, type SigningRequest } from '@cws/contracts';
 import { encodeResponse, SW_DENY, SW_OK } from './apdu';
-import { FUJI_HRP, FUJI_X_CHAIN_ID, avalancheBech32Address } from './apps/avalanche';
+import { FUJI_HRP, FUJI_X_CHAIN_ID, MAINNET_C_CHAIN_ID, avalancheBech32Address } from './apps/avalanche';
+import { ETH_APP_VERSION } from './apps/ethereum';
 import {
   deriveEd25519PrivateKey,
   deriveHdNode,
@@ -55,6 +56,43 @@ async function exchange(handler: LedgerProtocolHandler, framed: Uint8Array): Pro
   }
   expect(assembled).not.toBeNull();
   return assembled!.payload;
+}
+
+function encodeComponents(path: number[]): number[] {
+  const bytes: number[] = [path.length];
+  for (const component of path) {
+    bytes.push((component >>> 24) & 0xff, (component >>> 16) & 0xff, (component >>> 8) & 0xff, component & 0xff);
+  }
+  return bytes;
+}
+
+function u32(value: number): number[] {
+  return [(value >>> 24) & 0xff, (value >>> 16) & 0xff, (value >>> 8) & 0xff, value & 0xff];
+}
+
+function u64(value: number): number[] {
+  return [0, 0, 0, 0, ...u32(value)];
+}
+
+/** Minimal C-Chain export of `nano` nAVAX to the all-zero P-Chain id. */
+function cChainExportToP(nano: number): number[] {
+  return [
+    0x00,
+    0x00,
+    ...u32(1),
+    ...u32(1),
+    ...Array.from(MAINNET_C_CHAIN_ID),
+    ...new Array<number>(32).fill(0),
+    ...u32(0),
+    ...u32(1),
+    ...new Array<number>(32).fill(0),
+    ...u32(7),
+    ...u64(nano),
+    ...u64(0),
+    ...u32(1),
+    ...u32(1),
+    ...new Array<number>(20).fill(0x11),
+  ];
 }
 
 function handlerFor(modelId: string): LedgerProtocolHandler {
@@ -863,7 +901,7 @@ describe('LedgerProtocolHandler', () => {
       entropy,
     });
     handler.setApp('avalanche');
-    const path = [0x8000002c, 0x80002328, 0x80000000, 0x00000000, 0x00000000];
+    const path = [0x8000002c, 0x80002328, 0x80000000];
     const msg = Array.from(new TextEncoder().encode('fuji lab'));
     const init: number[] = [path.length];
     for (const component of path) {
@@ -873,14 +911,19 @@ describe('LedgerProtocolHandler', () => {
     await exchange(handler, apdu([0x80, 0x06, 0x00, 0x00, init.length, ...init]));
     const lastReply = await exchange(handler, apdu([0x80, 0x06, 0x02, 0x00, 0x00]));
     expect((lastReply[lastReply.length - 2] << 8) | lastReply[lastReply.length - 1]).toBe(SW_OK);
+    expect(lastReply.length).toBe(2);
     expect(confirms).toBe(1);
-    const extra = await exchange(handler, apdu([0x80, 0x04, 0x02, 0x00, 0x01, 0x00]));
+    const suffix = [0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
+    const signed = await exchange(handler, apdu([0x80, 0x04, 0x02, 0x00, suffix.length, ...suffix]));
+    expect((signed[signed.length - 2] << 8) | signed[signed.length - 1]).toBe(SW_OK);
+    expect(signed.length).toBe(67);
+    const extra = await exchange(handler, apdu([0x80, 0x04, 0x02, 0x00, suffix.length, ...suffix]));
     expect((extra[extra.length - 2] << 8) | extra[extra.length - 1]).not.toBe(SW_OK);
     expect(extra.length).toBe(2);
     expect(confirms).toBe(1);
   });
 
-  it('returns a secp256k1 signature on Avalanche SIGN_MSG last', async () => {
+  it('returns the Avalanche message signature from SIGN_HASH after the confirm sheet', async () => {
     const handler = new LedgerProtocolHandler({
       model: nanoX,
       confirmation: autoConfirm(),
@@ -888,7 +931,7 @@ describe('LedgerProtocolHandler', () => {
       entropy,
     });
     handler.setApp('avalanche');
-    const path = [0x8000002c, 0x80002328, 0x80000000, 0x00000000, 0x00000000];
+    const path = [0x8000002c, 0x80002328, 0x80000000];
     const msg = Array.from(new TextEncoder().encode('fuji lab'));
     const init: number[] = [path.length];
     for (const component of path) {
@@ -905,7 +948,10 @@ describe('LedgerProtocolHandler', () => {
     const lastReply = await exchange(handler, apdu([0x80, 0x06, 0x02, 0x00, 0x00]));
     const lastSw = (lastReply[lastReply.length - 2] << 8) | lastReply[lastReply.length - 1];
     expect(lastSw).toBe(SW_OK);
-    const sig = lastReply.slice(0, lastReply.length - 2);
+    expect(lastReply.length).toBe(2);
+    const suffix = [0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
+    const signed = await exchange(handler, apdu([0x80, 0x04, 0x02, 0x00, suffix.length, ...suffix]));
+    const sig = signed.slice(0, signed.length - 2);
     expect(sig.length).toBe(65);
     const expected = signSecp256k1Recoverable(
       deriveHdNode(entropy, "m/44'/9000'/0'/0/0").privateKey,
@@ -945,6 +991,110 @@ describe('LedgerProtocolHandler', () => {
       (b) => String.fromCharCode(b),
     ).join('');
     expect(address.toLowerCase()).toBe(EXPECTED_ADDRESS.toLowerCase());
+    expect(handler.getApp()).toBe('avalanche');
+  });
+
+  it('shows a C-Chain to P-Chain export sheet and does not switch to Near', async () => {
+    const titles: string[] = [];
+    const directions: string[] = [];
+    const amounts: string[] = [];
+    let confirms = 0;
+    const handler = new LedgerProtocolHandler({
+      model: nanoX,
+      confirmation: {
+        async confirm(request) {
+          confirms += 1;
+          titles.push(request.title);
+          directions.push(request.detail?.fields.find((field) => field.label === 'CHAIN')?.value ?? '');
+          amounts.push(request.detail?.fields.find((field) => field.label === 'AMOUNT')?.value ?? '');
+          return true;
+        },
+        async getPassphrase() {
+          return undefined;
+        },
+      },
+      slotId: 'slot',
+      entropy,
+    });
+    handler.setApp('avalanche');
+    const addressPath = [0x8000002c, 0x8000003c, 0x80000000, 0x00000000, 0x00000000];
+    const addressBytes = encodeComponents(addressPath);
+    const addressReply = await exchange(
+      handler,
+      apdu([0xe0, 0x02, 0x00, 0x00, addressBytes.length, ...addressBytes]),
+    );
+    expect((addressReply[addressReply.length - 2] << 8) | addressReply[addressReply.length - 1]).toBe(SW_OK);
+    expect(addressReply.length).toBeGreaterThan(2);
+    const versionReply = await exchange(handler, apdu([0xe0, 0x06, 0x00, 0x00, 0x00]));
+    expect(Array.from(versionReply.slice(0, versionReply.length - 2))).toEqual(Array.from(ETH_APP_VERSION));
+    expect(handler.getApp()).toBe('avalanche');
+
+    const prefix = encodeComponents([0x8000002c, 0x8000003c, 0x80000000]);
+    const tx = cChainExportToP(500_000_000);
+    const body = [0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, ...tx];
+    const initReply = await exchange(handler, apdu([0x80, 0x05, 0x00, 0x01, prefix.length, ...prefix]));
+    expect(initReply.length).toBe(2);
+    expect((initReply[0] << 8) | initReply[1]).toBe(SW_OK);
+    const lastReply = await exchange(handler, apdu([0x80, 0x05, 0x02, 0x00, body.length, ...body]));
+    expect(lastReply.length).toBe(2);
+    expect((lastReply[0] << 8) | lastReply[1]).toBe(SW_OK);
+    expect(handler.getApp()).toBe('avalanche');
+    expect(confirms).toBe(1);
+    expect(titles).toEqual(['Sign Avalanche C-Chain export']);
+    expect(directions).toEqual(['C-Chain → P-Chain']);
+    expect(amounts).toEqual(['0.5 AVAX']);
+
+    const wrongSuffix = [0x01, 0x00, 0x00, 0x00, 0x01];
+    const denied = await exchange(handler, apdu([0x80, 0x04, 0x02, 0x00, wrongSuffix.length, ...wrongSuffix]));
+    expect((denied[denied.length - 2] << 8) | denied[denied.length - 1]).toBe(SW_DENY);
+    expect(denied.length).toBe(2);
+    expect(confirms).toBe(1);
+
+    const suffix = [0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
+    const signed = await exchange(handler, apdu([0x80, 0x04, 0x02, 0x00, suffix.length, ...suffix]));
+    const sig = signed.slice(0, signed.length - 2);
+    expect(sig.length).toBe(65);
+    const expected = signSecp256k1Recoverable(
+      deriveHdNode(entropy, "m/44'/60'/0'/0/0").privateKey,
+      sha256(Uint8Array.from(tx)),
+    );
+    expect(Array.from(sig)).toEqual(Array.from(expected));
+    expect(confirms).toBe(1);
+    const again = await exchange(handler, apdu([0x80, 0x04, 0x02, 0x00, suffix.length, ...suffix]));
+    expect(again.length).toBe(2);
+    expect((again[again.length - 2] << 8) | again[again.length - 1]).not.toBe(SW_OK);
+  });
+
+  it('rejects a C-Chain export without producing a signature', async () => {
+    let confirms = 0;
+    const handler = new LedgerProtocolHandler({
+      model: nanoX,
+      confirmation: {
+        async confirm() {
+          confirms += 1;
+          return false;
+        },
+        async getPassphrase() {
+          return undefined;
+        },
+      },
+      slotId: 'slot',
+      entropy,
+    });
+    handler.setApp('avalanche');
+    const prefix = encodeComponents([0x8000002c, 0x8000003c, 0x80000000]);
+    const body = [0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, ...cChainExportToP(500_000_000)];
+    await exchange(handler, apdu([0x80, 0x05, 0x00, 0x00, prefix.length, ...prefix]));
+    const denied = await exchange(handler, apdu([0x80, 0x05, 0x02, 0x00, body.length, ...body]));
+    expect(confirms).toBe(1);
+    expect(denied.length).toBe(2);
+    expect((denied[0] << 8) | denied[1]).toBe(SW_DENY);
+    expect(handler.getApp()).toBe('avalanche');
+    const suffix = [0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
+    const signed = await exchange(handler, apdu([0x80, 0x04, 0x02, 0x00, suffix.length, ...suffix]));
+    expect(signed.length).toBe(2);
+    expect((signed[signed.length - 2] << 8) | signed[signed.length - 1]).not.toBe(SW_OK);
+    expect(confirms).toBe(1);
   });
 
   it('treats empty E0 03 as TON GET_APP_CONFIGURATION even if Solana is open', async () => {
