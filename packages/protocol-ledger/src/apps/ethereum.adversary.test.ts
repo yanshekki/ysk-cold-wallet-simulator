@@ -93,6 +93,38 @@ describe('ETH adversarial bounds', () => {
     expect(statusWord(reply!)).toBe(SW_WRONG_P1P2);
   });
 
+  it('ACKs an incomplete personal_sign chunk, then signs once the message is whole', async () => {
+    const nanoX = LEDGER_MODELS.find((model) => model.id === 'nano-x')!;
+    let confirms = 0;
+    const handler = new LedgerProtocolHandler({
+      model: nanoX,
+      confirmation: {
+        async confirm() {
+          confirms += 1;
+          return true;
+        },
+        async getPassphrase() {
+          return undefined;
+        },
+      },
+      slotId: 'slot',
+      entropy: entropyFromMnemonic(FOUNDATION),
+    });
+    handler.setApp('ethereum');
+    const message = Uint8Array.from([0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68, 0x69, 0x6a]);
+    const first = concatBytes(encodePath(ETH_PATH), Uint8Array.of(0x00, 0x00, 0x00, message.length), message.subarray(0, 1));
+    const ack = await exchange(handler, encodeApdu(0xe0, 0x08, 0x00, 0x00, first));
+    expect(ack).not.toBeNull();
+    expect(statusWord(ack!)).toBe(SW_OK);
+    expect(ack!.length).toBe(2);
+    expect(confirms).toBe(0);
+    const signed = await exchange(handler, encodeApdu(0xe0, 0x08, 0x80, 0x00, message.subarray(1)));
+    expect(signed).not.toBeNull();
+    expect(statusWord(signed!)).toBe(SW_OK);
+    expect(signed!.length).toBe(67);
+    expect(confirms).toBe(1);
+  });
+
   it('clears pendingPersonal on resetLink', async () => {
     const nanoX = LEDGER_MODELS.find((model) => model.id === 'nano-x')!;
     const handler = new LedgerProtocolHandler({
@@ -103,7 +135,10 @@ describe('ETH adversarial bounds', () => {
     });
     handler.setApp('ethereum');
     const first = concatBytes(encodePath(ETH_PATH), Uint8Array.of(0x00, 0x00, 0x00, 0x0a), Uint8Array.of(0x61));
-    expect(await exchange(handler, encodeApdu(0xe0, 0x08, 0x00, 0x00, first))).toBeNull();
+    const ack = await exchange(handler, encodeApdu(0xe0, 0x08, 0x00, 0x00, first));
+    expect(ack).not.toBeNull();
+    expect(statusWord(ack!)).toBe(SW_OK);
+    expect(ack!.length).toBe(2);
     handler.resetLink();
     const cont = await exchange(handler, encodeApdu(0xe0, 0x08, 0x80, 0x00, Uint8Array.of(0x62)));
     expect(cont).not.toBeNull();

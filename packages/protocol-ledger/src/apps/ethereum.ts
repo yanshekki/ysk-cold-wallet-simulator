@@ -198,8 +198,12 @@ async function handlePersonalSign(apdu: Apdu, ctx: EthContext): Promise<Uint8Arr
   }
 
   const pending = ctx.session.pendingPersonal;
-  if (!pending || pending.message.length < pending.expected) {
-    return null;
+  if (!pending) {
+    return encodeResponse(new Uint8Array(), SW_WRONG_LENGTH);
+  }
+  if (pending.message.length < pending.expected) {
+    // transport.send waits for a status word before the next P1=0x80 chunk.
+    return encodeResponse(new Uint8Array(), SW_OK);
   }
 
   const message = pending.message.slice(0, pending.expected);
@@ -254,7 +258,9 @@ async function handleSignTx(apdu: Apdu, ctx: EthContext): Promise<Uint8Array | n
   const shortGarbage =
     waiting && needed == null && (apdu.p1 === 0x80 || (apdu.p1 === 0x00 && apdu.data.length < 255));
   if (waiting && !shortGarbage) {
-    return null;
+    // The Ethereum app replies 9000 while the RLP is still open. Silence here
+    // stalls transport.send, so the host never sends the rest and review never starts.
+    return encodeResponse(new Uint8Array(), SW_OK);
   }
 
   const raw = needed != null ? pending.payload.slice(0, needed) : pending.payload;
