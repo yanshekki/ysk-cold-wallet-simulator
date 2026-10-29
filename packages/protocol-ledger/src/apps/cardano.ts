@@ -18,7 +18,10 @@ import { deriveIcarus, deriveIcarusFromRoot, signIcarus } from './icarus';
 export type CardanoSession = FamilySession;
 
 function versionBytes(): Uint8Array {
-  return versionTriple(catalogVersion('cardano', '7.2.1'));
+  const version = versionTriple(catalogVersion('cardano', '7.2.1'));
+  // hw-app-cardano GET_VERSION expects major || minor || patch || flags.
+  // Release flags are 0. Bit 0x01 marks a devel build and bit 0x04 marks the XS app.
+  return Uint8Array.of(version[0], version[1], version[2], 0x00);
 }
 
 export async function handleCardanoApdu(

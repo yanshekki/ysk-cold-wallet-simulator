@@ -224,6 +224,34 @@ describe('Ledger family APDU bodies', () => {
     expect(swOf(unknown)).toBe(SW_INS_NOT_SUPPORTED);
   });
 
+  it('Cardano GET_VERSION is major||minor||patch||flags so BLE connect passes the host length check', async () => {
+    const device = handler();
+    expect(device.getApp()).toBe('dashboard');
+    const payload = await exchange(device, apdu([0xd7, 0x00, 0x00, 0x00, 0x00]));
+    expect(device.getApp()).toBe('cardano');
+    expect(swOf(payload)).toBe(SW_OK);
+    const body = payload.subarray(0, payload.length - 2);
+    // @cardano-foundation/ledgerjs-hw-app-cardano Ada._send asserts this.
+    const expectedResponseLength = 4;
+    if (body.length !== expectedResponseLength) {
+      throw new Error(
+        `Assertion failed: unexpected response length: ${body.length} instead of ${expectedResponseLength}`,
+      );
+    }
+    const [major, minor, patch] = catalogVersion('cardano', '7.2.1')
+      .split('.')
+      .map((part) => Number.parseInt(part, 10) || 0);
+    expect(Array.from(body)).toEqual([major, minor, patch, 0x00]);
+
+    const account = encodePath([0x8000073c, 0x80000717, 0x80000000]);
+    const xpub = await exchange(device, apdu([0xd7, 0x10, 0x00, 0x00, account.length, ...account]));
+    expect(swOf(xpub)).toBe(SW_OK);
+    const key = xpub.subarray(0, xpub.length - 2);
+    if (key.length !== 64) {
+      throw new Error(`Assertion failed: unexpected response length: ${key.length} instead of 64`);
+    }
+  });
+
   it('Cardano GET_EXT_PUBKEY returns pub||chaincode via CIP-3 Icarus', async () => {
     const device = handler();
     device.setApp('cardano');
