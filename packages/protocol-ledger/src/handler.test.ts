@@ -724,7 +724,7 @@ describe('LedgerProtocolHandler', () => {
     expect(sw).toBe(SW_DENY);
   });
 
-  it('signs a NEAR payload with ed25519 after the last chunk', async () => {
+  it('signs sha256 of a NEAR transaction after the last chunk', async () => {
     const handler = new LedgerProtocolHandler({
       model: nanoX,
       confirmation: autoConfirm(),
@@ -754,11 +754,68 @@ describe('LedgerProtocolHandler', () => {
     );
     const sw = (signed[signed.length - 2] << 8) | signed[signed.length - 1];
     expect(sw).toBe(SW_OK);
-    const expected = signEd25519(
-      deriveEd25519PrivateKey(entropy, "m/44'/397'/0'/0'/1'"),
-      message,
-    );
+    const secret = deriveEd25519PrivateKey(entropy, "m/44'/397'/0'/0'/1'");
+    const expected = signEd25519(secret, sha256(message));
     expect(Array.from(signed.slice(0, 64))).toEqual(Array.from(expected));
+    expect(Array.from(signed.slice(0, 64))).not.toEqual(Array.from(signEd25519(secret, message)));
+  });
+
+  it('signs sha256 of a 250-byte host chunk and frames one 9000 signature', async () => {
+    const handler = new LedgerProtocolHandler({
+      model: nanoX,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy,
+    });
+    handler.setApp('near');
+    const tx = concatBytes(borshString('9'.repeat(64)), new Uint8Array(312 - 68));
+    expect(tx.length).toBe(312);
+    const data = concatBytes(Uint8Array.from(nearPathBytes()), tx);
+    const parts: Uint8Array[] = [];
+    for (let offset = 0; offset < data.length; offset += 250) {
+      parts.push(data.subarray(offset, Math.min(data.length, offset + 250)));
+    }
+    expect(parts).toHaveLength(2);
+    for (let index = 0; index < parts.length - 1; index += 1) {
+      const chunk = parts[index]!;
+      const ack = await exchange(
+        handler,
+        apdu([0x80, 0x02, 0x00, 0x57, chunk.length, ...chunk]),
+      );
+      expect(statusOf(ack)).toBe(SW_OK);
+      expect(ack.length).toBe(2);
+    }
+    const last = parts[parts.length - 1]!;
+    const signed = await exchange(
+      handler,
+      apdu([0x80, 0x02, 0x80, 0x57, last.length, ...last]),
+    );
+    expect(signed.length).toBe(66);
+    expect(statusOf(signed)).toBe(SW_OK);
+    const secret = deriveEd25519PrivateKey(entropy, "m/44'/397'/0'/0'/1'");
+    expect(Array.from(signed.subarray(0, 64))).toEqual(Array.from(signEd25519(secret, sha256(tx))));
+    expect(Array.from(signed.subarray(0, 64))).not.toEqual(Array.from(signEd25519(secret, tx)));
+
+    const packets = splitFramedPackets(framePayload(TAG_APDU, signed, DEFAULT_MTU), DEFAULT_MTU);
+    expect(packets).toHaveLength(4);
+    expect(Array.from(packets[0]!.subarray(0, 5))).toEqual([0x05, 0x00, 0x00, 0x00, 0x42]);
+    const signature = signed.subarray(0, 64);
+    expect(Array.from(packets[0]!.subarray(packets[0]!.length - 2))).toEqual(
+      Array.from(signature.subarray(13, 15)),
+    );
+    expect(Array.from(packets[1]!.subarray(packets[1]!.length - 2))).toEqual(
+      Array.from(signature.subarray(30, 32)),
+    );
+    expect(Array.from(packets[2]!.subarray(packets[2]!.length - 2))).toEqual(
+      Array.from(signature.subarray(47, 49)),
+    );
+    expect(Array.from(packets[3]!.subarray(packets[3]!.length - 2))).toEqual([0x90, 0x00]);
+    const assembler = new BleReassembler();
+    let assembled = null;
+    for (const packet of packets) {
+      assembled = assembler.push(packet);
+    }
+    expect(assembled?.payload).toEqual(signed);
   });
 
   it('shows a NEAR message sheet and signs the NEP-413 digest', async () => {

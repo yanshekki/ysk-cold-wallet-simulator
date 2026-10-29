@@ -194,7 +194,9 @@ async function finishTransaction(
     return encodeResponse(new Uint8Array(), SW_DENY);
   }
   const secret = await privateKeyAt(ctx, pending.path);
-  return encodeResponse(signEd25519(secret, pending.payload), SW_OK);
+  // app-near hashes the Borsh transaction after the 20-byte path, then Ed25519-signs
+  // that digest. nearcore verifies the signature over sha256(tx), not the raw bytes.
+  return encodeResponse(signEd25519(secret, sha256(pending.payload)), SW_OK);
 }
 
 async function finishNep413(
