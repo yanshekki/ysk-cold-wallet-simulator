@@ -129,6 +129,8 @@ final class ProxySession: ObservableObject {
     }
     var request = URLRequest(url: url)
     request.httpMethod = "POST"
+    // Must match apps/proxy/src/origin.ts mutationAllowed (UI fetch sends the same header).
+    request.setValue("1", forHTTPHeaderField: "X-CWS-Proxy")
     request.timeoutInterval = 1.5
     URLSession.shared.dataTask(with: request) { _, response, _ in
       let ok = (response as? HTTPURLResponse)?.statusCode == 200
