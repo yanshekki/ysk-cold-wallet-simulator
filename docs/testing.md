@@ -6,7 +6,7 @@
 
 ## What 1.1.0 is
 
-1.1.0 (build 6) publishes the code on main, with this version number, public documentation, and removal of local signing identity from the tree. It does not add a new handset pass of its own. A user-reported near.com session is listed under Third-party hosts.
+1.1.0 (build 6) publishes the code on main, with this version number, public documentation, and removal of local signing identity from the tree. It does not add a new handset pass of its own. User-reported near.com and Core sessions are listed under Third-party hosts.
 
 ## Automated
 
@@ -48,13 +48,16 @@ Those containers have no `uhid` kernel module and no udev daemon, so `modprobe u
 
 ## Third-party hosts
 
-One device session, reported by a person in October 2026. An iPhone running 1.1.0 (build 6) advertised as Ledger over Bluetooth (BLE). That tree includes the Near sign-message sheets and the Ledger catalog version picker.
+Two device sessions, reported by a person in October 2026. Each row is that host on that path. Seeds are not absolutely safe. See [security.md](security.md). This page does not record which secret a session used.
 
-| Host | Transport | Login | Transaction |
-| --- | --- | --- | --- |
-| near.com | Ledger over Bluetooth | Succeeded | Succeeded |
+| Host | Path | Reported result |
+| --- | --- | --- |
+| near.com | Ledger over Bluetooth (BLE) | Login succeeded. One transaction succeeded. |
+| Core (core.app) | CWS Proxy (wired to the host), Ledger identity | Avalanche C-Chain → X-Chain → P-Chain → X-Chain → C-Chain export/import succeeded. |
 
-near.com finished login, and one transaction finished. The row records near.com on the Ledger Bluetooth path. Seeds are not absolutely safe. See [security.md](security.md). This page does not record which secret the session used.
+The near.com phone was an iPhone running 1.1.0 (build 6). That tree includes the Near sign-message sheets and the Ledger catalog version picker. The phone advertised as Ledger over Bluetooth. near.com finished login, and one transaction finished.
+
+Core connected to a Ledger identity on CWS through CWS Proxy. The host path in this report is the proxy. Core finished the export/import round-trip across C-Chain, X-Chain, and P-Chain in the order above. The row records core.app on CWS Proxy for that sequence. Other Avalanche hosts are outside this report. The separate gap remains: Avalanche Core may not list X and P accounts end to end. See the list below and [security.md](security.md).
 
 ## Not tested, and not claimed
 
