@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { HOST_NETWORK_TICKER_WARNING } from './evmNativeGas';
 import type { SigningRequest } from './signing';
 import {
   describeBtcPsbt,
@@ -426,6 +427,82 @@ describe('describeSigning', () => {
     expect(detail).toBe(attached);
   });
 });
+
+describe('EVM gas symbol on the sign sheet', () => {
+  const one = fromHex('0x0de0b6b3a7640000');
+
+  it('shows AVAX for Avalanche C-Chain, including the max network fee', () => {
+    const detail = describeEthTransaction({
+      chainId: 43114,
+      value: one,
+      gasLimit: fromHex('0x5208'),
+      maxFeePerGas: fromHex('0x77359400'),
+      maxPriorityFeePerGas: fromHex('0x3b9aca00'),
+    });
+    expect(detail.headline).toBe('Avalanche C-Chain transaction');
+    expect(detail.fields.find((field) => field.label === 'CHAIN')?.value).toBe('Avalanche C-Chain');
+    expect(detail.fields.find((field) => field.label === 'VALUE')?.value).toBe('1 AVAX');
+    expect(detail.fields.find((field) => field.label === 'MAX FEE')?.value).toBe('0.000000002 AVAX / gas');
+    expect(detail.fields.find((field) => field.label === 'FEE')?.value).toBe('0.000042 AVAX');
+    expect(sheetUnits(detail)).not.toMatch(/\bETH\b/);
+  });
+
+  it('shows AVAX when the Avalanche app signs a chain-id template that is not Avalanche', () => {
+    const detail = describeEthTransaction({
+      app: 'avalanche',
+      chainId: fromHex('0xaa36a7'),
+      value: new Uint8Array(),
+      gasLimit: fromHex('0x5208'),
+      gasPrice: fromHex('0x01'),
+    });
+    expect(detail.headline).toBe('Avalanche C-Chain transaction');
+    expect(detail.fields.find((field) => field.label === 'VALUE')?.value).toBe('0 AVAX');
+    expect(detail.fields.find((field) => field.label === 'FEE')?.value).toBe('0.000000000000021 AVAX');
+    expect(sheetUnits(detail)).not.toMatch(/\bETH\b/);
+  });
+
+  it('keeps ETH on Ethereum mainnet and names other ETH-gas networks', () => {
+    const mainnet = describeEthTransaction({ chainId: 1, value: one });
+    expect(mainnet.headline).toBe('Ethereum transaction');
+    expect(mainnet.fields.find((field) => field.label === 'VALUE')?.value).toBe('1 ETH');
+    const base = describeEthTransaction({ chainId: 8453, value: one });
+    expect(base.headline).toBe('Base transaction');
+    expect(base.fields.find((field) => field.label === 'VALUE')?.value).toBe('1 ETH');
+  });
+
+  it('uses a neutral unit when the chain id is unknown', () => {
+    const detail = describeEthTransaction({ chainId: 424242, value: one, gasPrice: fromHex('0x01'), gasLimit: fromHex('0x01') });
+    expect(detail.headline).toBe('EVM transaction');
+    expect(detail.fields.find((field) => field.label === 'VALUE')?.value).toBe('1 native');
+    expect(detail.fields.find((field) => field.label === 'FEE')?.value).toBe('0.000000000000000001 native');
+    expect(sheetUnits(detail)).not.toMatch(/\bETH\b/);
+    expect(detail.warning).toBeUndefined();
+  });
+
+  it('labels an unverified host ticker and does not let it rename a known chain', () => {
+    const hosted = describeEthTransaction({
+      chainId: 424242,
+      value: one,
+      hostNetwork: { ticker: 'FOO', chainId: 424242, name: 'Foo Chain' },
+    });
+    expect(hosted.fields.find((field) => field.label === 'VALUE')?.value).toBe('1 FOO');
+    expect(hosted.warning).toBe(HOST_NETWORK_TICKER_WARNING);
+    const avalanche = describeEthTransaction({
+      chainId: 43114,
+      value: one,
+      hostNetwork: { ticker: 'ETH', chainId: 43114, name: 'Ethereum' },
+    });
+    expect(avalanche.fields.find((field) => field.label === 'VALUE')?.value).toBe('1 AVAX');
+    expect(avalanche.warning).toBeUndefined();
+  });
+});
+
+function sheetUnits(detail: { fields: Array<{ label: string; value: string }> }): string {
+  return detail.fields
+    .filter((field) => ['VALUE', 'FEE', 'GAS PRICE', 'MAX FEE', 'MAX PRIORITY', 'BLOB FEE'].includes(field.label))
+    .map((field) => field.value)
+    .join(' ');
+}
 
 function describeEthish() {
   return describeSigning(

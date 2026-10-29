@@ -3,6 +3,8 @@ import {
   bleAdvertiseName,
   describeEthMessage,
   describeEthTransaction,
+  evmSignTitle,
+  resolveEvmNativeGas,
   formatVersion,
   onekeyFirmwareFor,
   type BackupKind,
@@ -1345,7 +1347,10 @@ function pendingTitle(pending: PendingAction): string {
   if (pending.kind === 'eth-sign' || pending.kind === 'eth-712' || pending.kind === 'eth-712-stream' || pending.kind === 'btc-sign-msg') {
     return 'Sign message';
   }
-  if (pending.kind === 'eth-tx' || pending.kind === 'eth-tx-1559' || pending.kind === 'btc-psbt' || pending.kind === 'cardano-tx') {
+  if (pending.kind === 'eth-tx' || pending.kind === 'eth-tx-1559') {
+    return evmSignTitle(resolveEvmNativeGas({ chainId: pending.tx.chainId }));
+  }
+  if (pending.kind === 'btc-psbt' || pending.kind === 'cardano-tx') {
     return 'Sign transaction';
   }
   if (pending.kind === 'coin') {
@@ -1377,6 +1382,20 @@ function pendingDetail(pending: PendingAction): SigningDetail | undefined {
       data: pending.tx.data,
     });
   }
+  if (pending.kind === 'eth-tx-1559') {
+    return describeEthTransaction({
+      path: pending.path,
+      type: 'eip1559',
+      chainId: pending.tx.chainId,
+      nonce: pending.tx.nonce,
+      maxPriorityFeePerGas: pending.tx.maxPriorityFee,
+      maxFeePerGas: pending.tx.maxFee,
+      gasLimit: pending.tx.gasLimit,
+      to: pending.tx.to,
+      value: pending.tx.value,
+      data: pending.tx.data,
+    });
+  }
   if (pending.kind === 'eth-sign') {
     return describeEthMessage(pending.path, pending.message);
   }
@@ -1388,7 +1407,7 @@ function previewPending(pending: PendingAction): string {
     return `Sign personal message\n${pending.path}\n${previewMessage(pending.message)}`;
   }
   if (pending.kind === 'eth-tx' || pending.kind === 'eth-tx-1559') {
-    return `Sign Ethereum transaction\n${pending.path}`;
+    return `${evmSignTitle(resolveEvmNativeGas({ chainId: pending.tx.chainId }))}\n${pending.path}`;
   }
   if (pending.kind === 'eth-712') {
     return `Sign EIP-712 hashed message\n${pending.path}`;

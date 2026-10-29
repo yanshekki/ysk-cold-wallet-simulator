@@ -72,10 +72,19 @@ export {
   describeNearMessage,
   describeSigning,
   formatSatsBtc,
+  formatWeiAmount,
   formatWeiEth,
   hex0x,
   parseEthTx,
 } from './signingPreview';
+export type { EvmHostNetwork, EvmNativeGas } from './evmNativeGas';
+export {
+  EVM_UNKNOWN_GAS_SYMBOL,
+  HOST_NETWORK_TICKER_WARNING,
+  evmChainId,
+  evmSignTitle,
+  resolveEvmNativeGas,
+} from './evmNativeGas';
 
 export interface ProtocolHandler {
   brand: Brand;

@@ -1,5 +1,13 @@
 import type { Brand, ConfirmationPort, SigningRequest } from '@cws/contracts';
-import { describeBtcPsbt, describeEthTypedData } from '@cws/contracts';
+import {
+  describeBtcPsbt,
+  describeEthTransaction,
+  describeEthTypedData,
+  evmSignTitle,
+  parseEthTx,
+  resolveEvmNativeGas,
+  type EthTxInput,
+} from '@cws/contracts';
 import {
   BbqrDecoder,
   ETH_DATA_PERSONAL,
@@ -85,13 +93,31 @@ export function ethSignToSigningRequest(request: EthSignRequest): SigningRequest
       detail: describeEthTypedData(request.path, request.signData),
     };
   }
+  const parsed = parseEthTx(request.signData);
+  const chainId = transactionChainId(parsed, request.chainId);
+  const title = evmSignTitle(resolveEvmNativeGas({ chainId }));
   return {
     kind: 'sign',
-    title: 'Sign Ethereum transaction',
+    title,
     path: request.path,
-    message: ['Sign Ethereum transaction', request.path, request.origin].filter(Boolean).join('\n'),
+    message: [title, request.path, request.origin].filter(Boolean).join('\n'),
     rawPayload: request.signData,
+    detail: parsed ? describeEthTransaction({ ...parsed, chainId, path: request.path }) : undefined,
   };
+}
+
+function transactionChainId(
+  parsed: EthTxInput | null,
+  hint: number | undefined,
+): EthTxInput['chainId'] {
+  const embedded = parsed?.chainId;
+  if (typeof embedded === 'number') {
+    return embedded;
+  }
+  if (embedded instanceof Uint8Array && embedded.length > 0) {
+    return embedded;
+  }
+  return hint;
 }
 
 export function psbtToSigningRequest(preview: BtcPsbtPreview): SigningRequest {

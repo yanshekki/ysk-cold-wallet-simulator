@@ -25,9 +25,11 @@ import {
   describeEthTransaction,
   describeEthTypedData,
   describeHostSuppliedHash,
+  evmSignTitle,
   hashTypedData,
   parseEip712,
   parseEthTx,
+  resolveEvmNativeGas,
   type Eip712TypedData,
 } from '@cws/contracts';
 import { keccak_256 } from '@noble/hashes/sha3';
@@ -70,7 +72,7 @@ export type EthSession = {
   typed712?: TypedStream;
   token?: { ticker: string; decimals: number; contract: Uint8Array };
   nft?: { collection: string; contract: Uint8Array };
-  network?: { ticker: string; chainId: number };
+  network?: { ticker: string; chainId: number; name?: string };
   challenge?: Uint8Array;
 };
 
@@ -80,6 +82,8 @@ export type EthContext = {
   entropy: Uint8Array;
   backup?: BackupKind;
   session: EthSession;
+  /** Open Ledger app. Avalanche C-Chain uses this handler on CLA 0xE0. */
+  app?: string;
 };
 
 export async function handleEthereumApdu(apdu: Apdu, ctx: EthContext): Promise<Uint8Array | null> {
@@ -259,14 +263,26 @@ async function handleSignTx(apdu: Apdu, ctx: EthContext): Promise<Uint8Array | n
   if (!parsed) {
     return encodeResponse(new Uint8Array(), SW_INS_NOT_SUPPORTED);
   }
+  const gas = resolveEvmNativeGas({
+    chainId: parsed.chainId,
+    app: ctx.app,
+    host: ctx.session.network,
+  });
+  const title = evmSignTitle(gas);
   const request: SigningRequest = {
     brand: 'ledger',
     kind: 'sign',
-    title: 'Sign Ethereum transaction',
+    title,
     path: pending.path,
-    message: `Sign Ethereum transaction\n${pending.path}\n0x${Array.from(raw, (b) => b.toString(16).padStart(2, '0')).join('').slice(0, 96)}`,
+    message: `${title}\n${pending.path}\n0x${Array.from(raw, (b) => b.toString(16).padStart(2, '0')).join('').slice(0, 96)}`,
     rawPayload: raw,
-    detail: describeEthTransaction({ ...parsed, path: pending.path, token: ctx.session.token }),
+    detail: describeEthTransaction({
+      ...parsed,
+      path: pending.path,
+      token: ctx.session.token,
+      app: ctx.app,
+      hostNetwork: ctx.session.network,
+    }),
   };
   const ok = await ctx.confirmation.confirm(request);
   if (!ok) {
@@ -543,16 +559,55 @@ function handleGetChallenge(ctx: EthContext): Uint8Array {
   return encodeResponse(challenge, SW_OK);
 }
 
+const NETWORK_TYPE = 0x01;
+const NETWORK_CHAIN = 0x23;
+const NETWORK_TICKER = 0x24;
+const NETWORK_NAME = 0x52;
+const DYNAMIC_NETWORK = 0x08;
+
 function handleProvideNetwork(apdu: Apdu, ctx: EthContext): Uint8Array {
-  const data = apdu.data;
-  if (data.length < 2) {
+  if (apdu.p2 !== 0x00) {
     return encodeResponse(new Uint8Array(), SW_OK);
   }
-  const tickerLen = data[0]!;
-  const ticker = encodeAsciiToString(data.subarray(1, 1 + tickerLen));
-  const chainId = data.length >= 1 + tickerLen + 8 ? Number(readU32BE(data, 1 + tickerLen + 4)) : 1;
-  ctx.session.network = { ticker, chainId };
+  const parsed = readProvidedNetwork(apdu);
+  if (parsed) {
+    ctx.session.network = parsed;
+  }
   return encodeResponse(new Uint8Array(), SW_OK);
+}
+
+function readProvidedNetwork(apdu: Apdu): EthSession['network'] | undefined {
+  let data = apdu.data;
+  if (apdu.p1 === 0x01 && data.length >= 2) {
+    const declared = (data[0]! << 8) | data[1]!;
+    const body = data.subarray(2);
+    data = declared > 0 && declared <= body.length ? body.subarray(0, declared) : body;
+  }
+  const fields = parseTlv(data);
+  if (!fields) {
+    return undefined;
+  }
+  const type = fields.get(NETWORK_TYPE);
+  if (type && (type.length !== 1 || type[0] !== DYNAMIC_NETWORK)) {
+    return undefined;
+  }
+  const chainRaw = fields.get(NETWORK_CHAIN);
+  const tickerRaw = fields.get(NETWORK_TICKER);
+  if (!chainRaw || !tickerRaw) {
+    return undefined;
+  }
+  const chainId = readU64(chainRaw);
+  if (chainId == null || chainId > BigInt(Number.MAX_SAFE_INTEGER)) {
+    return undefined;
+  }
+  const ticker = encodeAsciiToString(tickerRaw).replace(/\0+$/, '');
+  if (!/^[A-Za-z][A-Za-z0-9]{1,11}$/.test(ticker)) {
+    return undefined;
+  }
+  const nameRaw = fields.get(NETWORK_NAME);
+  const nameText = nameRaw ? encodeAsciiToString(nameRaw).replace(/\0+$/, '').trim() : '';
+  const name = /^[\x20-\x7e]{1,31}$/.test(nameText) ? nameText : undefined;
+  return { ticker, chainId: Number(chainId), name };
 }
 
 const EIP7702_HEADLINE = 'EIP-7702 authorization';

@@ -8,7 +8,17 @@ import type {
   ProtocolHandler,
   SigningRequest,
 } from '@cws/contracts';
-import { TREZOR_FIRMWARE, applyConfirmationPath, describeEthMessage, hashTypedData, type Eip712TypedData } from '@cws/contracts';
+import {
+  TREZOR_FIRMWARE,
+  applyConfirmationPath,
+  describeEthMessage,
+  describeEthTransaction,
+  evmSignTitle,
+  hashTypedData,
+  resolveEvmNativeGas,
+  type Eip712TypedData,
+  type SigningDetail,
+} from '@cws/contracts';
 import {
   bip143Sighash,
   bitcoinP2pkh,
@@ -1137,7 +1147,7 @@ export class TrezorThpProtocolHandler implements ProtocolHandler {
       path: pending.path,
       message: pendingMessage(pending),
       rawPayload: pending.rawPayload,
-      detail: pending.kind === 'eth-sign' ? describeEthMessage(pending.path, pending.message) : undefined,
+      detail: ethConfirmDetail(pending),
       passphraseSource: material.passphraseSource === 'none' ? undefined : material.passphraseSource,
     };
     const ok = await this.confirmation.confirm(request);
@@ -1359,11 +1369,48 @@ function isSignPending(pending: PendingAction): boolean {
   );
 }
 
+function ethConfirmDetail(pending: PendingAction): SigningDetail | undefined {
+  if (pending.kind === 'eth-sign') {
+    return describeEthMessage(pending.path, pending.message);
+  }
+  if (pending.kind === 'eth-tx') {
+    return describeEthTransaction({
+      path: pending.path,
+      type: 'legacy',
+      chainId: pending.tx.chainId,
+      nonce: pending.tx.nonce,
+      gasPrice: pending.tx.gasPrice,
+      gasLimit: pending.tx.gasLimit,
+      to: pending.tx.to,
+      value: pending.tx.value,
+      data: pending.tx.data,
+    });
+  }
+  if (pending.kind === 'eth-tx-1559') {
+    return describeEthTransaction({
+      path: pending.path,
+      type: 'eip1559',
+      chainId: pending.tx.chainId,
+      nonce: pending.tx.nonce,
+      maxPriorityFeePerGas: pending.tx.maxPriorityFee,
+      maxFeePerGas: pending.tx.maxFee,
+      gasLimit: pending.tx.gasLimit,
+      to: pending.tx.to,
+      value: pending.tx.value,
+      data: pending.tx.data,
+    });
+  }
+  return undefined;
+}
+
 function pendingTitle(pending: PendingAction): string {
   if (pending.kind === 'coin') {
     return pending.op.title;
   }
-  if (pending.kind === 'eth-tx' || pending.kind === 'eth-tx-1559' || pending.kind === 'btc-tx' || pending.kind === 'cardano-tx') {
+  if (pending.kind === 'eth-tx' || pending.kind === 'eth-tx-1559') {
+    return evmSignTitle(resolveEvmNativeGas({ chainId: pending.tx.chainId }));
+  }
+  if (pending.kind === 'btc-tx' || pending.kind === 'cardano-tx') {
     return 'Sign transaction';
   }
   if (pending.kind === 'eth-sign' || pending.kind === 'eth-712' || pending.kind === 'eth-712-stream' || pending.kind === 'btc-sign-msg') {

@@ -289,7 +289,7 @@ export class LedgerProtocolHandler implements ProtocolHandler {
         }
         return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
       }
-      return handleEthereumApdu(apdu, { ...ctx, session: this.ethSession });
+      return handleEthereumApdu(apdu, { ...ctx, session: this.ethSession, app: this.app });
     }
 
     if (family === 'avalanche') {

@@ -1601,6 +1601,57 @@ describe('LedgerProtocolHandler', () => {
     expect(payload[0] === 0 || payload[0] === 1).toBe(true);
   });
 
+  it('shows AVAX on an Avalanche C-Chain sign sheet, and the chain id when Ethereum signs it', async () => {
+    const avalanche = await signCapturedEip1559('avalanche', 1);
+    expect(avalanche.title).toBe('Sign Avalanche C-Chain transaction');
+    expect(avalanche.detail?.headline).toBe('Avalanche C-Chain transaction');
+    expect(avalanche.detail?.fields.find((field) => field.label === 'VALUE')?.value).toBe('0 AVAX');
+    expect(avalanche.detail?.fields.find((field) => field.label === 'FEE')?.value).toMatch(/AVAX$/);
+    expect(gasSheet(avalanche)).not.toMatch(/\bETH\b/);
+
+    const fromEthereumApp = await signCapturedEip1559('ethereum', 43114);
+    expect(fromEthereumApp.title).toBe('Sign Avalanche C-Chain transaction');
+    expect(fromEthereumApp.detail?.fields.find((field) => field.label === 'VALUE')?.value).toBe('0 AVAX');
+    expect(fromEthereumApp.detail?.fields.find((field) => field.label === 'CHAIN ID')?.value).toBe('43114');
+    expect(gasSheet(fromEthereumApp)).not.toMatch(/\bETH\b/);
+
+    const mainnet = await signCapturedEip1559('ethereum', 1);
+    expect(mainnet.title).toBe('Sign Ethereum transaction');
+    expect(mainnet.detail?.fields.find((field) => field.label === 'VALUE')?.value).toBe('0 ETH');
+  });
+
+  it('uses a host network ticker for an unknown chain and ignores one that renames Avalanche', async () => {
+    const requests: SigningRequest[] = [];
+    const handler = new LedgerProtocolHandler({
+      model: nanoX,
+      confirmation: {
+        async confirm(request) {
+          requests.push(request);
+          return true;
+        },
+        async getPassphrase() {
+          return undefined;
+        },
+      },
+      slotId: 'slot',
+      entropy,
+    });
+    handler.setApp('ethereum');
+    const foo = withLength(networkTlv(424242, 'FOO', 'Foo Chain'));
+    await exchange(handler, apdu([0xe0, 0x30, 0x01, 0x00, foo.length, ...foo]));
+    await signOn(handler, 424242);
+    expect(requests[0]?.detail?.fields.find((field) => field.label === 'VALUE')?.value).toBe('0 FOO');
+    expect(requests[0]?.detail?.warning).toMatch(/host/i);
+    expect(gasSheet(requests[0]!)).not.toMatch(/\bETH\b/);
+
+    requests.length = 0;
+    const lie = withLength(networkTlv(43114, 'ETH', 'Ethereum'));
+    await exchange(handler, apdu([0xe0, 0x30, 0x01, 0x00, lie.length, ...lie]));
+    await signOn(handler, 43114);
+    expect(requests[0]?.detail?.fields.find((field) => field.label === 'VALUE')?.value).toBe('0 AVAX');
+    expect(requests[0]?.detail?.warning).toBeUndefined();
+  });
+
   it('refuses a short type-3 envelope instead of blind-signing it', async () => {
     let confirms = 0;
     const confirmation: ConfirmationPort = {
@@ -1783,6 +1834,96 @@ describe('LedgerProtocolHandler', () => {
       Array.from(ed25519PublicKey(deriveEd25519PrivateKey(entropy, "m/44'/784'/0'/0'/0'"))),
     );
   });
+
+  function rlpChain(chainId: number): number[] {
+    if (chainId < 0x80) {
+      return [chainId];
+    }
+    const bytes: number[] = [];
+    let value = chainId;
+    while (value > 0) {
+      bytes.unshift(value & 0xff);
+      value >>= 8;
+    }
+    return [0x80 + bytes.length, ...bytes];
+  }
+
+  function eip1559ForChain(chainId: number): number[] {
+    const to = new Array(20).fill(0x22);
+    const inner = [
+      ...rlpChain(chainId),
+      0x80,
+      0x01,
+      0x01,
+      0x82, 0x52, 0x08,
+      0x94, ...to,
+      0x80,
+      0x80,
+      0xc0,
+    ];
+    return [0x02, 0xc0 + inner.length, ...inner];
+  }
+
+  async function signOn(handler: LedgerProtocolHandler, chainId: number): Promise<void> {
+    const typed = eip1559ForChain(chainId);
+    const pathBytes = [
+      0x05, 0x80, 0x00, 0x00, 0x2c, 0x80, 0x00, 0x00, 0x3c, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+      0x00, 0x00, 0x00, 0x00, ...typed,
+    ];
+    const payload = await exchange(handler, apdu([0xe0, 0x04, 0x00, 0x00, pathBytes.length, ...pathBytes]));
+    expect((payload[payload.length - 2] << 8) | payload[payload.length - 1]).toBe(SW_OK);
+  }
+
+  async function signCapturedEip1559(app: string, chainId: number): Promise<SigningRequest> {
+    const requests: SigningRequest[] = [];
+    const handler = new LedgerProtocolHandler({
+      model: nanoX,
+      confirmation: {
+        async confirm(request) {
+          requests.push(request);
+          return true;
+        },
+        async getPassphrase() {
+          return undefined;
+        },
+      },
+      slotId: 'slot',
+      entropy,
+    });
+    handler.setApp(app);
+    await signOn(handler, chainId);
+    expect(requests).toHaveLength(1);
+    return requests[0]!;
+  }
+
+  function gasSheet(request: SigningRequest): string {
+    const fields = request.detail?.fields
+      .filter((field) => ['VALUE', 'FEE', 'GAS PRICE', 'MAX FEE', 'MAX PRIORITY', 'BLOB FEE'].includes(field.label))
+      .map((field) => field.value)
+      .join(' ');
+    return `${request.title} ${request.detail?.headline ?? ''} ${fields ?? ''}`;
+  }
+
+  function networkTlv(chainId: number, ticker: string, name: string): number[] {
+    const chain = new Array(8).fill(0);
+    let value = chainId;
+    for (let index = 7; index >= 0; index -= 1) {
+      chain[index] = value & 0xff;
+      value >>= 8;
+    }
+    const tickerBytes = Array.from(ticker, (char) => char.charCodeAt(0));
+    const nameBytes = Array.from(name, (char) => char.charCodeAt(0));
+    return [
+      0x01, 0x01, 0x08,
+      0x23, 0x08, ...chain,
+      0x24, tickerBytes.length, ...tickerBytes,
+      0x52, nameBytes.length, ...nameBytes,
+    ];
+  }
+
+  function withLength(body: number[]): number[] {
+    return [(body.length >> 8) & 0xff, body.length & 0xff, ...body];
+  }
 });
 
 describe('encodeResponse', () => {
