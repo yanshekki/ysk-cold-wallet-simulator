@@ -250,7 +250,7 @@ Declared versions live in each workspace `package.json`. The phone app uses Expo
 The security statement for readers is `docs/security.md`. In short: seeds are not absolutely safe. This build has no secure element.
 
 - **BLE peripheral requires a physical phone.** Simulators and Expo Go cannot advertise GATT.
-- **USB** is not emulated inside the phone. Desktop wallets that only speak HID use Linux `uhid` (`yarn proxy`) or the macOS CWS Proxy app. Virtual HID is not implemented on Windows. The gadget forwards to the phone over BLE.
+- **USB** is not emulated inside the phone. Desktop wallets that only speak HID use Linux `uhid` (`cws-proxy` from the Ubuntu package `hk.ysk.cws.proxy`, or `yarn proxy`) or the macOS CWS Proxy app. Virtual HID is not implemented on Windows. The gadget forwards to the phone over BLE.
 - **Advertising stays in the foreground.** The Android connected-device foreground service is removed. iOS background modes are not set. Notify MTU stays 20 on iOS.
 - **BLE link is not LE Secure Connections.** A host that speaks the vendor protocol can continue once GATT is up.
 - **Real devices have secure elements.** This build does not. It is a simulator for development and interoperability testing. Do not hold real digital assets with it. Seeds are not absolutely safe.

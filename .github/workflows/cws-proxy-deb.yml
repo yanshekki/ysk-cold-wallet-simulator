@@ -1,0 +1,80 @@
+# Builds the Ubuntu package hk.ysk.cws.proxy and uploads the .deb as a
+# workflow artifact. This does not attach the file to a GitHub Release.
+name: CWS Proxy Ubuntu package
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "apps/proxy/**"
+      - "packages/native-proxy/**"
+      - "packages/contracts/**"
+      - "packages/protocol-ledger/**"
+      - "packages/protocol-onekey/**"
+      - "packages/protocol-qr/**"
+      - "packages/protocol-trezor/**"
+      - "apps/mobile/app.json"
+      - "yarn.lock"
+      - ".github/workflows/cws-proxy-deb.yml"
+
+jobs:
+  deb:
+    name: ${{ matrix.arch }} .deb
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install native build libraries
+        run: sudo apt-get update && sudo apt-get install -y build-essential pkg-config libdbus-1-dev curl ca-certificates python3 xz-utils
+      - name: Install Yarn 1.22.22
+        run: corepack enable && corepack prepare yarn@1.22.22 --activate
+      - name: Install workspaces
+        run: yarn install --frozen-lockfile
+      - name: Build the Linux native addon
+        run: yarn workspace @cws/native-proxy build
+      - name: Build and verify the deb
+        run: |
+          bash apps/proxy/linux/build-deb.sh --arch "${{ matrix.arch }}"
+          bash apps/proxy/linux/check-deb.sh apps/proxy/dist/linux/hk.ysk.cws.proxy_*_"${{ matrix.arch }}".deb
+      - name: Install and smoke-test
+        run: |
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y ./apps/proxy/dist/linux/hk.ysk.cws.proxy_*_"${{ matrix.arch }}".deb
+          cws-proxy --help
+          test -f /usr/lib/udev/rules.d/99-cws-uhid.rules
+          grep -q 'KERNEL=="uhid"' /usr/lib/udev/rules.d/99-cws-uhid.rules
+          test -f /etc/modules-load.d/cws-proxy.conf
+          grep -qx uhid /etc/modules-load.d/cws-proxy.conf
+          CWS_NO_OPEN=1 cws-proxy > /tmp/cws-proxy.log 2>&1 &
+          pid=$!
+          ok=0
+          for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+            if curl -fsS http://127.0.0.1:8788/ > /tmp/cws-index.html; then
+              ok=1
+              break
+            fi
+            sleep 0.5
+          done
+          if [ "$ok" != 1 ]; then
+            echo "local page did not start" >&2
+            cat /tmp/cws-proxy.log >&2 || true
+            exit 1
+          fi
+          grep -q '<html' /tmp/cws-index.html
+          kill "$pid"
+          wait "$pid" || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hk.ysk.cws.proxy-${{ matrix.arch }}
+          path: apps/proxy/dist/linux/*.deb
+          if-no-files-found: error

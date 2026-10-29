@@ -1,0 +1,24 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: hk.ysk.cws.proxy
+Upstream-Contact: YSK Limited <yanshekki@gmail.com>
+Source: https://github.com/yanshekki/ysk-cold-wallet-simulator
+
+Files: *
+Copyright: 2026 YSK Limited
+License: LicenseRef-YSK-All-Rights-Reserved
+ Copyright (c) 2026 YSK Limited. All rights reserved.
+ .
+ The source of YSK Cold Wallet Simulator is published so that its behaviour
+ and security limits can be read. No other licence is granted.
+ .
+ You may clone the repository and propose changes. You may not present the
+ software as an official product of Ledger, Trezor, OneKey, or any other
+ wallet vendor. You may not remove or contradict the statement that seeds
+ are not absolutely safe.
+ .
+ The software is provided as is, without warranty of any kind. It is not fit
+ for holding real digital assets. YSK Limited accepts no liability for loss
+ of secrets or assets arising from use of this software.
+ .
+ The bundled Node.js runtime is separately licensed by the Node.js
+ contributors. Its licence is at https://nodejs.org/ and is not this file.

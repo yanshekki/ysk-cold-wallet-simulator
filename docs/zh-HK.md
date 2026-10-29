@@ -20,17 +20,18 @@ CWS 是模擬器。它不是安全元件。Ledger、Trezor 及 OneKey 均未認�
 
 ## 下載
 
-版本 1.1.0（組建編號 6）。本版本庫不提供安裝檔。[GitHub Release v1.1.0](https://github.com/yanshekki/ysk-cold-wallet-simulator/releases/tag/v1.1.0) 只有說明，沒有附上 APK、IPA 或桌面安裝包。
+版本 1.1.0（組建編號 6）。[GitHub Release v1.1.0](https://github.com/yanshekki/ysk-cold-wallet-simulator/releases/tag/v1.1.0) 只有說明，沒有附上 APK、IPA 或桌面安裝包。Ubuntu 可以從這份原始碼組建 `.deb`。macOS 與 Windows 在該發行仍然沒有可安裝的套件。
 
 | 產品 | 取得方式 |
 | --- | --- |
 | Android 手機 | [Google Play](https://play.google.com/store/apps/details?id=hk.ysk.cws)（`hk.ysk.cws`） |
 | iOS 手機 | App Store：即將推出 |
 | CWS Proxy（macOS） | Mac App Store：即將推出。HID Virtual Device 的 App Store entitlement 仍是 **Submitted**，尚未獲批。 |
-| CWS Proxy（Linux） | 沒有已封裝的下載。請從原始碼執行 `yarn proxy`，並先套用快速開始所述的 `uhid` 規則。 |
+| CWS Proxy（Ubuntu） | 套件 `hk.ysk.cws.proxy`（amd64 與 arm64）。在 Ubuntu 執行 `bash apps/proxy/linux/build-deb.sh`，再安裝該 `.deb`。套件會安裝 `cws-proxy` 及 `uhid` 的 udev 規則。GitHub Release 沒有附上這個 `.deb`。見 [Ubuntu 安裝包](#ubuntu-安裝包)。 |
+| CWS Proxy（其他 Linux） | 沒有安裝包。請從原始碼執行 `yarn proxy`，並先套用快速開始所述的 `uhid` 規則。 |
 | CWS Proxy（Windows） | 沒有已封裝的下載。請從原始碼先組建 `@cws/native-proxy`，再執行 `yarn proxy`。Windows 沒有虛擬 HID，因此不會建立 USB HID 裝置。本機頁面是 `http://127.0.0.1:8788`。 |
 
-虛擬 HID 只在 Linux（`/dev/uhid`）及 macOS 的 CWS Proxy 應用程式實現。
+虛擬 HID 在 Linux（`/dev/uhid`，包括 Ubuntu 安裝包）及 macOS 的 CWS Proxy 應用程式實現。Windows 沒有虛擬 HID。
 
 在 Mac App Store 版本推出之前，可用 `yarn workspace @cws/proxy app` 從原始碼組建 macOS 應用程式。該指令使用 Xcode 專案已設定的團隊。請勿把描述檔提交至版本庫。
 
@@ -41,7 +42,7 @@ CWS 是模擬器。它不是安全元件。Ledger、Trezor 及 OneKey 均未認�
 1. 從 Google Play 安裝 Android 應用程式，或從原始碼組建手機應用程式。
 2. 接受警告、解鎖、選擇型號，並使用一組不掌管真實資產的秘密資料。
 3. 開始廣播，然後以藍牙連接第三方錢包。
-4. 桌面 WebHID 請啟動 CWS Proxy（macOS 應用程式，或在 Linux 執行 `yarn proxy`），再按 Start。Chrome 其後可開啟虛擬 USB 裝置。本機頁面是 `http://127.0.0.1:8788`。
+4. 桌面 WebHID 請啟動 CWS Proxy（macOS 應用程式、Ubuntu 套件的 `cws-proxy`，或在 Linux 執行 `yarn proxy`），再按 Start。Chrome 其後可開啟虛擬 USB 裝置。本機頁面是 `http://127.0.0.1:8788`。
 
 從原始碼組建需要 Node.js、Yarn 1.22.22，以及 Xcode 或 Android Studio。代理程式的 HID 程式庫另需 Rust。
 
@@ -53,14 +54,57 @@ npx expo prebuild
 npx expo run:android   # 或 run:ios
 ```
 
-Linux 代理程式，在版本庫根目錄：
+從原始碼運行 Linux 代理程式時，在版本庫根目錄：
 
 ```bash
 yarn workspace @cws/native-proxy build   # 一次
 yarn proxy                               # http://127.0.0.1:8788
 ```
 
-Linux HID 需要 `apps/proxy/udev/99-cws-uhid.rules`。把它複製到 `/etc/udev/rules.d/`，然後重新登入。該規則把 `/dev/uhid` 的群組設為 `plugdev`，模式設為 `0660`。
+這條路徑不會安裝套件。請把 `apps/proxy/udev/99-cws-uhid.rules` 複製到 `/etc/udev/rules.d/`，然後重新登入。該規則把 `/dev/uhid` 的群組設為 `plugdev`，模式設為 `0660`。Ubuntu 可以用下面的套件安裝同一條規則。
+
+### Ubuntu 安裝包
+
+套件名稱是 `hk.ysk.cws.proxy`。這是給 Ubuntu amd64 與 arm64 的 `.deb`（需要 glibc 2.34 或更新，即 Ubuntu 22.04 與 24.04）。它會安裝：
+
+- `/usr/bin/cws-proxy`
+- 私有的 Node.js 24 運行環境，以及 `/usr/lib/hk.ysk.cws.proxy` 內的代理程式
+- `/usr/lib/udev/rules.d/99-cws-uhid.rules`，與 `apps/proxy/udev/99-cws-uhid.rules` 逐位元組相同
+
+`postinst` 在系統沒有 `plugdev` 群組時會建立它，寫入 `/etc/modules-load.d/cws-proxy.conf` 以便核心載入 `uhid`，並執行 `udevadm control --reload-rules`。`/dev/uhid` 的群組是 `plugdev`，模式是 `0660`。若你的帳戶不在 `plugdev`，請先加入，然後重新登入，虛擬 HID 才可使用。
+
+GitHub Release v1.1.0 沒有附上這個 `.deb`。請在 Ubuntu 上組建。[`.github/workflows/cws-proxy-deb.yml`](../.github/workflows/cws-proxy-deb.yml) 會在 `ubuntu-24.04` 組建 amd64、在 `ubuntu-24.04-arm` 組建 arm64，並把每個 `.deb` 上傳為工作流程成品。該成品不是 GitHub Release 的附件。
+
+```bash
+sudo apt-get install -y build-essential pkg-config libdbus-1-dev curl ca-certificates python3 xz-utils
+# 需要 Node.js 22 或更新、Yarn 1.22.22，以及 Rust（rustup）
+corepack enable && corepack prepare yarn@1.22.22 --activate
+yarn
+yarn workspace @cws/native-proxy build
+bash apps/proxy/linux/build-deb.sh
+bash apps/proxy/linux/check-deb.sh apps/proxy/dist/linux/hk.ysk.cws.proxy_*.deb
+sudo apt-get install -y ./apps/proxy/dist/linux/hk.ysk.cws.proxy_*.deb
+sudo usermod -aG plugdev "$USER"   # 然後重新登入
+cws-proxy                          # http://127.0.0.1:8788
+```
+
+在 arm64 的 Ubuntu 上，腳本會按 `uname -m` 選擇 arm64。可用 `--arch amd64` 或 `--arch arm64` 指定。`yarn workspace @cws/proxy deb` 就是同一個組建腳本。
+
+不安裝、只檢查安裝包：
+
+```bash
+dpkg-deb -I apps/proxy/dist/linux/hk.ysk.cws.proxy_*.deb
+dpkg-deb -c apps/proxy/dist/linux/hk.ysk.cws.proxy_*.deb
+bash apps/proxy/linux/check-deb.sh apps/proxy/dist/linux/hk.ysk.cws.proxy_*.deb
+```
+
+安裝之後，`cws-proxy --help` 應印出用法，`/usr/lib/udev/rules.d/99-cws-uhid.rules` 應與原始碼中的規則相同。要開啟 `/dev/uhid`，帳戶仍須屬於 `plugdev`，並重新登入。完整的 HID 連線還需要手機正在藍牙廣播。只檢查安裝包，並不能證明桌面登入之後可以開啟 `/dev/uhid`。
+
+不帶參數執行 `bash apps/proxy/linux/check-deb.sh` 會組建一個結構檢查用的 `.deb`。當中的 Node 二進位檔與原生附加元件只是 ELF 佔位檔。它只供在無法編譯 Linux 附加元件的機器上檢查安裝包結構。請勿安裝。
+
+套件不含種子、金鑰庫或描述檔。種子並非絕對安全。
+
+Windows 仍然沒有安裝包。Windows 沒有虛擬 HID。
 
 在 macOS，虛擬 HID 是已簽署的 CWS Proxy 應用程式，不是 `yarn proxy`：
 
@@ -86,7 +130,7 @@ OneKey Mini 沒有藍牙，本軟件不予模擬。
 
 | 傳輸 | 本版本的行為 |
 | --- | --- |
-| USB HID | macOS 的 CWS Proxy（虛擬 HID）或 Linux 的 `yarn proxy`（`uhid`）把報告經藍牙轉送至手機。沒有 APDU 允許清單。你在 Chrome 授權的網站可以發送手機已實現的任何指令。Phantom 仍可能無法完成解鎖。 |
+| USB HID | macOS 的 CWS Proxy（虛擬 HID），或 Linux 的 Ubuntu 套件 `cws-proxy` 或 `yarn proxy`（`uhid`），把報告經藍牙轉送至手機。沒有 APDU 允許清單。你在 Chrome 授權的網站可以發送手機已實現的任何指令。Phantom 仍可能無法完成解鎖。 |
 | Trezor Bridge | 代理程式可在 `http://127.0.0.1:21325` 回應，供相容主機列舉裝置。橋接器會反映請求的 `Origin`。 |
 | 二維碼 | 以 UR 及 BBQr 匯出帳戶金鑰與輸出描述符。備份種子二維碼必須經手機確認後才會產生。 |
 
@@ -212,6 +256,8 @@ iOS 可以在系統報告截圖時顯示警告，不會把即時畫面塗黑。�
 - 在該畫面做系統截圖後，Android 報告 CWS 已偵測到截圖。除錯組建仍允許擷取，這是預期行為。正式組建的 `FLAG_SECURE` 沒有安裝：Play 上架簽署未設定，該次檢查亦沒有建立金鑰庫。
 
 空白匯入畫面、長按及截圖提示的截圖在 [testing/](testing/)（英文紀錄所連結的三張圖）。圖中沒有助記詞、份額或密語。
+
+可安裝的 amd64 與 arm64 `.deb` 曾在 Ubuntu 容器內以 `apt` 安裝。`dpkg-deb` 接受這兩個檔案，`cws-proxy --help` 印出用法，本機頁面有回應，udev 規則與原始碼相同，`/etc/modules-load.d/cws-proxy.conf` 內容是 `uhid`。arm64 套件在 Ubuntu 24.04 與 22.04 安裝；22.04 上移除套件後，該規則與 modules-load 檔一併刪除。amd64 套件在 Ubuntu 24.04 安裝。這些容器的核心沒有 `uhid` 模組，亦沒有 udev 守護行程，所以 `modprobe` 與 `udevadm` 在那裡沒有成功，安裝仍然完成。該次沒有開啟 `/dev/uhid`，沒有桌面登入，亦沒有連接手機。
 
 下列項目沒有在 1.1.0 的實機上測試，亦沒有宣稱完成：
 

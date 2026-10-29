@@ -1,0 +1,37 @@
+#!/bin/sh
+# The udev rule itself is shipped at /usr/lib/udev/rules.d/99-cws-uhid.rules.
+# This script makes that rule take effect: plugdev exists, uhid is loaded,
+# and udev is reloaded. Failure to talk to udev in a chroot does not abort install.
+set -e
+
+case "$1" in
+  configure)
+    if ! getent group plugdev >/dev/null 2>&1; then
+      groupadd --system plugdev
+    fi
+    mkdir -p /etc/modules-load.d
+    printf '%s\n' uhid > /etc/modules-load.d/cws-proxy.conf
+    if command -v modprobe >/dev/null 2>&1; then
+      modprobe uhid || true
+    fi
+    if command -v udevadm >/dev/null 2>&1; then
+      udevadm control --reload-rules || true
+      udevadm trigger --sysname-match=uhid || true
+    fi
+    cat <<'EOF'
+CWS Proxy is installed.
+
+/usr/lib/udev/rules.d/99-cws-uhid.rules sets /dev/uhid to group plugdev and mode 0660.
+If your account is not in plugdev, add it and log in again:
+
+  sudo usermod -aG plugdev "$USER"
+
+Start the proxy with: cws-proxy
+Local page: http://127.0.0.1:8788
+
+This is a simulator. Seeds are not absolutely safe. Do not hold real assets.
+EOF
+    ;;
+esac
+
+exit 0

@@ -32,6 +32,20 @@ Screenshots of the empty Import screen, the long-press, and the screenshot discl
 
 They do not contain a recovery phrase, a share, or a passphrase.
 
+## Ubuntu package
+
+`bash apps/proxy/linux/check-deb.sh` checks the `.deb` layout. A layout-check package (ELF stubs) is not installable. Runnable amd64 and arm64 packages were built and installed with `apt` in Ubuntu containers:
+
+- `dpkg-deb` accepted both archives.
+- `cws-proxy --help` printed usage, which loads the native addon.
+- `http://127.0.0.1:8788/` returned the proxy page.
+- `/usr/lib/udev/rules.d/99-cws-uhid.rules` matched `apps/proxy/udev/99-cws-uhid.rules`.
+- `/etc/modules-load.d/cws-proxy.conf` contained `uhid`.
+
+The arm64 package was installed on Ubuntu 24.04 and on Ubuntu 22.04. On 22.04, `apt-get remove` deleted the udev rule and the modules-load file. The amd64 package was installed on Ubuntu 24.04.
+
+Those containers have no `uhid` kernel module and no udev daemon, so `modprobe uhid` and `udevadm control --reload-rules` did not succeed there. The install still finished. This did not open `/dev/uhid`, did not log in a desktop user in `plugdev`, and did not connect a phone. `.github/workflows/cws-proxy-deb.yml` is set up to build, install, and smoke-test both architectures on Ubuntu 24.04. A green workflow run is that check. It is not a desktop `/dev/uhid` session.
+
 ## Not tested, and not claimed
 
 - A release build’s OS authenticator prompt was not shown on a device for 1.1.0.

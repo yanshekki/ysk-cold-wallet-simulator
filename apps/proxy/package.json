@@ -9,6 +9,8 @@
   "scripts": {
     "start": "tsx src/main.ts",
     "app": "bash macos/xcode-app.sh",
+    "deb": "bash linux/build-deb.sh",
+    "deb:check": "bash linux/check-deb.sh",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "test:e2e": "playwright test"

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=CWS Proxy
+GenericName=Hardware-wallet simulator proxy
+Comment=Present the CWS phone simulator as a USB HID device. Seeds are not absolutely safe.
+Exec=cws-proxy
+Terminal=false
+Categories=Utility;
+Keywords=HID;WebHID;CWS;uhid;
+StartupNotify=false
