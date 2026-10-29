@@ -86,7 +86,7 @@ OneKey Mini has no BLE radio and is not simulated.
 
 | Transport | What this version does |
 | --- | --- |
-| USB HID | macOS CWS Proxy (virtual HID) or Linux `yarn proxy` (`uhid`) forwards reports to the phone over BLE. There is no APDU allowlist. Chrome WebHID clients written against this project include MetaMask, Rabby, Phantom, and Keplr. Phantom may still fail to finish unlock. |
+| USB HID | macOS CWS Proxy (virtual HID) or Linux `yarn proxy` (`uhid`) forwards reports to the phone over BLE. There is no APDU allowlist. A Chrome site you connect can send any command the phone implements. Phantom may still fail to finish unlock. |
 | Trezor Bridge | The proxy can answer `http://127.0.0.1:21325` so a Trezor-compatible host can enumerate a device. The bridge reflects the request `Origin`. |
 | QR | UR and BBQr for account keys and output descriptors. A backup-seed QR is produced only after on-device confirmation. |
 

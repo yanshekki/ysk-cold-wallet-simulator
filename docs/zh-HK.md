@@ -86,7 +86,7 @@ OneKey Mini 沒有藍牙，本軟件不予模擬。
 
 | 傳輸 | 本版本的行為 |
 | --- | --- |
-| USB HID | macOS 的 CWS Proxy（虛擬 HID）或 Linux 的 `yarn proxy`（`uhid`）把報告經藍牙轉送至手機。沒有 APDU 允許清單。本項目對接的 Chrome WebHID 客戶端包括 MetaMask、Rabby、Phantom 及 Keplr。Phantom 仍可能無法完成解鎖。 |
+| USB HID | macOS 的 CWS Proxy（虛擬 HID）或 Linux 的 `yarn proxy`（`uhid`）把報告經藍牙轉送至手機。沒有 APDU 允許清單。你在 Chrome 授權的網站可以發送手機已實現的任何指令。Phantom 仍可能無法完成解鎖。 |
 | Trezor Bridge | 代理程式可在 `http://127.0.0.1:21325` 回應，供相容主機列舉裝置。橋接器會反映請求的 `Origin`。 |
 | 二維碼 | 以 UR 及 BBQr 匯出帳戶金鑰與輸出描述符。備份種子二維碼必須經手機確認後才會產生。 |
 
