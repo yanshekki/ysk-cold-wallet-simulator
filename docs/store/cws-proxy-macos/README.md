@@ -1,21 +1,31 @@
 # CWS Proxy macOS screenshots
 
-App Store Connect, Mac, **繁體中文**. Version **1.1.0**. Bundle `hk.ysk.cws.proxy`.
+Version **1.1.0**. Bundle `hk.ysk.cws.proxy`. Two complete Mac sets. Upload one folder per App Store locale.
 
-Use the `2880×1800` files in the screenshot slot. `1280×800` is the same frame, scaled, for the smallest accepted size.
+Primary size is `2880×1800`. `1280×800` is the same frame, scaled.
 
-Each pair is the real Proxy page (`apps/proxy/ui`), which is what the Mac app shows. The window is that page, with a short 香港書面語 line and an English line. Phone App Store frames are not in this repo, so the type and colours follow the shared CWS UI: `#07080A`, IBM Plex, lime `#C8F542`, orange `#FF5A1F`.
+## zh-HK
 
-No seed, mnemonic, or private key. The signing sheet uses the lab’s own sample (`hello from lab`) and the public path `m/44'/60'/0'/0/0`. The console hex is a short version exchange (`cla=e0 ins=01`), not key material.
+Proxy UI language is 繁體中文（香港）. The caption on each frame is 香港書面語 only.
 
-| Stem | What it shows |
+## en
+
+Proxy UI language is English. The caption on each frame is English only.
+
+## Stems
+
+| Stem | Scene |
 | --- | --- |
-| `01-home` | 繁中. Ledger Nano X connected. Virtual HID up. Clock running. |
-| `02-waiting` | 繁中. Proxy is scanning. No phone yet. |
-| `03-pairing` | 繁中. Trezor Safe 7, GATT connecting. Pairing field empty. |
-| `04-webhid` | English. Trezor Safe 7, HID up, trezord `http://127.0.0.1:21325`. |
-| `05-language` | The same connected Nano X screen in 繁體中文（香港） and English. |
-| `06-apdu` | 繁中 console. Scan, GATT, HID, and one APDU. No secret. |
-| `07-signing` | 繁中 testnet host. personal_sign sheet open. Not submitted. |
+| `01-home` | Phone connected. Ledger Nano X. Virtual HID up. |
+| `02-waiting` | Scanning. No phone yet. |
+| `03-pairing` | Trezor Safe 7. Pairing field empty. |
+| `04-webhid` | HID up. trezord `http://127.0.0.1:21325`. |
+| `05-language` | Language control set to that folder’s locale. |
+| `06-apdu` | Console. One version exchange. No seed. |
+| `07-signing` | Testnet host. personal_sign sheet open, not submitted. |
 
-Filenames are `{stem}-2880x1800.png` and `{stem}-1280x800.png`.
+Filenames are `{stem}-2880x1800.png` and `{stem}-1280x800.png` inside `zh-HK/` and `en/`.
+
+The zh-HK build of the app still shows its own technical tokens (model names, `Service UUID`, `VID / PID`, and console trace lines). Those are the product UI. The caption beside the window is Chinese only.
+
+No seed, mnemonic, or private key. The zh-HK signing sample is 測試訊息. The English sample is the lab default `hello from lab`. The path is the public `m/44'/60'/0'/0/0`.
