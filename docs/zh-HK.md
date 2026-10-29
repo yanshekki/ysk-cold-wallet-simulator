@@ -241,7 +241,7 @@ iOS 可以在系統報告截圖時顯示警告，不會把即時畫面塗黑。�
 
 ## 測試紀錄
 
-本節與 [testing.md](testing.md) 同一要旨。1.1.0（組建編號 6）發布的是 main 上的程式，連同版本號、公開文件，以及從版本庫移除本機簽署身份。它本身沒有另一次實機驗收。使用者報告的 near.com 與 Core 會話見〈第三方主機〉。
+本節與 [testing.md](testing.md) 同一要旨。1.1.0（組建編號 6）發布的是 main 上的程式，連同版本號、公開文件，以及從版本庫移除本機簽署身份。它本身沒有另一次實機驗收。使用者報告的 near.com、Core 與 Rabby 會話見〈第三方主機〉。
 
 自動測試：
 
@@ -263,16 +263,19 @@ iOS 可以在系統報告截圖時顯示警告，不會把即時畫面塗黑。�
 
 ### 第三方主機
 
-2026 年 10 月有兩次使用者報告的實機會話。每一列只記錄該主機在該路徑上的結果。種子並非絕對安全。見 [security.md](security.md)。此頁沒有記錄各次使用的秘密資料。
+2026 年 10 月有三次使用者報告的實機會話。每一列只記錄該主機在該路徑上的結果。種子並非絕對安全。見 [security.md](security.md)。此頁沒有記錄各次使用的秘密資料。
 
 | 主機 | 路徑 | 報告結果 |
 | --- | --- | --- |
 | near.com | Ledger 藍牙（BLE） | 登入成功。一筆交易成功。 |
 | Core（core.app） | CWS Proxy（主機側為有線），Ledger 身份 | Avalanche C 鏈 → X 鏈 → P 鏈 → X 鏈 → C 鏈的匯出／匯入來回成功。 |
+| Rabby Wallet，於 lfj.gg（Trader Joe / LFJ） | CWS Proxy（主機側為有線），Ledger 身份 | lfj.gg 一筆交易成功。 |
 
 near.com 的手機是一部 iPhone，運行 1.1.0（組建編號 6）。該程式包含 Near 簽署訊息表，以及 Ledger 目錄的版本選擇。手機以 Ledger 裝置經藍牙廣播。near.com 完成登入，並完成一筆交易。
 
 Core 經 CWS Proxy 連接，使用的是 CWS 的 Ledger 身份。此報告的主機路徑是代理程式。Core 按上表順序完成 C 鏈、X 鏈與 P 鏈之間的匯出／匯入來回。此列記錄 core.app 在 CWS Proxy 上的該序列。其他 Avalanche 主機不在此報告內。另一項缺口仍然保留：Avalanche Core 可能無法完整列出 X 與 P 帳戶。見下列清單及 [security.md](security.md)。
+
+Rabby Wallet（瀏覽器擴充功能）在 lfj.gg（Trader Joe / LFJ）簽署一筆交易。手機是一部 iPhone，運行 1.1.0（組建編號 6），該次是在提交 0fbbf4c（#43）之後。裝置路徑與 Core 一列相同：CWS 的 Ledger 身份經 CWS Proxy 連接，主機側為有線 HID，報告經藍牙轉送至手機。報告者表示該筆交易成功（「成功係 lfj.gg 交易」）。在該提交之前，這條路徑會停住，確認表沒有打開：尚未結束的以太坊 SIGN 分塊（e0/04）沒有 ACK。此列是該 ACK 之後報告的成功，只記錄 Rabby 在 lfj.gg 經 CWS Proxy 的該筆交易。其他交易所，以及不經代理程式、Rabby 直接以藍牙連接的會話，不在此報告內。Rabby 相機掃描的缺口仍然保留。見下列清單及 [security.md](security.md)。
 
 下列項目沒有在 1.1.0 的實機上測試，亦沒有宣稱完成：
 

@@ -6,7 +6,7 @@
 
 ## What 1.1.0 is
 
-1.1.0 (build 6) publishes the code on main, with this version number, public documentation, and removal of local signing identity from the tree. It does not add a new handset pass of its own. User-reported near.com and Core sessions are listed under Third-party hosts.
+1.1.0 (build 6) publishes the code on main, with this version number, public documentation, and removal of local signing identity from the tree. It does not add a new handset pass of its own. User-reported near.com, Core, and Rabby sessions are listed under Third-party hosts.
 
 ## Automated
 
@@ -48,16 +48,19 @@ Those containers have no `uhid` kernel module and no udev daemon, so `modprobe u
 
 ## Third-party hosts
 
-Two device sessions, reported by a person in October 2026. Each row is that host on that path. Seeds are not absolutely safe. See [security.md](security.md). This page does not record which secret a session used.
+Three device sessions, reported by a person in October 2026. Each row is that host on that path. Seeds are not absolutely safe. See [security.md](security.md). This page does not record which secret a session used.
 
 | Host | Path | Reported result |
 | --- | --- | --- |
 | near.com | Ledger over Bluetooth (BLE) | Login succeeded. One transaction succeeded. |
 | Core (core.app) | CWS Proxy (wired to the host), Ledger identity | Avalanche C-Chain → X-Chain → P-Chain → X-Chain → C-Chain export/import succeeded. |
+| Rabby Wallet on lfj.gg (Trader Joe / LFJ) | CWS Proxy (wired to the host), Ledger identity | One trade on lfj.gg succeeded. |
 
 The near.com phone was an iPhone running 1.1.0 (build 6). That tree includes the Near sign-message sheets and the Ledger catalog version picker. The phone advertised as Ledger over Bluetooth. near.com finished login, and one transaction finished.
 
 Core connected to a Ledger identity on CWS through CWS Proxy. The host path in this report is the proxy. Core finished the export/import round-trip across C-Chain, X-Chain, and P-Chain in the order above. The row records core.app on CWS Proxy for that sequence. Other Avalanche hosts are outside this report. The separate gap remains: Avalanche Core may not list X and P accounts end to end. See the list below and [security.md](security.md).
+
+Rabby Wallet, the browser extension, signed one trade on lfj.gg (Trader Joe / LFJ). The phone was an iPhone running 1.1.0 (build 6) after tip 0fbbf4c (#43). The device path is the Core Proxy setup: a Ledger identity on CWS through CWS Proxy, wired HID on the host forwarded to the phone over BLE. The person reported that the trade succeeded (「成功係 lfj.gg 交易」). Before that commit, this path stopped with no confirm sheet: an open Ethereum SIGN chunk (e0/04) drew no ACK. This row is the success reported after that ACK. It records that one Rabby trade on lfj.gg through CWS Proxy. Other exchanges, and Rabby over Bluetooth without the proxy, are outside this report. The Rabby camera-scan gap remains. See the list below and [security.md](security.md).
 
 ## Not tested, and not claimed
 
