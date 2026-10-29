@@ -3,7 +3,15 @@ import { mnemonicToEntropy, mnemonicToSeedSync } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
 import { describe, expect, it } from 'vitest';
 import { LEDGER_MODELS, catalogVersion, overlayDerivationPath, type ConfirmationPort, type SigningRequest } from '@cws/contracts';
-import { encodeResponse, SW_DENY, SW_OK, SW_TX_PARSING_FAIL, SW_WRONG_P1P2 } from './apdu';
+import {
+  encodeResponse,
+  SW_CLA_NOT_SUPPORTED,
+  SW_DENY,
+  SW_INS_NOT_SUPPORTED,
+  SW_OK,
+  SW_TX_PARSING_FAIL,
+  SW_WRONG_P1P2,
+} from './apdu';
 import { concatBytes } from './bytes';
 import { FUJI_HRP, FUJI_X_CHAIN_ID, MAINNET_C_CHAIN_ID, avalancheBech32Address } from './apps/avalanche';
 import { ETH_APP_VERSION } from './apps/ethereum';
@@ -1658,6 +1666,88 @@ describe('LedgerProtocolHandler', () => {
     expect(payload[0] === 0 || payload[0] === 1).toBe(true);
   });
 
+  it('ACKs an open C-Chain e0/04 chunk with 9000, then shows the confirm sheet on the last chunk', async () => {
+    const tx = largeEip1559(43114, new Array(400).fill(0xab));
+    const full = signChunks(tx, 255);
+    expect(full[0]?.length).toBe(255);
+    expect(5 + full[0]!.length).toBe(0x0104);
+    const short = signChunks(tx, 80);
+    expect(short[0]!.length).toBeLessThan(255);
+    expect(short.length).toBeGreaterThan(2);
+
+    for (const chunks of [full, short]) {
+      const requests: SigningRequest[] = [];
+      const handler = new LedgerProtocolHandler({
+        model: nanoX,
+        confirmation: {
+          async confirm(request) {
+            requests.push(request);
+            return true;
+          },
+          async getPassphrase() {
+            return undefined;
+          },
+        },
+        slotId: 'slot',
+        entropy,
+      });
+      handler.setApp('avalanche');
+      const sim = await exchange(handler, apdu([0xe0, 0x32, 0x00, 0x00, 0x00]));
+      expect(statusOf(sim)).toBe(SW_INS_NOT_SUPPORTED);
+      const common = await exchange(handler, apdu([0xb0, 0x06, 0x00, 0x00, 0x00]));
+      expect(statusOf(common)).toBe(SW_CLA_NOT_SUPPORTED);
+
+      const first = await exchange(handler, signApdu(0x00, chunks[0]!));
+      expect(statusOf(first)).toBe(SW_OK);
+      expect(first.length).toBe(2);
+      expect(requests).toHaveLength(0);
+
+      let last = first;
+      for (let index = 1; index < chunks.length; index += 1) {
+        last = await exchange(handler, signApdu(0x80, chunks[index]!));
+        if (index < chunks.length - 1) {
+          expect(statusOf(last)).toBe(SW_OK);
+          expect(last.length).toBe(2);
+          expect(requests).toHaveLength(0);
+        }
+      }
+      expect(requests).toHaveLength(1);
+      expect(requests[0]?.title).toBe('Sign Avalanche C-Chain transaction');
+      expect(requests[0]?.detail?.fields.find((field) => field.label === 'VALUE')?.value).toBe('0 AVAX');
+      expect(gasSheet(requests[0]!)).not.toMatch(/\bETH\b/);
+      expect(statusOf(last)).toBe(SW_OK);
+      expect(last.length).toBe(67);
+      expect(last[0] === 0 || last[0] === 1).toBe(true);
+    }
+
+    const denied: SigningRequest[] = [];
+    const reject = new LedgerProtocolHandler({
+      model: nanoX,
+      confirmation: {
+        async confirm(request) {
+          denied.push(request);
+          return false;
+        },
+        async getPassphrase() {
+          return undefined;
+        },
+      },
+      slotId: 'slot',
+      entropy,
+    });
+    reject.setApp('avalanche');
+    const head = await exchange(reject, signApdu(0x00, full[0]!));
+    expect(statusOf(head)).toBe(SW_OK);
+    expect(denied).toHaveLength(0);
+    let reply = head;
+    for (let index = 1; index < full.length; index += 1) {
+      reply = await exchange(reject, signApdu(0x80, full[index]!));
+    }
+    expect(denied).toHaveLength(1);
+    expect(statusOf(reply)).toBe(SW_DENY);
+    expect(reply.length).toBe(2);
+  });
+
   it('shows AVAX on an Avalanche C-Chain sign sheet, and the chain id when Ethereum signs it', async () => {
     const avalanche = await signCapturedEip1559('avalanche', 1);
     expect(avalanche.title).toBe('Sign Avalanche C-Chain transaction');
@@ -1919,6 +2009,65 @@ describe('LedgerProtocolHandler', () => {
       0xc0,
     ];
     return [0x02, 0xc0 + inner.length, ...inner];
+  }
+
+  function rlpByteString(bytes: number[]): number[] {
+    if (bytes.length === 1 && bytes[0]! < 0x80) {
+      return [bytes[0]!];
+    }
+    if (bytes.length <= 55) {
+      return [0x80 + bytes.length, ...bytes];
+    }
+    if (bytes.length < 256) {
+      return [0xb8, bytes.length, ...bytes];
+    }
+    return [0xb9, (bytes.length >> 8) & 0xff, bytes.length & 0xff, ...bytes];
+  }
+
+  function rlpJoin(items: number[][]): number[] {
+    const body = items.flat();
+    if (body.length <= 55) {
+      return [0xc0 + body.length, ...body];
+    }
+    if (body.length < 256) {
+      return [0xf8, body.length, ...body];
+    }
+    return [0xf9, (body.length >> 8) & 0xff, body.length & 0xff, ...body];
+  }
+
+  /** EIP-1559 envelope with calldata long enough to span Ledger SIGN chunks. */
+  function largeEip1559(chainId: number, calldata: number[]): number[] {
+    const to = new Array<number>(20).fill(0x22);
+    return [
+      0x02,
+      ...rlpJoin([
+        rlpChain(chainId),
+        [0x80],
+        [0x01],
+        [0x01],
+        [0x82, 0x52, 0x08],
+        [0x94, ...to],
+        [0x80],
+        rlpByteString(calldata),
+        [0xc0],
+      ]),
+    ];
+  }
+
+  function signChunks(tx: number[], maxData: number): number[][] {
+    const payload = [
+      0x05, 0x80, 0x00, 0x00, 0x2c, 0x80, 0x00, 0x00, 0x3c, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+      0x00, 0x00, 0x00, 0x00, ...tx,
+    ];
+    const chunks: number[][] = [];
+    for (let offset = 0; offset < payload.length; offset += maxData) {
+      chunks.push(payload.slice(offset, offset + maxData));
+    }
+    return chunks;
+  }
+
+  function signApdu(p1: number, data: number[]): Uint8Array {
+    return apdu([0xe0, 0x04, p1, 0x00, data.length, ...data]);
   }
 
   async function signOn(handler: LedgerProtocolHandler, chainId: number): Promise<void> {
