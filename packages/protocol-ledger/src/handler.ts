@@ -473,6 +473,14 @@ function inferAppFromPath(apdu: ReturnType<typeof parseApdu>): LedgerApp | undef
 function inferAppFromApdu(app: LedgerApp, apdu: ReturnType<typeof parseApdu>): LedgerApp | undefined {
   const family = ledgerAppFamily(app);
   const empty = apdu.data.length === 0;
+  // The Avalanche app answers CLA 0x80 (X/P and C→P export) and CLA 0xE0
+  // (C-Chain, the same instructions as the Ethereum app). A C-Chain address
+  // read must not select Ethereum, and an empty E0 06 must not select Tron.
+  // Either switch makes the following 80 05 export look like NEAR, so the
+  // phone shows Near and never opens an export confirm sheet.
+  if (family === 'avalanche' && (apdu.cla === 0x80 || apdu.cla === 0xe0)) {
+    return undefined;
+  }
   const fromPath = inferAppFromPath(apdu);
   if (fromPath && ledgerAppFamily(fromPath) !== family) {
     return fromPath;
