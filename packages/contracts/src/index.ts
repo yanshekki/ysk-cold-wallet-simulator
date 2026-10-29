@@ -68,6 +68,8 @@ export {
   describeEthMessage,
   describeEthTransaction,
   describeEthTypedData,
+  describeNearDelegate,
+  describeNearMessage,
   describeSigning,
   formatSatsBtc,
   formatWeiEth,

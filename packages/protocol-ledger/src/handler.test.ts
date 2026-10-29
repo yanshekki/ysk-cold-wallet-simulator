@@ -3,7 +3,8 @@ import { mnemonicToEntropy, mnemonicToSeedSync } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
 import { describe, expect, it } from 'vitest';
 import { LEDGER_MODELS, catalogVersion, overlayDerivationPath, type ConfirmationPort, type SigningRequest } from '@cws/contracts';
-import { encodeResponse, SW_DENY, SW_OK } from './apdu';
+import { encodeResponse, SW_DENY, SW_OK, SW_TX_PARSING_FAIL, SW_WRONG_P1P2 } from './apdu';
+import { concatBytes } from './bytes';
 import { FUJI_HRP, FUJI_X_CHAIN_ID, MAINNET_C_CHAIN_ID, avalancheBech32Address } from './apps/avalanche';
 import { ETH_APP_VERSION } from './apps/ethereum';
 import {
@@ -93,6 +94,51 @@ function cChainExportToP(nano: number): number[] {
     ...u32(1),
     ...new Array<number>(20).fill(0x11),
   ];
+}
+
+function statusOf(payload: Uint8Array): number {
+  return (payload[payload.length - 2]! << 8) | payload[payload.length - 1]!;
+}
+
+function u32le(value: number): Uint8Array {
+  return Uint8Array.of(value & 0xff, (value >>> 8) & 0xff, (value >>> 16) & 0xff, (value >>> 24) & 0xff);
+}
+
+function borshString(text: string): Uint8Array {
+  const bytes = new TextEncoder().encode(text);
+  const out = new Uint8Array(4 + bytes.length);
+  out.set(u32le(bytes.length), 0);
+  out.set(bytes, 4);
+  return out;
+}
+
+function nearPathBytes(): number[] {
+  const path = [0x8000002c, 0x8000018d, 0x80000000, 0x80000000, 0x80000001];
+  const pathBytes: number[] = [];
+  for (const component of path) {
+    pathBytes.push(
+      (component >>> 24) & 0xff,
+      (component >>> 16) & 0xff,
+      (component >>> 8) & 0xff,
+      component & 0xff,
+    );
+  }
+  return pathBytes;
+}
+
+function nep413Payload(
+  message: string,
+  recipient: string,
+  nonce: Uint8Array,
+  callback?: string,
+): Uint8Array {
+  const parts = [borshString(message), nonce, borshString(recipient)];
+  if (callback === undefined) {
+    parts.push(Uint8Array.of(0));
+  } else {
+    parts.push(Uint8Array.of(1), borshString(callback));
+  }
+  return concatBytes(...parts);
 }
 
 function handlerFor(modelId: string): LedgerProtocolHandler {
@@ -713,6 +759,172 @@ describe('LedgerProtocolHandler', () => {
       message,
     );
     expect(Array.from(signed.slice(0, 64))).toEqual(Array.from(expected));
+  });
+
+  it('shows a NEAR message sheet and signs the NEP-413 digest', async () => {
+    const seen: SigningRequest[] = [];
+    const handler = new LedgerProtocolHandler({
+      model: nanoX,
+      confirmation: {
+        async confirm(request) {
+          seen.push(request);
+          return true;
+        },
+        async getPassphrase() {
+          return undefined;
+        },
+      },
+      slotId: 'slot',
+      entropy,
+    });
+    handler.setApp('near');
+    const nonce = Uint8Array.from({ length: 32 }, (_, index) => index);
+    const payload = nep413Payload('hi', 'myapp.com', nonce, 'myapp.com/callback');
+    const pathBytes = nearPathBytes();
+    const first = await exchange(
+      handler,
+      apdu([0x80, 0x07, 0x00, 0x57, pathBytes.length, ...pathBytes]),
+    );
+    expect(statusOf(first)).toBe(SW_OK);
+    expect(seen).toHaveLength(0);
+    const signed = await exchange(
+      handler,
+      apdu([0x80, 0x07, 0x80, 0x57, payload.length, ...payload]),
+    );
+    expect(statusOf(signed)).toBe(SW_OK);
+    expect(seen).toHaveLength(1);
+    expect(seen[0]?.title).toBe('Sign NEAR message');
+    expect(seen[0]?.detail?.headline).toBe('Sign NEAR message');
+    expect(seen[0]?.detail?.fields.find((field) => field.label === 'MESSAGE')?.value).toBe('hi');
+    expect(seen[0]?.detail?.fields.find((field) => field.label === 'RECIPIENT')?.value).toBe('myapp.com');
+    expect(seen[0]?.detail?.fields.find((field) => field.label === 'CALLBACK')?.value).toBe(
+      'myapp.com/callback',
+    );
+    const digest = sha256(concatBytes(Uint8Array.of(0x9d, 0x01, 0x00, 0x80), payload));
+    const expected = signEd25519(deriveEd25519PrivateKey(entropy, "m/44'/397'/0'/0'/1'"), digest);
+    expect(Array.from(signed.slice(0, 64))).toEqual(Array.from(expected));
+  });
+
+  it('signs a single-chunk NEAR message without the host prefix', async () => {
+    const handler = new LedgerProtocolHandler({
+      model: nanoX,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy,
+    });
+    handler.setApp('near');
+    const payload = nep413Payload('hello from near', 'near.example', new Uint8Array(32));
+    const data = [...nearPathBytes(), ...payload];
+    const signed = await exchange(handler, apdu([0x80, 0x07, 0x80, 0x57, data.length, ...data]));
+    expect(statusOf(signed)).toBe(SW_OK);
+    const digest = sha256(concatBytes(Uint8Array.of(0x9d, 0x01, 0x00, 0x80), payload));
+    const expected = signEd25519(deriveEd25519PrivateKey(entropy, "m/44'/397'/0'/0'/1'"), digest);
+    expect(Array.from(signed.slice(0, 64))).toEqual(Array.from(expected));
+    const raw = signEd25519(deriveEd25519PrivateKey(entropy, "m/44'/397'/0'/0'/1'"), payload);
+    expect(Array.from(signed.slice(0, 64))).not.toEqual(Array.from(raw));
+  });
+
+  it('does not sign a NEAR message when the user rejects', async () => {
+    const handler = new LedgerProtocolHandler({
+      model: nanoX,
+      confirmation: autoConfirm(false),
+      slotId: 'slot',
+      entropy,
+    });
+    handler.setApp('near');
+    const payload = nep413Payload('hi', 'myapp.com', new Uint8Array(32));
+    const data = [...nearPathBytes(), ...payload];
+    const reply = await exchange(handler, apdu([0x80, 0x07, 0x80, 0x57, data.length, ...data]));
+    expect(statusOf(reply)).toBe(SW_DENY);
+    expect(reply.length).toBe(2);
+  });
+
+  it('shows an unsupported sheet and does not sign a corrupt NEAR message', async () => {
+    const seen: SigningRequest[] = [];
+    const handler = new LedgerProtocolHandler({
+      model: nanoX,
+      confirmation: {
+        async confirm(request) {
+          seen.push(request);
+          return true;
+        },
+        async getPassphrase() {
+          return undefined;
+        },
+      },
+      slotId: 'slot',
+      entropy,
+    });
+    handler.setApp('near');
+    const data = [...nearPathBytes(), 0x01, 0x02];
+    const reply = await exchange(handler, apdu([0x80, 0x07, 0x80, 0x57, data.length, ...data]));
+    expect(statusOf(reply)).toBe(SW_TX_PARSING_FAIL);
+    expect(reply.length).toBe(2);
+    expect(seen[0]?.title).toBe('Unsupported NEAR message');
+    expect(seen[0]?.detail?.warning).toMatch(/will not be signed/);
+  });
+
+  it('rejects a NEAR message instruction with a bad P1', async () => {
+    const handler = new LedgerProtocolHandler({
+      model: nanoX,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy,
+    });
+    handler.setApp('near');
+    const reply = await exchange(handler, apdu([0x80, 0x07, 0x01, 0x57, 0x00]));
+    expect(statusOf(reply)).toBe(SW_WRONG_P1P2);
+  });
+
+  it('shows a NEAR delegate sheet and signs the NEP-366 digest', async () => {
+    const seen: SigningRequest[] = [];
+    const handler = new LedgerProtocolHandler({
+      model: nanoX,
+      confirmation: {
+        async confirm(request) {
+          seen.push(request);
+          return true;
+        },
+        async getPassphrase() {
+          return undefined;
+        },
+      },
+      slotId: 'slot',
+      entropy,
+    });
+    handler.setApp('near');
+    const body = concatBytes(
+      borshString('alice.near'),
+      borshString('bob.near'),
+      u32le(0),
+      new Uint8Array(8 + 8 + 33),
+    );
+    const data = [...nearPathBytes(), ...body];
+    const signed = await exchange(handler, apdu([0x80, 0x08, 0x80, 0x57, data.length, ...data]));
+    expect(statusOf(signed)).toBe(SW_OK);
+    expect(seen).toHaveLength(1);
+    expect(seen[0]?.title).toBe('Sign NEAR delegate action');
+    expect(seen[0]?.detail?.fields.find((field) => field.label === 'SENDER')?.value).toBe('alice.near');
+    expect(seen[0]?.detail?.fields.find((field) => field.label === 'RECEIVER')?.value).toBe('bob.near');
+    expect(seen[0]?.detail?.fields.find((field) => field.label === 'ACTIONS')?.value).toBe('0');
+    const digest = sha256(concatBytes(Uint8Array.of(0x6e, 0x01, 0x00, 0x40), body));
+    const expected = signEd25519(deriveEd25519PrivateKey(entropy, "m/44'/397'/0'/0'/1'"), digest);
+    expect(Array.from(signed.slice(0, 64))).toEqual(Array.from(expected));
+  });
+
+  it('does not sign a NEAR delegate action when the user rejects', async () => {
+    const handler = new LedgerProtocolHandler({
+      model: nanoX,
+      confirmation: autoConfirm(false),
+      slotId: 'slot',
+      entropy,
+    });
+    handler.setApp('near');
+    const body = concatBytes(borshString('alice.near'), borshString('bob.near'), u32le(1));
+    const data = [...nearPathBytes(), ...body];
+    const reply = await exchange(handler, apdu([0x80, 0x08, 0x80, 0x57, data.length, ...data]));
+    expect(statusOf(reply)).toBe(SW_DENY);
+    expect(reply.length).toBe(2);
   });
 
   it('answers Avalanche GET_VERSION (CLA 0x80 INS 0x00) instead of 0x6e00', async () => {

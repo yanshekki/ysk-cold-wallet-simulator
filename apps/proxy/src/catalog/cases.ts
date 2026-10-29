@@ -630,10 +630,66 @@ const LEDGER: LabAction[] = [
       return `sig 0x${bytesToHex(body)}`;
     },
   },
+  {
+    id: 'near-sign-message',
+    brand: 'ledger',
+    section: 'near',
+    en: 'SIGN_NEP413 message',
+    zh: '簽署 NEP-413 訊息',
+    editor: { path: pathString(PATH_NEAR), utf8: 'hello from near' },
+    run: async (host, draft) => {
+      const tx = host.requireLedger();
+      await tx.openApp('NEAR');
+      const message = draft.utf8.trim() || 'hello from near';
+      const payload = concatBytes(
+        encodeNearPath(pathOf(draft, PATH_NEAR)),
+        nearNep413(message, 'near.example'),
+      );
+      const body = await tx.sendOk(0x80, 0x07, 0x80, 0x57, payload, 'NEAR NEP-413');
+      return `nep413 ${body.length}b 0x${bytesToHex(body)}`;
+    },
+  },
+  {
+    id: 'near-sign-delegate',
+    brand: 'ledger',
+    section: 'near',
+    en: 'SIGN_NEP366 delegate',
+    zh: '簽署 NEP-366 委託',
+    editor: { path: pathString(PATH_NEAR), utf8: 'alice.near' },
+    run: async (host, draft) => {
+      const tx = host.requireLedger();
+      await tx.openApp('NEAR');
+      const sender = draft.utf8.trim() || 'alice.near';
+      const payload = concatBytes(
+        encodeNearPath(pathOf(draft, PATH_NEAR)),
+        nearDelegate(sender, 'bob.near'),
+      );
+      const body = await tx.sendOk(0x80, 0x08, 0x80, 0x57, payload, 'NEAR NEP-366');
+      return `nep366 ${body.length}b 0x${bytesToHex(body)}`;
+    },
+  },
   ...btcFamily(),
   ...avalancheFamily(),
   ...otherFamilies(),
 ];
+
+function borshString(text: string): Uint8Array {
+  const bytes = new TextEncoder().encode(text);
+  const len = new Uint8Array(4);
+  new DataView(len.buffer).setUint32(0, bytes.length, true);
+  return concatBytes(len, bytes);
+}
+
+/** Borsh NEP-413 payload without the off-chain prefix. Callback is absent, matching NEAR Connector. */
+function nearNep413(message: string, recipient: string): Uint8Array {
+  return concatBytes(borshString(message), new Uint8Array(32), borshString(recipient), Uint8Array.of(0));
+}
+
+/** Minimal NEP-366 delegate: sender, receiver, zero actions, then nonce, block height, and a public key. */
+function nearDelegate(sender: string, receiver: string): Uint8Array {
+  const count = new Uint8Array(4);
+  return concatBytes(borshString(sender), borshString(receiver), count, new Uint8Array(8 + 8 + 33));
+}
 
 function btcFamily(): LabAction[] {
   const hash = new Uint8Array(32).fill(0x11);

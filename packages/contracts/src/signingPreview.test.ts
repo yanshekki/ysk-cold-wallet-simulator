@@ -6,6 +6,8 @@ import {
   describeEthTypedData,
   describeHostSuppliedDigest,
   describeHostSuppliedHash,
+  describeNearDelegate,
+  describeNearMessage,
   describeSigning,
   hex0x,
   parseEthTx,
@@ -254,6 +256,47 @@ describe('describeSigning', () => {
     expect(detail.decodeFailed).toBe(true);
     expect(detail.fields.find((field) => field.label === 'TO')).toBeUndefined();
     expect(detail.hex).toBe('0xdeadbeef');
+  });
+
+  it('shows NEP-413 message fields on the confirm sheet', () => {
+    const nonce = Uint8Array.from({ length: 32 }, (_, index) => index);
+    const detail = describeNearMessage({
+      path: "m/44'/397'/0'/0'/1'",
+      message: 'hi',
+      recipient: 'myapp.com',
+      nonce,
+      callbackUrl: 'myapp.com/callback',
+    });
+    expect(detail.headline).toBe('Sign NEAR message');
+    expect(detail.fields.find((field) => field.label === 'MESSAGE')?.value).toBe('hi');
+    expect(detail.fields.find((field) => field.label === 'RECIPIENT')?.value).toBe('myapp.com');
+    expect(detail.fields.find((field) => field.label === 'CALLBACK')?.value).toBe('myapp.com/callback');
+    expect(detail.hex).toBeUndefined();
+    const shown = describeSigning(
+      request({
+        kind: 'sign',
+        title: 'Sign NEAR message',
+        path: "m/44'/397'/0'/0'/1'",
+        detail,
+      }),
+    );
+    expect(shown).toBe(detail);
+  });
+
+  it('shows NEP-366 sender and receiver before the raw payload', () => {
+    const raw = fromHex('0x01020304');
+    const detail = describeNearDelegate({
+      path: "m/44'/397'/0'/0'/1'",
+      sender: 'alice.near',
+      receiver: 'bob.near',
+      actionCount: 1,
+      raw,
+    });
+    expect(detail.headline).toBe('Sign NEAR delegate action');
+    expect(detail.fields.find((field) => field.label === 'SENDER')?.value).toBe('alice.near');
+    expect(detail.fields.find((field) => field.label === 'RECEIVER')?.value).toBe('bob.near');
+    expect(detail.fields.find((field) => field.label === 'ACTIONS')?.value).toBe('1');
+    expect(detail.hex).toBe('0x01020304');
   });
 
   it('keeps NEAR transaction payloads as opaque hex', () => {
