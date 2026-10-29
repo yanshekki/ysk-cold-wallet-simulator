@@ -178,6 +178,8 @@ Default paths live in `packages/contracts`. A host may request another path. Sig
 
 Litecoin and Dogecoin use the Bitcoin handler. A bundled Ledger app catalog lets a host open an app name, including names that have no dedicated signing handler. Those names resolve as an unknown family.
 
+Settings → Ledger catalog can pick a published version for each app. That is the version a host reads from the open app. It does not switch CWS to that older app’s commands. Update Ledger apps reloads names and versions from Ledger’s public catalog for the selected device. Until then, the list is the bundled catalog for that device.
+
 A transaction signature, a message signature, and a backup-seed export wait for press-and-hold on the phone and, on a release build, for the OS authenticator. Listing addresses and exporting an extended public key stay silent, because the wallets above list accounts that way. While the phone is advertising, the Device screen says that a connected host can derive addresses.
 
 ## Security

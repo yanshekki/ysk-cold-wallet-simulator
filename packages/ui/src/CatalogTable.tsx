@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
-import type { LedgerInstalledApp } from '@cws/contracts';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { versionsForApp, type LedgerInstalledApp } from '@cws/contracts';
+import { SelectSheet } from './SelectSheet';
 import { colors, fonts, hairline, radius, space } from './theme';
 
 export type CatalogTableLabels = {
@@ -10,19 +11,33 @@ export type CatalogTableLabels = {
   family?: string;
   version?: string;
   empty?: string;
+  reported?: string;
+  cancel?: string;
+  versionPick?: (appName: string) => string;
 };
 
 type Props = {
   apps: readonly LedgerInstalledApp[];
+  modelId?: string;
+  savedModelId?: string | null;
+  onSelectVersion?: (id: string, version: string) => void;
   labels?: CatalogTableLabels;
 };
 
-function haystack(app: LedgerInstalledApp): string {
-  return `${app.openAppName} ${app.id} ${app.chip} ${app.family} ${app.version}`.toLowerCase();
+function haystack(app: LedgerInstalledApp, modelId: string, savedModelId: string | null): string {
+  const versions = versionsForApp(app, modelId, savedModelId).join(' ');
+  return `${app.openAppName} ${app.id} ${app.chip} ${app.family} ${versions}`.toLowerCase();
 }
 
-export function CatalogTable({ apps, labels }: Props) {
+export function CatalogTable({
+  apps,
+  modelId = 'nano-x',
+  savedModelId = null,
+  onSelectVersion,
+  labels,
+}: Props) {
   const [query, setQuery] = useState('');
+  const [pickingId, setPickingId] = useState<string | null>(null);
   const L = {
     search: labels?.search ?? 'Search',
     app: labels?.app ?? 'App',
@@ -30,16 +45,23 @@ export function CatalogTable({ apps, labels }: Props) {
     family: labels?.family ?? 'Family',
     version: labels?.version ?? 'Version',
     empty: labels?.empty ?? 'No apps',
+    reported: labels?.reported ?? 'Reported',
+    cancel: labels?.cancel ?? 'Cancel',
   };
 
   const rows = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    const filtered = needle ? apps.filter((app) => haystack(app).includes(needle)) : [...apps];
+    const filtered = needle
+      ? apps.filter((app) => haystack(app, modelId, savedModelId).includes(needle))
+      : [...apps];
     return filtered.sort((a, b) => {
       const family = a.family.localeCompare(b.family);
       return family !== 0 ? family : a.openAppName.localeCompare(b.openAppName);
     });
-  }, [apps, query]);
+  }, [apps, modelId, query, savedModelId]);
+
+  const picking = pickingId ? apps.find((app) => app.id === pickingId) : undefined;
+  const pickingVersions = picking ? [...versionsForApp(picking, modelId, savedModelId)].reverse() : [];
 
   return (
     <View style={styles.root} testID="catalog-table">
@@ -80,11 +102,49 @@ export function CatalogTable({ apps, labels }: Props) {
           <Text style={[styles.cell, styles.family]} numberOfLines={1}>
             {app.family}
           </Text>
-          <Text style={[styles.cell, styles.version]} numberOfLines={1}>
-            {app.version}
-          </Text>
+          {onSelectVersion ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`${app.openAppName} ${L.version} ${app.version}`}
+              hitSlop={8}
+              onPress={() => setPickingId(app.id)}
+              style={styles.versionHit}
+              testID={`catalog-version-${app.id}`}
+            >
+              <Text style={[styles.cell, styles.version, styles.versionPick]} numberOfLines={1}>
+                {app.version} ▾
+              </Text>
+            </Pressable>
+          ) : (
+            <Text style={[styles.cell, styles.version]} numberOfLines={1}>
+              {app.version}
+            </Text>
+          )}
         </View>
       ))}
+      {onSelectVersion && picking ? (
+        <SelectSheet
+          visible
+          title={(labels?.versionPick ?? ((name: string) => name))(picking.openAppName)}
+          selectedId={picking.version}
+          options={pickingVersions.map((version) => ({
+            id: version,
+            label: version,
+            chip: version === picking.version ? L.reported : undefined,
+          }))}
+          onSelect={(version) => {
+            const id = picking.id;
+            setPickingId(null);
+            if (version !== picking.version) {
+              onSelectVersion(id, version);
+            }
+          }}
+          onClose={() => setPickingId(null)}
+          cancelLabel={L.cancel}
+          searchPlaceholder={L.search}
+          testIDPrefix={`catalog-version-${picking.id}-`}
+        />
+      ) : null}
     </View>
   );
 }
@@ -146,8 +206,18 @@ const styles = StyleSheet.create({
     color: colors.muted,
   },
   version: {
-    flex: 0.9,
+    flex: 1,
     textAlign: 'right',
+  },
+  versionHit: {
+    flex: 1,
+    minHeight: 40,
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+  },
+  versionPick: {
+    color: colors.ok,
+    flex: 0,
   },
   empty: {
     color: colors.muted,

@@ -202,6 +202,10 @@ export const ar: MessageTree = {
     colChip: 'Chip',
     colFamily: 'Family',
     colVersion: 'Version',
+    versionReported: 'المُبلَّغ بها',
+    versionPick: 'إصدار {{app}}',
+    versionNote:
+      'الإصدار الذي تختاره هو ما يقرأه المضيف عندما يطلب إصدار التطبيق المفتوح. لا يبدّل CWS إلى أوامر ذلك الملف القديم. يعيد التحديث تحميل الإصدارات المنشورة للجهاز المحدد من كتالوج Ledger العام. قبل التحديث، القائمة هي الكتالوج المضمّن لذلك الجهاز.',
     bundled: 'مضمّن',
     session: 'الجلسة',
     faceId: {
@@ -497,6 +501,7 @@ export const ar: MessageTree = {
     advertiseUnsupported: 'بث البلوتوث غير متاح لهذا الطراز.',
     advertisePermission: 'لم يُمنح إذن بث البلوتوث.',
     managerFailed: 'فشل تحديث الكتالوج.',
+    versionSaveFailed: 'تعذر حفظ الإصدار المحدد.',
     nearFailed: 'فشل NEAR.',
     passphraseFailed: 'فشل عبارة المرور.',
     qrBadUr: 'تعذر قراءة رمز QR هذا.',

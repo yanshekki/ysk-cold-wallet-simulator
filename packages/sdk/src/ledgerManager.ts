@@ -1,4 +1,5 @@
-import { fromManagerRow, ledgerOsFor, type LedgerInstalledApp } from '@cws/contracts';
+import { applyVersionCatalog, fromManagerRow, ledgerOsFor, type LedgerInstalledApp } from '@cws/contracts';
+import { scanApplicationVersions } from './ledgerCatalogScan';
 
 const TARGET_IDS: Record<string, number> = {
   'nano-x': 0x33000004,
@@ -16,6 +17,32 @@ export function managerCatalogUrl(modelId: string): string {
     firmware_version_name: firmware,
   });
   return `https://manager.api.live.ledger.com/api/v2/apps/by-target?${params.toString()}`;
+}
+
+/** Device-version row for a target id. `id` selects that device's app builds. */
+export function deviceVersionUrl(modelId: string): string {
+  const target = TARGET_IDS[modelId] ?? TARGET_IDS['nano-x'];
+  const params = new URLSearchParams({
+    provider: '1',
+    target_id: String(target >>> 0),
+  });
+  return `https://manager.api.live.ledger.com/api/get_device_version?${params.toString()}`;
+}
+
+/** Every published application version. Filtered per device while scanning. */
+export function applicationsCatalogUrl(): string {
+  return 'https://manager.api.live.ledger.com/api/applications?provider=1';
+}
+
+export function parseDeviceVersionId(payload: unknown): number {
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('Manager device version was empty');
+  }
+  const id = (payload as { id?: unknown }).id;
+  if (typeof id !== 'number' || !Number.isInteger(id) || id <= 0) {
+    throw new Error('Manager device version was empty');
+  }
+  return id;
 }
 
 type ManagerRow = {
@@ -51,15 +78,32 @@ export function parseManagerApps(payload: unknown): LedgerInstalledApp[] {
   return apps;
 }
 
-export async function fetchManagerCatalog(modelId: string): Promise<LedgerInstalledApp[]> {
-  const response = await fetch(managerCatalogUrl(modelId));
+async function readJson(response: Response, label: string): Promise<unknown> {
   if (!response.ok) {
-    throw new Error(`Manager catalog HTTP ${response.status}`);
+    throw new Error(`${label} HTTP ${response.status}`);
   }
-  const payload: unknown = await response.json();
-  const apps = parseManagerApps(payload);
-  if (apps.length === 0) {
+  return response.json() as Promise<unknown>;
+}
+
+export async function fetchManagerCatalog(modelId: string): Promise<LedgerInstalledApp[]> {
+  const [latestResponse, deviceResponse, versionsResponse] = await Promise.all([
+    fetch(managerCatalogUrl(modelId)),
+    fetch(deviceVersionUrl(modelId)),
+    fetch(applicationsCatalogUrl()),
+  ]);
+  const latestPayload = await readJson(latestResponse, 'Manager catalog');
+  const devicePayload = await readJson(deviceResponse, 'Manager device version');
+  if (!versionsResponse.ok) {
+    throw new Error(`Manager app versions HTTP ${versionsResponse.status}`);
+  }
+  const versionsText = await versionsResponse.text();
+  const latest = parseManagerApps(latestPayload);
+  if (latest.length === 0) {
     throw new Error('Manager catalog was empty');
   }
-  return apps;
+  const versionsById = scanApplicationVersions(versionsText, parseDeviceVersionId(devicePayload), 1);
+  if (Object.keys(versionsById).length === 0) {
+    throw new Error('Manager app versions were empty');
+  }
+  return applyVersionCatalog(latest, versionsById);
 }

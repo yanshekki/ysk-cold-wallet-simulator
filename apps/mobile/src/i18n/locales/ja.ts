@@ -202,6 +202,10 @@ export const ja: MessageTree = {
     colChip: 'Chip',
     colFamily: 'Family',
     colVersion: 'Version',
+    versionReported: '報告値',
+    versionPick: '{{app}} のバージョン',
+    versionNote:
+      '選んだバージョンは、ホストが開いているアプリのバージョンを問い合わせたときの応答です。CWS はその古いバイナリのコマンドには切り替えません。更新は、選択中の端末向けに公開されているバージョンを Ledger の公開カタログから読み直します。更新前の一覧は、その端末向けに同梱されたカタログです。',
     bundled: '内蔵',
     session: 'セッション',
     faceId: {
@@ -497,6 +501,7 @@ export const ja: MessageTree = {
     advertiseUnsupported: 'このモデルでは Bluetooth 広告を利用できません。',
     advertisePermission: 'Bluetooth 広告の許可がありません。',
     managerFailed: 'カタログの更新に失敗しました。',
+    versionSaveFailed: '選択したバージョンを保存できませんでした。',
     nearFailed: 'NEAR に失敗しました。',
     passphraseFailed: 'パスフレーズに失敗しました。',
     qrBadUr: 'この QR コードを読み取れません。',

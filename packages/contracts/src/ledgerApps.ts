@@ -39,7 +39,13 @@ export type LedgerApp = 'dashboard' | string;
 export type LedgerInstalledApp = {
   id: string;
   openAppName: string;
+  /** Version reported to hosts, before a user pick is applied. */
   version: string;
+  /**
+   * Published versions synced for one device. Absent on the bundled snapshot;
+   * the bundled index supplies choices until Update.
+   */
+  availableVersions?: readonly string[];
   chip: string;
   family: LedgerAppFamily;
 };
@@ -121,17 +127,69 @@ function chipFor(name: string, family: LedgerAppFamily): string {
 export const LEDGER_INSTALLED_APPS: readonly LedgerInstalledApp[] = LEDGER_MANAGER_SNAPSHOT;
 
 let overlay: LedgerInstalledApp[] | undefined;
+let overlayModelId: string | null = null;
+let versionPicks: Record<string, string> | undefined;
 
-export function ledgerCatalog(): readonly LedgerInstalledApp[] {
+/** Snapshot, or the last Update, without user version picks. */
+export function ledgerCatalogBase(): readonly LedgerInstalledApp[] {
   return overlay && overlay.length > 0 ? overlay : LEDGER_INSTALLED_APPS;
 }
 
-export function setLedgerCatalogOverlay(apps: LedgerInstalledApp[] | undefined): void {
-  overlay = apps && apps.length > 0 ? apps : undefined;
+/** Device id the saved version lists were synced for. Null means bundled lists. */
+export function ledgerCatalogModelId(): string | null {
+  return overlay ? overlayModelId : null;
+}
+
+export function ledgerVersionPicks(): Readonly<Record<string, string>> {
+  return versionPicks ?? {};
+}
+
+export function setLedgerVersionPicks(next: Readonly<Record<string, string>> | undefined): void {
+  if (!next || Object.keys(next).length === 0) {
+    versionPicks = undefined;
+    return;
+  }
+  versionPicks = { ...next };
+}
+
+export function resetLedgerVersionPicks(): void {
+  versionPicks = undefined;
+}
+
+/** Catalog hosts and the picker read. User picks replace the base version. */
+export function ledgerCatalog(): readonly LedgerInstalledApp[] {
+  const base = ledgerCatalogBase();
+  if (!versionPicks) {
+    return base;
+  }
+  let changed = false;
+  const apps = base.map((app) => {
+    const picked = versionPicks?.[app.id];
+    if (!picked || picked === app.version) {
+      return app;
+    }
+    changed = true;
+    return { ...app, version: picked };
+  });
+  return changed ? apps : base;
+}
+
+export function setLedgerCatalogOverlay(
+  apps: LedgerInstalledApp[] | undefined,
+  modelId: string | null = null,
+): void {
+  if (!apps || apps.length === 0) {
+    overlay = undefined;
+    overlayModelId = null;
+    return;
+  }
+  overlay = apps;
+  overlayModelId = modelId && modelId.trim() ? modelId.trim() : null;
 }
 
 export function resetLedgerCatalogOverlay(): void {
   overlay = undefined;
+  overlayModelId = null;
 }
 
 export function fromManagerRow(name: string, version: string): LedgerInstalledApp {

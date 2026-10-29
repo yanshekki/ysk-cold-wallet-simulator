@@ -18,7 +18,14 @@ import type {
   SeedSlot,
   SigningRequest,
 } from '@cws/contracts';
-import { ledgerCatalog } from '@cws/contracts';
+import {
+  keepVersionPicks,
+  ledgerCatalog,
+  ledgerCatalogBase,
+  ledgerVersionPicks,
+  nextVersionPicks,
+  sameVersionPicks,
+} from '@cws/contracts';
 import type { EthAirgapQr, QrFormatId, QrProfile, QrUrKind } from '@cws/protocol-qr';
 import {
   QrAirgapSession,
@@ -49,15 +56,18 @@ import { listSlots, loadEntropy, setVaultAuthPrompt, updateSlotMeta, wipeAllSlot
 import {
   DEFAULT_SETTINGS,
   clearCatalogOverlay,
+  clearVersionPicks,
   detectLanguage,
   loadActiveSlotId,
   loadCatalogOverlay,
   loadSettings,
+  loadVersionPicks,
   normalizeSettings,
   resolveDefaultSlot,
   saveActiveSlotId,
   saveCatalogOverlay,
   saveSettings,
+  saveVersionPicks,
   type AppSettings,
 } from '../settings/store';
 
@@ -84,6 +94,7 @@ type AppStateValue = {
   toast: string | null;
   settings: AppSettings;
   catalog: readonly LedgerInstalledApp[];
+  catalogModelId: string | null;
   unlock: () => Promise<boolean>;
   lock: () => void;
   selectModel: (model: DeviceModel) => void;
@@ -101,6 +112,7 @@ type AppStateValue = {
   appendAppLog: (channel: LogChannel, note: string, hex?: string) => void;
   patchSettings: (patch: Partial<AppSettings>) => Promise<void>;
   updateLedgerCatalog: () => Promise<number>;
+  selectLedgerAppVersion: (id: string, version: string) => Promise<void>;
   refreshNear: (slot: SeedSlot) => Promise<SeedSlot>;
   exportQrAccount: (profile: QrProfile, format?: QrFormatId | QrUrKind) => Promise<EthAirgapQr>;
   scanQrSign: (part: string) => Promise<QrScanStatus>;
@@ -134,6 +146,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [toast, setToast] = useState<string | null>(null);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [catalog, setCatalog] = useState<readonly LedgerInstalledApp[]>(() => [...ledgerCatalog()]);
+  const [catalogModelId, setCatalogModelId] = useState<string | null>(null);
   const [loading, setLoading] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
@@ -284,7 +297,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         setSettings(loaded);
         setFaceIdEnabled(loaded.faceIdEnabled);
         setVaultAuthPrompt(translate(loaded.language, 'vault.authPrompt'));
-        await loadCatalogOverlay();
+        const storedCatalog = await loadCatalogOverlay();
+        await loadVersionPicks();
+        setCatalogModelId(storedCatalog?.modelId ?? null);
         setCatalog([...ledgerCatalog()]);
         const slots = await listSlots();
         const activeId = await loadActiveSlotId();
@@ -398,6 +413,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     await wipeAllSlots();
     await saveActiveSlotId(null);
     await clearCatalogOverlay();
+    await clearVersionPicks();
     await clearDisclaimerAcceptance();
     const next = { ...DEFAULT_SETTINGS, language: detectLanguage() };
     settingsRef.current = next;
@@ -407,6 +423,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     await saveSettings(next);
     setSeed(null);
     seedRef.current = null;
+    setCatalogModelId(null);
     setCatalog([...ledgerCatalog()]);
     clearLogEntries();
     setDisclaimerAccepted(false);
@@ -419,13 +436,29 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const updateLedgerCatalog = useCallback(async () => {
     const modelId = model?.brand === 'ledger' ? model.id : 'nano-x';
     appendAppLog('manager', 'manager: fetch');
-    const apps = await fetchManagerCatalog(modelId);
-    await saveCatalogOverlay(apps);
-    setCatalog(apps);
+    const fresh = await fetchManagerCatalog(modelId);
+    const picks = keepVersionPicks(ledgerVersionPicks(), fresh, modelId);
+    await saveCatalogOverlay(fresh, modelId);
+    await saveVersionPicks(picks);
+    setCatalogModelId(modelId);
+    setCatalog([...ledgerCatalog()]);
     await patchSettings({ catalogUpdatedAt: Date.now() });
-    appendAppLog('manager', `manager: updated ${apps.length} apps`);
-    return apps.length;
+    appendAppLog('manager', `manager: updated ${fresh.length} apps`);
+    return fresh.length;
   }, [appendAppLog, model, patchSettings]);
+
+  const selectLedgerAppVersion = useCallback(
+    async (id: string, version: string) => {
+      const modelId = model?.brand === 'ledger' ? model.id : 'nano-x';
+      const next = nextVersionPicks(ledgerVersionPicks(), ledgerCatalogBase(), id, version, modelId, catalogModelId);
+      if (!next || sameVersionPicks(ledgerVersionPicks(), next)) {
+        return;
+      }
+      await saveVersionPicks(next);
+      setCatalog([...ledgerCatalog()]);
+    },
+    [catalogModelId, model],
+  );
 
   const spawnHandler = useCallback(() => {
     const currentModel = model;
@@ -676,6 +709,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       toast,
       settings,
       catalog,
+      catalogModelId,
       unlock,
       lock,
       selectModel: setModel,
@@ -690,6 +724,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       appendAppLog,
       patchSettings,
       updateLedgerCatalog,
+      selectLedgerAppVersion,
       refreshNear,
       exportQrAccount,
       scanQrSign,
@@ -708,6 +743,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       clearAllData,
       appendAppLog,
       catalog,
+      catalogModelId,
       clearLogs,
       connected,
       connectedLabel,
@@ -742,6 +778,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       toast,
       unlock,
       updateLedgerCatalog,
+      selectLedgerAppVersion,
       unlockedUntil,
     ],
   );

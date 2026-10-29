@@ -200,6 +200,10 @@ export const en = {
     colChip: 'Chip',
     colFamily: 'Family',
     colVersion: 'Version',
+    versionReported: 'Reported',
+    versionPick: '{{app}} version',
+    versionNote:
+      'The version you pick is what a host reads when it asks the open app for its version. CWS does not switch to that older binary\'s commands. Update reloads published versions for the selected device from Ledger\'s public catalog. Before an update, the list is the bundled catalog for that device.',
     bundled: 'bundled',
     session: 'Session',
     faceId: {
@@ -495,6 +499,7 @@ export const en = {
     advertiseUnsupported: 'Bluetooth advertising is not available for this model.',
     advertisePermission: 'Bluetooth advertising permission was not granted.',
     managerFailed: 'Catalog update failed.',
+    versionSaveFailed: 'Could not save the selected version.',
     nearFailed: 'NEAR failed.',
     passphraseFailed: 'Passphrase failed.',
     qrBadUr: 'This QR code could not be read.',

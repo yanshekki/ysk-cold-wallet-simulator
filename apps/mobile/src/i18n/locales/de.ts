@@ -202,6 +202,10 @@ export const de: MessageTree = {
     colChip: 'Chip',
     colFamily: 'Familie',
     colVersion: 'Version',
+    versionReported: 'Gemeldet',
+    versionPick: 'Version von {{app}}',
+    versionNote:
+      'Die gewählte Version ist das, was ein Host liest, wenn er die Version der geöffneten App abfragt. CWS wechselt nicht auf die Befehle dieses älteren Binaries. Aktualisieren lädt die veröffentlichten Versionen für das gewählte Gerät aus Ledgers öffentlichem Katalog neu. Vor einem Update ist die Liste der mitgelieferte Katalog für dieses Gerät.',
     bundled: 'integriert',
     session: 'Sitzung',
     faceId: {
@@ -497,6 +501,7 @@ export const de: MessageTree = {
     advertiseUnsupported: 'Bluetooth-Senden ist für dieses Modell nicht verfügbar.',
     advertisePermission: 'Bluetooth-Sendeberechtigung wurde nicht erteilt.',
     managerFailed: 'Katalogaktualisierung fehlgeschlagen.',
+    versionSaveFailed: 'Die gewählte Version konnte nicht gespeichert werden.',
     nearFailed: 'NEAR fehlgeschlagen.',
     passphraseFailed: 'Passphrase fehlgeschlagen.',
     qrBadUr: 'Dieser QR-Code konnte nicht gelesen werden.',
