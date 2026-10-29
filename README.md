@@ -195,6 +195,10 @@ That is not absolute safety. Four compatibility choices stay open in 1.1.0:
 
 iOS can warn on a capture. It does not black the live image. Anyone who can unlock the phone, debug the process, photograph the screen, or connect a host can reach more than the UI shows. Details, platform limits, and known host gaps are in [docs/security.md](docs/security.md).
 
+## Testing
+
+What was run, and what was not, is in [docs/testing.md](docs/testing.md). In October 2026 a person reported an iPhone session on 1.1.0 (build 6): the phone advertised as Ledger over Bluetooth, near.com finished login, and one transaction finished. The note records that session on the Ledger Bluetooth path. Seeds are not absolutely safe.
+
 ## Documentation
 
 | Document | What it is |
