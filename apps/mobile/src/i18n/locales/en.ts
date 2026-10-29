@@ -15,6 +15,7 @@ export const en = {
     slip39Ledger: 'Ledger Live requires BIP39.',
     advertising: 'Advertising as {{name}}',
     hostGatt: 'Connected',
+    hostDerive: 'A connected host can derive addresses from this seed.',
     start: 'Start advertising',
     starting: 'Starting Bluetooth…',
     stop: 'Stop advertising',

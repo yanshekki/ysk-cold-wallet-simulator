@@ -17,6 +17,7 @@ export const es: MessageTree = {
     slip39Ledger: 'Ledger Live requiere BIP39.',
     advertising: 'Anunciando como {{name}}',
     hostGatt: 'Conectado',
+    hostDerive: 'Un host conectado puede derivar direcciones de esta semilla.',
     start: 'Anunciar',
     starting: 'Iniciando Bluetooth…',
     stop: 'Detener',

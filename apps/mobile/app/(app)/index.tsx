@@ -33,6 +33,7 @@ import {
   fonts,
   hairline,
   radius,
+  secretInputProps,
   space,
 } from '@cws/ui';
 import { copyText } from '../../src/lab/copy';
@@ -40,6 +41,7 @@ import { HostedSigningModal } from '../../src/signing/HostedSigningModal';
 import { QrMatrix } from '../../src/qr/QrMatrix';
 import { QrScanner } from '../../src/qr/QrScanner';
 import { useT } from '../../src/i18n';
+import { SecretScreenshotBoundary } from '../../src/seeds/secretScreenshot';
 import { useAppState } from '../../src/state/AppState';
 
 const BRANDS: Brand[] = ['ledger', 'trezor', 'onekey'];
@@ -399,6 +401,9 @@ export default function DeviceScreen() {
                             ? t('device.hostGatt')
                             : t('device.advertising', { name: bleAdvertiseName(item) })}
                         </Text>
+                        <Text style={styles.hint} testID="device-host-derive">
+                          {t('device.hostDerive')}
+                        </Text>
                         {isLedger ? (
                           <>
                             <Button
@@ -529,21 +534,20 @@ export default function DeviceScreen() {
     >
       <Text style={styles.hint}>{t('device.passphraseHint')}</Text>
       <TextInput
+        {...secretInputProps}
         testID="device-passphrase-input"
         value={passDraft}
         onChangeText={setPassDraft}
         placeholder={t('device.passphrase')}
         placeholderTextColor={colors.muted}
+        accessibilityLabel={t('device.passphrase')}
         secureTextEntry
         autoCapitalize="none"
-        autoCorrect={false}
-        autoComplete="off"
         textContentType="oneTimeCode"
-        importantForAutofill="no"
-        spellCheck={false}
         style={styles.input}
       />
     </Sheet>
+    {passSheet || (qrSheet && qr?.format === 'crypto-seed') ? <SecretScreenshotBoundary /> : null}
     <QrScanner
       visible={scanOpen && !pending}
       hint={t('device.qrScanHint')}

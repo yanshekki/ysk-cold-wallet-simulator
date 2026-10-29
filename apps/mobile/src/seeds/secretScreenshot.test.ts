@@ -12,4 +12,23 @@ describe('secret screenshot warning', () => {
       expect(source, file).not.toContain('useSecretScreen(() => undefined)');
     }
   });
+
+  it('turns system copy off on seed entry and masked passphrase fields', () => {
+    for (const file of ['app/seeds/import.tsx', 'app/seeds/new.tsx', 'app/(app)/index.tsx']) {
+      const source = readFileSync(path.join(root, file), 'utf8');
+      expect(source, file).toContain('secretInputProps');
+    }
+    const imported = readFileSync(path.join(root, 'app/seeds/import.tsx'), 'utf8');
+    expect(imported).not.toContain('item.ok ? item.word');
+    expect(imported).not.toContain('copyText(');
+  });
+
+  it('arms capture for the passphrase sheet, seed QR, and seed-export confirm', () => {
+    const device = readFileSync(path.join(root, 'app/(app)/index.tsx'), 'utf8');
+    const signing = readFileSync(path.join(root, 'src/signing/HostedSigningModal.tsx'), 'utf8');
+    expect(device).toContain('SecretScreenshotBoundary');
+    expect(device).toContain("qr?.format === 'crypto-seed'");
+    expect(signing).toContain("pending?.kind === 'export-seed'");
+    expect(signing).toContain('SecretScreenshotBoundary');
+  });
 });

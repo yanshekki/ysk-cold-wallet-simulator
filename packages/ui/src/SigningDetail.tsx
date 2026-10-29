@@ -138,6 +138,7 @@ function localize(detail: SigningDetail, request: SigningRequest, copy?: Signing
 export function SigningDetailView({ request, copy }: Props) {
   const detail = localize(describeSigning(request), request, copy);
   const purpose = purposeFor(request, copy);
+  const selectable = request.kind !== 'export-seed';
   return (
     <View style={styles.box}>
       {purpose ? <Text style={styles.purpose}>{purpose}</Text> : null}
@@ -147,7 +148,7 @@ export function SigningDetailView({ request, copy }: Props) {
       {detail.fields.map((field) => (
         <View key={`${field.label}:${field.value.slice(0, 24)}`} style={styles.row}>
           <Text style={styles.label}>{field.label}</Text>
-          <Text style={field.mono ? styles.mono : styles.value} selectable>
+          <Text style={field.mono ? styles.mono : styles.value} selectable={selectable}>
             {field.value}
           </Text>
         </View>
@@ -155,7 +156,7 @@ export function SigningDetailView({ request, copy }: Props) {
       {detail.hex ? (
         <View style={styles.row}>
           <Text style={styles.label}>{copy?.payload ?? 'PAYLOAD'}</Text>
-          <Text style={styles.hex} selectable>
+          <Text style={styles.hex} selectable={selectable}>
             {formatHex(detail.hex)}
           </Text>
         </View>

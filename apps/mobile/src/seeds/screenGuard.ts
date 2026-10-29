@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
 import {
   addScreenshotListener,
@@ -9,6 +9,12 @@ import {
 import { isDevBuild } from '../passkeys/devFlag';
 
 const SECRET_KEY = 'cws-secret';
+
+let secretScreenHolders = 0;
+
+export function resetSecretScreenHoldersForTests(): void {
+  secretScreenHolders = 0;
+}
 
 /**
  * iOS `preventScreenCaptureAsync` re-parents the window into a secure UITextField
@@ -39,15 +45,41 @@ export function unlockSecretScreen(): void {
   }
 }
 
-export function useSecretScreen(onScreenshot: () => void) {
-  useEffect(() => {
-    const sub = addScreenshotListener(onScreenshot);
+/**
+ * Nested secret screens (Vault tab still mounted under Import) share one
+ * Android FLAG_SECURE. The last release is what clears it.
+ */
+export function retainSecretScreen(): () => void {
+  secretScreenHolders += 1;
+  if (secretScreenHolders === 1) {
     lockSecretScreen();
+  }
+  let released = false;
+  return () => {
+    if (released) {
+      return;
+    }
+    released = true;
+    secretScreenHolders = Math.max(0, secretScreenHolders - 1);
+    if (secretScreenHolders === 0) {
+      unlockSecretScreen();
+    }
+  };
+}
+
+export function useSecretScreen(onScreenshot: () => void) {
+  const onScreenshotRef = useRef(onScreenshot);
+  onScreenshotRef.current = onScreenshot;
+  useEffect(() => {
+    const sub = addScreenshotListener(() => {
+      onScreenshotRef.current();
+    });
+    const release = retainSecretScreen();
     return () => {
       sub.remove();
-      unlockSecretScreen();
+      release();
     };
-  }, [onScreenshot]);
+  }, []);
 }
 
 /** Native allow — undoes a leftover iOS secure-canvas from an older JS bundle. */

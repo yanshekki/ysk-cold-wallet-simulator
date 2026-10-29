@@ -17,9 +17,9 @@ import {
   type Bip39WordCount,
   type CustomEntropyKind,
 } from '@cws/sdk';
-import { Button, MnemonicGrid, Screen, colors, fonts, hairline, radius, space } from '@cws/ui';
+import { Button, MnemonicGrid, Screen, colors, fonts, hairline, radius, secretInputProps, space } from '@cws/ui';
 import { useT } from '../../src/i18n';
-import { unlock as requestUnlock } from '../../src/passkeys';
+import { reauthBeforeReveal } from '../../src/passkeys/secretReauth';
 import { generateSecureEntropy, generateSecureSecret, newSlotId } from '../../src/seeds/generate';
 import { collectMotionMix } from '../../src/seeds/motion';
 import { pickVerify, type VerifyPick } from '../../src/seeds/pickVerify';
@@ -133,7 +133,7 @@ export default function NewSeedScreen() {
       setError(t('generate.needSeedAndModel'));
       return;
     }
-    const ok = await requestUnlock(t('unlock.prompt'));
+    const ok = await reauthBeforeReveal(t('unlock.prompt'));
     if (!ok) {
       return;
     }
@@ -258,6 +258,7 @@ export default function NewSeedScreen() {
                     />
                   </View>
                   <TextInput
+                    {...secretInputProps}
                     testID="generate-custom-draft"
                     value={customDraft}
                     onChangeText={setCustomDraft}
@@ -268,9 +269,6 @@ export default function NewSeedScreen() {
                     }
                     placeholderTextColor={colors.muted}
                     autoCapitalize="none"
-                    autoCorrect={false}
-                    autoComplete="off"
-                    spellCheck={false}
                     multiline
                     style={[styles.input, styles.area]}
                   />
@@ -336,6 +334,7 @@ export default function NewSeedScreen() {
               </Text>
               {verify.map((item) => (
                 <TextInput
+                  {...secretInputProps}
                   key={item.index}
                   testID={`generate-verify-${item.index}`}
                   value={guess[item.index] ?? ''}
@@ -343,7 +342,6 @@ export default function NewSeedScreen() {
                   placeholder={`#${item.index + 1}`}
                   placeholderTextColor={colors.muted}
                   autoCapitalize="none"
-                  autoCorrect={false}
                   style={styles.input}
                 />
               ))}

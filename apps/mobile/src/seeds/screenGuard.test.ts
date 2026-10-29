@@ -24,7 +24,7 @@ vi.mock('expo-screen-capture', () => ({
 }));
 
 describe('secret screen capture lock', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     platform.OS = 'android';
     isDevBuild.mockReset();
     isDevBuild.mockReturnValue(false);
@@ -34,6 +34,8 @@ describe('secret screen capture lock', () => {
     preventScreenCaptureAsync.mockResolvedValue(undefined);
     allowScreenCaptureAsync.mockResolvedValue(undefined);
     enableAppSwitcherProtectionAsync.mockResolvedValue(undefined);
+    const { resetSecretScreenHoldersForTests } = await import('./screenGuard');
+    resetSecretScreenHoldersForTests();
   });
 
   it('sets Android FLAG_SECURE in a release build', async () => {
@@ -68,5 +70,16 @@ describe('secret screen capture lock', () => {
     unlockSecretScreen();
     expect(allowScreenCaptureAsync).toHaveBeenCalledWith('cws-secret');
     expect(preventScreenCaptureAsync).not.toHaveBeenCalled();
+  });
+
+  it('keeps Android FLAG_SECURE until the last secret screen releases', async () => {
+    const { retainSecretScreen } = await import('./screenGuard');
+    const releaseA = retainSecretScreen();
+    const releaseB = retainSecretScreen();
+    expect(preventScreenCaptureAsync).toHaveBeenCalledTimes(1);
+    releaseA();
+    expect(allowScreenCaptureAsync).not.toHaveBeenCalled();
+    releaseB();
+    expect(allowScreenCaptureAsync).toHaveBeenCalledWith('cws-secret');
   });
 });

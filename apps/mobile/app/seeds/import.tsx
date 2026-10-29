@@ -10,10 +10,10 @@ import {
   wordCountFromEntropy,
   wordCountOf,
 } from '@cws/sdk';
-import { Button, Screen, colors, fonts, hairline, radius, space } from '@cws/ui';
+import { Button, Screen, colors, fonts, hairline, radius, secretInputProps, space } from '@cws/ui';
 import { useT } from '../../src/i18n';
 import { readClipboard } from '../../src/lab/copy';
-import { unlock as requestUnlock } from '../../src/passkeys';
+import { reauthBeforeReveal } from '../../src/passkeys/secretReauth';
 import { newSlotId } from '../../src/seeds/generate';
 import {
   analyzeImport,
@@ -94,7 +94,7 @@ export default function ImportSeedScreen() {
           setError(t('generate.knownVector'));
           return;
         }
-        if (!(await requestUnlock(t('unlock.prompt')))) {
+        if (!(await reauthBeforeReveal(t('unlock.prompt')))) {
           return;
         }
         const entropy = entropyFromMnemonic(first);
@@ -121,7 +121,7 @@ export default function ImportSeedScreen() {
         }
         return;
       }
-      if (!(await requestUnlock(t('unlock.prompt')))) {
+      if (!(await reauthBeforeReveal(t('unlock.prompt')))) {
         return;
       }
       const secret = combineSlip39(filled, slipPass);
@@ -183,13 +183,13 @@ export default function ImportSeedScreen() {
           />
           <Button testID="import-paste" label={t('import.pasteClipboard')} variant="ghost" onPress={() => void onPaste()} />
           <TextInput
+            {...secretInputProps}
             testID="import-draft"
             value={draft}
             onChangeText={onDraftChange}
             placeholder={t('import.paste')}
             placeholderTextColor={colors.muted}
             autoCapitalize="none"
-            autoCorrect={false}
             multiline
             style={[styles.input, styles.area]}
           />
@@ -208,6 +208,8 @@ export default function ImportSeedScreen() {
                 <View key={`share-${index}`} style={styles.shareCard}>
                   <Text style={styles.shareTitle}>{t('import.shareN', { n: index + 2 })}</Text>
                   <TextInput
+                    {...secretInputProps}
+                    testID={`import-share-${index}`}
                     value={share}
                     onChangeText={(value) => {
                       setKnown(false);
@@ -216,7 +218,6 @@ export default function ImportSeedScreen() {
                     placeholder={t('import.paste')}
                     placeholderTextColor={colors.muted}
                     autoCapitalize="none"
-                    autoCorrect={false}
                     multiline
                     style={[styles.input, styles.area]}
                   />
@@ -242,18 +243,16 @@ export default function ImportSeedScreen() {
                 onPress={() => setExtraShares((current) => [...current, ''])}
               />
               <TextInput
+                {...secretInputProps}
                 testID="import-slip-pass"
                 value={slipPass}
                 onChangeText={setSlipPass}
                 placeholder={t('import.slip39Passphrase')}
                 placeholderTextColor={colors.muted}
+                accessibilityLabel={t('import.slip39Passphrase')}
                 secureTextEntry
                 autoCapitalize="none"
-                autoCorrect={false}
-                autoComplete="off"
                 textContentType="oneTimeCode"
-                importantForAutofill="no"
-                spellCheck={false}
                 style={styles.input}
               />
             </>
@@ -305,7 +304,11 @@ function ShareWords({
           }}
           style={[styles.cell, !item.ok && styles.cellBad]}
           accessibilityLabel={
-            item.ok ? item.word : item.suggestion ? t('import.suggest', { word: item.suggestion }) : t('import.wordUnknown')
+            item.ok
+              ? undefined
+              : item.suggestion
+                ? t('import.suggest', { word: item.suggestion })
+                : t('import.wordUnknown')
           }
         >
           <Text style={styles.index}>{item.index + 1}</Text>

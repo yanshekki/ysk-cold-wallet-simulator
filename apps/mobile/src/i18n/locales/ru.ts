@@ -17,6 +17,7 @@ export const ru: MessageTree = {
     slip39Ledger: 'Ledger Live требует BIP39.',
     advertising: 'Реклама как {{name}}',
     hostGatt: 'Подключено',
+    hostDerive: 'Подключённый хост может получать адреса из этого сида.',
     start: 'Рекламировать',
     starting: 'Запуск Bluetooth…',
     stop: 'Стоп',

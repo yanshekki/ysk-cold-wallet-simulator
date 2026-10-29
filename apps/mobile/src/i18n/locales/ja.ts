@@ -17,6 +17,7 @@ export const ja: MessageTree = {
     slip39Ledger: 'Ledger Live は BIP39 のみ対応です。',
     advertising: '{{name}} として広告中',
     hostGatt: '接続済み',
+    hostDerive: '接続中のホストは、このシードからアドレスを導出できます。',
     start: '広告開始',
     starting: 'Bluetooth を開始中…',
     stop: '停止',
