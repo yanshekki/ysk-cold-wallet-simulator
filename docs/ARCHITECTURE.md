@@ -112,58 +112,55 @@ ysk-cold-wallet-simulator/
 
 **Responsibilities:**
 1. Advertise the exact Service UUID of the selected model
-2. Advertise a local name that matches real devices (e.g. `Ledger Nano X`, `Trezor Safe 7`, `OneKey Pro`)
+2. Advertise the local name from `bleAdvertiseName` (short names such as `Nano X`, `Trezor Safe 7`, `K1234`)
 3. Implement GATT server with the correct characteristics
 4. Handle Write / WriteWithoutResponse → feed into protocol handler
 5. Send Notify responses back to the connected host
 6. Negotiate MTU where possible
 
-**Android:** Full support, including background advertising (with foreground service recommended).  
-**iOS:** Possible, but background time is limited. App should stay in foreground for reliable simulation. Document this limitation clearly in UI.
+**Android and iOS:** The phone advertises only while the app is on screen. The Android connected-device foreground service is removed, and iOS background modes are not set. Simulators and Expo Go cannot advertise BLE.
 
-**Security of BLE link:** Real devices use LE Secure Connections (Numeric Comparison). The simulator should request encrypted links where the library allows. Hosts (Ledger Live, Trezor Suite, OneKey app) will still treat the phone as a legitimate device once the protocol layer answers correctly.
+**BLE link:** This build does not use LE Secure Connections. A host that speaks the vendor protocol can continue after GATT is up. That is not a genuine-device attestation. Ledger Live’s genuine check is not expected to pass. Seeds are not absolutely safe. See `docs/security.md`.
 
 ---
 
-## 4. Seed Security (Most Secure Possible)
+## 4. Seed handling
 
-### Entropy Source (Critical)
+This section describes the vault. It does not make a seed safe. **Seeds are not absolutely safe.** There is no secure element. The public statement is [`docs/security.md`](security.md).
 
-**Correct method (research-backed):**
+### Entropy source
 
 ```ts
 import * as Crypto from 'expo-crypto';
-import { entropyToMnemonic, mnemonicToSeedSync } from '@scure/bip39';
+import { entropyToMnemonic } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
 
-// 16 bytes = 12 words, 32 bytes = 24 words
+// 16 bytes = 12 words, 32 bytes = 24 words. Shown for transcription. Not stored as text.
 const entropy = await Crypto.getRandomBytesAsync(wordCount === 12 ? 16 : 32);
 const mnemonic = entropyToMnemonic(entropy, wordlist);
 ```
 
-**Why this is real:**
-- `expo-crypto.getRandomBytesAsync` uses Android `SecureRandom` (/dev/urandom) and iOS `SecRandomCopyBytes` — both cryptographically secure.
-- Do **not** use `Math.random`, `crypto.getRandomValues` polyfills that fall back to insecure sources, or any WASM-based RNG that has been observed to return zeros on Android after first call.
-- Validate with `@scure/bip39` (audited, constant-time friendly).
+- `expo-crypto.getRandomBytesAsync` uses Android `SecureRandom` and iOS `SecRandomCopyBytes`.
+- Do not use `Math.random`, a `crypto.getRandomValues` polyfill that falls back to an insecure source, or a WASM RNG that has been observed to return zeros on Android after the first call.
+- Validate with `@scure/bip39`.
 
-**Never store the raw mnemonic.**  
-Store only the 64-byte BIP39 seed (or 32-byte entropy) encrypted.
+The vault stores entropy, or the SLIP-39 secret. It does not write the mnemonic to the clipboard.
 
 ### Storage
 
-Use `expo-secure-store` with `WHEN_UNLOCKED_THIS_DEVICE_ONLY`. Entropy is **not** written on web (`saveSlot` throws rather than using `localStorage`).
+Use `expo-secure-store` with `WHEN_UNLOCKED_THIS_DEVICE_ONLY`. The web build refuses to store entropy (`saveSlot` throws).
 
 ```ts
-await SecureStore.setItemAsync(key, base64Seed, {
+await SecureStore.setItemAsync(key, base64Entropy, {
   keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
 });
 ```
 
-**Tradeoff:** `requireAuthentication: true` is **not** set. Extra biometric prompts on every SecureStore read fail under iPhone Mirroring (“continue on iPhone”). The 15-minute app session already required the platform authenticator. Release builds should keep the Settings biometric toggle on; turning it off still allows Start in the current code.
+`requireAuthentication` is not set on the entropy item. The Expo API would prompt on every read, and the app reads entropy while a host lists accounts. That prompt breaks account listing and fails under iPhone Mirroring. After the device is unlocked, the process can read the item without a fresh biometric. Release builds still ask the OS authenticator before reveal, import, save, sign, and seed export. That check is in the application, not a keychain access-control list. A debug build skips the reveal prompt. Sign and seed export on a debug build follow the Settings toggle.
 
-- Android: Hardware-backed Keystore when available
-- iOS: Keychain, device-unlocked
-- Passphrase is **never** persisted. `SecretSession` keeps the derived seed in RAM. Host-supplied Trezor passphrases must surface on the signing chip (`passphraseSource: 'host'`) and must not silently override a device-applied seed.
+- Android may wrap the app storage key in a hardware-backed keystore when the device has one. That is not a secure element, and it does not make the seed absolutely safe.
+- iOS uses the keychain with device-unlocked accessibility. iOS does not black a live screenshot.
+- A passphrase is not persisted. `SecretSession` keeps the derived seed in RAM. Host-supplied Trezor passphrases must surface on the signing chip (`passphraseSource: 'host'`) and must not silently override a device-applied seed.
 - `crypto-seed` QR export requires `SigningModal` (`kind: 'export-seed'`). xpub / hdkey export may stay silent, matching GET_ADDRESS P1=0.
 
 ### Multiple Seeds
@@ -174,7 +171,7 @@ Each seed is a slot:
 - `brand` + `model` (for UI)
 - `wordCount` (12 or 24)
 - `createdAt`
-- Encrypted seed blob in SecureStore under a unique key
+- Entropy, or the SLIP-39 secret, in SecureStore under a unique key
 
 ---
 
@@ -186,10 +183,10 @@ This repo has **no associated domain**, so full WebAuthn passkeys are not used. 
 
 1. Disclaimer, then Unlock.
 2. Release: OS biometric / passcode. Success unlocks a session (`autoLockMinutes`, default 15).
-3. Debug: skip the OS prompt, Android FLAG_SECURE, and the new-seed verify quiz so USB / screenshot-gated lab tests can proceed (annotated in code). Release keeps all three.
+3. Debug builds skip the OS unlock prompt, Android `FLAG_SECURE`, and the new-seed verify quiz. Release builds keep all three.
 4. Session expiry returns to `/unlock`. Passphrase overlay is wiped with `SecretSession`.
 
-Do not document this as a resident passkey. A future associated-domain passkey can sit in front of the same session gate.
+Unlock uses the OS authenticator. It is not a resident passkey.
 
 ---
 
@@ -211,7 +208,7 @@ export interface ProtocolHandler {
 - Parse Ledger BLE framing (`0x05` + seq + len)
 - Reconstruct full APDU
 - Dispatch common APDUs (GET_VERSION, GET_APP_NAME, etc.)
-- For signing APDUs: require passphrase entry + user confirmation on the phone UI, then sign with the unlocked seed using standard crypto libraries
+- For signing APDUs: show the review and wait for press-and-hold, then sign. A passphrase is optional and stays in session memory.
 - Reply with proper framed response + status words (`0x9000` success)
 
 ### protocol-trezor
@@ -253,10 +250,10 @@ Declared versions live in each workspace `package.json`. The phone app uses Expo
 The security statement for readers is `docs/security.md`. In short: seeds are not absolutely safe. This build has no secure element.
 
 - **BLE peripheral requires a physical phone.** Simulators and Expo Go cannot advertise GATT.
-- **USB** is not emulated inside the phone. Desktop wallets that only speak HID use `apps/proxy` (Linux uhid / macOS CWS Proxy) as a local gadget that forwards to the phone over BLE.
-- **iOS background BLE** is restricted. Keep the app in foreground. Notify MTU stays 20 on iOS.
-- **BLE link is not LE Secure Connections.** Hosts still talk the vendor protocol once GATT is up.
-- **Real devices have Secure Elements.** This is a software simulator. Treat it as a development/testing tool, not a replacement for a hardware wallet for large amounts.
+- **USB** is not emulated inside the phone. Desktop wallets that only speak HID use Linux `uhid` (`yarn proxy`) or the macOS CWS Proxy app. Virtual HID is not implemented on Windows. The gadget forwards to the phone over BLE.
+- **Advertising stays in the foreground.** The Android connected-device foreground service is removed. iOS background modes are not set. Notify MTU stays 20 on iOS.
+- **BLE link is not LE Secure Connections.** A host that speaks the vendor protocol can continue once GATT is up.
+- **Real devices have secure elements.** This build does not. It is a simulator for development and interoperability testing. Do not hold real digital assets with it. Seeds are not absolutely safe.
 - Host apps may perform extra checks (Genuine, certificates). Do not expect Ledger Live Genuine to pass.
 - iOS has no `preventScreenCapture` equivalent to Android `FLAG_SECURE`. Release Android still sets FLAG_SECURE on Vault / secret screens; debug skips it so `adb screencap` QA can see the UI.
 
