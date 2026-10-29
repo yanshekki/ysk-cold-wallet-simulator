@@ -1,6 +1,8 @@
 # CWS Proxy macOS screenshots
 
-Version **1.1.0**. Bundle `hk.ysk.cws.proxy`. Two complete Mac sets. Upload one folder per App Store locale.
+Store index: [../README.md](../README.md).
+
+Version **1.1.0 (build 6)**. Bundle `hk.ysk.cws.proxy`. Two complete Mac sets, in `zh-HK/` and `en/` only. Upload one folder per App Store Connect localization. Do not mix the two locales.
 
 Primary size is `2880×1800`. `1280×800` is the same frame, scaled.
 
