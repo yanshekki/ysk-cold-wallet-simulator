@@ -121,6 +121,7 @@ export const de: MessageTree = {
     copyShare: 'Anteil kopieren',
     copyShareTitle: 'Nicht kopiert',
     copyShareBody: 'Der Wiederherstellungsanteil bleibt auf diesem Bildschirm und wird nicht in die Zwischenablage geschrieben.',
+    screenshot: 'Screenshot gespeichert. Auf diesem Bildschirm liegen Wiederherstellungsdaten.',
     createNear: 'NEAR-Konto ableiten',
     authPrompt: 'Entsperren',
   },

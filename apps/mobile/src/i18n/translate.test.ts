@@ -76,6 +76,10 @@ describe('platform-aware authenticator copy', () => {
     expect(translate('zh-HK', 'signing.field.to')).toBe('收款地址');
     expect(translate('en', 'signing.field.payload')).toBe('Payload');
     expect(translate('zh-HK', 'signing.field.payload')).toBe('資料負載');
+    expect(translate('en', 'vault.screenshot')).toBe('Screenshot saved. Recovery material is on this screen.');
+    for (const language of LANGUAGES) {
+      expect(translate(language, 'vault.screenshot')).not.toBe('vault.screenshot');
+    }
     expect(translate('en', 'signing.headlineEip7702')).toBe('EIP-7702 authorization');
     expect(translate('zh-HK', 'signing.headlineEip7702')).toBe('EIP-7702 授權');
     expect(translate('zh-HK', 'signing.notice7702')).toContain('合約');

@@ -22,7 +22,7 @@ import {
   splitShares,
   type ImportShareView,
 } from '../../src/seeds/importParse';
-import { useSecretScreen } from '../../src/seeds/screenGuard';
+import { useSecretScreenshotWarning } from '../../src/seeds/secretScreenshot';
 import { saveSlot } from '../../src/seeds/vault';
 import { useAppState } from '../../src/state/AppState';
 
@@ -36,7 +36,7 @@ export default function ImportSeedScreen() {
   const [slipPass, setSlipPass] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [known, setKnown] = useState(false);
-  useSecretScreen(() => undefined);
+  useSecretScreenshotWarning();
 
   const analysis = useMemo(() => analyzeImport([draft, ...extraShares]), [draft, extraShares]);
   const slipMode = analysis.scheme === 'slip39';

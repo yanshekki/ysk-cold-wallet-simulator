@@ -121,6 +121,7 @@ export const ru: MessageTree = {
     copyShare: 'Копировать долю',
     copyShareTitle: 'Не скопировано',
     copyShareBody: 'Доля восстановления остаётся на этом экране и не попадает в буфер обмена.',
+    screenshot: 'Снимок сохранён. На этом экране есть данные для восстановления.',
     createNear: 'Вывести счёт NEAR',
     authPrompt: 'Разблокировать',
   },

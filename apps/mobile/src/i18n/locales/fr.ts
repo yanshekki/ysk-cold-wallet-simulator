@@ -121,6 +121,7 @@ export const fr: MessageTree = {
     copyShare: 'Copier la part',
     copyShareTitle: 'Non copié',
     copyShareBody: 'La part de récupération reste sur cet écran. Elle n’est pas écrite dans le presse-papiers.',
+    screenshot: 'Capture enregistrée. Des données de récupération sont à l’écran.',
     createNear: 'Dériver le compte NEAR',
     authPrompt: 'Déverrouiller',
   },

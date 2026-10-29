@@ -121,6 +121,7 @@ export const ja: MessageTree = {
     copyShare: 'シェアをコピー',
     copyShareTitle: 'コピーしません',
     copyShareBody: 'リカバリーシェアはこの画面にだけ残ります。クリップボードには書き込みません。',
+    screenshot: 'スクリーンショットを保存しました。この画面に復元用の情報があります。',
     createNear: 'NEAR アカウントを導出',
     authPrompt: 'ロック解除',
   },

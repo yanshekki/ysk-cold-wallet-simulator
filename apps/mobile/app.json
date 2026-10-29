@@ -42,6 +42,7 @@
         }
       ],
       "./plugins/withForegroundOnlyBle",
+      "./plugins/withBlockedDebugPermissions",
       "expo-localization",
       "expo-font",
       [

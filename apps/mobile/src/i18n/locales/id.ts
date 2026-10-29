@@ -121,6 +121,7 @@ export const id: MessageTree = {
     copyShare: 'Salin bagian',
     copyShareTitle: 'Tidak disalin',
     copyShareBody: 'Bagian pemulihan tetap di layar ini dan tidak ditulis ke papan klip.',
+    screenshot: 'Tangkapan layar tersimpan. Materi pemulihan ada di layar ini.',
     createNear: 'Turunkan akun NEAR',
     authPrompt: 'Buka kunci',
   },

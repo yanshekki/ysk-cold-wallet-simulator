@@ -119,6 +119,7 @@ export const en = {
     copyShare: 'Copy share',
     copyShareTitle: 'Not copied',
     copyShareBody: 'The recovery share stays on this screen. It is not written to the clipboard.',
+    screenshot: 'Screenshot saved. Recovery material is on this screen.',
     createNear: 'Derive NEAR account',
     authPrompt: 'Unlock',
   },
