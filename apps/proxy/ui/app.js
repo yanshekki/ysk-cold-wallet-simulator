@@ -449,7 +449,13 @@ function bindPower() {
       return;
     }
     last = now;
-    void post(state.status?.running ? '/stop' : '/start');
+    void post(state.status?.running ? '/stop' : '/start').catch((error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      const phase = $('phase');
+      if (phase) {
+        phase.innerHTML = `<strong>${t('error')}</strong> ${message}`;
+      }
+    });
   };
   button.addEventListener('pointerdown', fire);
   button.addEventListener('click', fire);
