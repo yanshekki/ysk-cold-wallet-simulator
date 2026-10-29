@@ -6,7 +6,7 @@
 
 ## What 1.1.0 is
 
-1.1.0 (build 6) publishes the code on main, with this version number, public documentation, and removal of local signing identity from the tree. It does not add a new handset pass of its own.
+1.1.0 (build 6) publishes the code on main, with this version number, public documentation, and removal of local signing identity from the tree. It does not add a new handset pass of its own. User-reported near.com and Core sessions are listed under Third-party hosts.
 
 ## Automated
 
@@ -46,9 +46,22 @@ The arm64 package was installed on Ubuntu 24.04 and on Ubuntu 22.04. On 22.04, `
 
 Those containers have no `uhid` kernel module and no udev daemon, so `modprobe uhid` and `udevadm control --reload-rules` did not succeed there. The install still finished. This did not open `/dev/uhid`, did not log in a desktop user in `plugdev`, and did not connect a phone. `.github/workflows/cws-proxy-deb.yml` is set up to build, install, and smoke-test both architectures on Ubuntu 24.04. A green workflow run is that check. It is not a desktop `/dev/uhid` session.
 
+## Third-party hosts
+
+Two device sessions, reported by a person in October 2026. Each row is that host on that path. Seeds are not absolutely safe. See [security.md](security.md). This page does not record which secret a session used.
+
+| Host | Path | Reported result |
+| --- | --- | --- |
+| near.com | Ledger over Bluetooth (BLE) | Login succeeded. One transaction succeeded. |
+| Core (core.app) | CWS Proxy (wired to the host), Ledger identity | Avalanche C-Chain → X-Chain → P-Chain → X-Chain → C-Chain export/import succeeded. |
+
+The near.com phone was an iPhone running 1.1.0 (build 6). That tree includes the Near sign-message sheets and the Ledger catalog version picker. The phone advertised as Ledger over Bluetooth. near.com finished login, and one transaction finished.
+
+Core connected to a Ledger identity on CWS through CWS Proxy. The host path in this report is the proxy. Core finished the export/import round-trip across C-Chain, X-Chain, and P-Chain in the order above. The row records core.app on CWS Proxy for that sequence. Other Avalanche hosts are outside this report. The separate gap remains: Avalanche Core may not list X and P accounts end to end. See the list below and [security.md](security.md).
+
 ## Not tested, and not claimed
 
 - A release build’s OS authenticator prompt was not shown on a device for 1.1.0.
 - iOS screenshot behaviour was not re-checked on a device for this version note. The iOS limit is described in [security.md](security.md).
 - Phantom unlock, Rabby camera scan, Avalanche Core X/P listing, and OKX asset display were not closed. See known host gaps in the security document.
-- No test used a secret that controls real funds. Do not add one.
+- The automated suites, the October Android handset checks, and the Ubuntu package checks did not use a secret that controls real funds. Do not add one.

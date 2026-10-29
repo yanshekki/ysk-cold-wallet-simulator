@@ -195,6 +195,10 @@ That is not absolute safety. Four compatibility choices stay open in 1.1.0:
 
 iOS can warn on a capture. It does not black the live image. Anyone who can unlock the phone, debug the process, photograph the screen, or connect a host can reach more than the UI shows. Details, platform limits, and known host gaps are in [docs/security.md](docs/security.md).
 
+## Testing
+
+What was run, and what was not, is in [docs/testing.md](docs/testing.md). In October 2026 a person reported two sessions. An iPhone running 1.1.0 (build 6) advertised as Ledger over Bluetooth, and near.com finished login and one transaction. Core (core.app) used a Ledger identity on CWS through CWS Proxy and finished an Avalanche export/import round-trip: C-Chain → X-Chain → P-Chain → X-Chain → C-Chain. Each note is that host on that path. The Core note leaves the separate X/P account-listing gap in place. Seeds are not absolutely safe.
+
 ## Documentation
 
 | Document | What it is |

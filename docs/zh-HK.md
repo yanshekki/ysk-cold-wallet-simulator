@@ -241,7 +241,7 @@ iOS 可以在系統報告截圖時顯示警告，不會把即時畫面塗黑。�
 
 ## 測試紀錄
 
-本節與 [testing.md](testing.md) 同一要旨。1.1.0（組建編號 6）發布的是 main 上的程式，連同版本號、公開文件，以及從版本庫移除本機簽署身份。它本身沒有另一次實機驗收。
+本節與 [testing.md](testing.md) 同一要旨。1.1.0（組建編號 6）發布的是 main 上的程式，連同版本號、公開文件，以及從版本庫移除本機簽署身份。它本身沒有另一次實機驗收。使用者報告的 near.com 與 Core 會話見〈第三方主機〉。
 
 自動測試：
 
@@ -261,12 +261,25 @@ iOS 可以在系統報告截圖時顯示警告，不會把即時畫面塗黑。�
 
 可安裝的 amd64 與 arm64 `.deb` 曾在 Ubuntu 容器內以 `apt` 安裝。`dpkg-deb` 接受這兩個檔案，`cws-proxy --help` 印出用法，本機頁面有回應，udev 規則與原始碼相同，`/etc/modules-load.d/cws-proxy.conf` 內容是 `uhid`。arm64 套件在 Ubuntu 24.04 與 22.04 安裝；22.04 上移除套件後，該規則與 modules-load 檔一併刪除。amd64 套件在 Ubuntu 24.04 安裝。這些容器的核心沒有 `uhid` 模組，亦沒有 udev 守護行程，所以 `modprobe` 與 `udevadm` 在那裡沒有成功，安裝仍然完成。該次沒有開啟 `/dev/uhid`，沒有桌面登入，亦沒有連接手機。
 
+### 第三方主機
+
+2026 年 10 月有兩次使用者報告的實機會話。每一列只記錄該主機在該路徑上的結果。種子並非絕對安全。見 [security.md](security.md)。此頁沒有記錄各次使用的秘密資料。
+
+| 主機 | 路徑 | 報告結果 |
+| --- | --- | --- |
+| near.com | Ledger 藍牙（BLE） | 登入成功。一筆交易成功。 |
+| Core（core.app） | CWS Proxy（主機側為有線），Ledger 身份 | Avalanche C 鏈 → X 鏈 → P 鏈 → X 鏈 → C 鏈的匯出／匯入來回成功。 |
+
+near.com 的手機是一部 iPhone，運行 1.1.0（組建編號 6）。該程式包含 Near 簽署訊息表，以及 Ledger 目錄的版本選擇。手機以 Ledger 裝置經藍牙廣播。near.com 完成登入，並完成一筆交易。
+
+Core 經 CWS Proxy 連接，使用的是 CWS 的 Ledger 身份。此報告的主機路徑是代理程式。Core 按上表順序完成 C 鏈、X 鏈與 P 鏈之間的匯出／匯入來回。此列記錄 core.app 在 CWS Proxy 上的該序列。其他 Avalanche 主機不在此報告內。另一項缺口仍然保留：Avalanche Core 可能無法完整列出 X 與 P 帳戶。見下列清單及 [security.md](security.md)。
+
 下列項目沒有在 1.1.0 的實機上測試，亦沒有宣稱完成：
 
 - 正式組建的作業系統認證提示沒有在裝置上顯示。
 - 本版本說明沒有在 iOS 裝置上重測截圖行為。iOS 限制見〈平台限制〉。
 - Phantom 解鎖、Rabby 相機掃描、Avalanche Core 的 X／P 列出，以及 OKX 資產顯示，均未結束。見〈已知的主機缺口〉。
-- 沒有任何測試使用掌管真實資金的秘密資料。請勿加入。
+- 自動測試、2026 年 10 月的 Android 實機檢查，以及 Ubuntu 安裝包檢查，均沒有使用掌管真實資金的秘密資料。請勿加入。
 
 ## 文件
 
