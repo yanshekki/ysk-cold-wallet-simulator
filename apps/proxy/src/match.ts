@@ -107,7 +107,7 @@ function gapLabel(advertised: string): string {
 }
 
 /**
- * iOS CoreBluetooth reports `Shek Ki的iPhone [Pro 2 A1B2]` when CWS localName
+ * iOS CoreBluetooth reports `Sample的iPhone [Pro 2 A1B2]` when CWS localName
  * is wrapped by the phone GAP name. Android usually advertises the CWS name
  * alone. Use this only as a tie-break — both can be valid CWS advertisers.
  */

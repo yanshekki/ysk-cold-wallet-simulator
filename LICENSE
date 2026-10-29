@@ -1,0 +1,9 @@
+Copyright (c) 2026 YSK Limited. All rights reserved.
+
+The source of YSK Cold Wallet Simulator is published so that its behaviour and security limits can be read. No other licence is granted.
+
+You may clone this repository and propose changes. You may not present the software as an official product of Ledger, Trezor, OneKey, or any other wallet vendor. You may not remove or contradict the statement that seeds are not absolutely safe.
+
+The software is provided as is, without warranty of any kind. It is not fit for holding real digital assets. YSK Limited accepts no liability for loss of secrets or assets arising from use of this software.
+
+If you need a different licence, ask YSK Limited. Silence is not a grant.

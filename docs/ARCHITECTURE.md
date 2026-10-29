@@ -1,11 +1,12 @@
 # YSK Cold Wallet Simulator — Architecture Document
 
-**Project Name:** `ysk-cold-wallet-simulator`  
-**Display Name:** YSK Cold Wallet Simulator  
-**Style:** ysk-kit (Expo TypeScript monorepo)  
-**Scope:** Phone-as-device simulator for Ledger / Trezor / OneKey. Primary transport is BLE GATT peripheral. USB HID is bridged through `apps/proxy` + `packages/native-proxy`. Air-gap QR lives in `packages/protocol-qr`.  
-**Platform Priority:** Android first. iOS if feasible (with known background limitations).  
-**No mocks.** Real protocol implementations for every supported product.
+**Project:** `ysk-cold-wallet-simulator`  
+**Product:** YSK Cold Wallet Simulator (CWS), version 1.1.0 (build 6)  
+**Publisher:** YSK Limited  
+**Layout:** Expo TypeScript monorepo  
+**Scope:** The phone acts as a Bluetooth hardware-wallet peripheral for selected Ledger, Trezor, and OneKey models. USB HID is bridged by `apps/proxy` and `packages/native-proxy`. Air-gap QR lives in `packages/protocol-qr`.  
+**Platforms:** Android and iOS on a physical phone. Simulators and Expo Go cannot advertise BLE. iOS keeps the radio in the foreground.  
+**Protocols:** The handlers speak the vendor formats. They are not brand apps and they are not endorsed by those vendors.
 
 ---
 
@@ -74,7 +75,7 @@ Only Safe 7 has BLE. Older models are USB-only.
 
 ---
 
-## 2. High-Level Architecture (ysk-kit Style)
+## 2. High-Level Architecture
 
 ```
 ysk-cold-wallet-simulator/
@@ -241,38 +242,15 @@ export interface ProtocolHandler {
 
 ---
 
-## 8. Key Dependencies (apps/mobile)
+## 8. Dependencies
 
-```json
-{
-  "expo-crypto": "~14.0.0",
-  "expo-secure-store": "~14.0.0",
-  "expo-local-authentication": "~15.0.0",
-  "munim-bluetooth": "latest",
-  "@scure/bip39": "^1.4.0",
-  "@noble/curves": "^1.6.0",
-  "@noble/hashes": "^1.5.0"
-}
-```
+Declared versions live in each workspace `package.json`. The phone app uses Expo, `expo-secure-store`, `expo-local-authentication`, and `munim-bluetooth`. Cryptography uses `@noble/*` and `@scure/*`.
 
 ---
 
-## 9. Implementation Order for Cursor
+## 9. Limitations
 
-1. Scaffold monorepo + contracts
-2. Implement secure seed generation + SecureStore vault (with tests for entropy)
-3. Build brand/model picker + seed UI
-4. Integrate munim-bluetooth peripheral advertising (start with Ledger Nano X UUIDs)
-5. Implement protocol-ledger (framing + basic APDUs + signing)
-6. Add OneKey V1
-7. Add Trezor THP (most complex)
-8. Add remaining Ledger models (just UUID + name differences)
-9. Passkey unlock layer
-10. Polish UI + background service (Android)
-
----
-
-## 10. Limitations & Honesty
+The security statement for readers is `docs/security.md`. In short: seeds are not absolutely safe. This build has no secure element.
 
 - **BLE peripheral requires a physical phone.** Simulators and Expo Go cannot advertise GATT.
 - **USB** is not emulated inside the phone. Desktop wallets that only speak HID use `apps/proxy` (Linux uhid / macOS CWS Proxy) as a local gadget that forwards to the phone over BLE.
@@ -284,5 +262,5 @@ export interface ProtocolHandler {
 
 ---
 
-**Document version:** 1.3  
-**Date:** 2026-10-27
+**Document version:** 1.1.0  
+**Date:** 2026-10-29

@@ -31,3 +31,14 @@ apps/proxy/test-results/
 apps/proxy/playwright-report/
 apps/proxy/blob-report/
 apps/mobile/.maestro/screenshots/
+
+# Local captures and signing material. Never commit these.
+chrome/
+apps/proxy/dist/
+apps/proxy/macos/CWSProxy/DerivedData/
+**/DerivedData/
+*.provisionprofile
+*.cer
+*.pem
+upload-keystore*
+*.keystore
