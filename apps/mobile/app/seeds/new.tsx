@@ -23,7 +23,7 @@ import { unlock as requestUnlock } from '../../src/passkeys';
 import { generateSecureEntropy, generateSecureSecret, newSlotId } from '../../src/seeds/generate';
 import { collectMotionMix } from '../../src/seeds/motion';
 import { pickVerify, type VerifyPick } from '../../src/seeds/pickVerify';
-import { useSecretScreen } from '../../src/seeds/screenGuard';
+import { useSecretScreenshotWarning } from '../../src/seeds/secretScreenshot';
 import { saveSlot } from '../../src/seeds/vault';
 import { useAppState } from '../../src/state/AppState';
 
@@ -59,7 +59,7 @@ export default function NewSeedScreen() {
   const [revealMeta, setRevealMeta] = useState<RevealMeta | null>(null);
   const [hexRefused, setHexRefused] = useState(false);
   const revealing = Boolean(mnemonic || shares.length);
-  useSecretScreen(() => undefined);
+  useSecretScreenshotWarning();
 
   const slipScheme = backup === 'slip39' ? { threshold: shareCount === 1 ? 1 : threshold, count: shareCount } : null;
 

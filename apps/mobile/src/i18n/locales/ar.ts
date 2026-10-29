@@ -121,6 +121,7 @@ export const ar: MessageTree = {
     copyShare: 'نسخ الحصة',
     copyShareTitle: 'لم يُنسخ',
     copyShareBody: 'تبقى حصة الاسترداد على هذه الشاشة ولا تُكتب في الحافظة.',
+    screenshot: 'تم حفظ لقطة الشاشة. مواد الاسترداد ظاهرة على هذه الشاشة.',
     createNear: 'اشتقاق حساب NEAR',
     authPrompt: 'فتح القفل',
   },

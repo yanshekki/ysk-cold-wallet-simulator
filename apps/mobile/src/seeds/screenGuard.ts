@@ -13,12 +13,13 @@ const SECRET_KEY = 'cws-secret';
 /**
  * iOS `preventScreenCaptureAsync` re-parents the window into a secure UITextField
  * and paints a black overlay while `UIScreen.isCaptured` (mirroring / USB / Control
- * Center). That blacks the live Vault tab. Warn on screenshots instead; Android
- * FLAG_SECURE still hides recents without covering the display.
+ * Center). That blacks the live Vault tab. iOS does not set FLAG_SECURE.
+ * Callers pass a warning toast. Android release still sets FLAG_SECURE, which
+ * hides recents without covering the display.
  *
  * Debug builds skip Android FLAG_SECURE so `adb exec-out screencap` and other
- * screenshot-gated QA can capture Vault / seed UI. Same rationale as skipping
- * biometrics in `session.ts`. Release Android keeps FLAG_SECURE.
+ * screenshot-gated QA can capture Vault / seed UI. The screenshot listener
+ * still warns. Same rationale as skipping biometrics in `session.ts`.
  */
 export function lockSecretScreen(): void {
   if (Platform.OS === 'android') {

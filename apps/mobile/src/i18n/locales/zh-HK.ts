@@ -121,6 +121,7 @@ export const zhHK: MessageTree = {
     copyShare: '複製份額',
     copyShareTitle: '不會複製',
     copyShareBody: '還原份額只留在此畫面，不會寫入剪貼簿。',
+    screenshot: '已截圖。此畫面有還原資料。',
     createNear: '衍生 NEAR 帳戶',
     authPrompt: '解鎖',
   },

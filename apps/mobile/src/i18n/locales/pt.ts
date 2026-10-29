@@ -121,6 +121,7 @@ export const pt: MessageTree = {
     copyShare: 'Copiar partilha',
     copyShareTitle: 'Não copiado',
     copyShareBody: 'A partilha de recuperação fica neste ecrã. Não é escrita na área de transferência.',
+    screenshot: 'Captura guardada. Há material de recuperação neste ecrã.',
     createNear: 'Derivar conta NEAR',
     authPrompt: 'Desbloquear',
   },

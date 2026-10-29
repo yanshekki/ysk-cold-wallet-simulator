@@ -25,7 +25,7 @@ import {
 import { copyText } from '../../src/lab/copy';
 import { useT } from '../../src/i18n';
 import { unlock as requestUnlock } from '../../src/passkeys';
-import { useSecretScreen } from '../../src/seeds/screenGuard';
+import { useSecretScreenshotWarning } from '../../src/seeds/secretScreenshot';
 import { deleteSlot, listSlots, loadEntropy, loadShares } from '../../src/seeds/vault';
 import { useAppState } from '../../src/state/AppState';
 
@@ -46,7 +46,7 @@ export default function VaultScreen() {
   const [slotsReady, setSlotsReady] = useState(false);
   const cache = useRef(new Map<string, InspectRow[]>());
   const inspectSeq = useRef(0);
-  useSecretScreen(() => undefined);
+  useSecretScreenshotWarning();
 
   const refresh = useCallback(async () => {
     try {

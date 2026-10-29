@@ -121,6 +121,7 @@ export const es: MessageTree = {
     copyShare: 'Copiar parte',
     copyShareTitle: 'No copiado',
     copyShareBody: 'La parte de recuperación permanece en esta pantalla. No se escribe en el portapapeles.',
+    screenshot: 'Captura guardada. Hay material de recuperación en esta pantalla.',
     createNear: 'Derivar cuenta NEAR',
     authPrompt: 'Desbloquear',
   },
