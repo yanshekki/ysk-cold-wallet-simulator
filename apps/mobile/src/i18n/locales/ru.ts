@@ -202,6 +202,10 @@ export const ru: MessageTree = {
     colChip: 'Chip',
     colFamily: 'Family',
     colVersion: 'Version',
+    versionReported: 'Сообщаемая',
+    versionPick: 'Версия {{app}}',
+    versionNote:
+      'Выбранная версия — это то, что хост читает, когда запрашивает версию открытого приложения. CWS не переключается на команды этого старого двоичного файла. Обновление заново загружает опубликованные версии для выбранного устройства из публичного каталога Ledger. До обновления список — это каталог, встроенный для этого устройства.',
     bundled: 'встроенное',
     session: 'Сессия',
     faceId: {
@@ -497,6 +501,7 @@ export const ru: MessageTree = {
     advertiseUnsupported: 'Реклама Bluetooth недоступна для этой модели.',
     advertisePermission: 'Разрешение на рекламу Bluetooth не предоставлено.',
     managerFailed: 'Не удалось обновить каталог.',
+    versionSaveFailed: 'Не удалось сохранить выбранную версию.',
     nearFailed: 'Сбой NEAR.',
     passphraseFailed: 'Сбой парольной фразы.',
     qrBadUr: 'Не удалось прочитать этот QR-код.',

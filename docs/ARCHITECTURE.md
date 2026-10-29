@@ -211,6 +211,19 @@ export interface ProtocolHandler {
 - For signing APDUs: show the review and wait for press-and-hold, then sign. A passphrase is optional and stays in session memory.
 - Reply with proper framed response + status words (`0x9000` success)
 
+#### Reported app version
+
+Settings → Ledger catalog. The version on a row is what a host reads for that open app:
+
+- App `GET_VERSION` major, minor, and patch bytes (Cardano is `CLA 0xD7 INS 0x00`: those three bytes plus the existing flags byte).
+- ASCII version in `GET_APP_AND_VERSION` (`CLA 0xB0 INS 0x01`).
+
+Dashboard `GET_VERSION` (`CLA 0xE0 INS 0x01`) stays the device OS string. App name strings and flag bytes stay as this build already sends them. Choosing 7.2.1 does not replay the 7.2.1 binary’s commands. A version component above 255 is omitted, because the 3-byte reply cannot carry it. The current Polymesh string `8.8000001.7` stays selectable as the snapshot default; `GET_APP_AND_VERSION` still sends that full string.
+
+Update Ledger apps loads two public Ledger endpoints for the selected device, provider 1: `v2/apps/by-target` (the default reported version, same as before) and `/api/applications` (every published build). The pick is kept when that version is still in the new list. Before an update, each model uses the bundled list in `ledgerVersionIndex.json` (Nano X, Stax, Flex, Nano G5; snapshot 29 Oct 2026). Cardano `7.0.0` is on Ledger’s club provider and is not in that default catalog. `7.1.1` through `7.3.1` are, and an older host that rejects 8.x and recommends “7.0” accepts those 7.x builds.
+
+QR air-gap does not speak Ledger `GET_VERSION`. The desktop proxy forwards HID to the phone, so the phone’s pick is what the HID host reads. The proxy fills an empty `GET_APP_AND_VERSION` from its own bundled catalog only when the phone reply has no version.
+
 ### protocol-trezor
 - Implement THP L2 framing
 - Implement Noise XX handshake (use audited Noise implementation, e.g. `@noble/curves` + AES-GCM)

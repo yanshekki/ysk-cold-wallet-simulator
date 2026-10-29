@@ -7,7 +7,9 @@ import { settingsStyles as styles } from '../../../src/settings/styles';
 
 export default function CatalogSettingsScreen() {
   const t = useT();
-  const { settings, catalog, updateLedgerCatalog, showToast, runWithLoading } = useAppState();
+  const { settings, catalog, catalogModelId, model, updateLedgerCatalog, selectLedgerAppVersion, showToast, runWithLoading } =
+    useAppState();
+  const modelId = model?.brand === 'ledger' ? model.id : 'nano-x';
 
   const onUpdate = async () => {
     try {
@@ -22,12 +24,28 @@ export default function CatalogSettingsScreen() {
     ? new Date(settings.catalogUpdatedAt).toISOString()
     : t('settings.bundled');
 
+  const onSelectVersion = async (id: string, version: string) => {
+    try {
+      await selectLedgerAppVersion(id, version);
+    } catch {
+      Alert.alert(t('common.error'), t('errors.versionSaveFailed'));
+    }
+  };
+
   return (
     <SettingsScreen title={t('settings.catalogPage')}>
       <Button testID="settings-catalog-update" label={t('settings.ledgerUpdate')} onPress={() => void onUpdate()} />
       <Text style={styles.meta}>{t('settings.ledgerWhen', { when })}</Text>
+      <Text style={styles.meta} testID="catalog-version-note">
+        {t('settings.versionNote')}
+      </Text>
       <CatalogTable
         apps={catalog}
+        modelId={modelId}
+        savedModelId={catalogModelId}
+        onSelectVersion={(id, version) => {
+          void onSelectVersion(id, version);
+        }}
         labels={{
           search: t('common.search'),
           app: t('settings.colApp'),
@@ -35,6 +53,9 @@ export default function CatalogSettingsScreen() {
           family: t('settings.colFamily'),
           version: t('settings.colVersion'),
           empty: t('settings.catalogEmpty'),
+          reported: t('settings.versionReported'),
+          cancel: t('common.cancel'),
+          versionPick: (app) => t('settings.versionPick', { app }),
         }}
       />
     </SettingsScreen>

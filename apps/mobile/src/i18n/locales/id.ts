@@ -202,6 +202,10 @@ export const id: MessageTree = {
     colChip: 'Chip',
     colFamily: 'Family',
     colVersion: 'Version',
+    versionReported: 'Dilaporkan',
+    versionPick: 'Versi {{app}}',
+    versionNote:
+      'Versi yang dipilih adalah yang dibaca host saat meminta versi aplikasi yang terbuka. CWS tidak beralih ke perintah biner lama itu. Perbarui memuat ulang versi yang diterbitkan untuk perangkat yang dipilih dari katalog publik Ledger. Sebelum diperbarui, daftarnya adalah katalog bawaan untuk perangkat itu.',
     bundled: 'bawaan',
     session: 'Sesi',
     faceId: {
@@ -497,6 +501,7 @@ export const id: MessageTree = {
     advertiseUnsupported: 'Iklan Bluetooth tidak tersedia untuk model ini.',
     advertisePermission: 'Izin iklan Bluetooth tidak diberikan.',
     managerFailed: 'Pembaruan katalog gagal.',
+    versionSaveFailed: 'Versi yang dipilih tidak dapat disimpan.',
     nearFailed: 'NEAR gagal.',
     passphraseFailed: 'Frasa sandi gagal.',
     qrBadUr: 'Kode QR ini tidak dapat dibaca.',

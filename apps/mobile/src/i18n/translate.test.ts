@@ -77,6 +77,9 @@ describe('platform-aware authenticator copy', () => {
     expect(translate('en', 'signing.field.payload')).toBe('Payload');
     expect(translate('zh-HK', 'signing.field.payload')).toBe('資料負載');
     expect(translate('en', 'vault.screenshot')).toBe('Screenshot saved. Recovery material is on this screen.');
+    expect(translate('en', 'settings.versionNote')).toContain('does not switch');
+    expect(translate('zh-HK', 'settings.versionNote')).toContain('不會改用');
+    expect(translate('en', 'settings.versionPick', { app: 'Cardano ADA' })).toBe('Cardano ADA version');
     for (const language of LANGUAGES) {
       expect(translate(language, 'vault.screenshot')).not.toBe('vault.screenshot');
     }

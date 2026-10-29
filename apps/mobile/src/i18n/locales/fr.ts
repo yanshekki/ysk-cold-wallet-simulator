@@ -202,6 +202,10 @@ export const fr: MessageTree = {
     colChip: 'Puce',
     colFamily: 'Famille',
     colVersion: 'Version',
+    versionReported: 'Annoncée',
+    versionPick: 'Version de {{app}}',
+    versionNote:
+      'La version choisie est celle qu’un hôte lit quand il demande la version de l’app ouverte. CWS ne passe pas aux commandes de cet ancien binaire. Mettre à jour recharge les versions publiées pour l’appareil sélectionné depuis le catalogue public Ledger. Avant une mise à jour, la liste est le catalogue fourni pour cet appareil.',
     bundled: 'intégrée',
     session: 'Session',
     faceId: {
@@ -497,6 +501,7 @@ export const fr: MessageTree = {
     advertiseUnsupported: 'L’annonce Bluetooth n’est pas disponible pour ce modèle.',
     advertisePermission: 'L’autorisation d’annonce Bluetooth n’a pas été accordée.',
     managerFailed: 'Échec de la mise à jour du catalogue.',
+    versionSaveFailed: 'Impossible d’enregistrer la version choisie.',
     nearFailed: 'Échec NEAR.',
     passphraseFailed: 'Échec de la phrase secrète.',
     qrBadUr: 'Impossible de lire ce code QR.',

@@ -5,8 +5,13 @@ import type { ChainPathMap, LedgerInstalledApp } from '@cws/contracts';
 import {
   HOLD_CONFIRM_DEFAULT_SECONDS,
   clampHoldDuration,
+  ledgerVersionPicks,
+  parseStoredCatalog,
+  parseVersionPicks,
   resetLedgerCatalogOverlay,
+  resetLedgerVersionPicks,
   setLedgerCatalogOverlay,
+  setLedgerVersionPicks,
   type SeedSlot,
 } from '@cws/contracts';
 import { isAppLanguage, type AppLanguage } from '../i18n/translate';
@@ -14,6 +19,7 @@ import { isAppLanguage, type AppLanguage } from '../i18n/translate';
 const SETTINGS_KEY = 'cws.settings.v1';
 const ACTIVE_KEY = 'cws.activeSlot';
 const CATALOG_KEY = 'cws.ledger.catalog';
+const VERSION_PICKS_KEY = 'cws.ledger.versions';
 const CATALOG_CHUNK = 1800;
 
 export type AppSettings = {
@@ -165,7 +171,9 @@ async function deleteRaw(key: string): Promise<void> {
   }
 }
 
-export async function loadCatalogOverlay(): Promise<LedgerInstalledApp[] | undefined> {
+export async function loadCatalogOverlay(): Promise<
+  { modelId: string | null; apps: LedgerInstalledApp[] } | undefined
+> {
   const countRaw = await readRaw(`${CATALOG_KEY}.n`);
   let raw: string | null = null;
   if (countRaw) {
@@ -183,20 +191,20 @@ export async function loadCatalogOverlay(): Promise<LedgerInstalledApp[] | undef
     return undefined;
   }
   try {
-    const parsed = JSON.parse(raw) as LedgerInstalledApp[];
-    if (!Array.isArray(parsed) || parsed.length === 0) {
+    const stored = parseStoredCatalog(JSON.parse(raw) as unknown);
+    if (!stored) {
       return undefined;
     }
-    setLedgerCatalogOverlay(parsed);
-    return parsed;
+    setLedgerCatalogOverlay(stored.apps, stored.modelId);
+    return stored;
   } catch {
     return undefined;
   }
 }
 
-export async function saveCatalogOverlay(apps: LedgerInstalledApp[]): Promise<void> {
-  setLedgerCatalogOverlay(apps);
-  const raw = JSON.stringify(apps);
+export async function saveCatalogOverlay(apps: LedgerInstalledApp[], modelId: string | null): Promise<void> {
+  setLedgerCatalogOverlay(apps, modelId);
+  const raw = JSON.stringify({ modelId, apps });
   if (Platform.OS === 'web') {
     webSet(CATALOG_KEY, raw);
     return;
@@ -207,6 +215,42 @@ export async function saveCatalogOverlay(apps: LedgerInstalledApp[]): Promise<vo
     await writeRaw(`${CATALOG_KEY}.${i}`, raw.slice(i * CATALOG_CHUNK, (i + 1) * CATALOG_CHUNK));
   }
   await deleteRaw(CATALOG_KEY);
+}
+
+export async function loadVersionPicks(): Promise<Record<string, string>> {
+  const raw = await readRaw(VERSION_PICKS_KEY);
+  if (!raw) {
+    resetLedgerVersionPicks();
+    return {};
+  }
+  try {
+    const picks = parseVersionPicks(JSON.parse(raw) as unknown);
+    setLedgerVersionPicks(picks);
+    return picks;
+  } catch {
+    resetLedgerVersionPicks();
+    return {};
+  }
+}
+
+export async function saveVersionPicks(picks: Record<string, string>): Promise<void> {
+  const previous = { ...ledgerVersionPicks() };
+  setLedgerVersionPicks(picks);
+  try {
+    if (Object.keys(picks).length === 0) {
+      await deleteRaw(VERSION_PICKS_KEY);
+      return;
+    }
+    await writeRaw(VERSION_PICKS_KEY, JSON.stringify(picks));
+  } catch (error) {
+    setLedgerVersionPicks(previous);
+    throw error;
+  }
+}
+
+export async function clearVersionPicks(): Promise<void> {
+  resetLedgerVersionPicks();
+  await deleteRaw(VERSION_PICKS_KEY);
 }
 
 export async function clearCatalogOverlay(): Promise<void> {

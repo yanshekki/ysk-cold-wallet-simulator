@@ -114,14 +114,32 @@ export {
   ledgerAppFamily,
   ledgerAppLabel,
   ledgerCatalog,
+  ledgerCatalogBase,
+  ledgerCatalogModelId,
   ledgerInstalledApp,
   ledgerPickerApps,
   ledgerPickerRank,
+  ledgerVersionPicks,
   matchLedgerApp,
   resetLedgerCatalogOverlay,
+  resetLedgerVersionPicks,
   setLedgerCatalogOverlay,
+  setLedgerVersionPicks,
   slugLedgerApp,
 } from './ledgerApps';
+export type { StoredLedgerCatalog } from './ledgerAppVersions';
+export {
+  applyVersionCatalog,
+  bundledLedgerVersions,
+  isReportableLedgerVersion,
+  keepVersionPicks,
+  nextVersionPicks,
+  parseStoredCatalog,
+  parseVersionPicks,
+  sameVersionPicks,
+  stableVersionList,
+  versionsForApp,
+} from './ledgerAppVersions';
 export type { ChainPathId, ChainPathMap, SessionPathOverlay } from './derivation';
 export {
   CHAIN_PATH_IDS,

@@ -37,4 +37,38 @@ describe('settings hold duration', () => {
     const loaded = await loadSettings();
     expect(loaded.holdDurationSeconds).toBe(3);
   });
+
+  it('round-trips a synced catalog and a version pick on web', async () => {
+    platform.OS = 'web';
+    const storage = new Map<string, string>();
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        storage.set(key, value);
+      },
+      removeItem: (key: string) => {
+        storage.delete(key);
+      },
+    });
+    const { clearCatalogOverlay, clearVersionPicks, loadCatalogOverlay, loadVersionPicks, saveCatalogOverlay, saveVersionPicks } =
+      await import('./store');
+    const cardano = {
+      id: 'cardano',
+      openAppName: 'Cardano ADA',
+      version: '8.0.8',
+      chip: 'ADA',
+      family: 'cardano' as const,
+      availableVersions: ['7.2.1', '8.0.8'],
+    };
+    await saveCatalogOverlay([cardano], 'nano-x');
+    await saveVersionPicks({ cardano: '7.2.1' });
+    const loaded = await loadCatalogOverlay();
+    const picks = await loadVersionPicks();
+    expect(loaded?.modelId).toBe('nano-x');
+    expect(loaded?.apps[0]?.availableVersions).toEqual(['7.2.1', '8.0.8']);
+    expect(picks).toEqual({ cardano: '7.2.1' });
+    await clearVersionPicks();
+    await clearCatalogOverlay();
+    vi.unstubAllGlobals();
+  });
 });

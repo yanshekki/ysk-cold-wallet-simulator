@@ -202,6 +202,10 @@ export const zhHK: MessageTree = {
     colChip: '代號',
     colFamily: '系列',
     colVersion: '版本',
+    versionReported: '回報中',
+    versionPick: '{{app}} 版本',
+    versionNote:
+      '你選擇的版本，就是主機向已開啟應用程式查詢版本時讀到的版本。CWS 不會改用該舊版程式的指令。更新會按目前選擇的裝置，從 Ledger 公開目錄重新載入已發布版本。尚未更新時，清單是此組建內置、對應該裝置的目錄。',
     bundled: '內建',
     session: '工作階段',
     faceId: {
@@ -496,6 +500,7 @@ export const zhHK: MessageTree = {
     advertiseUnsupported: '此型號不支援藍牙廣播。',
     advertisePermission: '未獲藍牙廣播權限。',
     managerFailed: '目錄更新失敗。',
+    versionSaveFailed: '未能儲存所選版本。',
     nearFailed: 'NEAR 失敗。',
     passphraseFailed: '密語失敗。',
     qrBadUr: '無法解讀此二維碼。',

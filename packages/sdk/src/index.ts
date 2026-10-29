@@ -38,7 +38,15 @@ export {
   parseCustomEntropy,
   type CustomEntropyKind,
 } from './customEntropy';
-export { fetchManagerCatalog, managerCatalogUrl, parseManagerApps } from './ledgerManager';
+export {
+  applicationsCatalogUrl,
+  deviceVersionUrl,
+  fetchManagerCatalog,
+  managerCatalogUrl,
+  parseDeviceVersionId,
+  parseManagerApps,
+} from './ledgerManager';
+export { scanApplicationVersions } from './ledgerCatalogScan';
 
 export {
   createHandler,

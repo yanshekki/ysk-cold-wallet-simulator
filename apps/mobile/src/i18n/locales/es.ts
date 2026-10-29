@@ -202,6 +202,10 @@ export const es: MessageTree = {
     colChip: 'Chip',
     colFamily: 'Familia',
     colVersion: 'Versión',
+    versionReported: 'Informada',
+    versionPick: 'Versión de {{app}}',
+    versionNote:
+      'La versión elegida es la que el host lee cuando pide la versión de la app abierta. CWS no cambia a los comandos de ese binario antiguo. Actualizar vuelve a cargar las versiones publicadas del dispositivo seleccionado desde el catálogo público de Ledger. Antes de actualizar, la lista es el catálogo incluido para ese dispositivo.',
     bundled: 'incluida',
     session: 'Sesión',
     faceId: {
@@ -497,6 +501,7 @@ export const es: MessageTree = {
     advertiseUnsupported: 'El anuncio Bluetooth no está disponible para este modelo.',
     advertisePermission: 'No se concedió el permiso de anuncio Bluetooth.',
     managerFailed: 'Error al actualizar el catálogo.',
+    versionSaveFailed: 'No se pudo guardar la versión elegida.',
     nearFailed: 'Error de NEAR.',
     passphraseFailed: 'Error de frase de contraseña.',
     qrBadUr: 'No se pudo leer este código QR.',

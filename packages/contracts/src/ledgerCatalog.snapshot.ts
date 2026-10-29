@@ -1,6 +1,6 @@
 import type { LedgerInstalledApp } from './ledgerApps';
 
-/** Nano X 2.7.1 Manager by-target snapshot. Overlay replaces this after Update. */
+/** Nano X 2.7.1 Manager by-target snapshot. Overlay replaces this after Update. Version choices: ledgerVersionIndex.json. */
 export const LEDGER_MANAGER_SNAPSHOT: readonly LedgerInstalledApp[] = [
   { id: '1inch', openAppName: '1inch', version: '2.2.2', chip: '1INC', family: 'unknown' },
   { id: 'aeternity', openAppName: 'Aeternity', version: '0.4.5', chip: 'AETE', family: 'unknown' },
