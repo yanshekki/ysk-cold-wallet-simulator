@@ -1,3 +1,9 @@
+import {
+  HOST_NETWORK_TICKER_WARNING,
+  resolveEvmNativeGas,
+  type EvmHostNetwork,
+  type EvmNativeGas,
+} from './evmNativeGas';
 import type { SigningRequest } from './signing';
 
 export type SigningStyle =
@@ -55,13 +61,17 @@ function bigintFromBytes(bytes: Uint8Array): bigint {
   return value;
 }
 
-export function formatWeiEth(wei: bigint): { eth: string; wei: string } {
+export function formatWeiAmount(wei: bigint, symbol: string): string {
   const unit = 1_000_000_000_000_000_000n;
   const whole = wei / unit;
   const frac = wei % unit;
-  const eth =
-    frac === 0n ? `${whole} ETH` : `${whole}.${frac.toString().padStart(18, '0').replace(/0+$/, '')} ETH`;
-  return { eth, wei: `${wei.toString()} wei` };
+  const body =
+    frac === 0n ? `${whole}` : `${whole}.${frac.toString().padStart(18, '0').replace(/0+$/, '')}`;
+  return `${body} ${symbol}`;
+}
+
+export function formatWeiEth(wei: bigint): { eth: string; wei: string } {
+  return { eth: formatWeiAmount(wei, 'ETH'), wei: `${wei.toString()} wei` };
 }
 
 export function formatSatsBtc(sats: bigint): string {
@@ -216,6 +226,10 @@ export type EthTxInput = {
   authorizationCount?: number;
   token?: { ticker: string; decimals: number; contract?: Uint8Array };
   envelopeHex?: string;
+  /** Open Ledger app id. Avalanche and Ethereum Classic pick the gas token. */
+  app?: string;
+  /** Host network from PROVIDE_NETWORK. Used only when the chain id is unknown. */
+  hostNetwork?: EvmHostNetwork;
 };
 
 function formatChainId(value: number | Uint8Array | undefined): string | undefined {
@@ -228,7 +242,34 @@ function formatChainId(value: number | Uint8Array | undefined): string | undefin
   return bigintFromBytes(value).toString();
 }
 
+function perGas(bytes: Uint8Array, symbol: string): string {
+  return `${formatWeiAmount(bigintFromBytes(bytes), symbol)} / gas`;
+}
+
+function networkFeeWei(input: EthTxInput): bigint | undefined {
+  if (!input.gasLimit) {
+    return undefined;
+  }
+  const rate = input.gasPrice ?? input.maxFeePerGas;
+  if (!rate) {
+    return undefined;
+  }
+  return bigintFromBytes(input.gasLimit) * bigintFromBytes(rate);
+}
+
+function txHeadline(gas: EvmNativeGas): string {
+  if (gas.name === 'Ethereum' && !gas.hostProvided) {
+    return 'Ethereum transaction';
+  }
+  return `${gas.name} transaction`;
+}
+
 export function describeEthTransaction(input: EthTxInput): SigningDetail {
+  const gas = resolveEvmNativeGas({
+    chainId: input.chainId,
+    app: input.app,
+    host: input.hostNetwork,
+  });
   const fields: SigningField[] = [];
   const push = (label: string, value: string | undefined, mono = true) => {
     if (value) {
@@ -237,14 +278,15 @@ export function describeEthTransaction(input: EthTxInput): SigningDetail {
   };
   push('PATH', input.path);
   push('TYPE', input.type);
+  push('CHAIN', gas.name, false);
   push('CHAIN ID', formatChainId(input.chainId));
   if (input.to) {
     push('TO', formatAddress(input.to));
   }
   if (input.value) {
-    const formatted = formatWeiEth(bigintFromBytes(input.value));
-    push('VALUE', formatted.eth);
-    push('WEI', formatted.wei);
+    const amount = bigintFromBytes(input.value);
+    push('VALUE', formatWeiAmount(amount, gas.symbol));
+    push('WEI', `${amount.toString()} wei`);
   }
   if (input.nonce) {
     push('NONCE', bigintFromBytes(input.nonce).toString());
@@ -253,19 +295,23 @@ export function describeEthTransaction(input: EthTxInput): SigningDetail {
     push('GAS', bigintFromBytes(input.gasLimit).toString());
   }
   if (input.gasPrice) {
-    push('GAS PRICE', `${bigintFromBytes(input.gasPrice).toString()} wei`);
+    push('GAS PRICE', perGas(input.gasPrice, gas.symbol), false);
   }
   if (input.maxFeePerGas) {
-    push('MAX FEE', `${bigintFromBytes(input.maxFeePerGas).toString()} wei`);
+    push('MAX FEE', perGas(input.maxFeePerGas, gas.symbol), false);
   }
   if (input.maxPriorityFeePerGas) {
-    push('MAX PRIORITY', `${bigintFromBytes(input.maxPriorityFeePerGas).toString()} wei`);
+    push('MAX PRIORITY', perGas(input.maxPriorityFeePerGas, gas.symbol), false);
+  }
+  const fee = networkFeeWei(input);
+  if (fee != null) {
+    push('FEE', formatWeiAmount(fee, gas.symbol), false);
   }
   if (input.accessListCount && input.accessListCount > 0) {
     push('ACCESS LIST', `${input.accessListCount} keys`, false);
   }
   if (input.maxFeePerBlobGas) {
-    push('BLOB FEE', `${bigintFromBytes(input.maxFeePerBlobGas).toString()} wei`);
+    push('BLOB FEE', perGas(input.maxFeePerBlobGas, gas.symbol), false);
   }
   if (input.blobCount && input.blobCount > 0) {
     push('BLOBS', String(input.blobCount), false);
@@ -285,10 +331,13 @@ export function describeEthTransaction(input: EthTxInput): SigningDetail {
   if (data.length > 0 && !erc20) {
     push('DATA', hex0x(data));
   }
+  const warnings = [erc20?.warning, gas.hostProvided ? HOST_NETWORK_TICKER_WARNING : undefined].filter(
+    (line): line is string => Boolean(line),
+  );
   return {
     style: 'eth-tx',
-    headline: erc20?.headline ?? 'Ethereum transaction',
-    warning: erc20?.warning,
+    headline: erc20?.headline ?? txHeadline(gas),
+    warning: warnings.length > 0 ? warnings.join(' ') : undefined,
     fields,
     hex: input.envelopeHex,
   };
