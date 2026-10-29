@@ -615,6 +615,55 @@ function describeBtcMessage(request: SigningRequest): SigningDetail {
   };
 }
 
+/** NEP-413 review. The device adds the off-chain prefix before hashing; the sheet shows the message itself. */
+export function describeNearMessage(input: {
+  path: string;
+  message: string;
+  recipient: string;
+  nonce: Uint8Array;
+  callbackUrl?: string;
+}): SigningDetail {
+  const fields: SigningField[] = [
+    { label: 'CHAIN', value: 'NEAR' },
+    { label: 'PATH', value: input.path, mono: true },
+    { label: 'MESSAGE', value: input.message },
+    { label: 'RECIPIENT', value: input.recipient, mono: true },
+    { label: 'NONCE', value: hex0x(input.nonce), mono: true },
+  ];
+  if (input.callbackUrl !== undefined) {
+    fields.push({ label: 'CALLBACK', value: input.callbackUrl, mono: true });
+  }
+  return {
+    style: 'raw-sign',
+    headline: 'Sign NEAR message',
+    note: 'NEP-413 off-chain message. Nothing is broadcast until an app uses this signature.',
+    fields,
+  };
+}
+
+/** NEP-366 review. Action bytes stay visible as hex because nested actions are not fully decoded. */
+export function describeNearDelegate(input: {
+  path: string;
+  sender: string;
+  receiver: string;
+  actionCount: number;
+  raw: Uint8Array;
+}): SigningDetail {
+  return {
+    style: 'raw-sign',
+    headline: 'Sign NEAR delegate action',
+    note: 'NEP-366 meta-transaction. Confirm only if the sender, receiver, and payload are expected.',
+    fields: [
+      { label: 'CHAIN', value: 'NEAR' },
+      { label: 'PATH', value: input.path, mono: true },
+      { label: 'SENDER', value: input.sender, mono: true },
+      { label: 'RECEIVER', value: input.receiver, mono: true },
+      { label: 'ACTIONS', value: String(input.actionCount) },
+    ],
+    hex: hex0x(input.raw),
+  };
+}
+
 function describeRaw(request: SigningRequest): SigningDetail {
   return {
     style: 'raw-sign',

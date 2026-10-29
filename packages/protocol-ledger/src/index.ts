@@ -49,6 +49,7 @@ export {
   SW_INS_NOT_SUPPORTED,
   SW_INTERRUPTED,
   SW_OK,
+  SW_TX_PARSING_FAIL,
   SW_WRONG_LENGTH,
   SW_WRONG_P1P2,
 } from './apdu';

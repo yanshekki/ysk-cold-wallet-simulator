@@ -137,6 +137,26 @@ describe('in-process lab actions', () => {
     expect(result.toLowerCase()).toContain('f39fd6e51aad88f6f4ce6ab8827279cfffb92266');
   });
 
+  it('signs a NEAR NEP-413 message instead of returning 6d00', async () => {
+    const { host } = ledgerHost();
+    const result = await action('near-sign-message').run(host, {
+      path: '',
+      utf8: 'hello from near',
+      hex: '',
+    });
+    expect(result).toMatch(/^nep413 64b 0x[0-9a-f]{128}$/);
+  });
+
+  it('signs a NEAR NEP-366 delegate instead of returning 6d00', async () => {
+    const { host } = ledgerHost();
+    const result = await action('near-sign-delegate').run(host, {
+      path: '',
+      utf8: 'alice.near',
+      hex: '',
+    });
+    expect(result).toMatch(/^nep366 64b 0x[0-9a-f]{128}$/);
+  });
+
   it('refuses eth-garbage instead of signing undecodable bytes', async () => {
     const { host } = ledgerHost();
     await expect(action('eth-garbage').run(host, EMPTY_DRAFT)).rejects.toThrow(/6d00/);
