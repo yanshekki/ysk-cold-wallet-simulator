@@ -1,6 +1,7 @@
 import { signingHoldLabel } from '@cws/contracts';
 import { SigningModal } from '@cws/ui';
 import { useT } from '../i18n';
+import { SecretScreenshotBoundary } from '../seeds/secretScreenshot';
 import { useAppState } from '../state/AppState';
 
 type Props = {
@@ -21,6 +22,8 @@ export function HostedSigningModal({ embedded = false }: Props) {
   const visible = embedded ? !!pending : !!pending && !signingHosted;
 
   return (
+    <>
+    {visible && pending?.kind === 'export-seed' ? <SecretScreenshotBoundary /> : null}
     <SigningModal
       embedded={embedded}
       visible={visible}
@@ -103,5 +106,6 @@ export function HostedSigningModal({ embedded = false }: Props) {
         },
       }}
     />
+    </>
   );
 }

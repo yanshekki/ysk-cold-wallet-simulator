@@ -34,6 +34,7 @@ export { PairingTakeover } from './PairingTakeover';
 export { Toast } from './Toast';
 export { LoadingOverlay } from './LoadingOverlay';
 export { MnemonicGrid, type MnemonicGridLabels } from './MnemonicGrid';
+export { secretInputProps } from './secretInput';
 export {
   KeyboardAvoidingView,
   KeyboardAwareScrollView,

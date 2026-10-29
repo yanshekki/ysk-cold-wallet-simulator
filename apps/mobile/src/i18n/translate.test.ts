@@ -90,6 +90,7 @@ describe('platform-aware authenticator copy', () => {
       expect(translate(language, 'pairing.hint')).not.toBe('pairing.hint');
       expect(translate(language, 'signing.verifying')).not.toBe('signing.verifying');
       expect(translate(language, 'signing.field.path')).not.toBe('signing.field.path');
+      expect(translate(language, 'device.hostDerive')).not.toBe('device.hostDerive');
     }
   });
 

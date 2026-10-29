@@ -43,6 +43,7 @@
       ],
       "./plugins/withForegroundOnlyBle",
       "./plugins/withBlockedDebugPermissions",
+      "./plugins/withReleaseUploadSigning",
       "expo-localization",
       "expo-font",
       [

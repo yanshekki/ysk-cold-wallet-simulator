@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { secretInputProps } from './secretInput';
 import { colors, fonts, hairline, radius, space } from './theme';
 
 export type InspectRow = {
@@ -46,17 +47,15 @@ export function AddressInspector({
       {hint ? <Text style={styles.hint}>{hint}</Text> : null}
       {onPassphrase ? (
         <TextInput
+          {...secretInputProps}
           value={passphrase}
           onChangeText={onPassphrase}
           placeholder={passphrasePlaceholder}
           placeholderTextColor={colors.muted}
+          accessibilityLabel={passphrasePlaceholder}
           secureTextEntry
           autoCapitalize="none"
-          autoCorrect={false}
-          autoComplete="off"
           textContentType="oneTimeCode"
-          importantForAutofill="no"
-          spellCheck={false}
           style={styles.input}
         />
       ) : null}

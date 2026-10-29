@@ -17,6 +17,7 @@ export const zhHK: MessageTree = {
     slip39Ledger: 'Ledger Live 只接受 BIP39。',
     advertising: '正在廣播 {{name}}',
     hostGatt: '已連接',
+    hostDerive: '已連接的主機可以從這個種子衍生地址。',
     start: '開始廣播',
     starting: '正在啟動藍牙…',
     stop: '停止廣播',

@@ -17,6 +17,7 @@ export const ar: MessageTree = {
     slip39Ledger: 'Ledger Live يتطلب BIP39.',
     advertising: 'يبث باسم {{name}}',
     hostGatt: 'متصل',
+    hostDerive: 'يمكن للمضيف المتصل اشتقاق العناوين من هذه البذرة.',
     start: 'بدء البث',
     starting: 'جارٍ تشغيل Bluetooth…',
     stop: 'إيقاف',

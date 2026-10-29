@@ -12,3 +12,9 @@ export function useSecretScreenshotWarning(): void {
   }, [showToast, t]);
   useSecretScreen(warn);
 }
+
+/** Mount only while a secret sheet is visible. Renders nothing. */
+export function SecretScreenshotBoundary(): null {
+  useSecretScreenshotWarning();
+  return null;
+}

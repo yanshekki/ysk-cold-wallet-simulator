@@ -84,9 +84,11 @@ async function writeSecret(key: string, value: string): Promise<void> {
   if (Platform.OS === 'web') {
     throw new Error('web vault refuses to store entropy');
   }
-  // WHEN_UNLOCKED_THIS_DEVICE_ONLY is the device-side gate. The 15-minute
-  // session already required the platform authenticator. Extra
-  // requireAuthentication prompts fail under iPhone Mirroring ("continue on iPhone").
+  // KEEP: do not set requireAuthentication. expo-secure-store prompts on every
+  // read, and loadEntropy runs for silent address / xpub listing. That prompt
+  // breaks account listing and fails under iPhone Mirroring ("continue on
+  // iPhone"). WHEN_UNLOCKED_THIS_DEVICE_ONLY stays. Release OS reauth is the
+  // app-layer gate for reveal, import, and seed export.
   await SecureStore.setItemAsync(key, value, BASE_OPTIONS);
 }
 

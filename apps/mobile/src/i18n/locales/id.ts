@@ -17,6 +17,7 @@ export const id: MessageTree = {
     slip39Ledger: 'Ledger Live memerlukan BIP39.',
     advertising: 'Mengiklankan sebagai {{name}}',
     hostGatt: 'Terhubung',
+    hostDerive: 'Host yang terhubung dapat menurunkan alamat dari seed ini.',
     start: 'Iklankan',
     starting: 'Memulai Bluetooth…',
     stop: 'Berhenti',

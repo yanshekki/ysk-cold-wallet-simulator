@@ -41,6 +41,7 @@ import { describeBlePayload, redactLogHex } from '../lab/apduNote';
 import { expoRng } from '../lab/polyfillCrypto';
 import { ensureNearAccount } from '../near/service';
 import { isDevBuild } from '../passkeys/devFlag';
+import { reauthBeforeReveal } from '../passkeys/secretReauth';
 import { needsSignReauth } from '../passkeys/signGate';
 import { setFaceIdEnabled, unlock as requestUnlock } from '../passkeys';
 import { SecretSession } from '../seeds/secretSession';
@@ -587,7 +588,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   const applySessionPassphrase = useCallback(async (value: string) => {
     try {
-      if (!(await requestUnlock(translate(settingsRef.current.language, 'unlock.prompt')))) {
+      if (!(await reauthBeforeReveal(translate(settingsRef.current.language, 'unlock.prompt')))) {
         return false;
       }
     } catch (err) {

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
 
@@ -17,6 +19,18 @@ const DEBUG_TEMPLATE = `<?xml version="1.0" encoding="utf-8"?>
 `;
 
 describe('debug blocked permissions', () => {
+  it('blocks the overlay permission in app config and does not grant it', () => {
+    const app = JSON.parse(readFileSync(path.resolve(import.meta.dirname, '../../app.json'), 'utf8')) as {
+      expo: {
+        plugins: string[];
+        android: { permissions: string[]; blockedPermissions: string[] };
+      };
+    };
+    expect(app.expo.plugins).toContain('./plugins/withBlockedDebugPermissions');
+    expect(app.expo.android.blockedPermissions).toContain('android.permission.SYSTEM_ALERT_WINDOW');
+    expect(app.expo.android.permissions).not.toContain('android.permission.SYSTEM_ALERT_WINDOW');
+  });
+
   it('marks the debug overlay permission for removal', () => {
     const next = applyBlockedPermissions(DEBUG_TEMPLATE, ['android.permission.SYSTEM_ALERT_WINDOW']);
     expect(next).toContain(

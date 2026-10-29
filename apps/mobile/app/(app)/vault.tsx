@@ -24,7 +24,7 @@ import {
 } from '@cws/ui';
 import { copyText } from '../../src/lab/copy';
 import { useT } from '../../src/i18n';
-import { unlock as requestUnlock } from '../../src/passkeys';
+import { reauthBeforeReveal } from '../../src/passkeys/secretReauth';
 import { useSecretScreenshotWarning } from '../../src/seeds/secretScreenshot';
 import { deleteSlot, listSlots, loadEntropy, loadShares } from '../../src/seeds/vault';
 import { useAppState } from '../../src/state/AppState';
@@ -167,7 +167,7 @@ export default function VaultScreen() {
 
   const onBackup = async (slot: SeedSlot) => {
     selectSeed(slot);
-    const ok = await requestUnlock(t('unlock.prompt'));
+    const ok = await reauthBeforeReveal(t('unlock.prompt'));
     if (!ok) {
       return;
     }
