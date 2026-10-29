@@ -488,6 +488,11 @@ describe('TrezorThpProtocolHandler', () => {
     const witness = await host.app(MessageType.ButtonAck, new Uint8Array());
     expect(witness.type).toBe(MessageType.CardanoTxWitnessResponse);
     expect(witness.type).not.toBe(325);
+    expect(MessageType.CardanoTxAuxiliaryDataSupplement).toBe(314);
+    expect(MessageType.CardanoTxHostAck).toBe(317);
+    expect(MessageType.CardanoTxBodyHash).toBe(318);
+    const supplement = await host.app(MessageType.CardanoTxAuxiliaryDataSupplement, new Uint8Array());
+    expect(supplement.type).toBe(MessageType.Failure);
     const finished = await host.app(MessageType.CardanoTxHostAck, new Uint8Array());
     expect(finished.type).toBe(MessageType.CardanoSignTxFinished);
   });

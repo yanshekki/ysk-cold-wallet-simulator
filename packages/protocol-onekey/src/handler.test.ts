@@ -638,6 +638,10 @@ describe('OneKey V2 BLE handshake', () => {
     const witness = await exchange(handler, frameV1(MessageType.ButtonAck, new Uint8Array()));
     expect(witness.type).toBe(MessageType.CardanoTxWitnessResponse);
     expect(witness.type).toBe(316);
+    expect(MessageType.CardanoTxAuxiliaryDataSupplement).toBe(314);
+    expect(MessageType.CardanoTxHostAck).toBe(317);
+    const supplement = await exchange(handler, frameV1(MessageType.CardanoTxAuxiliaryDataSupplement, new Uint8Array()));
+    expect(supplement.type).toBe(MessageType.Failure);
     const finished = await exchange(handler, frameV1(MessageType.CardanoTxHostAck, new Uint8Array()));
     expect(finished.type).toBe(MessageType.CardanoSignTxFinished);
   });
