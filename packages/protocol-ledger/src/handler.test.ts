@@ -1714,6 +1714,10 @@ describe('LedgerProtocolHandler', () => {
       expect(requests).toHaveLength(1);
       expect(requests[0]?.title).toBe('Sign Avalanche C-Chain transaction');
       expect(requests[0]?.detail?.fields.find((field) => field.label === 'VALUE')?.value).toBe('0 AVAX');
+      expect(requests[0]?.detail?.warning).toMatch(/Raw contract call/);
+      expect(requests[0]?.detail?.fields.find((field) => field.label === 'SELECTOR')?.value).toBe('0xabababab');
+      expect(requests[0]?.detail?.fields.find((field) => field.label === 'DATA')?.raw).toBe(true);
+      expect(requests[0]?.detail?.fields.find((field) => field.label === 'AMOUNT')).toBeUndefined();
       expect(gasSheet(requests[0]!)).not.toMatch(/\bETH\b/);
       expect(statusOf(last)).toBe(SW_OK);
       expect(last.length).toBe(67);
@@ -1752,6 +1756,7 @@ describe('LedgerProtocolHandler', () => {
     const avalanche = await signCapturedEip1559('avalanche', 1);
     expect(avalanche.title).toBe('Sign Avalanche C-Chain transaction');
     expect(avalanche.detail?.headline).toBe('Avalanche C-Chain transaction');
+    expect(avalanche.detail?.warning).toBeUndefined();
     expect(avalanche.detail?.fields.find((field) => field.label === 'VALUE')?.value).toBe('0 AVAX');
     expect(avalanche.detail?.fields.find((field) => field.label === 'FEE')?.value).toMatch(/AVAX$/);
     expect(gasSheet(avalanche)).not.toMatch(/\bETH\b/);

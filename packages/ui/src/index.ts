@@ -4,7 +4,7 @@ export { Button } from './Button';
 export { SeedCard } from './SeedCard';
 export { AddressInspector } from './AddressInspector';
 export { SigningModal } from './SigningModal';
-export { SigningDetailView, type SigningCopy } from './SigningDetail';
+export { SigningDetailView, type SigningCopy, type SigningHexCopy } from './SigningDetail';
 export { SelectSheet, type SelectSheetOption } from './SelectSheet';
 export {
   GroupedSelectSheet,

@@ -19,6 +19,8 @@ export type SigningField = {
   label: string;
   value: string;
   mono?: boolean;
+  /** Hex dump. The sheet groups it with the raw envelope and keeps the full value. */
+  raw?: boolean;
 };
 
 export type SigningDetail = {
@@ -264,12 +266,21 @@ function txHeadline(gas: EvmNativeGas): string {
   return `${gas.name} transaction`;
 }
 
+/**
+ * Shown when the transaction fields decode but the calldata is not a standard
+ * ERC-20 transfer or approve. Router and DEX payloads stay in this bucket.
+ */
+export const OPAQUE_CALLDATA_NOTE =
+  'Raw contract call. Amounts inside the call data are not shown.';
+
 export function describeEthTransaction(input: EthTxInput): SigningDetail {
   const gas = resolveEvmNativeGas({
     chainId: input.chainId,
     app: input.app,
     host: input.hostNetwork,
   });
+  const data = input.data ?? new Uint8Array();
+  const erc20 = describeErc20(data, input.token, input.to);
   const fields: SigningField[] = [];
   const push = (label: string, value: string | undefined, mono = true) => {
     if (value) {
@@ -280,7 +291,7 @@ export function describeEthTransaction(input: EthTxInput): SigningDetail {
   push('TYPE', input.type);
   push('CHAIN', gas.name, false);
   push('CHAIN ID', formatChainId(input.chainId));
-  if (input.to) {
+  if (input.to && !calledAddressShownAsContract(erc20, input.to)) {
     push('TO', formatAddress(input.to));
   }
   if (input.value) {
@@ -319,8 +330,6 @@ export function describeEthTransaction(input: EthTxInput): SigningDetail {
   if (input.authorizationCount && input.authorizationCount > 0) {
     push('AUTHORIZATIONS', String(input.authorizationCount), false);
   }
-  const data = input.data ?? new Uint8Array();
-  const erc20 = describeErc20(data, input.token, input.to);
   if (erc20) {
     for (const field of erc20.fields) {
       fields.push(field);
@@ -329,32 +338,57 @@ export function describeEthTransaction(input: EthTxInput): SigningDetail {
     push('SELECTOR', hex0x(data.subarray(0, 4)));
   }
   if (data.length > 0 && !erc20) {
-    push('DATA', hex0x(data));
+    fields.push({ label: 'DATA', value: hex0x(data), mono: true, raw: true });
   }
   const warnings = [erc20?.warning, gas.hostProvided ? HOST_NETWORK_TICKER_WARNING : undefined].filter(
     (line): line is string => Boolean(line),
   );
+  const opaque = !erc20 && data.length > 0 ? OPAQUE_CALLDATA_NOTE : undefined;
   return {
     style: 'eth-tx',
     headline: erc20?.headline ?? txHeadline(gas),
-    warning: warnings.length > 0 ? warnings.join(' ') : undefined,
+    warning: warnings.length > 0 ? warnings.join(' ') : opaque,
+    note: warnings.length > 0 ? opaque : undefined,
     fields,
     hex: input.envelopeHex,
   };
 }
 
+function calledAddressShownAsContract(
+  erc20: { fields: SigningField[] } | null,
+  to: Uint8Array,
+): boolean {
+  if (!erc20 || to.length === 0) {
+    return false;
+  }
+  const called = hex0x(to);
+  return erc20.fields.some((field) => field.label === 'CONTRACT' && field.value === called);
+}
+
+/** transfer(address,uint256) and approve(address,uint256) are 4 + 32 + 32 bytes. */
+const ERC20_ABI_BYTES = 68;
+
+/**
+ * Matches only the standard ABI encoding. A longer payload that starts with the
+ * same selector is not a transfer — slicing a prefix would invent an amount.
+ */
 function describeErc20(
   data: Uint8Array,
   token?: { ticker: string; decimals: number; contract?: Uint8Array },
   to?: Uint8Array,
 ): { headline: string; warning?: string; fields: SigningField[] } | null {
-  if (data.length < 68) {
+  if (data.length !== ERC20_ABI_BYTES) {
     return null;
   }
   const selector = toHex(data.subarray(0, 4));
   const method = selector === 'a9059cbb' ? 'transfer' : selector === '095ea7b3' ? 'approve' : null;
   if (!method) {
     return null;
+  }
+  for (let index = 4; index < 16; index += 1) {
+    if (data[index] !== 0) {
+      return null;
+    }
   }
   const target = data.subarray(16, 36);
   const amount = bigintFromBytes(data.subarray(36, 68));
@@ -366,7 +400,7 @@ function describeErc20(
     fields.push({ label: 'CONTRACT', value: hex0x(contract), mono: true });
   }
   fields.push({
-    label: method === 'transfer' ? 'TO' : 'SPENDER',
+    label: method === 'transfer' ? 'RECIPIENT' : 'SPENDER',
     value: hex0x(target),
     mono: true,
   });

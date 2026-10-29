@@ -84,6 +84,20 @@ describe('platform-aware authenticator copy', () => {
       expect(translate(language, 'vault.screenshot')).not.toBe('vault.screenshot');
     }
     expect(translate('en', 'signing.headlineEip7702')).toBe('EIP-7702 authorization');
+    expect(translate('en', 'signing.opaqueCalldata')).toBe(
+      'Raw contract call. Amounts inside the call data are not shown.',
+    );
+    expect(translate('en', 'signing.field.recipient')).toBe('Recipient');
+    expect(translate('zh-HK', 'signing.opaqueCalldata')).toContain('不會顯示');
+    expect(translate('zh-HK', 'signing.showRaw')).toBe('顯示');
+    for (const language of LANGUAGES) {
+      if (language === 'en') {
+        continue;
+      }
+      expect(translate(language, 'signing.opaqueCalldata')).not.toBe(translate('en', 'signing.opaqueCalldata'));
+      expect(translate(language, 'signing.field.recipient')).not.toBe('Recipient');
+      expect(translate(language, 'signing.rawSection')).not.toBe('Raw data');
+    }
     expect(translate('zh-HK', 'signing.headlineEip7702')).toBe('EIP-7702 授權');
     expect(translate('zh-HK', 'signing.notice7702')).toContain('合約');
     expect(translate('zh-HK', 'signing.notice7702')).toContain('帳戶');

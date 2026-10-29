@@ -236,7 +236,7 @@ QR air-gap does not speak Ledger `GET_VERSION`. The desktop proxy forwards HID t
 - V2: handle chunked CRC framing
 - Same seed-signing flow as above
 
-**Important:** The phone UI must show clear signing confirmations (amount, address, etc.) before any signature is produced. Never auto-sign.
+**Important:** The phone UI must show the review before any signature is produced. Never auto-sign. A decoded EVM transaction shows the chain, the called address, the native amount, gas, and nonce. Contract calldata that is not an exact ERC-20 transfer or approve stays raw, and amounts inside that calldata are not shown. That review is not Ledger clear signing and does not run an e0/32 simulation.
 
 ---
 
@@ -246,7 +246,7 @@ QR air-gap does not speak Ledger `GET_VERSION`. The desktop proxy forwards HID t
 2. **Device** — Pick a BLE model (`DeviceCard`), optional session passphrase, Start advertising
 3. **Seed Vault** — Generate / import BIP39 or SLIP-39, HD inspect
 4. **Host** — `yarn proxy` / CWS Proxy. USB HID gadget plus the **Testnet host** tab (Ledger / OneKey / Trezor catalogs over the phone BLE link). Signing still confirms on the phone.
-5. **Signing Request** — `SigningModal` hold-to-confirm. ERC-20 tickers from PROVIDE_ERC20 are labeled host-provided.
+5. **Signing Request** — `SigningModal` hold-to-confirm. Decoded EVM fields stay labeled. An exact ERC-20 transfer or approve shows the raw token amount; a PROVIDE_ERC20 ticker is labeled host-provided. Other calldata is not decoded. Long raw hex stays collapsed until it is expanded.
 6. **QR air-gap** — Export account UR / scan sign requests via `@cws/sdk` QR helpers
 7. **Stop** — Stop advertising, `resetLink`, wipe session seed
 

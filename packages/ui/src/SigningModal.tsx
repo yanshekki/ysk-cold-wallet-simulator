@@ -9,7 +9,7 @@ import {
 } from '@cws/contracts';
 import { Button } from './Button';
 import { HoldToConfirm } from './HoldToConfirm';
-import { SigningDetailView, type SigningCopy } from './SigningDetail';
+import { SigningDetailView, type SigningCopy, type SigningHexCopy } from './SigningDetail';
 import { BRAND_LABEL, brandColor, colors, fonts, hairline, radius, space } from './theme';
 
 type Props = {
@@ -27,6 +27,7 @@ type Props = {
   passphraseHostLabel?: string;
   verifyingLabel?: string;
   copy?: SigningCopy;
+  onCopyHex?: SigningHexCopy;
   /** Draw inside an already-presented modal. A second iOS Modal stays behind the first. */
   embedded?: boolean;
 };
@@ -46,6 +47,7 @@ export function SigningModal({
   passphraseHostLabel = 'Host passphrase',
   verifyingLabel = 'Verifying…',
   copy,
+  onCopyHex,
   embedded = false,
 }: Props) {
   const [verifying, setVerifying] = useState(false);
@@ -95,7 +97,7 @@ export function SigningModal({
                 contentContainerStyle={styles.previewInner}
                 nestedScrollEnabled
               >
-                <SigningDetailView request={request} copy={copy} />
+                <SigningDetailView key={resetKey} request={request} copy={copy} onCopyHex={onCopyHex} />
               </ScrollView>
             ) : null}
             {showChip ? (

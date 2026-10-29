@@ -330,6 +330,13 @@ export const ru: MessageTree = {
     noticeZeroHmac: 'HMAC политики состоит из нулей и не проверялся.',
     noticeHostHash: 'Этот хеш передал хост. Это не разобранная транзакция.',
     headlineHostHash: 'Хеш от хоста',
+    opaqueCalldata: 'Сырой вызов контракта. Суммы внутри данных вызова не показаны.',
+    rawSection: 'Сырые данные',
+    showRaw: 'Показать',
+    hideRaw: 'Скрыть',
+    copyRaw: 'Копировать',
+    copiedRaw: 'Скопировано',
+    rawBytes: '{{n}} байт',
     field: {
       chain: 'Сеть',
       chainId: 'ID сети',
@@ -364,6 +371,7 @@ export const ru: MessageTree = {
       bytes: 'Байты',
       payload: 'Полезная нагрузка',
       spender: 'Тратящий',
+      recipient: 'Получатель',
     },
   },
   unlock: {

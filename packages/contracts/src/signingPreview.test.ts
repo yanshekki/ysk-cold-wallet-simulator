@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { HOST_NETWORK_TICKER_WARNING } from './evmNativeGas';
 import type { SigningRequest } from './signing';
 import {
+  OPAQUE_CALLDATA_NOTE,
   describeBtcPsbt,
   describeEthTransaction,
   describeEthTypedData,
@@ -198,6 +199,10 @@ describe('describeSigning', () => {
     expect(detail.fields.find((field) => field.label === 'NONCE')?.value).toBe('9');
     expect(detail.fields.find((field) => field.label === 'SELECTOR')?.value).toBe('0xa9059cbb');
     expect(detail.fields.find((field) => field.label === 'DATA')?.value).toBe(hex0x(data));
+    expect(detail.fields.find((field) => field.label === 'DATA')?.raw).toBe(true);
+    expect(detail.fields.find((field) => field.label === 'AMOUNT')).toBeUndefined();
+    expect(detail.warning).toBe(OPAQUE_CALLDATA_NOTE);
+    expect(detail.note).toBeUndefined();
   });
 
   it('shows UTF-8 personal_sign text', () => {
@@ -409,9 +414,115 @@ describe('describeSigning', () => {
     expect(detail.headline).toBe('Token transfer');
     expect(detail.headline).not.toMatch(/USDT/);
     expect(detail.warning).toMatch(/host/i);
+    expect(detail.note).toBeUndefined();
     expect(detail.fields.find((field) => field.label === 'CONTRACT')?.value).toBe(hex0x(attacker));
+    expect(detail.fields.find((field) => field.label === 'TO')).toBeUndefined();
+    expect(detail.fields.find((field) => field.label === 'RECIPIENT')?.value).toBe(hex0x(recipient));
     expect(detail.fields.find((field) => field.label === 'TICKER')?.value).toBe('USDT (host-provided)');
     expect(detail.fields.find((field) => field.label === 'AMOUNT RAW')?.value).toBe('1000000');
+    expect(detail.fields.find((field) => field.label === 'DATA')).toBeUndefined();
+  });
+
+  it('shows the called address when the host token contract differs', () => {
+    const called = fromHex('0x2222222222222222222222222222222222222222');
+    const claimed = fromHex('0x1111111111111111111111111111111111111111');
+    const recipient = fromHex('0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+    const detail = describeEthTransaction({
+      to: called,
+      data: erc20Data('a9059cbb', recipient),
+      token: { ticker: 'USDT', decimals: 6, contract: claimed },
+    });
+    expect(detail.fields.find((field) => field.label === 'TO')?.value).toBe(hex0x(called));
+    expect(detail.fields.find((field) => field.label === 'CONTRACT')?.value).toBe(hex0x(claimed));
+    expect(detail.fields.find((field) => field.label === 'RECIPIENT')?.value).toBe(hex0x(recipient));
+  });
+
+  it('decodes an exact approve and does not invent a transfer amount', () => {
+    const token = fromHex('0x1111111111111111111111111111111111111111');
+    const spender = fromHex('0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb');
+    const detail = describeEthTransaction({
+      to: token,
+      data: erc20Data('095ea7b3', spender),
+    });
+    expect(detail.headline).toBe('Token approve');
+    expect(detail.warning).toBeUndefined();
+    expect(detail.fields.find((field) => field.label === 'SPENDER')?.value).toBe(hex0x(spender));
+    expect(detail.fields.find((field) => field.label === 'CONTRACT')?.value).toBe(hex0x(token));
+    expect(detail.fields.find((field) => field.label === 'AMOUNT')).toBeUndefined();
+    expect(detail.fields.find((field) => field.label === 'DATA')).toBeUndefined();
+  });
+
+  it('does not read a token amount from a longer payload that starts with transfer', () => {
+    const token = fromHex('0x1111111111111111111111111111111111111111');
+    const recipient = fromHex('0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+    const detail = describeEthTransaction({
+      to: token,
+      data: erc20Data('a9059cbb', recipient, Uint8Array.of(0x01)),
+      token: { ticker: 'USDC', decimals: 6, contract: token },
+    });
+    expect(detail.headline).not.toBe('Token transfer');
+    expect(detail.warning).toBe(OPAQUE_CALLDATA_NOTE);
+    expect(detail.note).toBeUndefined();
+    expect(detail.fields.find((field) => field.label === 'AMOUNT')).toBeUndefined();
+    expect(detail.fields.find((field) => field.label === 'AMOUNT RAW')).toBeUndefined();
+    expect(detail.fields.find((field) => field.label === 'TICKER')).toBeUndefined();
+    expect(detail.fields.find((field) => field.label === 'DATA')?.raw).toBe(true);
+    expect(detail.fields.some((field) => field.value.includes('USDC'))).toBe(false);
+  });
+
+  it('does not treat dirty address padding as an ERC-20 transfer', () => {
+    const token = fromHex('0x1111111111111111111111111111111111111111');
+    const recipient = fromHex('0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+    const data = erc20Data('a9059cbb', recipient);
+    data[4] = 0x01;
+    const detail = describeEthTransaction({ to: token, data });
+    expect(detail.headline).not.toBe('Token transfer');
+    expect(detail.warning).toBe(OPAQUE_CALLDATA_NOTE);
+    expect(detail.fields.find((field) => field.label === 'RECIPIENT')).toBeUndefined();
+    expect(detail.fields.find((field) => field.label === 'AMOUNT RAW')).toBeUndefined();
+  });
+
+  it('shows Avalanche native fields and leaves router calldata undecoded', () => {
+    const router = fromHex('0x2222222222222222222222222222222222222222');
+    const data = new Uint8Array(132);
+    data.set(fromHex('0x38ed1739'));
+    const envelope = `0x${'ab'.repeat(180)}`;
+    const detail = describeEthTransaction({
+      type: 'eip1559',
+      path: "m/44'/60'/0'/0/0",
+      chainId: 43114,
+      nonce: Uint8Array.of(7),
+      maxPriorityFeePerGas: fromHex('0x3b9aca00'),
+      maxFeePerGas: fromHex('0x77359400'),
+      gasLimit: fromHex('0x030d40'),
+      to: router,
+      value: new Uint8Array(),
+      data,
+      token: { ticker: 'USDC', decimals: 6, contract: router },
+      envelopeHex: envelope,
+    });
+    expect(detail.headline).toBe('Avalanche C-Chain transaction');
+    expect(detail.warning).toBe(OPAQUE_CALLDATA_NOTE);
+    expect(detail.note).toBeUndefined();
+    expect(detail.fields.find((field) => field.label === 'CHAIN')?.value).toBe('Avalanche C-Chain');
+    expect(detail.fields.find((field) => field.label === 'CHAIN ID')?.value).toBe('43114');
+    expect(detail.fields.find((field) => field.label === 'TO')?.value).toBe(hex0x(router));
+    expect(detail.fields.find((field) => field.label === 'VALUE')?.value).toBe('0 AVAX');
+    expect(detail.fields.find((field) => field.label === 'NONCE')?.value).toBe('7');
+    expect(detail.fields.find((field) => field.label === 'GAS')?.value).toBe('200000');
+    expect(detail.fields.find((field) => field.label === 'MAX FEE')?.value).toMatch(/AVAX/);
+    expect(detail.fields.find((field) => field.label === 'FEE')?.value).toMatch(/AVAX$/);
+    expect(detail.fields.find((field) => field.label === 'SELECTOR')?.value).toBe('0x38ed1739');
+    expect(detail.fields.find((field) => field.label === 'DATA')).toMatchObject({
+      raw: true,
+      value: hex0x(data),
+    });
+    expect(detail.hex).toBe(envelope);
+    for (const label of ['AMOUNT', 'AMOUNT RAW', 'TICKER', 'METHOD', 'RECIPIENT', 'SPENDER']) {
+      expect(detail.fields.find((field) => field.label === label)).toBeUndefined();
+    }
+    expect(detail.fields.some((field) => field.value.includes('USDC'))).toBe(false);
+    expect(sheetUnits(detail)).not.toMatch(/\bETH\b/);
   });
 
   it('returns attached detail unchanged', () => {
@@ -440,6 +551,9 @@ describe('EVM gas symbol on the sign sheet', () => {
       maxPriorityFeePerGas: fromHex('0x3b9aca00'),
     });
     expect(detail.headline).toBe('Avalanche C-Chain transaction');
+    expect(detail.warning).toBeUndefined();
+    expect(detail.note).toBeUndefined();
+    expect(detail.fields.find((field) => field.label === 'DATA')).toBeUndefined();
     expect(detail.fields.find((field) => field.label === 'CHAIN')?.value).toBe('Avalanche C-Chain');
     expect(detail.fields.find((field) => field.label === 'VALUE')?.value).toBe('1 AVAX');
     expect(detail.fields.find((field) => field.label === 'MAX FEE')?.value).toBe('0.000000002 AVAX / gas');
@@ -487,6 +601,18 @@ describe('EVM gas symbol on the sign sheet', () => {
     });
     expect(hosted.fields.find((field) => field.label === 'VALUE')?.value).toBe('1 FOO');
     expect(hosted.warning).toBe(HOST_NETWORK_TICKER_WARNING);
+    expect(hosted.note).toBeUndefined();
+    const hostedCall = describeEthTransaction({
+      chainId: 424242,
+      value: one,
+      data: fromHex('0x12345678'),
+      hostNetwork: { ticker: 'FOO', chainId: 424242, name: 'Foo Chain' },
+    });
+    expect(hostedCall.warning).toBe(HOST_NETWORK_TICKER_WARNING);
+    expect(hostedCall.note).toBe(OPAQUE_CALLDATA_NOTE);
+    expect(hostedCall.fields.find((field) => field.label === 'VALUE')?.value).toBe('1 FOO');
+    expect(hostedCall.fields.find((field) => field.label === 'SELECTOR')?.value).toBe('0x12345678');
+    expect(hostedCall.fields.find((field) => field.label === 'AMOUNT')).toBeUndefined();
     const avalanche = describeEthTransaction({
       chainId: 43114,
       value: one,
@@ -496,6 +622,16 @@ describe('EVM gas symbol on the sign sheet', () => {
     expect(avalanche.warning).toBeUndefined();
   });
 });
+
+function erc20Data(selector: string, address: Uint8Array, extra?: Uint8Array): Uint8Array {
+  const body = concat(
+    fromHex(selector),
+    new Uint8Array(12),
+    address,
+    fromHex('0x00000000000000000000000000000000000000000000000000000000000f4240'),
+  );
+  return extra ? concat(body, extra) : body;
+}
 
 function sheetUnits(detail: { fields: Array<{ label: string; value: string }> }): string {
   return detail.fields

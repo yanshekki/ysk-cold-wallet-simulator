@@ -330,6 +330,13 @@ export const ja: MessageTree = {
     noticeZeroHmac: 'ポリシー HMAC はすべてゼロで、検証されていません。',
     noticeHostHash: 'このハッシュはホストが渡したものです。復号した取引ではありません。',
     headlineHostHash: 'ホスト提供のハッシュ',
+    opaqueCalldata: '未解読のコントラクト呼び出しです。コールデータ内の金額は表示しません。',
+    rawSection: '生データ',
+    showRaw: '表示',
+    hideRaw: '閉じる',
+    copyRaw: 'コピー',
+    copiedRaw: 'コピーしました',
+    rawBytes: '{{n}} バイト',
     field: {
       chain: 'チェーン',
       chainId: 'チェーン ID',
@@ -364,6 +371,7 @@ export const ja: MessageTree = {
       bytes: 'バイト',
       payload: 'ペイロード',
       spender: '支出者',
+      recipient: '受取人',
     },
   },
   unlock: {

@@ -330,6 +330,13 @@ export const zhHK: MessageTree = {
     noticeZeroHmac: '政策 HMAC 全為零，未核對。',
     noticeHostHash: '此雜湊由主機提供，並非已解碼的交易。',
     headlineHostHash: '主機提供的雜湊',
+    opaqueCalldata: '這是原始合約呼叫。呼叫資料裡的金額不會顯示。',
+    rawSection: '原始資料',
+    showRaw: '顯示',
+    hideRaw: '收起',
+    copyRaw: '複製',
+    copiedRaw: '已複製',
+    rawBytes: '{{n}} 位元組',
     field: {
       chain: '鏈',
       chainId: '鏈 ID',
@@ -364,6 +371,7 @@ export const zhHK: MessageTree = {
       bytes: '位元組',
       payload: '資料負載',
       spender: '授權對象',
+      recipient: '代幣收款人',
     },
   },
   unlock: {
