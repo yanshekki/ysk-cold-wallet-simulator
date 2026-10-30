@@ -89,6 +89,10 @@ import { handleIotaApdu } from './apps/iota';
 import { handleNervosApdu } from './apps/nervos';
 import { handleNamadaApdu } from './apps/namada';
 import { handleSpacemeshApdu } from './apps/spacemesh';
+import { handleQubicApdu } from './apps/qubic';
+import { handleSolarApdu } from './apps/solar';
+import { handleLtoApdu } from './apps/lto';
+import { handleFactomApdu } from './apps/factom';
 import type { FamilySession } from './apps/generic';
 import { replaceSeedCache, wrapSeedPort, type SeedCache } from './crypto';
 
@@ -651,6 +655,30 @@ export class LedgerProtocolHandler implements ProtocolHandler {
       }
       return handleSpacemeshApdu(apdu);
     }
+    if (family === 'qubic') {
+      if (apdu.cla !== 0xe0) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleQubicApdu(apdu);
+    }
+    if (family === 'solar') {
+      if (apdu.cla !== 0xe0) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleSolarApdu(apdu);
+    }
+    if (family === 'lto') {
+      if (apdu.cla !== 0x80) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleLtoApdu(apdu);
+    }
+    if (family === 'factom') {
+      if (apdu.cla !== 0xe0) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleFactomApdu(apdu);
+    }
 
     // ethereum-plugin / utility: not standalone coin APDU targets.
     if (family === 'ethereum-plugin' || family === 'utility') {
@@ -781,22 +809,35 @@ function inferAppFromApdu(app: LedgerApp, apdu: ReturnType<typeof parseApdu>): L
     family !== 'aleo' &&
     family !== 'hathor' &&
     family !== 'canton' &&
-    family !== 'kaspa'
+    family !== 'kaspa' &&
+    family !== 'qubic'
   ) {
     return family === 'ton' ? undefined : 'ton';
   }
   if (apdu.cla === 0xe0 && apdu.ins === 0x04 && empty) {
     // TON GET_APP_NAME is also empty E0 04.
     // Canton and Kaspa GET_APP_NAME share that header. Leave them on the open app.
-    if (family === 'solana' || family === 'ton' || family === 'canton' || family === 'kaspa') {
+    if (
+      family === 'solana' ||
+      family === 'ton' ||
+      family === 'canton' ||
+      family === 'kaspa' ||
+      family === 'qubic'
+    ) {
       return undefined;
     }
     return 'solana';
   }
   if (apdu.cla === 0xe0 && apdu.ins === 0x05) {
     // TON GET_PUBLIC_KEY is E0 05 (32-byte ed25519), same INS as Solana.
-    // Canton and Kaspa GET_PUBLIC_KEY share that header. Pubkey stays KEEP there.
-    if (family === 'solana' || family === 'ton' || family === 'canton' || family === 'kaspa') {
+    // Canton, Kaspa, and Qubic GET_PUBLIC_KEY share that header. Pubkey stays KEEP there.
+    if (
+      family === 'solana' ||
+      family === 'ton' ||
+      family === 'canton' ||
+      family === 'kaspa' ||
+      family === 'qubic'
+    ) {
       return undefined;
     }
     return 'solana';
@@ -809,7 +850,9 @@ function inferAppFromApdu(app: LedgerApp, apdu: ReturnType<typeof parseApdu>): L
       family === 'symbol' ||
       family === 'aion' ||
       family === 'canton' ||
-      family === 'kaspa'
+      family === 'kaspa' ||
+      family === 'qubic' ||
+      family === 'factom'
     ) {
       return undefined;
     }
@@ -847,7 +890,8 @@ function inferAppFromApdu(app: LedgerApp, apdu: ReturnType<typeof parseApdu>): L
     family !== 'neo' &&
     family !== 'waves' &&
     family !== 'alephium' &&
-    family !== 'nervos'
+    family !== 'nervos' &&
+    family !== 'lto'
   ) {
     return family === 'near' ? undefined : 'near';
   }

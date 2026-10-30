@@ -286,7 +286,7 @@ See also [ledger-apdu-plan.md](./ledger-apdu-plan.md) for the catalog matrix and
 | Everscale | `everscale` | 1.1.8 | MATCH GET_APP_CONFIGURATION (CLA E0 INS 01) 3-byte; pubkey/sign KEEP — LedgerHQ/app-everscale | MATCH GET_APP_CONFIGURATION (CLA E0 INS 01) 3-byte; pubkey/sign KEEP — LedgerHQ/app-everscale |
 | Exchange | `unknown` | 4.4.4 | unknown — needs firmware research | unknown — needs firmware research |
 | Expanse | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
-| Factom | `unknown` | 1.2.4 | unknown — needs firmware research | unknown — needs firmware research |
+| Factom | `factom` | 1.2.4 | MATCH GET_APP_CONFIGURATION (CLA E0 INS 06) flag\|\|major\|\|minor\|\|major; pubkey/sign KEEP — LedgerHQ/app-factom `handleGetAppConfiguration` | CLA E0: 02/04/06/08/10/12/14/16/18 |
 | Fido U2F | `unknown` | 1.3.8 | unknown — needs firmware research | unknown — needs firmware research |
 | Figment | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | Filecoin | `filecoin` | 2.3.15 | MATCH Zondax VERSION/ADDR/SIGN; ETH dual path — LedgerHQ/app-filecoin (#52) | MATCH Zondax VERSION/ADDR/SIGN; ETH dual path — LedgerHQ/app-filecoin (#52) |
@@ -322,7 +322,7 @@ See also [ledger-apdu-plan.md](./ledger-apdu-plan.md) for the catalog matrix and
 | Lens | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | libertify | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | Litecoin | `bitcoin` | 2.4.13 | bitcoin family — see Bitcoin section; coin params differ | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
-| LTO Network | `unknown` | 2.2.3 | unknown — needs firmware research | unknown — needs firmware research |
+| LTO Network | `lto` | 2.2.3 | MATCH GET_APP_CONFIGURATION (CLA 80 INS 06) 3-byte; pubkey/sign KEEP — LedgerHQ/app-lto `src/main.h` | CLA 80: 02/04/06 |
 | MimbleWimble Coin | `unknown` | 7.7.0 | unknown — needs firmware research | unknown — needs firmware research |
 | Mina | `mina` | 1.6.10 | MATCH GET_CONF; GET_ADDR/SIGN KEEP — LedgerHQ/app-mina (#52) | MATCH GET_CONF; GET_ADDR/SIGN KEEP — LedgerHQ/app-mina (#52) |
 | Mix | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
@@ -363,7 +363,7 @@ See also [ledger-apdu-plan.md](./ledger-apdu-plan.md) for the catalog matrix and
 | Polkadot Migration | `polkadot` | 100.0.27 | polkadot family — see Other open apps (FIXED; coin params may differ) | CLA F9/90: 00/01/02/03 (APDUSPEC) |
 | Polymesh | `polkadot` | 8.8000001.7 | family-mapped — catalog `polkadot` (reuses polkadot handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA F9/90: 00/01/02 (Zondax pattern) |
 | QRL | `qrl` | 1.1.5 | MATCH VERSION (CLA 77 INS 00) 4-byte; XMSS pubkey/sign KEEP — LedgerHQ/app-qrl | MATCH VERSION (CLA 77 INS 00) 4-byte; XMSS pubkey/sign KEEP — LedgerHQ/app-qrl |
-| Qubic | `unknown` | 0.1.7 | unknown — needs firmware research | unknown — needs firmware research |
+| Qubic | `qubic` | 0.1.7 | MATCH GET_VERSION (CLA E0 INS 03) 3-byte; bad P1/P2 is 6A86; pubkey/sign KEEP — LedgerHQ/app-qubic `src/apdu/dispatcher.c` | CLA E0: 03/04/05/06 |
 | QuickSwap | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | Radix Babylon | `unknown` | 0.7.35 | unknown — needs firmware research | unknown — needs firmware research |
 | Rarible | `ethereum-plugin` | 1.2.1 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
@@ -382,7 +382,7 @@ See also [ledger-apdu-plan.md](./ledger-apdu-plan.md) for the catalog matrix and
 | Shimmer | `unknown` | 0.8.8 | unknown — needs firmware research | unknown — needs firmware research |
 | Sia | `sia` | 2.2.1 | MATCH GET_VERSION (CLA E0 INS 01) 3-byte; pubkey/sign KEEP — LedgerHQ/app-sia | MATCH GET_VERSION (CLA E0 INS 01) 3-byte; pubkey/sign KEEP — LedgerHQ/app-sia |
 | Solana | `solana` | 1.17.1 | see Solana section (MATCH/FIXED/KEEP) | CLA E0: 04/05/06/07 |
-| Solar | `unknown` | 1.3.1 | unknown — needs firmware research | unknown — needs firmware research |
+| Solar | `solar` | 1.3.1 | MATCH GET_VERSION (CLA E0 INS A2) 3-byte; name/sign KEEP — LedgerHQ/app-solar `doc/COMMANDS.md` | CLA E0: A1/A2/B1/B2/C1/C2 |
 | Songbird | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | Sonic | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | Spacemesh | `spacemesh` | 0.0.16 | MATCH GET_VERSION (CLA 45 INS 00) test\|\|u16 triple\|\|locked; addr/sign KEEP — LedgerHQ/app-spacemesh `docs/APDUSPEC.md` | CLA 45: 00/01/02 |
