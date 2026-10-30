@@ -12,6 +12,7 @@ import {
 } from '../apdu';
 import { icarusRootFor } from '../crypto';
 import { deriveIcarus, deriveIcarusFromRoot, signIcarus } from './icarus';
+import { cip8AddressType, readShelleyAddress, shelleyAddressAllowed, shelleyAddressBytes } from './cardanoAddress';
 
 /**
  * LedgerHQ/app-cardano §10.1 and `src/handler/sign_msg.c`.
@@ -29,6 +30,7 @@ const SW_MSG_PATH = 0x6b61;
 const SW_MSG_HASH_FLAG = 0x6b62;
 const SW_MSG_ASCII_FLAG = 0x6b63;
 const SW_MSG_FIELD_TYPE = 0x6b64;
+const SW_MSG_ADDRESS = 0x6b65;
 const SW_MSG_CHUNK_SIZE = 0x6b66;
 const SW_MSG_CHUNK_DATA = 0x6b67;
 const SW_MSG_BAD_CHUNK = 0x6b68;
@@ -233,14 +235,33 @@ async function msgInit(apdu: Apdu, ctx: FamilyContext, session: FamilySession): 
     return encodeResponse(new Uint8Array(), SW_MSG_FIELD_TYPE);
   }
   const fieldType = offset[0] ?? 0;
+  const field = offset.subarray(1);
+  let addressField: Uint8Array;
   if (fieldType === 0x01) {
-    return encodeResponse(new Uint8Array(), SW_INS_NOT_SUPPORTED);
-  }
-  if (fieldType !== 0x02) {
+    if (field[0] === 0x08) {
+      return encodeResponse(new Uint8Array(), SW_INS_NOT_SUPPORTED);
+    }
+    const read = readShelleyAddress(field);
+    if (read === 'byron') {
+      return encodeResponse(new Uint8Array(), SW_INS_NOT_SUPPORTED);
+    }
+    if (!read) {
+      return encodeResponse(new Uint8Array(), SW_MSG_ADDRESS);
+    }
+    if (read.next !== field.length) {
+      return encodeResponse(new Uint8Array(), SW_WRONG_DATA);
+    }
+    if (!shelleyAddressAllowed(read.address) || !cip8AddressType(read.address.type)) {
+      return encodeResponse(new Uint8Array(), SW_SECURITY);
+    }
+    addressField = await shelleyAddressBytes(ctx, read.address);
+  } else if (fieldType === 0x02) {
+    if (field.length !== 0) {
+      return encodeResponse(new Uint8Array(), SW_WRONG_DATA);
+    }
+    addressField = new Uint8Array();
+  } else {
     return encodeResponse(new Uint8Array(), SW_MSG_BAD_TYPE);
-  }
-  if (offset.length !== 1) {
-    return encodeResponse(new Uint8Array(), SW_WRONG_DATA);
   }
   if (!lengthAllowed(length, hashPayload, isAscii)) {
     return encodeResponse(new Uint8Array(), SW_MEMORY);
@@ -250,6 +271,9 @@ async function msgInit(apdu: Apdu, ctx: FamilyContext, session: FamilySession): 
   }
   const path = ctx.confirmation.resolvePath?.(parsed.path, ['ada']) ?? parsed.path;
   const node = await icarusNode(ctx, path);
+  if (fieldType === 0x02) {
+    addressField = blake2b(node.publicKey, { dkLen: 28 });
+  }
   session.cardanoSignMsg = {
     state: length === 0 ? 'confirm' : 'chunk',
     hashPayload,
@@ -258,7 +282,7 @@ async function msgInit(apdu: Apdu, ctx: FamilyContext, session: FamilySession): 
     filled: 0,
     path,
     pubkey: node.publicKey,
-    keyHash: blake2b(node.publicKey, { dkLen: 28 }),
+    addressField,
   };
   return emptyOk();
 }
@@ -304,7 +328,7 @@ async function msgConfirm(apdu: Apdu, ctx: FamilyContext, session: FamilySession
     return msgFail(session, SW_MSG_CONFIRM);
   }
   const payload = msg.hashPayload ? blake2b(msg.message, { dkLen: 28 }) : msg.message;
-  const structure = sigStructure(msg.keyHash, payload);
+  const structure = sigStructure(msg.addressField, payload);
   const ok = await ctx.confirmation.confirm({
     brand: 'ledger',
     kind: 'sign',
@@ -318,7 +342,7 @@ async function msgConfirm(apdu: Apdu, ctx: FamilyContext, session: FamilySession
   }
   const node = await icarusNode(ctx, msg.path);
   const signature = signIcarus(node, structure);
-  const body = concatBytes(signature, msg.pubkey, writeU32BE(28), msg.keyHash);
+  const body = concatBytes(signature, msg.pubkey, writeU32BE(msg.addressField.length), msg.addressField);
   session.cardanoSignMsg = undefined;
   return encodeResponse(body, SW_OK);
 }

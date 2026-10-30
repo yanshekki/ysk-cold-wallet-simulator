@@ -1365,6 +1365,37 @@ describe('attachLedger', () => {
     expect(device.getApp()).toBe('cardano');
     adapter.close();
   });
+
+  it('forwards a Cardano enterprise address over HID', async () => {
+    const device = new LedgerProtocolHandler({
+      model: LEDGER_MODELS.find((item) => item.id === 'nano-x')!,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy: entropy(),
+    });
+    device.setApp('cardano');
+    const path = [0x8000073c, 0x80000717, 0x80000000, 0, 0];
+    const data: number[] = [0x06, 0x01, path.length];
+    for (const component of path) {
+      data.push((component >>> 24) & 0xff, (component >>> 16) & 0xff, (component >>> 8) & 0xff, component & 0xff);
+    }
+    data.push(0x11);
+    const { host, gadget } = memoryHidPair();
+    const ble = bleToHandler(device, (framed) => splitFramedPackets(framed, DEFAULT_MTU));
+    const adapter = attachLedger(gadget, ble, DEFAULT_MTU, () => undefined);
+    const replies: Uint8Array[] = [];
+    host.onInput((report) => replies.push(report));
+    for (const report of wrapHidApdu(Uint8Array.of(0xd7, 0x11, 0x01, 0x00, data.length, ...data))) {
+      host.write(report);
+    }
+    await adapter.idle();
+    const payload = unwrapHidReports(replies).payload;
+    const node = deriveIcarus(entropy(), "m/1852'/1815'/0'/0/0");
+    const address = Uint8Array.of(0x61, ...blake2b(node.publicKey, { dkLen: 28 }));
+    expect(Array.from(payload.subarray(0, payload.length - 2))).toEqual(Array.from(address));
+    expect((payload[payload.length - 2] << 8) | payload[payload.length - 1]).toBe(SW_OK);
+    adapter.close();
+  });
 });
 
 describe('attachOneKey', () => {

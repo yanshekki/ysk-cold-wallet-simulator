@@ -473,12 +473,16 @@ function cip8Apdu(p1: number, data: number[]): Uint8Array {
   return apdu([0xd7, 0x24, p1, 0x00, data.length, ...data]);
 }
 
-function cip8Structure(keyHash: Uint8Array, payload: Uint8Array): Uint8Array {
+function cip8Structure(addressField: Uint8Array, payload: Uint8Array): Uint8Array {
+  const fieldHead =
+    addressField.length < 24
+      ? Uint8Array.of(0x40 | addressField.length)
+      : Uint8Array.of(0x58, addressField.length);
   const header = concatBytes(
     Uint8Array.of(0xa2, 0x01, 0x27, 0x67),
     Uint8Array.from('address', (char) => char.charCodeAt(0)),
-    Uint8Array.of(0x58, 0x1c),
-    keyHash,
+    fieldHead,
+    addressField,
   );
   const payloadHead = payload.length < 24 ? Uint8Array.of(0x40 | payload.length) : Uint8Array.of(0x58, payload.length);
   return concatBytes(
@@ -555,8 +559,95 @@ describe('Cardano CIP-8 key-hash messages sign the COSE structure', () => {
       device,
       cip8Apdu(0x01, [...u32be(2), ...encodePath(ADA_PATH), 0x01, 0x02, 0x01]),
     );
-    expect(statusOf(address)).toBe(SW_INS_NOT_SUPPORTED);
+    expect(statusOf(address)).toBe(0x6b65);
+    const byron = await exchange(
+      device,
+      cip8Apdu(0x01, [...u32be(2), ...encodePath(ADA_PATH), 0x01, 0x02, 0x01, 0x08]),
+    );
+    expect(statusOf(byron)).toBe(SW_INS_NOT_SUPPORTED);
     expect(confirms()).toBe(0);
+  });
+});
+
+const STAKE_PATH = [0x8000073c, 0x80000717, 0x80000000, 2, 0];
+
+function enterpriseParams(): number[] {
+  return [0x06, 0x01, ...encodePath(ADA_PATH), 0x11];
+}
+
+describe('Cardano Shelley address bytes', () => {
+  it('returns a 29-byte enterprise address with no sheet', async () => {
+    const { device, confirms } = handler();
+    device.setApp('cardano');
+    const reply = await exchange(device, apdu([0xd7, 0x11, 0x01, 0x00, enterpriseParams().length, ...enterpriseParams()]));
+    expect(statusOf(reply)).toBe(SW_OK);
+    expect(confirms()).toBe(0);
+    const node = deriveIcarus(entropy(), "m/1852'/1815'/0'/0/0");
+    const key = blake2b(node.publicKey, { dkLen: 28 });
+    expect(Array.from(bodyOf(reply))).toEqual([0x61, ...key]);
+  });
+
+  it('displays an enterprise address and returns an empty body', async () => {
+    const { device, confirms } = handler();
+    device.setApp('cardano');
+    const reply = await exchange(device, apdu([0xd7, 0x11, 0x02, 0x00, enterpriseParams().length, ...enterpriseParams()]));
+    expect(statusOf(reply)).toBe(SW_OK);
+    expect(bodyOf(reply).length).toBe(0);
+    expect(confirms()).toBe(1);
+  });
+
+  it('returns a 57-byte base address and a 29-byte reward address', async () => {
+    const { device } = handler();
+    device.setApp('cardano');
+    const payment = deriveIcarus(entropy(), "m/1852'/1815'/0'/0/0");
+    const stake = deriveIcarus(entropy(), "m/1852'/1815'/0'/2/0");
+    const base = [
+      0x00,
+      0x01,
+      ...encodePath(ADA_PATH),
+      0x22,
+      ...encodePath(STAKE_PATH),
+    ];
+    const baseReply = await exchange(device, apdu([0xd7, 0x11, 0x01, 0x00, base.length, ...base]));
+    expect(Array.from(bodyOf(baseReply))).toEqual([
+      0x01,
+      ...blake2b(payment.publicKey, { dkLen: 28 }),
+      ...blake2b(stake.publicKey, { dkLen: 28 }),
+    ]);
+    const reward = [0x0e, 0x01, 0x22, ...encodePath(STAKE_PATH)];
+    const rewardReply = await exchange(device, apdu([0xd7, 0x11, 0x01, 0x00, reward.length, ...reward]));
+    expect(Array.from(bodyOf(rewardReply))).toEqual([0xe1, ...blake2b(stake.publicKey, { dkLen: 28 })]);
+  });
+
+  it('rejects Byron, a bad type, and a non-Shelley payment path', async () => {
+    const { device, confirms } = handler();
+    device.setApp('cardano');
+    expect(statusOf(await exchange(device, apdu([0xd7, 0x11, 0x01, 0x00, 1, 0x08])))).toBe(SW_INS_NOT_SUPPORTED);
+    expect(statusOf(await exchange(device, apdu([0xd7, 0x11, 0x01, 0x00, 1, 0x09])))).toBe(0x6b06);
+    const byronPath = encodePath([0x8000002c, 0x80000717, 0x80000000, 0, 0]);
+    const foreign = [0x06, 0x01, ...byronPath, 0x11];
+    expect(statusOf(await exchange(device, apdu([0xd7, 0x11, 0x01, 0x00, foreign.length, ...foreign])))).toBe(0x6982);
+    expect(confirms()).toBe(0);
+  });
+
+  it('CIP-8 address field 01 signs the enterprise address bytes', async () => {
+    const { device, confirms } = handler();
+    device.setApp('cardano');
+    const params = enterpriseParams();
+    const message = Uint8Array.from('Hi', (char) => char.charCodeAt(0));
+    const init = [...u32be(message.length), ...encodePath(ADA_PATH), 0x01, 0x02, 0x01, ...params];
+    expect(statusOf(await exchange(device, cip8Apdu(0x01, init)))).toBe(SW_OK);
+    expect(confirms()).toBe(0);
+    expect(statusOf(await exchange(device, cip8Apdu(0x02, [...u32be(message.length), ...message])))).toBe(SW_OK);
+    const done = await exchange(device, cip8Apdu(0x03, []));
+    const node = deriveIcarus(entropy(), "m/1852'/1815'/0'/0/0");
+    const address = Uint8Array.of(0x61, ...blake2b(node.publicKey, { dkLen: 28 }));
+    expect(Array.from(bodyOf(done).subarray(0, 64))).toEqual(
+      Array.from(signIcarus(node, cip8Structure(address, message))),
+    );
+    expect(Array.from(bodyOf(done).subarray(96, 100))).toEqual([0, 0, 0, 29]);
+    expect(Array.from(bodyOf(done).subarray(100))).toEqual(Array.from(address));
+    expect(confirms()).toBe(1);
   });
 });
 
