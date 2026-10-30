@@ -47,6 +47,9 @@ export async function handleCardanoApdu(
   if (apdu.ins === 0x21) {
     return signTransaction(apdu, ctx, session);
   }
+  if (apdu.ins === 0x22) {
+    return signOpCert(apdu, ctx);
+  }
   return encodeResponse(new Uint8Array(), SW_INS_NOT_SUPPORTED);
 }
 
@@ -206,6 +209,71 @@ async function confirmTx(ctx: FamilyContext, body: Uint8Array): Promise<boolean>
     message: 'Sign Cardano transaction',
     rawPayload: body,
   });
+}
+
+/**
+ * LedgerHQ/app-cardano `doc/apdu_reference.md` §8.1 and `src/handler/sign_opcert.c`.
+ * APDU order is KES ‖ KES period ‖ issue counter ‖ path. The signed body is
+ * KES ‖ issue counter ‖ KES period. `signRawMessageWithPath` signs those bytes.
+ * `MAX_OPCERT_LENGTH` is 32 + 8 + 8 + sizeof(bip44_path_t). That struct is 24 bytes.
+ */
+const MAX_OPCERT_LENGTH = 72;
+const SW_SECURITY_CONDITION = 0x6982;
+const SW_OPCERT_KES = 0x6b10;
+const SW_OPCERT_PERIOD = 0x6b11;
+const SW_OPCERT_COUNTER = 0x6b12;
+const SW_OPCERT_PATH = 0x6b13;
+const SW_OPCERT_LENGTH = 0x6b14;
+/** `bip44_isPoolColdKeyPath`: m/1853'/1815'/0'/index' and the index is hardened. */
+const POOL_COLD_KEY_PATH = /^m\/1853'\/1815'\/0'\/\d+'$/;
+
+async function signOpCert(apdu: Apdu, ctx: FamilyContext): Promise<Uint8Array> {
+  if (apdu.p1 !== 0x00 || apdu.p2 !== 0x00) {
+    return encodeResponse(new Uint8Array(), SW_WRONG_P1P2);
+  }
+  const data = apdu.data;
+  if (data.length > MAX_OPCERT_LENGTH) {
+    return encodeResponse(new Uint8Array(), SW_OPCERT_LENGTH);
+  }
+  if (data.length < 32) {
+    return encodeResponse(new Uint8Array(), SW_OPCERT_KES);
+  }
+  if (data.length < 40) {
+    return encodeResponse(new Uint8Array(), SW_OPCERT_PERIOD);
+  }
+  if (data.length < 48) {
+    return encodeResponse(new Uint8Array(), SW_OPCERT_COUNTER);
+  }
+  let parsed: { path: string; rest: Uint8Array };
+  try {
+    parsed = parseBip32Path(data.subarray(48));
+  } catch {
+    return encodeResponse(new Uint8Array(), SW_OPCERT_PATH);
+  }
+  if (parsed.rest.length !== 0) {
+    return encodeResponse(new Uint8Array(), SW_OPCERT_LENGTH);
+  }
+  if (!POOL_COLD_KEY_PATH.test(parsed.path)) {
+    return encodeResponse(new Uint8Array(), SW_SECURITY_CONDITION);
+  }
+  const path = ctx.confirmation.resolvePath?.(parsed.path, ['ada']) ?? parsed.path;
+  const signedBody = concatBytes(
+    data.subarray(0, 32),
+    data.subarray(40, 48),
+    data.subarray(32, 40),
+  );
+  const ok = await confirm(ctx, {
+    kind: 'sign',
+    title: 'Sign Cardano op cert',
+    path,
+    message: `Sign Cardano operational certificate\n${path}`,
+    rawPayload: signedBody,
+  });
+  if (!ok) {
+    return encodeResponse(new Uint8Array(), SW_DENY);
+  }
+  const node = await icarusAt(ctx, path);
+  return encodeResponse(signIcarus(node, signedBody), SW_OK);
 }
 
 async function signWitness(

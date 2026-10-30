@@ -10,6 +10,7 @@ import {
   type ConfirmationPort,
 } from '@cws/contracts';
 import { SW_DENY, SW_INS_NOT_SUPPORTED, SW_OK, SW_WRONG_P1P2 } from '../apdu';
+import { concatBytes } from '../bytes';
 import { deriveEd25519PrivateKey, signEd25519 } from '../crypto';
 import { BleReassembler, DEFAULT_MTU, framePayload, splitFramedPackets, TAG_APDU } from '../framing';
 import { LedgerProtocolHandler } from '../handler';
@@ -85,6 +86,30 @@ function encodePath(components: number[]): number[] {
 
 const ADA_PATH = [0x8000073c, 0x80000717, 0x80000000, 0, 0];
 const SOL_PATH = [0x8000002c, 0x800001f5, 0x80000000];
+
+function hex(value: string): Uint8Array {
+  const bytes = value.match(/../g);
+  if (!bytes) {
+    throw new Error('empty hex');
+  }
+  return Uint8Array.from(bytes, (byte) => Number.parseInt(byte, 16));
+}
+
+const OPCERT_KES = hex('3d24bc547388cf2403fd978fc3d3a93d1f39acf68a9c00e40512084dc05f2822');
+const OPCERT_PERIOD = Uint8Array.of(0, 0, 0, 0, 0, 0, 0, 0x2f);
+const OPCERT_COUNTER = Uint8Array.of(0, 0, 0, 0, 0, 0, 0, 0x2a);
+
+function opCertSignedBody(): Uint8Array {
+  return concatBytes(OPCERT_KES, OPCERT_COUNTER, OPCERT_PERIOD);
+}
+
+function opCertPayload(path: number[]): number[] {
+  return [...OPCERT_KES, ...OPCERT_PERIOD, ...OPCERT_COUNTER, ...path];
+}
+
+function opCertApdu(body: number[], p1 = 0x00, p2 = 0x00): Uint8Array {
+  return apdu([0xd7, 0x22, p1, p2, body.length, ...body]);
+}
 
 describe('Cardano SIGN_TX body lengths follow the reported app version', () => {
   it('v8 INIT is empty 9000 and does not open the confirm sheet', async () => {
@@ -175,6 +200,97 @@ describe('Cardano SIGN_TX body lengths follow the reported app version', () => {
     } finally {
       resetLedgerVersionPicks();
     }
+  });
+
+  it('SIGN_OPCERT signs KES, issue counter, then KES period with the pool cold key', async () => {
+    const { device, confirms } = handler();
+    device.setApp('cardano');
+    const kes = hex(
+      '3d24bc547388cf2403fd978fc3d3a93d1f39acf68a9c00e40512084dc05f2822',
+    );
+    const period = Uint8Array.of(0, 0, 0, 0, 0, 0, 0, 0x2f);
+    const counter = Uint8Array.of(0, 0, 0, 0, 0, 0, 0, 0x2a);
+    const path = encodePath([0x8000073d, 0x80000717, 0x80000000, 0x80000000]);
+    const reply = await exchange(device, opCertApdu([...kes, ...period, ...counter, ...path]));
+    expect(statusOf(reply)).toBe(SW_OK);
+    expect(bodyOf(reply).length).toBe(64);
+    expect(confirms()).toBe(1);
+    const node = deriveIcarus(entropy(), "m/1853'/1815'/0'/0'");
+    const signed = concatBytes(kes, counter, period);
+    expect(Array.from(bodyOf(reply))).toEqual(Array.from(signIcarus(node, signed)));
+    expect(Array.from(bodyOf(reply))).not.toEqual(
+      Array.from(signIcarus(node, concatBytes(kes, period, counter))),
+    );
+  });
+
+  it('SIGN_OPCERT still signs an unusual cold-key index', async () => {
+    const { device, confirms } = handler();
+    device.setApp('cardano');
+    const body = opCertPayload(encodePath([0x8000073d, 0x80000717, 0x80000000, 0x800f4241]));
+    const reply = await exchange(device, opCertApdu(body));
+    expect(statusOf(reply)).toBe(SW_OK);
+    expect(bodyOf(reply).length).toBe(64);
+    expect(confirms()).toBe(1);
+    const node = deriveIcarus(entropy(), "m/1853'/1815'/0'/1000001'");
+    expect(Array.from(bodyOf(reply))).toEqual(Array.from(signIcarus(node, opCertSignedBody())));
+  });
+
+  it('SIGN_OPCERT rejects a path that is not a pool cold key before the sheet', async () => {
+    const { device, confirms } = handler();
+    device.setApp('cardano');
+    const ordinary = encodePath([0x8000073c, 0x80000717, 0x80000000, 2, 0]);
+    const denied = await exchange(device, opCertApdu(opCertPayload(ordinary)));
+    expect(statusOf(denied)).toBe(0x6982);
+    expect(bodyOf(denied).length).toBe(0);
+    expect(confirms()).toBe(0);
+    const prefix = encodePath([0x8000073d, 0x80000717]);
+    expect(statusOf(await exchange(device, opCertApdu(opCertPayload(prefix))))).toBe(0x6982);
+    const softIndex = encodePath([0x8000073d, 0x80000717, 0x80000000, 0]);
+    expect(statusOf(await exchange(device, opCertApdu(opCertPayload(softIndex))))).toBe(0x6982);
+    const usecase = encodePath([0x8000073d, 0x80000717, 0x80000001, 0x80000000]);
+    expect(statusOf(await exchange(device, opCertApdu(opCertPayload(usecase))))).toBe(0x6982);
+    expect(confirms()).toBe(0);
+  });
+
+  it('SIGN_OPCERT parse failures use the operational-certificate status words', async () => {
+    const { device, confirms } = handler();
+    device.setApp('cardano');
+    const kes = [...hex('3d24bc547388cf2403fd978fc3d3a93d1f39acf68a9c00e40512084dc05f2822')];
+    const period = [0, 0, 0, 0, 0, 0, 0, 0x2f];
+    const counter = [0, 0, 0, 0, 0, 0, 0, 0x2a];
+    expect(statusOf(await exchange(device, opCertApdu(kes.slice(0, 16))))).toBe(0x6b10);
+    expect(statusOf(await exchange(device, opCertApdu([...kes, ...period.slice(0, 4)])))).toBe(0x6b11);
+    expect(
+      statusOf(await exchange(device, opCertApdu([...kes, ...period, ...counter.slice(0, 4)]))),
+    ).toBe(0x6b12);
+    expect(statusOf(await exchange(device, opCertApdu([...kes, ...period, ...counter, 0x05])))).toBe(
+      0x6b13,
+    );
+    const path = encodePath([0x8000073d, 0x80000717, 0x80000000, 0x80000000]);
+    expect(
+      statusOf(await exchange(device, opCertApdu([...kes, ...period, ...counter, ...path, 0xff]))),
+    ).toBe(0x6b14);
+    expect(statusOf(await exchange(device, opCertApdu(new Array(73).fill(0xaa))))).toBe(0x6b14);
+    expect(statusOf(await exchange(device, opCertApdu(opCertPayload(path), 0x01, 0x00)))).toBe(
+      SW_WRONG_P1P2,
+    );
+    expect(confirms()).toBe(0);
+  });
+
+  it('a denied SIGN_OPCERT returns 6985 and the other Cardano commands stay 6D00', async () => {
+    const { device, confirms } = handler(async () => false);
+    device.setApp('cardano');
+    const path = encodePath([0x8000073d, 0x80000717, 0x80000000, 0x80000000]);
+    const denied = await exchange(device, opCertApdu(opCertPayload(path)));
+    expect(statusOf(denied)).toBe(SW_DENY);
+    expect(bodyOf(denied).length).toBe(0);
+    expect(confirms()).toBe(1);
+    for (const ins of [0x12, 0x23, 0x24]) {
+      const reply = await exchange(device, apdu([0xd7, ins, 0x00, 0x00, 0x00]));
+      expect(statusOf(reply)).toBe(SW_INS_NOT_SUPPORTED);
+    }
+    const aux = await exchange(device, apdu([0xd7, 0x21, 0x13, 0x36, 0x00]));
+    expect(statusOf(aux)).toBe(SW_INS_NOT_SUPPORTED);
   });
 
   it('a denied v8 confirm returns 6985 and no hash', async () => {
