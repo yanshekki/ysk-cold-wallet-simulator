@@ -1,6 +1,6 @@
 # Ledger APDU wire matrix
 
-**Phase 2 item 2 (KEEP re-diff follow-up):** Tron/XRP/Stellar/Cosmos/Polkadot/TON/Aptos handlers re-diffed against official firmware/hw-app; MATCH/FIXED only with citations + `family.test.ts` KEEP re-diff cases. Cardano operational certificate, CIP-36 vote, native script hash, Shelley `DERIVE_ADDRESS`, and CIP-8 key-hash and Shelley address fields are MATCH. Byron addresses, CIP-36 auxiliary, Solana multi-path, Bitcoin policy, and Eth clear-sign stream stay KEEP.
+**Phase 2 item 2 (KEEP re-diff follow-up):** Tron/XRP/Stellar/Cosmos/Polkadot/TON/Aptos handlers re-diffed against official firmware/hw-app; MATCH/FIXED only with citations + `family.test.ts` KEEP re-diff cases. Cardano operational certificate, CIP-36 vote, native script hash, Shelley and Byron `DERIVE_ADDRESS`, and CIP-8 Shelley address fields are MATCH. CIP-36 auxiliary, Solana multi-path, Bitcoin policy, and Eth clear-sign stream stay KEEP.
 
 **Phase 2 family map (follow-up to #49):** catalog/`inferLedgerFamily` remaps ethereum CHAIN, bitcoin-like, cosmos-like, polkadot-like, and `ethereum-plugin` names so Open App is not `unknown`. Remapped rows are **not** new wire MATCH/FIXED — only family routing changed.
 
@@ -105,7 +105,7 @@ The 32-byte v7 body is blake2b-256 of the concatenated stage payloads. That is n
 
 | INS | Upstream | CWS | Status |
 | --- | --- | --- | --- |
-| `11` DERIVE_ADDRESS | Shelley raw address bytes. P1 `01` returns them with no sheet. P1 `02` shows them and returns an empty body. Byron stays `6D00` | Shelley raw bytes, or empty after display | MATCH for Shelley. KEEP for Byron |
+| `11` DERIVE_ADDRESS | Shelley raw bytes, or Byron CBOR with a CRC-32. P1 `01` returns them with no sheet. P1 `02` shows them and returns an empty body | raw address bytes, or empty after display | MATCH |
 | `12` native script hash | INIT, complex, and leaf stages are empty after confirm. FINISH returns blake2b-224 of `0x00 ‖` CBOR(script) | 28 bytes after the finish sheet | MATCH |
 | `22` operational certificate | 64-byte signature of KES ‖ issue counter ‖ KES period. Path is `m/1853'/1815'/0'/index'` | 64-byte Icarus signature after confirm | MATCH |
 | `23` CIP-36 vote | INIT and CHUNK are empty. CONFIRM returns blake2b-256 of the votecast bytes, then a 64-byte signature. Witness path is `m/1694'/1815'/account'/0/address` | 96 bytes after confirm | MATCH |
@@ -118,9 +118,9 @@ The 32-byte v7 body is blake2b-256 of the concatenated stage payloads. That is n
 
 `INS 12` builds the same CBOR as `derive_native_script_hash_builder.c`: a leading `0x00`, then all/any/n-of-k arrays and pubkey or timelock leaves. A pubkey is either a 28-byte hash or blake2b-224 of an Icarus public key. A script-hash credential is `6B41`. An unrecognized device path is `6982`. FINISH before the tree is complete is `6B43`. Nesting uses `MAX_SCRIPT_DEPTH` 11, so the eleventh nested complex node is `6B45`. Both display formats return the same 28 bytes. Each stage opens a sheet. User rejection is `6985`. Source: `doc/apdu_reference.md` §6.1 and `src/handler/derive_native_script_hash.c` (develop).
 
-`INS 11` reads Shelley address parameters from `addressUtilsShelley.c`. The body is `(type << 4) | networkId`, then the payment credential, then the staking credential or pointer. A key credential is blake2b-224 of the Icarus public key. P1 `01` returns those bytes with no sheet. P1 `02` confirms and returns an empty body. A bad parse is `6B06`. A parsed address that fails the firmware checks is `6982`. Byron (`08`) stays `6D00`.
+`INS 11` reads address parameters from `addressUtilsShelley.c`. A Shelley body is `(type << 4) | networkId`, then the payment credential, then the staking credential or pointer. A key credential is blake2b-224 of the Icarus public key. Byron type `08` is the CBOR address from `addressUtilsByron.c`: tag 24 around the inner address, then CRC-32 of that inner address. Mainnet magic `764824073` uses an empty attribute map. The payment path is `m/44'/1815'/account'/0/index`. P1 `01` returns those bytes with no sheet. P1 `02` confirms and returns an empty body. A bad parse is `6B06`. A parsed address that fails the firmware checks is `6982`.
 
-`INS 24` address-field type `01` puts those same Shelley bytes in the COSE header. `policyForSignMsg` allows base key/key, base key/script, reward key, and enterprise key. Byron stays `6D00`. Type `02` is still the 28-byte key hash. Source: `src/addressUtils/addressUtilsShelley.c`, `src/handler/derive_address.c`, and `src/handler/sign_msg.c` (develop).
+`INS 24` address-field type `01` puts a Shelley address in the COSE header. `policyForSignMsg` allows base key/key, base key/script, reward key, and enterprise key. A valid Byron address is `6982`. Type `02` is still the 28-byte key hash. Source: `src/addressUtils/addressUtilsShelley.c`, `src/addressUtils/addressUtilsByron.c`, `src/handler/derive_address.c`, and `src/handler/sign_msg.c` (develop).
 
 The old `P2 & 0x02` "more data" bit is not how either Cardano major chunks `SIGN_TX`. Using it made INIT (`P1 10`, `P2 00` on 8.x) look finished and return a 64-byte Icarus signature. That is the Minswap `64 instead of 0` failure.
 

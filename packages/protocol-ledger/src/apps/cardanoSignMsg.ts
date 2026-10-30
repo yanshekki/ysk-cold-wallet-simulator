@@ -5,7 +5,6 @@ import {
   encodeResponse,
   parseBip32Path,
   SW_DENY,
-  SW_INS_NOT_SUPPORTED,
   SW_OK,
   SW_WRONG_P1P2,
   type Apdu,
@@ -238,13 +237,7 @@ async function msgInit(apdu: Apdu, ctx: FamilyContext, session: FamilySession): 
   const field = offset.subarray(1);
   let addressField: Uint8Array;
   if (fieldType === 0x01) {
-    if (field[0] === 0x08) {
-      return encodeResponse(new Uint8Array(), SW_INS_NOT_SUPPORTED);
-    }
     const read = readShelleyAddress(field);
-    if (read === 'byron') {
-      return encodeResponse(new Uint8Array(), SW_INS_NOT_SUPPORTED);
-    }
     if (!read) {
       return encodeResponse(new Uint8Array(), SW_MSG_ADDRESS);
     }

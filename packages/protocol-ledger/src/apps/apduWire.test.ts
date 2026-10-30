@@ -1,6 +1,7 @@
 import { mnemonicToEntropy } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
 import { blake2b } from '@noble/hashes/blake2b';
+import { sha3_256 } from '@noble/hashes/sha3';
 import { describe, expect, it } from 'vitest';
 import {
   LEDGER_MODELS,
@@ -564,12 +565,63 @@ describe('Cardano CIP-8 key-hash messages sign the COSE structure', () => {
       device,
       cip8Apdu(0x01, [...u32be(2), ...encodePath(ADA_PATH), 0x01, 0x02, 0x01, 0x08]),
     );
-    expect(statusOf(byron)).toBe(SW_INS_NOT_SUPPORTED);
+    expect(statusOf(byron)).toBe(0x6b65);
     expect(confirms()).toBe(0);
   });
 });
 
 const STAKE_PATH = [0x8000073c, 0x80000717, 0x80000000, 2, 0];
+const BYRON_PATH = [0x8000002c, 0x80000717, 0x80000000, 0, 0];
+
+function cborHead(major: number, value: number): Uint8Array {
+  const type = (major << 5) & 0xe0;
+  if (value < 24) {
+    return Uint8Array.of(type | value);
+  }
+  if (value < 256) {
+    return Uint8Array.of(type | 24, value);
+  }
+  if (value < 65536) {
+    return Uint8Array.of(type | 25, (value >> 8) & 0xff, value & 0xff);
+  }
+  return Uint8Array.of(type | 26, (value >>> 24) & 0xff, (value >>> 16) & 0xff, (value >>> 8) & 0xff, value & 0xff);
+}
+
+function ieeeCrc32(data: Uint8Array): number {
+  let crc = 0xffffffff;
+  for (const byte of data) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function byronCbor(node: { publicKey: Uint8Array; chainCode: Uint8Array }, magic: number): Uint8Array {
+  const extended = concatBytes(node.publicKey, node.chainCode);
+  const rootInput = concatBytes(
+    cborHead(4, 3),
+    cborHead(0, 0),
+    cborHead(4, 2),
+    cborHead(0, 0),
+    concatBytes(cborHead(2, extended.length), extended),
+    cborHead(5, 0),
+  );
+  const root = blake2b(sha3_256(rootInput), { dkLen: 28 });
+  const magicBytes = cborHead(0, magic);
+  const attributes =
+    magic === 764824073
+      ? cborHead(5, 0)
+      : concatBytes(cborHead(5, 1), cborHead(0, 2), concatBytes(cborHead(2, magicBytes.length), magicBytes));
+  const inner = concatBytes(cborHead(4, 3), concatBytes(cborHead(2, root.length), root), attributes, cborHead(0, 0));
+  return concatBytes(
+    cborHead(4, 2),
+    cborHead(6, 24),
+    concatBytes(cborHead(2, inner.length), inner),
+    cborHead(0, ieeeCrc32(inner)),
+  );
+}
 
 function enterpriseParams(): number[] {
   return [0x06, 0x01, ...encodePath(ADA_PATH), 0x11];
@@ -622,11 +674,41 @@ describe('Cardano Shelley address bytes', () => {
   it('rejects Byron, a bad type, and a non-Shelley payment path', async () => {
     const { device, confirms } = handler();
     device.setApp('cardano');
-    expect(statusOf(await exchange(device, apdu([0xd7, 0x11, 0x01, 0x00, 1, 0x08])))).toBe(SW_INS_NOT_SUPPORTED);
+    expect(statusOf(await exchange(device, apdu([0xd7, 0x11, 0x01, 0x00, 1, 0x08])))).toBe(0x6b06);
     expect(statusOf(await exchange(device, apdu([0xd7, 0x11, 0x01, 0x00, 1, 0x09])))).toBe(0x6b06);
     const byronPath = encodePath([0x8000002c, 0x80000717, 0x80000000, 0, 0]);
     const foreign = [0x06, 0x01, ...byronPath, 0x11];
     expect(statusOf(await exchange(device, apdu([0xd7, 0x11, 0x01, 0x00, foreign.length, ...foreign])))).toBe(0x6982);
+    expect(confirms()).toBe(0);
+  });
+
+  it('returns Byron CBOR for mainnet and for another protocol magic', async () => {
+    const { device, confirms } = handler();
+    device.setApp('cardano');
+    const node = deriveIcarus(entropy(), "m/44'/1815'/0'/0/0");
+    const main = [0x08, ...u32be(764824073), ...encodePath(BYRON_PATH), 0x11];
+    const reply = await exchange(device, apdu([0xd7, 0x11, 0x01, 0x00, main.length, ...main]));
+    expect(statusOf(reply)).toBe(SW_OK);
+    expect(confirms()).toBe(0);
+    expect(Array.from(bodyOf(reply))).toEqual(Array.from(byronCbor(node, 764824073)));
+    const other = [0x08, ...u32be(1), ...encodePath(BYRON_PATH), 0x11];
+    const testnet = await exchange(device, apdu([0xd7, 0x11, 0x01, 0x00, other.length, ...other]));
+    expect(Array.from(bodyOf(testnet))).toEqual(Array.from(byronCbor(node, 1)));
+    const shown = await exchange(device, apdu([0xd7, 0x11, 0x02, 0x00, main.length, ...main]));
+    expect(bodyOf(shown).length).toBe(0);
+    expect(confirms()).toBe(1);
+    const shelley = [0x08, ...u32be(764824073), ...encodePath(ADA_PATH), 0x11];
+    expect(statusOf(await exchange(device, apdu([0xd7, 0x11, 0x01, 0x00, shelley.length, ...shelley])))).toBe(
+      0x6982,
+    );
+  });
+
+  it('CIP-8 rejects a valid Byron address', async () => {
+    const { device, confirms } = handler();
+    device.setApp('cardano');
+    const params = [0x08, ...u32be(764824073), ...encodePath(BYRON_PATH), 0x11];
+    const init = [...u32be(2), ...encodePath(ADA_PATH), 0x01, 0x02, 0x01, ...params];
+    expect(statusOf(await exchange(device, cip8Apdu(0x01, init)))).toBe(0x6982);
     expect(confirms()).toBe(0);
   });
 
