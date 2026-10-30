@@ -1513,7 +1513,7 @@ describe('LedgerProtocolHandler', () => {
     const [major, minor, patch] = catalogVersion('stellar', '6.1.0')
       .split('.')
       .map((part) => Number.parseInt(part, 10) || 0);
-    expect(Array.from(payload)).toEqual([0x00, major & 0xff, minor & 0xff, patch & 0xff, 0x90, 0x00]);
+    expect(Array.from(payload)).toEqual([0x00, major & 0xff, minor & 0xff, patch & 0xff, 0x10, 0x00, 0x90, 0x00]);
   });
 
   it('does not treat XRP GET_VERSION as Bitcoin because 44\'/144\' contains 44\'/0\'', async () => {

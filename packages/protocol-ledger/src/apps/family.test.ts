@@ -630,6 +630,71 @@ describe('Ledger family APDU bodies', () => {
     expect(Array.from(done.subarray(0, 64))).toEqual(Array.from(expected));
   });
 
+  it('Solana rejects a path count other than 1 with 0x6A80', async () => {
+    const device = handler();
+    device.setApp('solana');
+    const pathBytes = encodePath([0x8000002c, 0x800001f5, 0x80000000]);
+    const two = [0x02, ...pathBytes, ...pathBytes, 0x11];
+    const rejected = await exchange(device, apdu([0xe0, 0x06, 0x01, 0x00, two.length, ...two]));
+    expect(swOf(rejected)).toBe(0x6a80);
+    expect(rejected.length).toBe(2);
+    const zero = [0x00, 0x11];
+    expect(swOf(await exchange(device, apdu([0xe0, 0x06, 0x01, 0x00, zero.length, ...zero])))).toBe(0x6a80);
+  });
+
+  it('Solana GET_CHALLENGE returns the same 4 bytes until the app session resets', async () => {
+    const first = handler();
+    const second = handler();
+    first.setApp('solana');
+    second.setApp('solana');
+    const a = await exchange(first, apdu([0xe0, 0x20, 0x00, 0x00, 0x00]));
+    const again = await exchange(first, apdu([0xe0, 0x20, 0x00, 0x00, 0x00]));
+    const other = await exchange(second, apdu([0xe0, 0x20, 0x00, 0x00, 0x00]));
+    expect(swOf(a)).toBe(SW_OK);
+    expect(a.length).toBe(6);
+    expect(Array.from(again)).toEqual(Array.from(a));
+    expect(Array.from(other.subarray(0, 4))).not.toEqual(Array.from(a.subarray(0, 4)));
+    first.setApp('bitcoin');
+    first.setApp('solana');
+    const rolled = await exchange(first, apdu([0xe0, 0x20, 0x00, 0x00, 0x00]));
+    expect(swOf(rolled)).toBe(SW_OK);
+    expect(rolled.length).toBe(6);
+    expect(swOf(await exchange(first, apdu([0xe0, 0x21, 0x00, 0x00, 0x00])))).toBe(SW_INS_NOT_SUPPORTED);
+    expect(swOf(await exchange(first, apdu([0xe0, 0x22, 0x00, 0x00, 0x00])))).toBe(SW_INS_NOT_SUPPORTED);
+  });
+
+  it('Stellar GET_CONF appends the firmware maxDataSize', async () => {
+    const nanoX = handler();
+    nanoX.setApp('stellar');
+    const onX = await exchange(nanoX, apdu([0xe0, 0x06, 0x00, 0x00, 0x00]));
+    expect(swOf(onX)).toBe(SW_OK);
+    const [major, minor, patch] = catalogVersion('stellar', '6.1.0')
+      .split('.')
+      .map((part) => Number.parseInt(part, 10) || 0);
+    expect(Array.from(onX)).toEqual([0x00, major & 0xff, minor & 0xff, patch & 0xff, 0x10, 0x00, 0x90, 0x00]);
+
+    const staxModel = LEDGER_MODELS.find((model) => model.id === 'stax')!;
+    const stax = new LedgerProtocolHandler({
+      model: staxModel,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy: entropyFromMnemonic(FOUNDATION),
+    });
+    stax.setApp('stellar');
+    const onStax = await exchange(stax, apdu([0xe0, 0x06, 0x00, 0x00, 0x00]));
+    expect(Array.from(onStax.subarray(0, 6))).toEqual([0x00, major & 0xff, minor & 0xff, patch & 0xff, 0x20, 0x00]);
+  });
+
+  it('Ethereum clear-sign INS 22/32/36/38/3A stay 6D00', async () => {
+    const device = handler();
+    device.setApp('ethereum');
+    for (const ins of [0x22, 0x32, 0x36, 0x38, 0x3a]) {
+      const payload = await exchange(device, apdu([0xe0, ins, 0x00, 0x00, 0x00]));
+      expect(swOf(payload)).toBe(SW_INS_NOT_SUPPORTED);
+      expect(payload.length).toBe(2);
+    }
+  });
+
   it('Cardano v8 INIT and CHUNK ACK empty 9000', async () => {
     const device = handler();
     device.setApp('cardano');

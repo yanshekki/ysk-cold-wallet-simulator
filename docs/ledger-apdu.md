@@ -1,6 +1,6 @@
 # Ledger APDU wire matrix
 
-**Phase 2 item 2 (KEEP re-diff follow-up):** Tron/XRP/Stellar/Cosmos/Polkadot/TON/Aptos handlers re-diffed against official firmware/hw-app; MATCH/FIXED only with citations + `family.test.ts` KEEP re-diff cases. Cardano operational certificate, CIP-36 vote, native script hash, Shelley and Byron `DERIVE_ADDRESS`, and CIP-8 Shelley address fields are MATCH. CIP-36 auxiliary, Solana multi-path, Bitcoin policy, and Eth clear-sign stream stay KEEP.
+**Phase 2 item 2 (KEEP re-diff follow-up):** Tron/XRP/Stellar/Cosmos/Polkadot/TON/Aptos handlers re-diffed against official firmware/hw-app; MATCH/FIXED only with citations + `family.test.ts` KEEP re-diff cases. Cardano operational certificate, CIP-36 vote, native script hash, Shelley and Byron `DERIVE_ADDRESS`, and CIP-8 Shelley address fields are MATCH. Solana `numPaths` must be 1 (`6A80` otherwise) and INS `20` returns a 4-byte challenge. Stellar `GET_CONF` appends `maxDataSize`. CIP-36 auxiliary, the canonical transaction hash, Solana trusted-name INS `21`/`22`, Bitcoin policy HMAC, and Ethereum clear-sign stay KEEP.
 
 **Phase 2 family map (follow-up to #49):** catalog/`inferLedgerFamily` remaps ethereum CHAIN, bitcoin-like, cosmos-like, polkadot-like, and `ethereum-plugin` names so Open App is not `unknown`. Remapped rows are **not** new wire MATCH/FIXED — only family routing changed.
 
@@ -77,11 +77,11 @@ Source: app-cardano APDU reference and `V8TxP1` in the v8 command builder.
 | `11` | CHUNK (non-final raw body) | 0 | no | FIXED |
 | `12` | CONFIRM (final raw body) | 32 | yes, transaction review | FIXED |
 | `0F` | SIGN_WITNESS (one BIP32 path) | 64 | yes, that witness | FIXED |
-| `13` | CIP-36 auxiliary | host wants 0, or 96 on the last delegation | — | KEEP |
+| `13` | CIP-36 auxiliary | host wants 0, or 96 on the last delegation | — | KEEP. `aux_data_hash_builder` is not built. Hashing the uploaded bytes would not match the auxiliary hash |
 
 `0A` is not a v8 stage. It returns `6A86` and an empty body.
 
-The 32-byte body is blake2b-256 of the uploaded raw chunks. The firmware hashes the canonical transaction body after it parses that buffer. CWS does not build that canonical encoding. A host that only checks the length proceeds. A host that compares the hash to its own transaction id will reject it. KEEP: canonical Cardano transaction hash. The witness signature is over the 32 bytes just returned, which is what the device signs, not over a hash CWS did not compute.
+The 32-byte body is blake2b-256 of the uploaded raw chunks. The firmware `txHashBuilder` hashes the canonical transaction body after it parses that buffer. CWS does not build that encoding. A host that only checks the length proceeds. A host that compares the hash to its own transaction id will reject it. KEEP: canonical Cardano transaction hash. The witness signature is over the 32 bytes just returned, which is what the device signs, not over a hash CWS did not compute.
 
 ### 7.x (including a pick of 7.2.1; major ≤ 7)
 
@@ -97,7 +97,7 @@ Source: `src/interactions/v7/signTx.ts`. Every stage below returns an empty body
 | `13`, `15`, `16` | voting procedures, treasury, donation | 0 | no | FIXED |
 | `0A` | CONFIRM | 32 | yes | FIXED |
 | `0F` | WITNESS | 64 | yes, that witness | FIXED |
-| `08` with P2 `34` | CIP-36 registration confirm | host wants 96 | — | KEEP, `6D00` |
+| `08` with P2 `34` | CIP-36 registration confirm | host wants 96 | — | KEEP, `6D00`. Same auxiliary-hash blocker as v8 P1 `13` |
 
 The 32-byte v7 body is blake2b-256 of the concatenated stage payloads. That is not the firmware's transaction hash. Same KEEP as v8.
 
@@ -133,9 +133,10 @@ CLA `E0`. No P1 remap across the 1.x app in the sources above, so the handler do
 | `05` GET_PUBKEY | `00` silent, `01` display | `00` | 32 | only when P1 is `01` | MATCH |
 | `06` SIGN_MESSAGE | `01` (host confirm) | `02` MORE on every chunk except the last; `01` EXTEND on every chunk except the first. Flags combine | 0 while MORE is set; 64 on the last chunk | only the last chunk | FIXED |
 | `07` SIGN_OFFCHAIN | same chunk flags | same | 0 then 64 | last chunk | FIXED |
-| `20` challenge, `21` trusted name, `22` dynamic descriptor | — | — | — | — | KEEP, `6D00` |
+| `20` GET_CHALLENGE | — | — | 4-byte big-endian challenge | no | MATCH. Stable until the Solana session resets. Not derived from the seed |
+| `21` trusted name, `22` dynamic descriptor | — | — | — | — | KEEP, `6D00`. Success requires `tlv_use_case_trusted_name` and a Ledger PKI signature (`handle_provide_trusted_info.c`) |
 
-First-chunk data is `[numPaths][path…][message]`. Each path is a BIP32 depth and big-endian components. Continuation chunks are message bytes only. The signature is ed25519 over the message, not over a hash. The host currently sends one path; extra paths are skipped so the message offset stays correct, and only the first path is signed. KEEP: one signature for a multi-path request.
+First-chunk data is `[numPaths][path…][message]`. Each path is a BIP32 depth and big-endian components. Continuation chunks are message bytes only. The signature is ed25519 over the message, not over a hash. hw-app-solana writes `numPaths` 1. app-solana `apdu.c` returns `ApduReplySolanaInvalidMessage` (`6A80`) when that count is not 1. CWS does the same and does not sign the first path of a multi-path request.
 
 `P2` bit `02` is the more-data flag from hw-app-solana. It is not the Cardano rule, and it is not applied to Cardano.
 
@@ -151,7 +152,7 @@ CLA `E0` for Ethereum and for Avalanche C-Chain (the Avalanche app's own X/P com
 | `08` | personal_sign | 0 until the declared length arrives | 65 | on the last byte of the message | MATCH |
 | `0C` / `1A` / `1C` | EIP-712 | depends on the clear-sign stream | 65 on the sign | on the sign | MATCH for the hashed and JSON paths already tested |
 | `34` | EIP-7702 | — | 65 | yes | MATCH |
-| `22`, `32`, `36`, `38`, `3A` | domain name, simulation, safe account, gated signing, map entry | — | — | — | KEEP, not implemented. `12` / `16` / `1E` acknowledge and store nothing |
+| `22`, `32`, `36`, `38`, `3A` | domain name, simulation, safe account, gated signing, map entry | — | — | — | KEEP, `6D00`. hw-app-eth `Eth.ts` sends `provideDomainName` as INS `22` (chunked TLV). INS `32` / `36` / `38` / `3A` are in app-ethereum `doc/apdu.md` and are not written by that host package. An empty `9000` would accept an unsigned domain or CAL entry. `12` / `16` / `1E` acknowledge and store nothing |
 
 Avalanche CLA `80` follows `docs/APDUSPEC.md`:
 
@@ -181,13 +182,13 @@ Two protocols, selected by CLA. The bytes do not overlap, so both stay enabled n
 | `E1` | `04` | SIGN_PSBT | signed PSBT, or `E000` then CLA `F8` INS `01` CONTINUE | on the PSBT | MATCH for a single-input PSBT that fits one APDU |
 | `E1` | `05` | GET_MASTER_FINGERPRINT | 4 bytes | no | MATCH |
 | `E1` | `10` | SIGN_MESSAGE | signature | yes | MATCH |
-| `F8` | `01` | CONTINUE | next step or final body | — | MATCH |
+| `F8` | `01` | CONTINUE | next step or final body | — | MATCH. Proxy unarmed empty-`9000` hold-forward covers this APDU |
 | `E0` | `40` | legacy GET_WALLET_PUBLIC_KEY | pubkey and address | when P1 asks | MATCH |
 | `E0` | `44` / `4A` | legacy input start / finalize | 0 | no | MATCH |
 | `E0` | `48` | legacy untrusted hash sign | DER signature and a sighash byte | yes. The sheet says the hash is host-supplied | MATCH |
 | `E0` | `4E` | legacy sign message | recoverable signature | yes | MATCH |
 
-KEEP: wallet policies and PSBT merkle proofs beyond the cases in `family.test.ts` and `handler.test.ts`. A zero HMAC is named on the sheet; it is not a registered-policy proof.
+KEEP: wallet policies and PSBT merkle proofs beyond the cases in `family.test.ts` and `handler.test.ts`. `walletHmac` is `hmac(sha256, seed, "CWS/ledger-wallet-hmac")`, then HMAC of the serialized policy. That is not the app-bitcoin policy key. A zero HMAC is named on the sheet as host-unproven. It is not a registered-policy proof. A non-zero HMAC is checked against the CWS key only.
 
 ## Other open apps
 
@@ -197,7 +198,7 @@ Family SIGN chunking is no longer one shared P2-bit-`02` rule for every app belo
 | --- | --- | --- | --- | --- | --- |
 | Tron | `E0` | `06` (flags, major, minor, patch) | `04`, `05` (hash), `08` (message) | 65, keccak (hash INS uses 32-byte digest as-is) | FIXED chunking to hw-app-trx P1 startBytes (`10` single / `00` first / `80` mid / `90` last). Pubkey export stays silent (P1 forced to 0). KEEP: ECDH `0A` peer-key UX; TIP-712 |
 | XRP | `E0` | `06` (flags + major/minor/patch = 4 bytes so host `response[1..3]` matches) | `04` | 65, double sha256 | FIXED chunking to hw-app-xrp P1 `(isFirst?0:1)|(hasMore?0x80:0)`. KEEP: ed25519 curve mask path (`P2 0x80`) not exercised in unit tests |
-| Stellar | `E0` | `06` (hash-sign flag, major, minor, patch). Empty body still selects this app from Tron | `04`, `08`, `0A`, `0C` | 64 | FIXED chunking to hw-app-str P1 `00`/`80` + P2 `00`/`80`. Confirm-on-address is P2 on the real app; export here stays silent. KEEP: maxDataSize trailing bytes on newer GET_CONF |
+| Stellar | `E0` | `06` (hash-sign flag, major, minor, patch, then `maxDataSize` u16). Empty body still selects this app from Tron. Nano X is `4096` (`0x1000`); Stax and Flex are `8192` (`0x2000`) | `04`, `08`, `0A`, `0C` | 64 | FIXED chunking to hw-app-str P1 `00`/`80` + P2 `00`/`80`. Confirm-on-address is P2 on the real app; export here stays silent. `maxDataSize` matches `get_configuration.rs` / `context.rs` `MAX_RAW_DATA_LEN` |
 | Cosmos | `55` | `00` → 9 bytes (`test|maj|min|patch|locked|target_id`) | `02` | 65, sha256 | FIXED version layout + Zondax P1 `0/1/2` chunk with fixed-5 path (no length byte) per `process_chunk`. KEEP: GET_ADDR HRP-prefixed request / pk|addr response without length prefixes (still length-prefixed BIP32 helper for hosts that send it) |
 | Polkadot | `F9` or `90` | `00` → 12 bytes (u16 maj/min/patch layout) | `02`, `03` (raw) | 65 (`00`|ed25519 sig) | FIXED version + Zondax P1 chunk + 65-byte sig envelope per APDUSPEC. KEEP: SCALE/metadata proof parsing; SS58 prefix from path payload |
 | TON | `E0` | `03` (and legacy `01`) | `06`, `08`, `09` | 98 = `len|sig64|len|hash32` | FIXED P2 first/more (`03`/`02`/`00`) + length-prefixed sig|hash per COMMANDS.md; `0A` GET_APP_SETTINGS returns `00`. KEEP: BOC/cell hash (hash field is sha256 of uploaded bytes, not parsed cell hash); proof/sign-data field parse |

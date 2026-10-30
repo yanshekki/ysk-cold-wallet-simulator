@@ -106,16 +106,14 @@ Sources already cited in [ledger-apdu.md](ledger-apdu.md). Close a row only with
 
 | Area | Left open | Why it stays KEEP |
 | --- | --- | --- |
-| Cardano | v8 P1 `13` CIP-36 auxiliary; v7 P2 `34` CIP-36 registration (`6D00`) | [app-cardano APDU reference](https://github.com/LedgerHQ/app-cardano/blob/develop/doc/apdu_reference.md) describes them. Shelley and Byron `DERIVE_ADDRESS`, and CIP-8 Shelley address fields, are MATCH |
-| Cardano hash | v7 and v8 confirm body is blake2b-256 of uploaded chunks | Firmware hashes the canonical transaction. A host that checks the tx id will reject it |
-| Solana | One signature when `numPaths` > 1; extra paths are skipped | [hw-app-solana](https://github.com/LedgerHQ/ledger-live/blob/develop/libs/ledgerjs/packages/hw-app-solana/src/Solana.ts) and [app-solana `apdu.h`](https://github.com/LedgerHQ/app-solana/blob/master/src/apdu.h) |
-| Solana | INS `20` / `21` / `22` challenge, trusted name, dynamic descriptor | `6D00`. Not implemented |
+| Cardano | v8 P1 `13` CIP-36 auxiliary; v7 P2 `34` CIP-36 registration (`6D00`) | [app-cardano APDU reference](https://github.com/LedgerHQ/app-cardano/blob/develop/doc/apdu_reference.md) describes them. Blocker: `aux_data_hash_builder` / CIP-36 registration CBOR is not built. Shelley and Byron `DERIVE_ADDRESS`, and CIP-8 Shelley address fields, are MATCH |
+| Cardano hash | v7 and v8 confirm body is blake2b-256 of uploaded chunks | Blocker: firmware `txHashBuilder` hashes the canonical transaction body. CWS does not encode that body. A host that checks the tx id will reject the chunk hash |
+| Solana | INS `21` / `22` trusted name and dynamic descriptor | `6D00`. Blocker: `tlv_use_case_trusted_name` plus a Ledger PKI signature in `handle_provide_trusted_info.c`. INS `20` and `numPaths == 1` are MATCH |
 | Solana dashboard | Only `44'/501'` forces a switch | Other paths are accepted once Solana is open. They are not a probe |
-| Bitcoin | Wallet-policy HMAC and PSBT merkle proofs beyond `family.test.ts` and `handler.test.ts` | [app-bitcoin `doc/bitcoin.md`](https://github.com/LedgerHQ/app-bitcoin/blob/develop/doc/bitcoin.md). A zero HMAC is named on the sheet. It is not a registered-policy proof |
-| Ethereum | INS `22` `32` `36` `38` `3A` (domain, simulation, safe account, gated signing, map entry) | [app-ethereum `doc/apdu.md`](https://github.com/LedgerHQ/app-ethereum/blob/develop/doc/apdu.md). Not implemented. `12` / `16` / `1E` acknowledge and store nothing |
+| Bitcoin | Wallet-policy HMAC and PSBT merkle proofs beyond `family.test.ts` and `handler.test.ts` | [app-bitcoin `doc/bitcoin.md`](https://github.com/LedgerHQ/app-bitcoin/blob/develop/doc/bitcoin.md). Blocker: `walletHmac` uses the CWS key `CWS/ledger-wallet-hmac`, not the app-bitcoin policy key. A zero HMAC stays host-unproven. CLA `F8` INS `01` has an unarmed hold-forward test |
+| Ethereum | INS `22` `32` `36` `38` `3A` (domain, simulation, safe account, gated signing, map entry) | [app-ethereum `doc/apdu.md`](https://github.com/LedgerHQ/app-ethereum/blob/develop/doc/apdu.md). hw-app-eth `Eth.ts` sends only `22` (`provideDomainName`) from this set. Blocker: the TLV is CAL-signed. Empty `9000` would accept an unsigned domain. `32` / `36` / `38` / `3A` are not written by that host package. All five stay `6D00`. `12` / `16` / `1E` acknowledge and store nothing |
 | Tron | ECDH `0A`; TIP-712 | [hw-app-trx](https://github.com/LedgerHQ/ledger-live/blob/develop/libs/ledgerjs/packages/hw-app-trx/src/Trx.ts) |
 | XRP | ed25519 when P2 is `80` | [hw-app-xrp](https://github.com/LedgerHQ/ledger-live/blob/develop/libs/ledgerjs/packages/hw-app-xrp/src/Xrp.ts). Not exercised |
-| Stellar | `maxDataSize` trailing bytes on newer GET_CONF | [hw-app-str](https://github.com/LedgerHQ/ledger-live/blob/develop/libs/ledgerjs/packages/hw-app-str/src/Str.ts) |
 | Cosmos | GET_ADDR HRP request and `pk\|addr` without length prefixes | [Zondax ledger-cosmos](https://github.com/Zondax/ledger-cosmos/blob/master/app/src/common/app_main.h). The length-prefixed helper is still what some hosts send |
 | Polkadot | SCALE / metadata proof; SS58 prefix taken from the payload | [Zondax ledger-polkadot APDUSPEC](https://github.com/Zondax/ledger-polkadot/blob/master/docs/APDUSPEC.md) |
 | TON | BOC / cell hash; proof and sign-data fields | [app-ton COMMANDS](https://github.com/LedgerHQ/app-ton/blob/master/doc/COMMANDS.md). The hash field is sha256 of the uploaded bytes |
@@ -150,7 +148,7 @@ The phone handler already ACKs these with an empty `9000`. The proxy rule is the
 | Cosmos, Polkadot, Filecoin, Casper, Stacks, Binance | Zondax P1 `0` / `1` / `2` | Zondax `process_chunk`. Proxy hold-forward test covers Cosmos init. The other Zondax apps share that ACK shape |
 | Tron, XRP, Stellar, TON | family chunk modes in `generic.ts` | Proxy hold-forward test covers XRP P1 more. Tron, Stellar, and TON use the same empty-`9000` hold |
 | NEAR | P1 `80` marks the last chunk; earlier chunks are empty `9000` | Proxy hold-forward test covers the mid-chunk |
-| Bitcoin CONTINUE | CLA `F8` INS `01` | app-bitcoin `doc/bitcoin.md`. Catalog cases exist. No unarmed-status adapter test |
+| Bitcoin CONTINUE | CLA `F8` INS `01` | app-bitcoin `doc/bitcoin.md`. Unarmed empty-`9000` hold-forward test added |
 
 `hidStatusWord` only parses a status word when the HID length field is 2. A longer body is forwarded as a whole frame. The race that matters is the **empty** status, which is what a multi-chunk ACK is.
 
@@ -336,14 +334,12 @@ Docs only. No handler change. No USB install. No Proxy rebuild.
 
 ### Phase 4 — High-host KEEP
 
-**Status.** `SIGN_OPCERT`, `SIGN_CVOTE`, native script hash, CIP-8 Shelley messages, and Shelley and Byron `DERIVE_ADDRESS` are MATCH. A valid Byron address inside CIP-8 is `6982`. CIP-36 auxiliary and the canonical transaction hash stay KEEP. Solana multi-path, Bitcoin policy HMAC, and Ethereum clear-sign are still open. Snapshot unknown stays 27.
+**Status.** `SIGN_OPCERT`, `SIGN_CVOTE`, native script hash, CIP-8 Shelley messages, and Shelley and Byron `DERIVE_ADDRESS` are MATCH. A valid Byron address inside CIP-8 is `6982`. Solana `numPaths` other than 1 is `6A80`. Solana INS `20` is a 4-byte challenge. CIP-36 auxiliary, the canonical transaction hash, Solana INS `21`/`22`, the Bitcoin policy HMAC, and Ethereum clear-sign stay KEEP with the blockers in section 1b. Snapshot unknown stays 27.
 
-One PR per row, or a pair that shares a parser:
-
-1. Cardano CIP-36 auxiliary. Operational certificate, CIP-36 vote, native script hash, CIP-8 Shelley messages, and Shelley and Byron `DERIVE_ADDRESS` are MATCH. Canonical transaction hash stays KEEP until CWS builds the firmware encoding.
-2. Solana `numPaths` > 1, then INS `20` / `21` / `22` if hw-app-solana sends them.
-3. Bitcoin wallet-policy HMAC and merkle PSBT beyond the current tests. A zero HMAC stays labeled host-unproven.
-4. Ethereum clear-sign INS `22` / `32` / `36` / `38` / `3A`, only the commands `@ledgerhq/hw-app-eth` sends.
+1. Cardano CIP-36 auxiliary stays KEEP. Operational certificate, CIP-36 vote, native script hash, CIP-8 Shelley messages, and Shelley and Byron `DERIVE_ADDRESS` are MATCH. Canonical transaction hash stays KEEP until CWS builds `txHashBuilder`.
+2. Solana `numPaths` other than 1 is `6A80`. INS `20` is MATCH. INS `21` / `22` stay KEEP (PKI TLV).
+3. Bitcoin wallet-policy HMAC and merkle PSBT beyond the current tests stay KEEP. A zero HMAC stays labeled host-unproven. CLA `F8` INS `01` has an unarmed hold-forward test.
+4. Ethereum clear-sign INS `22` / `32` / `36` / `38` / `3A` stay `6D00`. hw-app-eth sends `22` only, and that TLV is CAL-signed.
 
 **Proxy.** Each multi-chunk command gets the phase 1 hold-forward test.
 
@@ -351,7 +347,7 @@ One PR per row, or a pair that shares a parser:
 
 One family, or a small set that shares a chunk mode, per PR. Official chunk mode, response length, and a confirm sheet. Algorand Ed25519 stays KEEP if the source is HDW_NORMAL and CWS would sign SLIP-10. XMSS (QRL), RSA (Arweave), Mina field, and Curve25519 (Waves) stay KEEP when the curve is not the one CWS derives. Proxy test in the same PR.
 
-Tron ECDH / TIP-712, XRP ed25519, Stellar `maxDataSize`, Cosmos HRP GET_ADDR, Polkadot SCALE, and TON cell hash are this phase too. They already have a core handler.
+Tron ECDH / TIP-712, XRP ed25519, Cosmos HRP GET_ADDR, Polkadot SCALE, and TON cell hash are this phase too. They already have a core handler. Stellar `maxDataSize` is MATCH (Nano X `4096`, other models `8192`).
 
 ### Phase 6 — Trezor gaps Safe 7 hosts send
 

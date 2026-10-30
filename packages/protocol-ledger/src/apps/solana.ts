@@ -5,6 +5,7 @@ import {
   parseBip32Path,
   SW_CLA_NOT_SUPPORTED,
   SW_DENY,
+  SW_INS_NOT_SUPPORTED,
   SW_OK,
   SW_WRONG_LENGTH,
   SW_WRONG_P1P2,
@@ -27,6 +28,8 @@ export type SolanaSession = FamilySession;
 const P2_EXTEND = 0x01;
 const P2_MORE = 0x02;
 const MAX_SIGN_PATHS = 5;
+/** app-solana `ApduReplySolanaInvalidMessage`. `num_derivation_paths` must be 1. */
+const SW_INVALID_MESSAGE = 0x6a80;
 
 function spec(): FamilySpec {
   return {
@@ -101,6 +104,14 @@ export async function handleSolanaApdu(
   if (apdu.ins === 0x04) {
     return encodeResponse(spec().versionBytes(), SW_OK);
   }
+  if (apdu.ins === 0x20) {
+    return encodeResponse(solanaChallenge(session), SW_OK);
+  }
+  // INS 0x21 / 0x22 require `tlv_use_case_trusted_name` and a Ledger PKI signature.
+  // An empty 9000 would accept an unsigned name. Stay 6D00.
+  if (apdu.ins === 0x21 || apdu.ins === 0x22) {
+    return encodeResponse(new Uint8Array(), SW_INS_NOT_SUPPORTED);
+  }
   if (apdu.ins === 0x06 || apdu.ins === 0x07) {
     return signSolana(apdu, ctx, session);
   }
@@ -119,6 +130,12 @@ async function signSolana(
     return encodeResponse(new Uint8Array(), SW_WRONG_P1P2);
   }
   if (!extend || !session.pendingSign) {
+    // app-solana `apdu.c`: the first data byte is `num_derivation_paths`.
+    // Any count other than 1 is `ApduReplySolanaInvalidMessage` (0x6A80).
+    // hw-app-solana writes 1 and expects one 64-byte signature.
+    if (apdu.data.length > 0 && apdu.data[0] !== 1) {
+      return encodeResponse(new Uint8Array(), SW_INVALID_MESSAGE);
+    }
     const parsed = parseSolanaSignPayload(apdu.data);
     if (!parsed) {
       return encodeResponse(new Uint8Array(), SW_WRONG_P1P2);
@@ -156,4 +173,19 @@ async function signSolana(
   const seed = await seedFor(ctx.confirmation, ctx.slotId, ctx.entropy, ctx.backup ?? 'bip39');
   const signature = signEd25519(deriveEd25519PrivateKeyFromSeed(seed, pending.path), pending.payload);
   return encodeResponse(signature, SW_OK);
+}
+
+/**
+ * Current challenge, created once per Solana session.
+ * `handle_get_challenge.c` encodes `get_challenge()` as 4 big-endian bytes and
+ * does not call `roll_challenge`. The bytes come from `crypto.getRandomValues`,
+ * never from the seed.
+ */
+function solanaChallenge(session: SolanaSession): Uint8Array {
+  if (!session.solanaChallenge || session.solanaChallenge.length !== 4) {
+    const word = new Uint8Array(4);
+    crypto.getRandomValues(word);
+    session.solanaChallenge = word;
+  }
+  return session.solanaChallenge;
 }

@@ -85,6 +85,11 @@ export type FamilySession = {
   cardanoCvote?: CardanoCvoteWire;
   cardanoNativeScript?: CardanoNativeScriptWire;
   cardanoSignMsg?: CardanoSignMsgWire;
+  /**
+   * Solana trusted-name challenge. `handle_get_challenge` returns the current
+   * `uint32` and does not roll it. The value is device RNG, not a seed derivative.
+   */
+  solanaChallenge?: Uint8Array;
 };
 
 /**
