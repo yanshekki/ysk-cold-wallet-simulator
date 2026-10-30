@@ -58,6 +58,14 @@ import { handleMultiversXApdu } from './apps/multiversx';
 import { handleFilecoinApdu } from './apps/filecoin';
 import { handleStacksApdu } from './apps/stacks';
 import { handleMinaApdu } from './apps/mina';
+import { handleEosApdu } from './apps/eos';
+import { handleHederaApdu } from './apps/hedera';
+import { handleNeoApdu } from './apps/neo';
+import { handleCasperApdu } from './apps/casper';
+import { handleFlareApdu } from './apps/flare';
+import { handleConfluxApdu } from './apps/conflux';
+import { handleBinanceApdu } from './apps/binance';
+import { handleWavesApdu } from './apps/waves';
 import type { FamilySession } from './apps/generic';
 import { replaceSeedCache, wrapSeedPort, type SeedCache } from './crypto';
 
@@ -289,7 +297,7 @@ export class LedgerProtocolHandler implements ProtocolHandler {
       backup: this.backup,
     };
 
-    if (family === 'ethereum' || (family === 'avalanche' && apdu.cla === 0xe0) || (family === 'filecoin' && apdu.cla === 0xe0)) {
+    if (family === 'ethereum' || (family === 'avalanche' && apdu.cla === 0xe0) || (family === 'filecoin' && apdu.cla === 0xe0) || (family === 'flare' && apdu.cla === 0xe0)) {
       if (apdu.cla !== 0xe0) {
         if (family === 'avalanche' && apdu.cla === 0x80) {
           return handleAvalancheApdu(apdu, {
@@ -434,6 +442,55 @@ export class LedgerProtocolHandler implements ProtocolHandler {
       return handleMinaApdu(apdu, ctx, this.familySession);
     }
 
+    if (family === 'eos') {
+      if (apdu.cla !== 0xd4) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleEosApdu(apdu, ctx, this.familySession);
+    }
+    if (family === 'hedera') {
+      if (apdu.cla !== 0xe0) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleHederaApdu(apdu, ctx, this.familySession);
+    }
+    if (family === 'neo') {
+      if (apdu.cla !== 0x80) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleNeoApdu(apdu, ctx, this.familySession);
+    }
+    if (family === 'casper') {
+      if (apdu.cla !== 0x06) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleCasperApdu(apdu, ctx, this.familySession);
+    }
+    if (family === 'flare') {
+      if (apdu.cla === 0x58) {
+        return handleFlareApdu(apdu, { ...ctx, targetId: targetIdFor(this.model.id) }, this.familySession);
+      }
+      return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+    }
+    if (family === 'conflux') {
+      if (apdu.cla !== 0xe0) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleConfluxApdu(apdu, ctx, this.familySession);
+    }
+    if (family === 'binance') {
+      if (apdu.cla !== 0xbc) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleBinanceApdu(apdu, ctx, this.familySession);
+    }
+    if (family === 'waves') {
+      if (apdu.cla !== 0x80) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleWavesApdu(apdu, ctx, this.familySession);
+    }
+
     // ethereum-plugin / utility: not standalone coin APDU targets.
     if (family === 'ethereum-plugin' || family === 'utility') {
       return encodeResponse(new Uint8Array(), SW_INS_NOT_SUPPORTED);
@@ -552,7 +609,15 @@ function inferAppFromApdu(app: LedgerApp, apdu: ReturnType<typeof parseApdu>): L
   }
 
   // HOT Wallet never sends OpenApp. Empty probes identify the next chain.
-  if (apdu.cla === 0xe0 && apdu.ins === 0x03 && empty) {
+  if (
+    apdu.cla === 0xe0 &&
+    apdu.ins === 0x03 &&
+    empty &&
+    family !== 'conflux' &&
+    family !== 'hedera' &&
+    family !== 'mina' &&
+    family !== 'flare'
+  ) {
     return family === 'ton' ? undefined : 'ton';
   }
   if (apdu.cla === 0xe0 && apdu.ins === 0x04 && empty) {
@@ -590,7 +655,17 @@ function inferAppFromApdu(app: LedgerApp, apdu: ReturnType<typeof parseApdu>): L
   ) {
     return family === 'sui' ? undefined : 'sui';
   }
-  if (apdu.cla === 0x80 && (apdu.ins === 0x04 || apdu.ins === 0x05 || apdu.ins === 0x06) && family !== 'avalanche') {
+  // CLA 80 is shared by Near, Avalanche, Tezos, Algorand, NEO, Waves — only
+  // infer Near when the open app is not already one of those families.
+  if (
+    apdu.cla === 0x80 &&
+    (apdu.ins === 0x04 || apdu.ins === 0x05 || apdu.ins === 0x06) &&
+    family !== 'avalanche' &&
+    family !== 'tezos' &&
+    family !== 'algorand' &&
+    family !== 'neo' &&
+    family !== 'waves'
+  ) {
     return family === 'near' ? undefined : 'near';
   }
 

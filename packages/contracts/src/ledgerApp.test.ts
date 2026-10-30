@@ -113,6 +113,15 @@ describe('ledger app labels', () => {
     expect(inferLedgerFamily('Filecoin')).toBe('filecoin');
     expect(inferLedgerFamily('Stacks')).toBe('stacks');
     expect(inferLedgerFamily('Mina')).toBe('mina');
+    expect(inferLedgerFamily('Eos')).toBe('eos');
+    expect(inferLedgerFamily('Hedera')).toBe('hedera');
+    expect(inferLedgerFamily('NEO')).toBe('neo');
+    expect(inferLedgerFamily('NEO N3')).toBe('neo');
+    expect(inferLedgerFamily('Casper')).toBe('casper');
+    expect(inferLedgerFamily('Flare Network')).toBe('flare');
+    expect(inferLedgerFamily('Conflux')).toBe('conflux');
+    expect(inferLedgerFamily('Binance Chain')).toBe('binance');
+    expect(inferLedgerFamily('Waves')).toBe('waves');
   });
 
   it('stores remapped families on the bundled Manager snapshot', () => {
@@ -127,9 +136,18 @@ describe('ledger app labels', () => {
     expect(byName['VeChain']).toBe('ethereum');
     expect(byName['Tezos Wallet']).toBe('tezos');
     expect(byName['Exchange']).toBe('utility');
+    expect(byName['Eos']).toBe('eos');
+    expect(byName['Hedera']).toBe('hedera');
+    expect(byName['NEO']).toBe('neo');
+    expect(byName['NEO N3']).toBe('neo');
+    expect(byName['Casper']).toBe('casper');
+    expect(byName['Flare Network']).toBe('flare');
+    expect(byName['Conflux']).toBe('conflux');
+    expect(byName['Binance Chain']).toBe('binance');
+    expect(byName['Waves']).toBe('waves');
     expect(byName['Zcash']).toBe('unknown');
     const known = LEDGER_INSTALLED_APPS.filter((app) => app.family !== 'unknown').length;
-    expect(known).toBe(142);
-    expect(LEDGER_INSTALLED_APPS.filter((app) => app.family === 'unknown').length).toBe(63);
+    expect(known).toBe(151);
+    expect(LEDGER_INSTALLED_APPS.filter((app) => app.family === 'unknown').length).toBe(54);
   });
 });
