@@ -1,11 +1,11 @@
 import { blake2b } from '@noble/hashes/blake2b';
+import { sha3_256 } from '@noble/hashes/sha3';
 import type { FamilyContext } from './generic';
 import { concatBytes, readU32BE } from '../bytes';
 import {
   encodeResponse,
   parseBip32Path,
   SW_DENY,
-  SW_INS_NOT_SUPPORTED,
   SW_OK,
   SW_WRONG_P1P2,
   type Apdu,
@@ -38,13 +38,16 @@ type Stake =
 export type ShelleyAddress = {
   type: number;
   networkId: number;
+  protocolMagic?: number;
   paymentPath?: string;
   paymentComponents?: number[];
   paymentScript?: Uint8Array;
   stake: Stake;
 };
 
-type Read = { address: ShelleyAddress; next: number } | 'byron' | null;
+type Read = { address: ShelleyAddress; next: number } | null;
+
+const MAINNET_MAGIC = 764824073;
 
 function hard(index: number): number {
   return (index | HARD) >>> 0;
@@ -52,6 +55,16 @@ function hard(index: number): number {
 
 function isHard(value: number): boolean {
   return (value & HARD) !== 0;
+}
+
+function byronPayment(components: number[]): boolean {
+  return (
+    components.length === 5 &&
+    components[0] === hard(44) &&
+    components[1] === hard(1815) &&
+    isHard(components[2] ?? 0) &&
+    (components[3] === 0 || components[3] === 1)
+  );
 }
 
 function shelleyPayment(components: number[]): boolean {
@@ -99,30 +112,40 @@ function take(data: Uint8Array, offset: number, size: number): Uint8Array | null
   return data.slice(offset, offset + size);
 }
 
-/** `buffer_read_address_params` for Shelley. Byron is reported separately. */
+/** `buffer_read_address_params` for Shelley and Byron. */
 export function readShelleyAddress(data: Uint8Array): Read {
   if (data.length < 1) {
     return null;
   }
   const type = data[0] ?? 0;
-  if (type === 0x08) {
-    return 'byron';
-  }
-  const supported =
-    (type >= 0x00 && type <= 0x07) || type === 0x0e || type === 0x0f;
-  if (!supported) {
+  const shelley = (type >= 0x00 && type <= 0x07) || type === 0x0e || type === 0x0f;
+  if (type !== 0x08 && !shelley) {
     return null;
   }
   let offset = 1;
-  if (data.length <= offset || (data[offset] ?? 0) > 0x0f) {
-    return null;
+  const address: ShelleyAddress = { type, networkId: 0, stake: { kind: 'none' } };
+  if (type === 0x08) {
+    if (data.length < 5) {
+      return null;
+    }
+    address.protocolMagic = readU32BE(data, 1);
+    const path = takePath(data, 5);
+    if (!path) {
+      return null;
+    }
+    address.paymentPath = path.path;
+    address.paymentComponents = path.components;
+    offset = path.next;
+  } else {
+    if (data.length <= offset || (data[offset] ?? 0) > 0x0f) {
+      return null;
+    }
+    address.networkId = data[offset] ?? 0;
+    offset += 1;
   }
-  const networkId = data[offset] ?? 0;
-  offset += 1;
-  const address: ShelleyAddress = { type, networkId, stake: { kind: 'none' } };
   const keyPayment = type === 0x00 || type === 0x02 || type === 0x04 || type === 0x06;
   const scriptPayment = type === 0x01 || type === 0x03 || type === 0x05 || type === 0x07;
-  if (keyPayment) {
+  if (type !== 0x08 && keyPayment) {
     const path = takePath(data, offset);
     if (!path) {
       return null;
@@ -130,7 +153,7 @@ export function readShelleyAddress(data: Uint8Array): Read {
     address.paymentPath = path.path;
     address.paymentComponents = path.components;
     offset = path.next;
-  } else if (scriptPayment) {
+  } else if (type !== 0x08 && scriptPayment) {
     const hash = take(data, offset, 28);
     if (!hash) {
       return null;
@@ -210,6 +233,11 @@ export function shelleyAddressAllowed(address: ShelleyAddress): boolean {
         return false;
       }
       break;
+    case 0x08:
+      if (stake !== 'none' || !address.paymentComponents || !byronPayment(address.paymentComponents)) {
+        return false;
+      }
+      break;
     default:
       return false;
   }
@@ -257,13 +285,67 @@ function varUint(value: number): Uint8Array {
   return Uint8Array.from(out);
 }
 
-async function hashPath(ctx: FamilyContext, path: string): Promise<Uint8Array> {
+async function icarusNode(ctx: FamilyContext, path: string) {
   const resolved = ctx.confirmation.resolvePath?.(path, ['ada']) ?? path;
   const root = await icarusRootFor(ctx.confirmation, ctx.slotId, ctx.entropy, ctx.backup ?? 'bip39');
-  const node = root
+  return root
     ? deriveIcarusFromRoot(root, resolved)
     : deriveIcarus(ctx.entropy, resolved, undefined, ctx.backup);
-  return blake2b(node.publicKey, { dkLen: 28 });
+}
+
+async function hashPath(ctx: FamilyContext, path: string): Promise<Uint8Array> {
+  return blake2b((await icarusNode(ctx, path)).publicKey, { dkLen: 28 });
+}
+
+function cborHead(major: number, value: number): Uint8Array {
+  const type = (major << 5) & 0xe0;
+  if (value < 24) {
+    return Uint8Array.of(type | value);
+  }
+  if (value < 256) {
+    return Uint8Array.of(type | 24, value);
+  }
+  if (value < 65536) {
+    return Uint8Array.of(type | 25, (value >> 8) & 0xff, value & 0xff);
+  }
+  return Uint8Array.of(type | 26, (value >>> 24) & 0xff, (value >>> 16) & 0xff, (value >>> 8) & 0xff, value & 0xff);
+}
+
+function cborBytes(value: Uint8Array): Uint8Array {
+  return concatBytes(cborHead(2, value.length), value);
+}
+
+/** Reflected IEEE CRC-32, the same polynomial as Ledger `cx_crc32`. */
+function crc32(data: Uint8Array): number {
+  let crc = 0xffffffff;
+  for (const byte of data) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+async function byronAddressBytes(ctx: FamilyContext, address: ShelleyAddress): Promise<Uint8Array> {
+  const node = await icarusNode(ctx, address.paymentPath ?? 'm');
+  const extended = concatBytes(node.publicKey, node.chainCode);
+  const rootInput = concatBytes(
+    cborHead(4, 3),
+    cborHead(0, 0),
+    cborHead(4, 2),
+    cborHead(0, 0),
+    cborBytes(extended),
+    cborHead(5, 0),
+  );
+  const root = blake2b(sha3_256(rootInput), { dkLen: 28 });
+  const magic = address.protocolMagic ?? 0;
+  const attributes =
+    magic === MAINNET_MAGIC
+      ? cborHead(5, 0)
+      : concatBytes(cborHead(5, 1), cborHead(0, 2), cborBytes(cborHead(0, magic)));
+  const inner = concatBytes(cborHead(4, 3), cborBytes(root), attributes, cborHead(0, 0));
+  return concatBytes(cborHead(4, 2), cborHead(6, 24), cborBytes(inner), cborHead(0, crc32(inner)));
 }
 
 export async function shelleyAddressBytes(ctx: FamilyContext, address: ShelleyAddress): Promise<Uint8Array> {
@@ -289,16 +371,16 @@ export async function handleCardanoDeriveAddress(apdu: Apdu, ctx: FamilyContext)
     return encodeResponse(new Uint8Array(), SW_WRONG_P1P2);
   }
   const read = readShelleyAddress(apdu.data);
-  if (read === 'byron') {
-    return encodeResponse(new Uint8Array(), SW_INS_NOT_SUPPORTED);
-  }
   if (!read || read.next !== apdu.data.length) {
     return encodeResponse(new Uint8Array(), !read ? SW_ADDRESS_PARAMS : SW_WRONG_DATA);
   }
   if (!shelleyAddressAllowed(read.address)) {
     return encodeResponse(new Uint8Array(), SW_SECURITY);
   }
-  const bytes = await shelleyAddressBytes(ctx, read.address);
+  const bytes =
+    read.address.type === 0x08
+      ? await byronAddressBytes(ctx, read.address)
+      : await shelleyAddressBytes(ctx, read.address);
   if (apdu.p1 === 0x01) {
     return encodeResponse(bytes, SW_OK);
   }

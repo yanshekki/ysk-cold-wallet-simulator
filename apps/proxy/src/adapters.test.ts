@@ -1,4 +1,5 @@
 import { blake2b } from '@noble/hashes/blake2b';
+import { sha3_256 } from '@noble/hashes/sha3';
 import { mnemonicToEntropy } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
 import { describe, expect, it } from 'vitest';
@@ -1393,6 +1394,60 @@ describe('attachLedger', () => {
     const node = deriveIcarus(entropy(), "m/1852'/1815'/0'/0/0");
     const address = Uint8Array.of(0x61, ...blake2b(node.publicKey, { dkLen: 28 }));
     expect(Array.from(payload.subarray(0, payload.length - 2))).toEqual(Array.from(address));
+    expect((payload[payload.length - 2] << 8) | payload[payload.length - 1]).toBe(SW_OK);
+    adapter.close();
+  });
+
+  it('forwards a Cardano Byron address over HID', async () => {
+    const device = new LedgerProtocolHandler({
+      model: LEDGER_MODELS.find((item) => item.id === 'nano-x')!,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy: entropy(),
+    });
+    device.setApp('cardano');
+    const path = [0x8000002c, 0x80000717, 0x80000000, 0, 0];
+    const data: number[] = [0x08, 0x2d, 0x96, 0x4a, 0x09, path.length];
+    for (const component of path) {
+      data.push((component >>> 24) & 0xff, (component >>> 16) & 0xff, (component >>> 8) & 0xff, component & 0xff);
+    }
+    data.push(0x11);
+    const { host, gadget } = memoryHidPair();
+    const ble = bleToHandler(device, (framed) => splitFramedPackets(framed, DEFAULT_MTU));
+    const adapter = attachLedger(gadget, ble, DEFAULT_MTU, () => undefined);
+    const replies: Uint8Array[] = [];
+    host.onInput((report) => replies.push(report));
+    for (const report of wrapHidApdu(Uint8Array.of(0xd7, 0x11, 0x01, 0x00, data.length, ...data))) {
+      host.write(report);
+    }
+    await adapter.idle();
+    const payload = unwrapHidReports(replies).payload;
+    const body = payload.subarray(0, payload.length - 2);
+    const node = deriveIcarus(entropy(), "m/44'/1815'/0'/0/0");
+    const extended = new Uint8Array(64);
+    extended.set(node.publicKey, 0);
+    extended.set(node.chainCode, 32);
+    const rootInput = Uint8Array.of(0x83, 0x00, 0x82, 0x00, 0x58, 0x40, ...extended, 0xa0);
+    const root = blake2b(sha3_256(rootInput), { dkLen: 28 });
+    const inner = Uint8Array.of(0x83, 0x58, 0x1c, ...root, 0xa0, 0x00);
+    let crc = 0xffffffff;
+    for (const byte of inner) {
+      crc ^= byte;
+      for (let bit = 0; bit < 8; bit += 1) {
+        crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
+      }
+    }
+    crc = (crc ^ 0xffffffff) >>> 0;
+    const checksum =
+      crc < 24
+        ? Uint8Array.of(crc)
+        : crc < 256
+          ? Uint8Array.of(24, crc)
+          : crc < 65536
+            ? Uint8Array.of(25, (crc >> 8) & 0xff, crc & 0xff)
+            : Uint8Array.of(26, (crc >>> 24) & 0xff, (crc >>> 16) & 0xff, (crc >>> 8) & 0xff, crc & 0xff);
+    const expected = Uint8Array.of(0x82, 0xd8, 0x18, 0x58, inner.length, ...inner, ...checksum);
+    expect(Array.from(body)).toEqual(Array.from(expected));
     expect((payload[payload.length - 2] << 8) | payload[payload.length - 1]).toBe(SW_OK);
     adapter.close();
   });
