@@ -1,6 +1,6 @@
 # YSK Cold Wallet Simulator
 
-**版本 1.1.0（組建編號 6）** · YSK Limited
+**版本 1.1.1（組建編號 7）** · YSK Limited
 
 手機套件識別碼 `hk.ysk.cws` · CWS Proxy 套件識別碼 `hk.ysk.cws.proxy`
 
@@ -20,7 +20,7 @@ CWS 是模擬器。它不是安全元件。Ledger、Trezor 及 OneKey 均未認�
 
 ## 下載
 
-版本 1.1.0（組建編號 6）。[GitHub Release v1.1.0](https://github.com/yanshekki/ysk-cold-wallet-simulator/releases/tag/v1.1.0) 只有說明，沒有附上 APK、IPA 或桌面安裝包。Ubuntu 可以從這份原始碼組建 `.deb`。macOS 與 Windows 在該發行仍然沒有可安裝的套件。
+版本 1.1.1（組建編號 7），包含 #70 與 #71 的熱錢包基線。種子不是硬體錢包級安全。 [GitHub Release v1.1.0](https://github.com/yanshekki/ysk-cold-wallet-simulator/releases/tag/v1.1.0) 只有說明，沒有附上 APK、IPA 或桌面安裝包。Ubuntu 可以從這份原始碼組建 `.deb`。macOS 與 Windows 在該發行仍然沒有可安裝的套件。
 
 | 產品 | 取得方式 |
 | --- | --- |
@@ -112,7 +112,7 @@ Windows 仍然沒有安裝包。Windows 沒有虛擬 HID。
 yarn workspace @cws/proxy app
 ```
 
-產品版本 **1.1.0** 與組建編號 **6** 來自 `apps/mobile/app.json` 的 `version`、`versionCode` 及 `buildNumber`。Expo prebuild 會寫入 Android 的 `versionName`／`versionCode`，以及 iOS 的 `CFBundleShortVersionString`／`CFBundleVersion`。隨應用程式發行的工作區套件版本同為 `1.1.0`。macOS 代理程式的行銷版本與組建編號相同。
+產品版本 **1.1.1** 與組建編號 **7** 來自 `apps/mobile/app.json` 的 `version`、`versionCode` 及 `buildNumber`。Expo prebuild 會寫入 Android 的 `versionName`／`versionCode`，以及 iOS 的 `CFBundleShortVersionString`／`CFBundleVersion`。隨應用程式發行的工作區套件版本同為 `1.1.1`。macOS 代理程式的行銷版本與組建編號相同。
 
 ## 協議範圍
 
@@ -180,20 +180,20 @@ OneKey Mini 沒有藍牙，本軟件不予模擬。
 
 設定 → Ledger 目錄可為每個應用程式選擇一個已發布版本。主機向已開啟應用程式查詢版本時，讀到的就是這個版本。CWS 不會因此改用該舊版程式的指令。更新 Ledger 應用程式會按目前選擇的裝置，從 Ledger 公開目錄重新載入名稱與版本。尚未更新時，清單是此組建內置、對應該裝置的目錄。
 
-交易簽署、訊息簽署及備份種子匯出，須在手機上長按確認；正式組建另須通過作業系統認證。列出地址及匯出擴展公鑰則保持靜默，因為上述錢包以此方式列出帳戶。手機廣播期間，裝置畫面會說明已連線的主機可以衍生地址。
+交易簽署、訊息簽署及備份種子匯出，須在手機上長按確認；正式組建另須通過作業系統認證。公開帳戶或擴展公鑰的讀取亦須確認。一次確認涵蓋該次讀取，以及其後 60 秒內的 15 次公開讀取。它不會簽署。手機廣播期間，裝置畫面會說明已連線的主機可以衍生地址。
 
 ## 保安摘要
 
-秘密資料以 `WHEN_UNLOCKED_THIS_DEVICE_ONLY` 儲存，不會寫入剪貼簿。正式組建在顯示、匯入、儲存、簽署及匯出種子之前，會要求作業系統認證。Android 正式組建在秘密畫面設定 `FLAG_SECURE`。
+秘密資料以 `WHEN_UNLOCKED_THIS_DEVICE_ONLY` 儲存。正式組建另設定 `requireAuthentication`。助記詞不會寫入剪貼簿。匯入只在確認貼上之後才讀取剪貼簿。正式組建在顯示、匯入、儲存、簽署及匯出種子之前，會要求作業系統認證。Android 正式組建在秘密畫面設定 `FLAG_SECURE`。這些略過只在 `__DEV__` 為真時存在。
 
-這不是絕對安全。1.1.0 為相容保留四項風險：
+這不是硬體錢包級安全。種子不是硬體錢包級安全。1.1.1 仍保留的相容選擇：
 
 - WebHID 轉送報告時沒有指令允許清單。
 - 本機 trezord 橋接器聽 `127.0.0.1`，並反映請求的 `Origin`。
-- 公鑰與地址列出保持靜默；若指令帶有鏈碼，擴展公鑰亦然。
-- 儲存的熵項目不使用 `requireAuthentication`，因為每次讀取都提示會中斷列出帳戶。
+- iOS 在系統報告截圖時顯示警告，不會把即時畫面塗黑。只警告是有意的，因為塗黑亦會塗黑鏡像輸出。
+- iOS 不提供 BLE 連結金鑰。
 
-iOS 可以在系統報告截圖時顯示警告，不會把即時畫面塗黑。能夠解鎖手機、除錯行程、拍攝螢幕或連上主機的人，所能取得的資料多於介面所顯示。
+能夠解鎖手機、除錯行程、拍攝螢幕或連上主機的人，所能取得的資料多於介面所顯示。全文見 [security.md](security.md)。1.1.1 說明見 [releases/1.1.1.md](releases/1.1.1.md)。
 
 ## 保安模型
 
@@ -294,6 +294,7 @@ app.rhea.finance（Rhea Finance）經 Ledger 藍牙連接一部運行 CWS 的 iP
 | [../README.md](../README.md) | 英文公開首頁 |
 | [security.md](security.md) | 英文保安說明 |
 | [testing.md](testing.md) | 英文測試紀錄 |
+| [releases/1.1.1.md](releases/1.1.1.md) | 1.1.1（組建編號 7）熱錢包基線的雙語發行說明 |
 | [releases/1.1.0.md](releases/1.1.0.md) | 1.1.0（組建編號 6）雙語發行說明 |
 | [store/README.md](store/README.md) | Mac App Store 截圖索引 |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | 工程結構 |
