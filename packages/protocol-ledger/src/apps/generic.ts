@@ -56,11 +56,22 @@ export type CardanoCvoteWire = {
   body: Uint8Array;
 };
 
+/**
+ * Native script hash. `cbor` is `0x00` plus the CBOR the firmware hashes.
+ * `remaining[level]` is how many children that level still expects.
+ */
+export type CardanoNativeScriptWire = {
+  level: number;
+  remaining: number[];
+  cbor: Uint8Array;
+};
+
 export type FamilySession = {
   pendingSign?: { path: string; payload: Uint8Array };
   suiBlocks?: SuiBlocksSession;
   cardanoTx?: CardanoTxWire;
   cardanoCvote?: CardanoCvoteWire;
+  cardanoNativeScript?: CardanoNativeScriptWire;
 };
 
 /**

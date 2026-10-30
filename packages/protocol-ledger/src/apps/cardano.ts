@@ -17,6 +17,7 @@ import { versionTriple, type CardanoTxWire, type FamilyContext, type FamilySessi
 import { cardanoEnterprise, encodePubAndAddress } from './addresses';
 import { icarusRootFor } from '../crypto';
 import { deriveIcarus, deriveIcarusFromRoot, signIcarus } from './icarus';
+import { handleCardanoNativeScript } from './cardanoNativeScript';
 
 export type CardanoSession = FamilySession;
 
@@ -43,6 +44,9 @@ export async function handleCardanoApdu(
   }
   if (apdu.ins === 0x11) {
     return exportAddress(apdu, ctx);
+  }
+  if (apdu.ins === 0x12) {
+    return handleCardanoNativeScript(apdu, ctx, session);
   }
   if (apdu.ins === 0x21) {
     return signTransaction(apdu, ctx, session);
