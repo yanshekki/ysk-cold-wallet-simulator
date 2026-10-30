@@ -18,6 +18,7 @@ import { cardanoEnterprise, encodePubAndAddress } from './addresses';
 import { icarusRootFor } from '../crypto';
 import { deriveIcarus, deriveIcarusFromRoot, signIcarus } from './icarus';
 import { handleCardanoNativeScript } from './cardanoNativeScript';
+import { handleCardanoSignMsg } from './cardanoSignMsg';
 
 export type CardanoSession = FamilySession;
 
@@ -56,6 +57,9 @@ export async function handleCardanoApdu(
   }
   if (apdu.ins === 0x23) {
     return signCvote(apdu, ctx, session);
+  }
+  if (apdu.ins === 0x24) {
+    return handleCardanoSignMsg(apdu, ctx, session);
   }
   return encodeResponse(new Uint8Array(), SW_INS_NOT_SUPPORTED);
 }

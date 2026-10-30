@@ -1,6 +1,6 @@
 # Ledger APDU wire matrix
 
-**Phase 2 item 2 (KEEP re-diff follow-up):** Tron/XRP/Stellar/Cosmos/Polkadot/TON/Aptos handlers re-diffed against official firmware/hw-app; MATCH/FIXED only with citations + `family.test.ts` KEEP re-diff cases. Cardano operational certificate, CIP-36 vote, and native script hash are MATCH. Cardano CIP-36 auxiliary, address, and CIP-8, plus Solana multi-path, Bitcoin policy, and Eth clear-sign stream, stay KEEP.
+**Phase 2 item 2 (KEEP re-diff follow-up):** Tron/XRP/Stellar/Cosmos/Polkadot/TON/Aptos handlers re-diffed against official firmware/hw-app; MATCH/FIXED only with citations + `family.test.ts` KEEP re-diff cases. Cardano operational certificate, CIP-36 vote, native script hash, and CIP-8 key-hash messages are MATCH. Cardano CIP-36 auxiliary, address, CIP-8 full-address field, Solana multi-path, Bitcoin policy, and Eth clear-sign stream stay KEEP.
 
 **Phase 2 family map (follow-up to #49):** catalog/`inferLedgerFamily` remaps ethereum CHAIN, bitcoin-like, cosmos-like, polkadot-like, and `ethereum-plugin` names so Open App is not `unknown`. Remapped rows are **not** new wire MATCH/FIXED — only family routing changed.
 
@@ -109,7 +109,7 @@ The 32-byte v7 body is blake2b-256 of the concatenated stage payloads. That is n
 | `12` native script hash | INIT, complex, and leaf stages are empty after confirm. FINISH returns blake2b-224 of `0x00 ‖` CBOR(script) | 28 bytes after the finish sheet | MATCH |
 | `22` operational certificate | 64-byte signature of KES ‖ issue counter ‖ KES period. Path is `m/1853'/1815'/0'/index'` | 64-byte Icarus signature after confirm | MATCH |
 | `23` CIP-36 vote | INIT and CHUNK are empty. CONFIRM returns blake2b-256 of the votecast bytes, then a 64-byte signature. Witness path is `m/1694'/1815'/account'/0/address` | 96 bytes after confirm | MATCH |
-| `24` CIP-8 message | init/chunk empty, confirm returns signature, pubkey, and address field | `6D00` | KEEP |
+| `24` CIP-8 message | key-hash field: signature, pubkey, length 28, and the key hash. Full address field stays `6D00` | 128 bytes after confirm for a key hash | MATCH for field `02`. KEEP for field `01` |
 | `15` | not an instruction in the v7 or v8 INS table | `6D00` | FIXED. It used to be treated as a finished signature |
 
 `INS 22` is one APDU. The device signs the KES public key, then the issue counter, then the KES period. That is the reverse of the APDU field order, and it is not a hash. A payload longer than 72 bytes, or bytes left after the path, returns `6B14`. A cut-short KES key, period, or issue counter returns `6B10`, `6B11`, or `6B12`. A path that does not parse returns `6B13`. A path that parses and is not a pool cold key returns `6982` and does not open a sheet. User rejection is `6985`. Source: LedgerHQ/app-cardano `doc/apdu_reference.md` §8.1, `src/opcert/opcert_parse.c`, and `src/handler/sign_opcert.c` (develop).
@@ -117,6 +117,8 @@ The 32-byte v7 body is blake2b-256 of the concatenated stage payloads. That is n
 `INS 23` streams the votecast in chunks of at most 250 bytes. The 4-byte length is not part of the hash. CONFIRM signs that 32-byte blake2b-256 with `signIcarus`. A total of 0 or a chunk of the wrong size returns `6A87`. A missing length is `6B54`. A missing plan id, proposal index, or payload tag is `6B51`, `6B52`, or `6B53`. A path that does not parse is `6B05`. A parsed path that is not a CIP-36 witness key returns `6982` and does not open a sheet. CHUNK or CONFIRM with no open vote, or a second INIT, returns `6980`. User rejection is `6985`. Source: `doc/apdu_reference.md` §9.1, `src/handler/sign_cvote.c`, and `src/cvote/vote_cast_hash_builder.c` (develop).
 
 `INS 12` builds the same CBOR as `derive_native_script_hash_builder.c`: a leading `0x00`, then all/any/n-of-k arrays and pubkey or timelock leaves. A pubkey is either a 28-byte hash or blake2b-224 of an Icarus public key. A script-hash credential is `6B41`. An unrecognized device path is `6982`. FINISH before the tree is complete is `6B43`. Nesting uses `MAX_SCRIPT_DEPTH` 11, so the eleventh nested complex node is `6B45`. Both display formats return the same 28 bytes. Each stage opens a sheet. User rejection is `6985`. Source: `doc/apdu_reference.md` §6.1 and `src/handler/derive_native_script_hash.c` (develop).
+
+`INS 24` with address-field type `02` signs the COSE `Sig_structure` from `sign_msg.c`: array `"Signature1"`, the protected header `{1: -8, "address": key hash}` as a byte string, an empty byte string, and either the raw message or its blake2b-224. Flags are `01` no and `02` yes. Chunks are at most 250 bytes. A CIP-36 path is `6982`. A full address field (`01`) stays `6D00` because CWS does not build `address_params`. Source: `doc/apdu_reference.md` §10.1 and `src/handler/sign_msg.c` (develop).
 
 The old `P2 & 0x02` "more data" bit is not how either Cardano major chunks `SIGN_TX`. Using it made INIT (`P1 10`, `P2 00` on 8.x) look finished and return a 64-byte Icarus signature. That is the Minswap `64 instead of 0` failure.
 
