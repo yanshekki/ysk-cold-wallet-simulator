@@ -63,7 +63,7 @@ A Solana sign whose path is not `44'/501'` does not force a switch. The Solana a
 
 ## Cardano (`Cardano ADA`)
 
-CLA `D7`. `GET_VERSION` (`INS 00`) is 4 bytes: major, minor, patch, flags `00`. Both majors use that layout. `INS 10` extended public key is 64 bytes (32-byte key and 32-byte chain code) on both.
+CLA `D7`. `GET_VERSION` (`INS 00`) is 4 bytes: major, minor, patch, flags `00`. Both majors use that layout. `GET_SERIAL` (`INS 01`) is 7 bytes, the simulator stand-in for `os_serial()`. `GET_APP_NAME` (`INS 04`) is the UTF-8 string `Cardano ADA` with no length prefix. `INS 10` extended public key is 64 bytes (32-byte key and 32-byte chain code) on both. A non-zero P1 or P2 on the serial or name query is `6A86`. Extra data is `6700`. Source: LedgerHQ/app-cardano `doc/apdu_reference.md` §3.2–§3.3 and `Makefile` `APPNAME`.
 
 `SIGN_TX` is `INS 21`. The host strips the status word and asserts the body length. The same P1 does not mean the same stage.
 

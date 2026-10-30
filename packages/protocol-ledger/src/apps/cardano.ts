@@ -24,6 +24,32 @@ import { CardanoV7Tx } from './cardanoTxV7';
 
 export type CardanoSession = FamilySession;
 
+/**
+ * Ledger `os_serial()` is 7 bytes (`doc/apdu_reference.md` §3.2). A simulator
+ * has no MCU serial, so Eternl gets a stable device id.
+ */
+const CARDANO_SERIAL = Uint8Array.of(0x43, 0x57, 0x53, 0x00, 0x00, 0x00, 0x01);
+/** `Makefile` `APPNAME`, returned by GET_APP_NAME with no length prefix. */
+const CARDANO_APP_NAME = new TextEncoder().encode('Cardano ADA');
+
+function emptyQuery(apdu: Apdu, body: Uint8Array): Uint8Array {
+  if (apdu.p1 !== 0x00 || apdu.p2 !== 0x00) {
+    return encodeResponse(new Uint8Array(), SW_WRONG_P1P2);
+  }
+  if (apdu.data.length !== 0) {
+    return encodeResponse(new Uint8Array(), SW_WRONG_LENGTH);
+  }
+  return encodeResponse(body, SW_OK);
+}
+
+function cardanoSerial(apdu: Apdu): Uint8Array {
+  return emptyQuery(apdu, CARDANO_SERIAL);
+}
+
+function cardanoAppName(apdu: Apdu): Uint8Array {
+  return emptyQuery(apdu, CARDANO_APP_NAME);
+}
+
 function versionBytes(): Uint8Array {
   const version = versionTriple(catalogVersion('cardano', '7.2.1'));
   // hw-app-cardano GET_VERSION expects major || minor || patch || flags.
@@ -41,6 +67,12 @@ export async function handleCardanoApdu(
   }
   if (apdu.ins === 0x00) {
     return encodeResponse(versionBytes(), SW_OK);
+  }
+  if (apdu.ins === 0x01) {
+    return cardanoSerial(apdu);
+  }
+  if (apdu.ins === 0x04) {
+    return cardanoAppName(apdu);
   }
   if (apdu.ins === 0x10) {
     return exportExtPubkey(apdu, ctx);

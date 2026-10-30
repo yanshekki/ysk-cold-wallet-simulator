@@ -112,6 +112,22 @@ function opCertApdu(body: number[], p1 = 0x00, p2 = 0x00): Uint8Array {
   return apdu([0xd7, 0x22, p1, p2, body.length, ...body]);
 }
 
+describe('Cardano device queries Eternl sends before the account key', () => {
+  it('returns the 7-byte serial and the Cardano ADA app name', async () => {
+    const { device, confirms } = handler();
+    device.setApp('cardano');
+    const serial = await exchange(device, apdu([0xd7, 0x01, 0x00, 0x00, 0x00]));
+    expect(statusOf(serial)).toBe(SW_OK);
+    expect(Array.from(bodyOf(serial))).toEqual([0x43, 0x57, 0x53, 0x00, 0x00, 0x00, 0x01]);
+    const name = await exchange(device, apdu([0xd7, 0x04, 0x00, 0x00, 0x00]));
+    expect(statusOf(name)).toBe(SW_OK);
+    expect(new TextDecoder().decode(bodyOf(name))).toBe('Cardano ADA');
+    const wrong = await exchange(device, apdu([0xd7, 0x01, 0x01, 0x00, 0x00]));
+    expect(statusOf(wrong)).toBe(SW_WRONG_P1P2);
+    expect(confirms()).toBe(0);
+  });
+});
+
 describe('Cardano SIGN_TX body lengths follow the reported app version', () => {
   it('v8 INIT is empty 9000 and does not open the confirm sheet', async () => {
     expect(catalogVersion('cardano', '0').split('.')[0]).toBe('8');
