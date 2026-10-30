@@ -285,7 +285,7 @@ describe('Cardano SIGN_TX body lengths follow the reported app version', () => {
     expect(statusOf(denied)).toBe(SW_DENY);
     expect(bodyOf(denied).length).toBe(0);
     expect(confirms()).toBe(1);
-    for (const ins of [0x12, 0x24]) {
+    for (const ins of [0x24]) {
       const reply = await exchange(device, apdu([0xd7, ins, 0x00, 0x00, 0x00]));
       expect(statusOf(reply)).toBe(SW_INS_NOT_SUPPORTED);
     }
@@ -392,6 +392,84 @@ describe('Cardano SIGN_CVOTE hashes the raw votecast', () => {
     expect(confirms()).toBe(1);
     const again = await exchange(device, cvoteApdu(0x52, encodePath(CVOTE_PATH)));
     expect(statusOf(again)).toBe(0x6980);
+  });
+});
+
+function scriptApdu(p1: number, data: number[] = []): Uint8Array {
+  return apdu([0xd7, 0x12, p1, 0x00, data.length, ...data]);
+}
+
+function u32bytes(value: number): number[] {
+  return [(value >>> 24) & 0xff, (value >>> 16) & 0xff, (value >>> 8) & 0xff, value & 0xff];
+}
+
+describe('Cardano native script hash is blake2b-224 of 0x00 and CBOR', () => {
+  const keyHash = new Uint8Array(28).fill(0x11);
+
+  function pubkeyScript(hash: Uint8Array): Uint8Array {
+    return concatBytes(
+      Uint8Array.of(0x00, 0x82, 0x01, 0x81, 0x82, 0x00, 0x58, 0x1c),
+      hash,
+    );
+  }
+
+  it('a key-hash pubkey inside all returns 28 bytes after four sheets', async () => {
+    const { device, confirms } = handler();
+    device.setApp('cardano');
+    const init = await exchange(device, scriptApdu(0x00));
+    expect(statusOf(init)).toBe(SW_OK);
+    expect(bodyOf(init).length).toBe(0);
+    const complex = await exchange(device, scriptApdu(0x01, [0x01, ...u32bytes(1)]));
+    expect(bodyOf(complex).length).toBe(0);
+    const leaf = await exchange(device, scriptApdu(0x02, [0x00, 0x00, ...keyHash]));
+    expect(bodyOf(leaf).length).toBe(0);
+    const done = await exchange(device, scriptApdu(0x03, [0x02]));
+    expect(statusOf(done)).toBe(SW_OK);
+    expect(Array.from(bodyOf(done))).toEqual(Array.from(blake2b(pubkeyScript(keyHash), { dkLen: 28 })));
+    expect(confirms()).toBe(4);
+  });
+
+  it('a device-owned Shelley path hashes that Icarus public key', async () => {
+    const { device, confirms } = handler();
+    device.setApp('cardano');
+    await exchange(device, scriptApdu(0x00));
+    await exchange(device, scriptApdu(0x01, [0x01, ...u32bytes(1)]));
+    const path = encodePath(ADA_PATH);
+    await exchange(device, scriptApdu(0x02, [0x00, 0x02, ...path]));
+    const done = await exchange(device, scriptApdu(0x03, [0x01]));
+    const node = deriveIcarus(entropy(), "m/1852'/1815'/0'/0/0");
+    const hash = blake2b(node.publicKey, { dkLen: 28 });
+    expect(Array.from(bodyOf(done))).toEqual(Array.from(blake2b(pubkeyScript(hash), { dkLen: 28 })));
+    expect(confirms()).toBe(4);
+  });
+
+  it('rejects a script hash, an unclassified path, and an early finish', async () => {
+    const { device, confirms } = handler();
+    device.setApp('cardano');
+    await exchange(device, scriptApdu(0x00));
+    const early = await exchange(device, scriptApdu(0x03, [0x02]));
+    expect(statusOf(early)).toBe(0x6b43);
+    await exchange(device, scriptApdu(0x00));
+    await exchange(device, scriptApdu(0x01, [0x01, ...u32bytes(1)]));
+    const scriptHash = await exchange(device, scriptApdu(0x02, [0x00, 0x01, ...keyHash]));
+    expect(statusOf(scriptHash)).toBe(0x6b41);
+    expect(confirms()).toBe(3);
+    await exchange(device, scriptApdu(0x00));
+    await exchange(device, scriptApdu(0x01, [0x01, ...u32bytes(1)]));
+    const foreign = encodePath([0x80000000, 0x80000001, 0x80000002]);
+    const denied = await exchange(device, scriptApdu(0x02, [0x00, 0x02, ...foreign]));
+    expect(statusOf(denied)).toBe(0x6982);
+    expect(confirms()).toBe(5);
+  });
+
+  it('a denied native script returns 6985', async () => {
+    const { device, confirms } = handler(async () => false);
+    device.setApp('cardano');
+    const denied = await exchange(device, scriptApdu(0x00));
+    expect(statusOf(denied)).toBe(SW_DENY);
+    expect(confirms()).toBe(1);
+    const next = await exchange(device, scriptApdu(0x01, [0x01, ...u32bytes(1)]));
+    expect(statusOf(next)).toBe(0x6980);
   });
 });
 
