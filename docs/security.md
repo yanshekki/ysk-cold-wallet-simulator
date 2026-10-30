@@ -62,7 +62,7 @@ Release writes set `requireAuthentication`. The decision is `keychainRequiresAut
 These behaviours are not finished in 1.1.0. They are usability gaps. They are not a reason to drop the public-read confirm.
 
 - Phantom may not complete unlock after connect.
-- Rabby’s camera may still fail to scan the phone QR. The static account PNG is ECC M, a four-module quiet zone, 8 px modules, and black-on-white (`qrPng.ts`). That layout was not rescanned with Rabby in this pass. Unimplemented Keystone UR types stay out of the export.
+- Rabby’s camera may still fail to scan the phone QR. The static account PNG is ECC M, a four-module quiet zone, 8 px modules, and black-on-white (`qrPng.ts`). On 2026-10-31, host `ki-mac-mini` encoded that PNG for the OneKey and Keystone account profiles. Local `zbarimg` 0.23.95 decoded both files. That is not a wallet scan. Rabby was not opened: Chrome’s extension directory returned `Operation not permitted`, and an unpacked Rabby 0.94.13 tree was not loaded. OneKey.app 6.6.3 was not given a scan session. No Keystone wallet app is installed. Continuity Camera is enumerated as the lab iPhone, and ffmpeg timed out without a frame while Preview showed the PNG. The attempt is host-only KEEP in [testing.md](testing.md). Unimplemented Keystone UR types stay out of the export.
 - Avalanche Core may not list Avalanche X and P accounts end to end.
 - OKX may not show asset balances for an imported account.
 

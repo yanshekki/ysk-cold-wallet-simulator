@@ -7,6 +7,7 @@ import {
   cameraPreviewKey,
   cameraSettleMs,
   cameraSettleReason,
+  canStartCameraSettle,
   isCameraAppActive,
   nextCameraGeneration,
   shouldMountCameraPreview,
@@ -92,7 +93,7 @@ export function QrScanner({
     const isRetry = retryNonce !== retryNonceRef.current;
     retryNonceRef.current = retryNonce;
 
-    if (!visible || !presented || !appActive) {
+    if (!canStartCameraSettle({ visible, granted, presented, appActive })) {
       setSettled(false);
       return;
     }
@@ -108,7 +109,7 @@ export function QrScanner({
       clearTimeout(timer);
       setSettled(false);
     };
-  }, [visible, presented, appActive, retryNonce]);
+  }, [visible, presented, appActive, retryNonce, granted]);
 
   useEffect(() => {
     if (
