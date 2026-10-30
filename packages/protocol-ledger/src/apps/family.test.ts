@@ -223,6 +223,22 @@ const FAMILIES: FamilyCase[] = [
     path: [0x8000002c, 0x8000167d, 0x80000000, 0, 0],
     address: (value) => value.startsWith('SP'),
   },
+  {
+    app: 'casper',
+    cla: 0x06,
+    versionIns: 0x00,
+    pubkeyIns: 0x01,
+    path: [0x8000002c, 0x800001fa, 0x80000000, 0, 0],
+    rawPubkey: 33,
+  },
+  {
+    app: 'binance-chain',
+    cla: 0xbc,
+    versionIns: 0x00,
+    pubkeyIns: 0x04,
+    path: [0x8000002c, 0x800002ca, 0x80000000, 0, 0],
+    address: (value) => value.startsWith('bnb'),
+  },
 ];
 
 describe('Ledger family APDU bodies', () => {
@@ -270,6 +286,120 @@ describe('Ledger family APDU bodies', () => {
     expect(Array.from(version.subarray(0, version.length - 2))).toEqual([maj, min, patch]);
     const addr = await exchange(device, apdu([0xe0, 0x02, 0x00, 0x00, 0x00]));
     expect(swOf(addr)).toBe(SW_INS_NOT_SUPPORTED);
+  });
+
+  it('Eos GET_APP_CONFIGURATION is flags||version; pubkey/sign KEEP (WIF+stream)', async () => {
+    const device = handler();
+    device.setApp('eos');
+    const version = await exchange(device, apdu([0xd4, 0x06, 0x00, 0x00, 0x00]));
+    expect(swOf(version)).toBe(SW_OK);
+    const [maj, min, patch] = catalogVersion('eos', '1.6.1')
+      .split('.')
+      .map((part) => Number.parseInt(part, 10) || 0);
+    expect(Array.from(version.subarray(0, version.length - 2))).toEqual([0x01, maj, min, patch]);
+    const pubkey = await exchange(device, apdu([0xd4, 0x02, 0x00, 0x00, 0x00]));
+    expect(swOf(pubkey)).toBe(SW_INS_NOT_SUPPORTED);
+  });
+
+  it('Hedera GET_APP_CONFIGURATION is storage||version; pubkey/sign KEEP', async () => {
+    const device = handler();
+    device.setApp('hedera');
+    const version = await exchange(device, apdu([0xe0, 0x01, 0x00, 0x00, 0x00]));
+    expect(swOf(version)).toBe(SW_OK);
+    const [maj, min, patch] = catalogVersion('hedera', '1.9.3')
+      .split('.')
+      .map((part) => Number.parseInt(part, 10) || 0);
+    expect(Array.from(version.subarray(0, version.length - 2))).toEqual([0x00, maj, min, patch]);
+    const pubkey = await exchange(device, apdu([0xe0, 0x02, 0x00, 0x00, 0x00]));
+    expect(swOf(pubkey)).toBe(SW_INS_NOT_SUPPORTED);
+  });
+
+  it('NEO GET_PUBLIC_KEY returns 65-byte P-256 uncompressed; SIGN KEEP', async () => {
+    const device = handler();
+    device.setApp('neo');
+    const pathBytes = [0x80, 0x00, 0x03, 0x78, 0x80, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0, 0, 0, 0, 0, 0, 0, 0];
+    const pubkey = await exchange(device, apdu([0x80, 0x04, 0x00, 0x00, pathBytes.length, ...pathBytes]));
+    expect(swOf(pubkey)).toBe(SW_OK);
+    expect(pubkey.length).toBe(65 + 2);
+    expect(pubkey[0]).toBe(0x04);
+    const sign = await exchange(device, apdu([0x80, 0x02, 0x00, 0x00, 0x00]));
+    expect(swOf(sign)).toBe(SW_INS_NOT_SUPPORTED);
+  });
+
+  it('NEO N3 reuses neo family GET_PUBLIC_KEY', async () => {
+    const device = handler();
+    device.setApp('neo-n3');
+    const pathBytes = [0x80, 0x00, 0x03, 0x78, 0x80, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0, 0, 0, 0, 0, 0, 0, 0];
+    const pubkey = await exchange(device, apdu([0x80, 0x04, 0x00, 0x00, pathBytes.length, ...pathBytes]));
+    expect(swOf(pubkey)).toBe(SW_OK);
+    expect(pubkey.length).toBe(65 + 2);
+  });
+
+  it('Flare GET_VERSION is u16 triple + target; dual E0 uses ethereum; ADDR KEEP', async () => {
+    const device = handler();
+    device.setApp('flare-network');
+    const version = await exchange(device, apdu([0x58, 0x00, 0x00, 0x00, 0x00]));
+    expect(swOf(version)).toBe(SW_OK);
+    expect(version.length).toBe(12 + 2);
+    const [maj, min, patch] = catalogVersion('flare-network', '2.6.7')
+      .split('.')
+      .map((part) => Number.parseInt(part, 10) || 0);
+    const body = version.subarray(0, version.length - 2);
+    expect(body[0]).toBe(0x00);
+    expect((body[1]! << 8) | body[2]!).toBe(maj);
+    expect((body[3]! << 8) | body[4]!).toBe(min);
+    expect((body[5]! << 8) | body[6]!).toBe(patch);
+    const addr = await exchange(device, apdu([0x58, 0x01, 0x00, 0x00, 0x00]));
+    expect(swOf(addr)).toBe(SW_INS_NOT_SUPPORTED);
+    // dual E0 ETH GET_APP_CONFIGURATION
+    const ethCfg = await exchange(device, apdu([0xe0, 0x06, 0x00, 0x00, 0x00]));
+    expect(swOf(ethCfg)).toBe(SW_OK);
+  });
+
+  it('Conflux GET_APP_INFO is flags||version; ≠ ethereum INS table', async () => {
+    const device = handler();
+    device.setApp('conflux');
+    const info = await exchange(device, apdu([0xe0, 0x01, 0x00, 0x00, 0x00]));
+    expect(swOf(info)).toBe(SW_OK);
+    const [maj, min, patch] = catalogVersion('conflux', '2.2.2')
+      .split('.')
+      .map((part) => Number.parseInt(part, 10) || 0);
+    expect(Array.from(info.subarray(0, info.length - 2))).toEqual([0x03, maj, min, patch]);
+    const sign = await exchange(device, apdu([0xe0, 0x03, 0x00, 0x00, 0x00]));
+    expect(swOf(sign)).toBe(SW_INS_NOT_SUPPORTED);
+  });
+
+  it('Waves GET_APP_CONFIGURATION is 3-byte version; Curve25519 pubkey/sign KEEP', async () => {
+    const device = handler();
+    device.setApp('waves');
+    const version = await exchange(device, apdu([0x80, 0x06, 0x00, 0x00, 0x00]));
+    expect(swOf(version)).toBe(SW_OK);
+    const [maj, min, patch] = catalogVersion('waves', '1.2.2')
+      .split('.')
+      .map((part) => Number.parseInt(part, 10) || 0);
+    expect(Array.from(version.subarray(0, version.length - 2))).toEqual([maj, min, patch]);
+    const pubkey = await exchange(device, apdu([0x80, 0x04, 0x00, 0x00, 0x00]));
+    expect(swOf(pubkey)).toBe(SW_INS_NOT_SUPPORTED);
+  });
+
+  it('Casper GET_VERSION is 5-byte; ADDR is 33-byte PK; SIGN returns R||S 64', async () => {
+    const device = handler();
+    device.setApp('casper');
+    const version = await exchange(device, apdu([0x06, 0x00, 0x00, 0x00, 0x00]));
+    expect(swOf(version)).toBe(SW_OK);
+    expect(version.length).toBe(5 + 2);
+    const pathWithLen = encodePath([0x8000002c, 0x800001fa, 0x80000000, 0, 0]);
+    const addr = await exchange(device, apdu([0x06, 0x01, 0x00, 0x00, pathWithLen.length, ...pathWithLen]));
+    expect(swOf(addr)).toBe(SW_OK);
+    expect(addr.length).toBe(33 + 2);
+    // SIGN init: Zondax fixed-5 path, no length byte
+    const pathFixed = pathWithLen.slice(1);
+    const init = await exchange(device, apdu([0x06, 0x02, 0x00, 0x00, pathFixed.length, ...pathFixed]));
+    expect(swOf(init)).toBe(SW_OK);
+    const payload = Array.from({ length: 32 }, (_, i) => i + 1);
+    const signed = await exchange(device, apdu([0x06, 0x02, 0x02, 0x00, payload.length, ...payload]));
+    expect(swOf(signed)).toBe(SW_OK);
+    expect(signed.length).toBe(64 + 2);
   });
 
   it('MultiversX GET_ADDR returns len||erd bech32 from account||index', async () => {

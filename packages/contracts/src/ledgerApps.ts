@@ -152,6 +152,15 @@ const FAMILY_BY_OPEN_NAME: Readonly<Record<string, LedgerAppFamily>> = {
   filecoin: 'filecoin',
   stacks: 'stacks',
   mina: 'mina',
+  eos: 'eos',
+  hedera: 'hedera',
+  neo: 'neo',
+  'neo n3': 'neo',
+  casper: 'casper',
+  'flare network': 'flare',
+  conflux: 'conflux',
+  'binance chain': 'binance',
+  waves: 'waves',
   // ethereum clear-signing plugins — companions, not standalone APDU apps
   '1inch': 'ethereum-plugin',
   alkemi: 'ethereum-plugin',
@@ -218,6 +227,14 @@ const FAMILY_RULES: [RegExp, LedgerAppFamily][] = [
   [/filecoin/i, 'filecoin'],
   [/stacks/i, 'stacks'],
   [/^mina$/i, 'mina'],
+  [/^eos$/i, 'eos'],
+  [/^hedera$/i, 'hedera'],
+  [/^neo( n3)?$/i, 'neo'],
+  [/^casper$/i, 'casper'],
+  [/flare/i, 'flare'],
+  [/^conflux$/i, 'conflux'],
+  [/binance chain/i, 'binance'],
+  [/^waves$/i, 'waves'],
 ];
 
 export function inferLedgerFamily(name: string): LedgerAppFamily {
@@ -287,6 +304,14 @@ function chipFor(name: string, family: LedgerAppFamily): string {
       filecoin: 'FIL',
       stacks: 'STX',
       mina: 'MINA',
+      eos: 'EOS',
+      hedera: 'HEDE',
+      neo: 'NEO',
+      casper: 'CASP',
+      flare: 'FLAR',
+      conflux: 'CONF',
+      binance: 'BINA',
+      waves: 'WAVE',
     };
     if (name.toLowerCase().includes('litecoin')) {
       return 'LTC';
