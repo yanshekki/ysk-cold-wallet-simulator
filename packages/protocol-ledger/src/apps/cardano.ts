@@ -1,7 +1,7 @@
 import type { SigningRequest } from '@cws/contracts';
 import { catalogVersion } from '@cws/contracts';
 import { blake2b } from '@noble/hashes/blake2b';
-import { concatBytes } from '../bytes';
+import { concatBytes, readU32BE } from '../bytes';
 import {
   encodeResponse,
   parseBip32Path,
@@ -49,6 +49,9 @@ export async function handleCardanoApdu(
   }
   if (apdu.ins === 0x22) {
     return signOpCert(apdu, ctx);
+  }
+  if (apdu.ins === 0x23) {
+    return signCvote(apdu, ctx, session);
   }
   return encodeResponse(new Uint8Array(), SW_INS_NOT_SUPPORTED);
 }
@@ -274,6 +277,135 @@ async function signOpCert(apdu: Apdu, ctx: FamilyContext): Promise<Uint8Array> {
   }
   const node = await icarusAt(ctx, path);
   return encodeResponse(signIcarus(node, signedBody), SW_OK);
+}
+
+/**
+ * LedgerHQ/app-cardano §9.1, `src/handler/sign_cvote.c`, and
+ * `src/cvote/vote_cast_hash_builder.c`. The hash is blake2b-256 of the raw
+ * votecast bytes. The 4-byte length prefix is not hashed.
+ */
+const CVOTE_CHUNK = 250;
+const SW_WRONG_DATA = 0x6a87;
+const SW_NOT_ALLOWED = 0x6980;
+const SW_CVOTE_PLAN = 0x6b51;
+const SW_CVOTE_INDEX = 0x6b52;
+const SW_CVOTE_TAG = 0x6b53;
+const SW_CVOTE_LENGTH = 0x6b54;
+const SW_BIP44_PATH = 0x6b05;
+/** `bip44_isCVoteKeyPath`: m/1694'/1815'/account'/0/address, address not hardened. */
+const CVOTE_WITNESS_PATH = /^m\/1694'\/1815'\/\d+'\/0\/\d+$/;
+
+function cvoteFail(session: CardanoSession, sw: number): Uint8Array {
+  session.cardanoCvote = undefined;
+  return encodeResponse(new Uint8Array(), sw);
+}
+
+async function signCvote(
+  apdu: Apdu,
+  ctx: FamilyContext,
+  session: CardanoSession,
+): Promise<Uint8Array> {
+  const p1 = apdu.p1;
+  if (apdu.p2 !== 0x00 || (p1 !== 0x50 && p1 !== 0x51 && p1 !== 0x52)) {
+    return cvoteFail(session, SW_WRONG_P1P2);
+  }
+  if (p1 === 0x50) {
+    return cvoteInit(apdu, session);
+  }
+  if (p1 === 0x51) {
+    return cvoteChunk(apdu, session);
+  }
+  return cvoteConfirm(apdu, ctx, session);
+}
+
+function cvoteInit(apdu: Apdu, session: CardanoSession): Uint8Array {
+  if (session.cardanoCvote) {
+    return cvoteFail(session, SW_NOT_ALLOWED);
+  }
+  if (apdu.data.length < 4) {
+    return encodeResponse(new Uint8Array(), SW_CVOTE_LENGTH);
+  }
+  const total = readU32BE(apdu.data, 0);
+  if (total === 0) {
+    return encodeResponse(new Uint8Array(), SW_WRONG_DATA);
+  }
+  const chunk = apdu.data.subarray(4);
+  if (chunk.length > total || chunk.length !== Math.min(total, CVOTE_CHUNK)) {
+    return encodeResponse(new Uint8Array(), SW_WRONG_DATA);
+  }
+  if (chunk.length < 32) {
+    return encodeResponse(new Uint8Array(), SW_CVOTE_PLAN);
+  }
+  if (chunk.length < 33) {
+    return encodeResponse(new Uint8Array(), SW_CVOTE_INDEX);
+  }
+  if (chunk.length < 34) {
+    return encodeResponse(new Uint8Array(), SW_CVOTE_TAG);
+  }
+  const remaining = total - chunk.length;
+  session.cardanoCvote = {
+    state: remaining === 0 ? 'confirm' : 'chunk',
+    remaining,
+    body: chunk.slice(),
+  };
+  return emptyOk();
+}
+
+function cvoteChunk(apdu: Apdu, session: CardanoSession): Uint8Array {
+  const vote = session.cardanoCvote;
+  if (!vote || vote.state !== 'chunk') {
+    return cvoteFail(session, SW_NOT_ALLOWED);
+  }
+  const expected = Math.min(vote.remaining, CVOTE_CHUNK);
+  if (apdu.data.length !== expected) {
+    return cvoteFail(session, SW_WRONG_DATA);
+  }
+  const remaining = vote.remaining - apdu.data.length;
+  vote.body = concatBytes(vote.body, apdu.data);
+  vote.remaining = remaining;
+  vote.state = remaining === 0 ? 'confirm' : 'chunk';
+  return emptyOk();
+}
+
+async function cvoteConfirm(
+  apdu: Apdu,
+  ctx: FamilyContext,
+  session: CardanoSession,
+): Promise<Uint8Array> {
+  const vote = session.cardanoCvote;
+  if (!vote || vote.state !== 'confirm') {
+    return cvoteFail(session, SW_NOT_ALLOWED);
+  }
+  let parsed: { path: string; rest: Uint8Array };
+  if (apdu.data.length < 1 || apdu.data[0] === 0 || apdu.data[0] > 5) {
+    return cvoteFail(session, SW_BIP44_PATH);
+  }
+  try {
+    parsed = parseBip32Path(apdu.data);
+  } catch {
+    return cvoteFail(session, SW_BIP44_PATH);
+  }
+  if (parsed.rest.length !== 0) {
+    return cvoteFail(session, SW_WRONG_DATA);
+  }
+  if (!CVOTE_WITNESS_PATH.test(parsed.path)) {
+    return cvoteFail(session, SW_SECURITY_CONDITION);
+  }
+  const path = ctx.confirmation.resolvePath?.(parsed.path, ['ada']) ?? parsed.path;
+  const ok = await confirm(ctx, {
+    kind: 'sign',
+    title: 'Sign Cardano vote',
+    path,
+    message: `Sign Cardano CIP-36 vote\n${path}`,
+    rawPayload: vote.body,
+  });
+  if (!ok) {
+    return cvoteFail(session, SW_DENY);
+  }
+  const hash = blake2b(vote.body, { dkLen: 32 });
+  const node = await icarusAt(ctx, path);
+  session.cardanoCvote = undefined;
+  return encodeResponse(concatBytes(hash, signIcarus(node, hash)), SW_OK);
 }
 
 async function signWitness(
