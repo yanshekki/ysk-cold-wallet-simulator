@@ -7,6 +7,7 @@ import {
   preventScreenCaptureAsync,
 } from 'expo-screen-capture';
 import { isDevBuild } from '../passkeys/devFlag';
+import { androidFlagSecureOnSecretScreens } from '../passkeys/releaseGates';
 
 const SECRET_KEY = 'cws-secret';
 
@@ -29,10 +30,10 @@ export function resetSecretScreenHoldersForTests(): void {
  */
 export function lockSecretScreen(): void {
   if (Platform.OS === 'android') {
-    if (isDevBuild()) {
-      void allowScreenCaptureAsync(SECRET_KEY).catch(() => undefined);
-    } else {
+    if (androidFlagSecureOnSecretScreens(isDevBuild())) {
       void preventScreenCaptureAsync(SECRET_KEY).catch(() => undefined);
+    } else {
+      void allowScreenCaptureAsync(SECRET_KEY).catch(() => undefined);
     }
     return;
   }

@@ -42,6 +42,7 @@ import { bleSignHostGate, centralHasLinkKey } from '../ble/bleSignGate';
 import { startAdvertising } from '../ble/peripheral';
 import type { PeripheralHandle } from '../ble/types';
 import { BleHostSheet } from '../signing/BleHostSheet';
+import { PUBLIC_READ_BATCH, PUBLIC_READ_BATCH_MS, PublicReadBatch } from '../signing/publicReadBatch';
 import { clearDisclaimerAcceptance, loadDisclaimerAccepted, saveDisclaimerAcceptance } from '../disclaimer/store';
 import { I18nProvider, translate } from '../i18n';
 import { describeBlePayload, redactLogHex } from '../lab/apduNote';
@@ -160,6 +161,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     throw new Error('handler factory not ready');
   });
   const pendingRef = useRef<PendingConfirm | null>(null);
+  const publicReadBatchRef = useRef(new PublicReadBatch());
   const bleHostResolveRef = useRef<((ok: boolean) => void) | null>(null);
   const secretSession = useRef(new SecretSession());
   const qrSession = useRef(new QrAirgapSession());
@@ -241,6 +243,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       confirm(request) {
         return new Promise<boolean>((resolve) => {
           void (async () => {
+            if (request.kind === 'address' && publicReadBatchRef.current.take()) {
+              resolve(true);
+              return;
+            }
             if (bleSignHostGate.needsConfirm(request.kind, false)) {
               const centralId = bleSignHostGate.currentCentral();
               const linked = await centralHasLinkKey(centralId, async (id) => {
@@ -262,8 +268,18 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
                 bleSignHostGate.allowCurrent();
               }
             }
-            pendingRef.current = { request, resolve };
-            setPending(request);
+            const shown =
+              request.kind === 'address'
+                ? {
+                    ...request,
+                    message: `${request.message}\n${translate(settingsRef.current.language, 'signing.publicBatch', {
+                      extra: PUBLIC_READ_BATCH - 1,
+                      seconds: PUBLIC_READ_BATCH_MS / 1000,
+                    })}`,
+                  }
+                : request;
+            pendingRef.current = { request: shown, resolve };
+            setPending(shown);
             appendLog('out', '', `${request.kind} ${request.title}`, request.kind === 'open-app' ? 'app' : 'sign');
           })().catch(() => {
             resolve(false);
@@ -361,6 +377,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const lock = useCallback(() => {
     void stopSimulation();
     lockVaultMemory();
+    publicReadBatchRef.current.reset();
     setError(null);
     setUnlockedUntil(null);
   }, [stopSimulation]);
@@ -538,6 +555,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           connectedRef.current = false;
           handlerRef.current?.resetLink?.();
           bleSignHostGate.reset();
+          publicReadBatchRef.current.reset();
           setPairingCode(null);
           setConnected(false);
           setConnectedLabel('');
@@ -687,6 +705,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         appendAppLog('sign', 'reject');
         setError(translate(settingsRef.current.language, err instanceof Error ? err.message : 'unlock.failed'));
         return;
+      }
+    }
+    if (request?.kind === 'address') {
+      if (ok) {
+        publicReadBatchRef.current.grant();
+      } else {
+        publicReadBatchRef.current.reset();
       }
     }
     pendingRef.current?.resolve(ok);
