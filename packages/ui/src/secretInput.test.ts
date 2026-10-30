@@ -14,7 +14,8 @@ describe('secretInputProps', () => {
   it('does not put a mnemonic into an accessibility label on the word grid', () => {
     const source = readFileSync(path.join(import.meta.dirname, 'MnemonicGrid.tsx'), 'utf8');
     expect(source).toContain('selectable={false}');
-    expect(source).not.toContain('accessibilityLabel');
+    expect(source).toContain('accessibilityLabel={`Recovery word ${index + 1}`}');
+    expect(source).not.toContain('accessibilityLabel={word}');
     expect(source).not.toContain('accessibilityHint');
   });
 });

@@ -28,6 +28,11 @@ export type FamilyContext = {
   slotId: string;
   entropy: Uint8Array;
   backup?: BackupKind;
+  /**
+   * Hot-wallet policy. Firmware P1=0 public reads stay silent unless the
+   * phone sets this. It is not a Ledger wire MATCH.
+   */
+  confirmSilentPublic?: boolean;
 };
 
 export type SuiBlocksSession = {
@@ -561,7 +566,7 @@ async function exportKey(apdu: Apdu, spec: FamilySpec, ctx: FamilyContext): Prom
   } catch {
     return encodeResponse(new Uint8Array(), SW_WRONG_P1P2);
   }
-  if (apdu.p1 !== 0x00) {
+  if (apdu.p1 !== 0x00 || ctx.confirmSilentPublic) {
     const ok = await ctx.confirmation.confirm({
       brand: 'ledger',
       kind: 'address',

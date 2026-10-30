@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createPairingGate } from './pairing';
-import { createStatusBus } from './status';
+import { createStatusBus, redactSecrets } from './status';
 
 describe('status bus', () => {
   it('derives SCAN then HID from phase patches', () => {
@@ -18,13 +18,18 @@ describe('status bus', () => {
     expect(bus.snapshot().labReady).toBe(true);
     bus.log('hello');
     expect(bus.snapshot().logs[0].line).toBe('hello');
+    bus.log('abandon '.repeat(11) + 'about');
+    expect(bus.snapshot().logs[0].line).toBe('[redacted]');
+    bus.log(`entropy ${'ab'.repeat(32)}`);
+    expect(bus.snapshot().logs[0].line).toBe('entropy [redacted]');
+    expect(redactSecrets('host connected')).toBe('host connected');
     bus.idle();
     expect(bus.snapshot().running).toBe(false);
     expect(bus.snapshot().radio).toBe('IDLE');
     expect(bus.snapshot().hid).toBe('up');
     expect(bus.snapshot().vendorId).toBeNull();
     expect(seen.includes('SCAN')).toBe(true);
-    expect(bus.snapshot().logs[0].line).toBe('hello');
+    expect(bus.snapshot().logs.some((entry) => entry.line === 'hello')).toBe(true);
     bus.clearLogs();
     expect(bus.snapshot().logs).toEqual([]);
   });

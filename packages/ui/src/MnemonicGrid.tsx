@@ -23,11 +23,16 @@ export function MnemonicGrid({ phrase, labels }: Props) {
     <View style={styles.wrap}>
       <View style={styles.grid}>
         {words.map((word, index) => (
-          <View key={`${index}-${word}`} style={styles.cell}>
-            <Text selectable={false} style={styles.index}>
+          <View
+            key={`${index}-${word}`}
+            accessible
+            accessibilityLabel={`Recovery word ${index + 1}`}
+            style={styles.cell}
+          >
+            <Text selectable={false} importantForAccessibility="no" style={styles.index}>
               {index + 1}
             </Text>
-            <Text selectable={false} style={styles.word}>
+            <Text selectable={false} importantForAccessibility="no" style={styles.word}>
               {word}
             </Text>
           </View>

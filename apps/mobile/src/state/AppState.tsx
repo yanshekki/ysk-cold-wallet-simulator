@@ -52,7 +52,7 @@ import { reauthBeforeReveal } from '../passkeys/secretReauth';
 import { needsSignReauth } from '../passkeys/signGate';
 import { setFaceIdEnabled, unlock as requestUnlock } from '../passkeys';
 import { SecretSession } from '../seeds/secretSession';
-import { listSlots, loadEntropy, setVaultAuthPrompt, updateSlotMeta, wipeAllSlots } from '../seeds/vault';
+import { listSlots, loadEntropy, lockVaultMemory, setVaultAuthPrompt, updateSlotMeta, wipeAllSlots } from '../seeds/vault';
 import {
   DEFAULT_SETTINGS,
   clearCatalogOverlay,
@@ -360,6 +360,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   const lock = useCallback(() => {
     void stopSimulation();
+    lockVaultMemory();
     setError(null);
     setUnlockedUntil(null);
   }, [stopSimulation]);
@@ -473,6 +474,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       slotId: active.id,
       entropy,
       backup: active.backup ?? 'bip39',
+      confirmSilentPublic: true,
       onAppChange: (app) => {
         currentAppRef.current = app;
         setCurrentApp(app);
@@ -534,6 +536,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         },
         onDisconnected: () => {
           connectedRef.current = false;
+          handlerRef.current?.resetLink?.();
+          bleSignHostGate.reset();
+          setPairingCode(null);
           setConnected(false);
           setConnectedLabel('');
           appendAppLog('ble', 'host disconnected');

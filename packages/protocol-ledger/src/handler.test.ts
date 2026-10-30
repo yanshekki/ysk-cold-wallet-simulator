@@ -419,6 +419,34 @@ describe('LedgerProtocolHandler', () => {
     expect(confirms).toBe(1);
   });
 
+  it('confirms a silent ETH GET_ADDRESS when the hot-wallet flag is set', async () => {
+    let confirms = 0;
+    const handler = new LedgerProtocolHandler({
+      model: nanoX,
+      confirmation: {
+        async confirm() {
+          confirms += 1;
+          return false;
+        },
+        async getPassphrase() {
+          return undefined;
+        },
+      },
+      slotId: 'slot',
+      entropy,
+      confirmSilentPublic: true,
+    });
+    handler.setApp('ethereum');
+    const path = [0x8000002c, 0x8000003c, 0x80000000, 0, 0];
+    const pathBytes: number[] = [path.length];
+    for (const component of path) {
+      pathBytes.push((component >>> 24) & 0xff, (component >>> 16) & 0xff, (component >>> 8) & 0xff, component & 0xff);
+    }
+    const denied = await exchange(handler, apdu([0xe0, 0x02, 0x00, 0x00, pathBytes.length, ...pathBytes]));
+    expect((denied[denied.length - 2] << 8) | denied[denied.length - 1]).toBe(0x6985);
+    expect(confirms).toBe(1);
+  });
+
   it('opens Ethereum when GET_ADDRESS arrives on the dashboard', async () => {
     const handler = new LedgerProtocolHandler({
       model: nanoX,

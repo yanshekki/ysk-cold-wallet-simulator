@@ -41,13 +41,24 @@ describe('vault SecureStore options', () => {
     deleteItemAsync.mockResolvedValue(undefined);
   });
 
-  it('stores entropy with WHEN_UNLOCKED_THIS_DEVICE_ONLY and without requireAuthentication', async () => {
-    const { saveSlot, entropyKey } = await import('./vault');
+  it('stores entropy with requireAuthentication in a release build', async () => {
+    const { saveSlot, entropyKey, loadEntropy, lockVaultMemory } = await import('./vault');
+    lockVaultMemory();
     await saveSlot(SLOT, new Uint8Array(16));
     const entropyCall = setItemAsync.mock.calls.find((call) => call[0] === entropyKey(SLOT.id));
-    expect(entropyCall).toBeTruthy();
-    expect(entropyCall?.[2]).toEqual({ keychainAccessible: 'WHEN_UNLOCKED_THIS_DEVICE_ONLY' });
-    expect(entropyCall?.[2]).not.toHaveProperty('requireAuthentication');
+    expect(entropyCall?.[2]).toMatchObject({
+      keychainAccessible: 'WHEN_UNLOCKED_THIS_DEVICE_ONLY',
+      requireAuthentication: true,
+    });
+    lockVaultMemory();
+    getItemAsync.mockClear();
+    getItemAsync.mockResolvedValue('AAAAAAAAAAAAAAAAAAAAAA==');
+    await loadEntropy(SLOT.id);
+    await loadEntropy(SLOT.id);
+    expect(getItemAsync).toHaveBeenCalledTimes(1);
+    expect(getItemAsync.mock.calls[0]?.[1]).toMatchObject({ requireAuthentication: true });
+    await loadEntropy(SLOT.id, true);
+    expect(getItemAsync).toHaveBeenCalledTimes(2);
   });
 
   it('refuses to write entropy on web', async () => {

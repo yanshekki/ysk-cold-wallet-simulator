@@ -70,6 +70,8 @@ export type BtcContext = {
   backup?: BackupKind;
   coin?: BtcCoin;
   session?: BtcSession;
+  /** Phone hot-wallet policy. Firmware silent xpub reads stay silent when unset. */
+  confirmSilentPublic?: boolean;
 };
 
 export function coinFromAppId(id: string): BtcCoin {
@@ -198,7 +200,7 @@ async function handleGetWalletPublicKey(apdu: Apdu, ctx: BtcContext): Promise<Ui
   const coin = ctx.coin ?? 'bitcoin';
   const { path: apduPath } = parseBip32Path(apdu.data);
   const path = btcPath(ctx, apduPath);
-  if (apdu.p1 !== 0x00) {
+  if (apdu.p1 !== 0x00 || ctx.confirmSilentPublic) {
     const request: SigningRequest = {
       brand: 'ledger',
       kind: 'address',

@@ -37,6 +37,19 @@ export type StatusPatch = Partial<Omit<ProxyStatus, 'radio' | 'logs'>>;
 
 const LOG_CAP = 200;
 
+/**
+ * Proxy is transport-only. It does not store a seed. Logs must not keep a
+ * mnemonic or a long hex secret if a caller passes one by mistake.
+ */
+export function redactSecrets(line: string): string {
+  const words = line.trim().split(/\s+/);
+  const mnemonicLike = words.length >= 12 && words.every((word) => /^[a-z]+$/i.test(word));
+  if (mnemonicLike) {
+    return '[redacted]';
+  }
+  return line.replace(/\b[0-9a-f]{64,}\b/gi, '[redacted]');
+}
+
 function radioFor(state: Omit<ProxyStatus, 'radio' | 'logs'>): RadioMode {
   if (!state.running) {
     return 'IDLE';
@@ -117,7 +130,7 @@ export function createStatusBus(nativeOk = true): StatusBus {
     },
     log(line) {
       seq += 1;
-      logs.unshift({ id: String(seq), at: Date.now(), line });
+      logs.unshift({ id: String(seq), at: Date.now(), line: redactSecrets(line) });
       if (logs.length > LOG_CAP) {
         logs.length = LOG_CAP;
       }
