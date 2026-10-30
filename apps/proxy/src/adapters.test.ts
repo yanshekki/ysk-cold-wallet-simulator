@@ -1522,6 +1522,37 @@ describe('attachLedger', () => {
     expect((payload[payload.length - 2] << 8) | payload[payload.length - 1]).toBe(SW_OK);
     adapter.close();
   });
+
+  it('forwards a Cosmos HRP address over HID', async () => {
+    const device = new LedgerProtocolHandler({
+      model: LEDGER_MODELS.find((item) => item.id === 'nano-x')!,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy: entropy(),
+    });
+    device.setApp('cosmos');
+    const hrp = Array.from('osmo', (char) => char.charCodeAt(0));
+    const path = [0x8000002c, 0x80000076, 0x80000000, 0, 0];
+    const data = [hrp.length, ...hrp];
+    for (const component of path) {
+      data.push(component & 0xff, (component >>> 8) & 0xff, (component >>> 16) & 0xff, (component >>> 24) & 0xff);
+    }
+    const { host, gadget } = memoryHidPair();
+    const ble = bleToHandler(device, (framed) => splitFramedPackets(framed, DEFAULT_MTU));
+    const adapter = attachLedger(gadget, ble, DEFAULT_MTU, () => undefined);
+    const replies: Uint8Array[] = [];
+    host.onInput((report) => replies.push(report));
+    for (const report of wrapHidApdu(Uint8Array.of(0x55, 0x04, 0x00, 0x00, data.length, ...data))) {
+      host.write(report);
+    }
+    await adapter.idle();
+    const payload = unwrapHidReports(replies).payload;
+    const address = Array.from(payload.subarray(33, payload.length - 2), (byte) => String.fromCharCode(byte)).join('');
+    expect(address.startsWith('osmo1')).toBe(true);
+    expect(payload.length).toBe(33 + address.length + 2);
+    expect((payload[payload.length - 2] << 8) | payload[payload.length - 1]).toBe(SW_OK);
+    adapter.close();
+  });
 });
 
 describe('attachOneKey', () => {

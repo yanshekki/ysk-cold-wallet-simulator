@@ -25,6 +25,7 @@ import {
   deriveEd25519PrivateKey,
   derivePrivateKey,
   ed25519PublicKey,
+  publicKeyCompressed,
   publicKeyUncompressed,
   signEd25519,
   signSecp256k1Recoverable,
@@ -32,7 +33,7 @@ import {
 import { BleReassembler, DEFAULT_MTU, framePayload, splitFramedPackets, TAG_APDU } from '../framing';
 import { LedgerProtocolHandler } from '../handler';
 import { bytesToHex, concatBytes } from '../bytes';
-import { suiAddress, suiAddressBytes } from './addresses';
+import { cosmosBech32, suiAddress, suiAddressBytes } from './addresses';
 import {
   previewCosmosSignDoc,
   previewSolanaMessage,
@@ -1338,6 +1339,26 @@ describe('KEEP re-diff official chunk / version bodies', () => {
     const last = await exchange(device, apdu([0x55, 0x02, 0x02, 0x00, doc.length, ...doc]));
     expect(swOf(last)).toBe(SW_OK);
     expect(last.length).toBe(67);
+  });
+
+  it('Cosmos GET_ADDR with an HRP returns the compressed key and bech32 text', async () => {
+    const device = handler();
+    device.setApp('cosmos');
+    const hrp = Array.from('osmo', (char) => char.charCodeAt(0));
+    const path = [0x8000002c, 0x80000076, 0x80000000, 0, 0];
+    const data = [hrp.length, ...hrp];
+    for (const component of path) {
+      data.push(component & 0xff, (component >>> 8) & 0xff, (component >>> 16) & 0xff, (component >>> 24) & 0xff);
+    }
+    const payload = await exchange(device, apdu([0x55, 0x04, 0x00, 0x00, data.length, ...data]));
+    expect(swOf(payload)).toBe(SW_OK);
+    const compressed = publicKeyCompressed(derivePrivateKey(entropyFromMnemonic(FOUNDATION), "m/44'/118'/0'/0/0"));
+    const address = cosmosBech32(compressed, 'osmo');
+    expect(Array.from(payload.subarray(0, 33))).toEqual(Array.from(compressed));
+    expect(Array.from(payload.subarray(33, payload.length - 2))).toEqual(
+      Array.from(address, (char) => char.charCodeAt(0)),
+    );
+    expect(address.startsWith('osmo1')).toBe(true);
   });
 
   it('Polkadot GET_VERSION is 12 bytes; SIGN returns 65-byte ed25519 envelope', async () => {
