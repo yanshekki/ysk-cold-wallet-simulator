@@ -39,6 +39,31 @@ export type LedgerAppFamily =
   | 'filecoin'
   | 'stacks'
   | 'mina'
+  | 'eos'
+  | 'hedera'
+  | 'neo'
+  | 'casper'
+  | 'flare'
+  | 'conflux'
+  | 'binance'
+  | 'waves'
+  | 'aion'
+  | 'aleo'
+  | 'alephium'
+  | 'sia'
+  | 'ergo'
+  | 'arweave'
+  | 'flow'
+  | 'internetcomputer'
+  | 'starknet'
+  | 'hathor'
+  | 'hive'
+  | 'concordium'
+  | 'symbol'
+  | 'everscale'
+  | 'qrl'
+  | 'ardor'
+  | 'fio'
   | 'utility'
   | 'unknown';
 
@@ -161,6 +186,23 @@ const FAMILY_BY_OPEN_NAME: Readonly<Record<string, LedgerAppFamily>> = {
   conflux: 'conflux',
   'binance chain': 'binance',
   waves: 'waves',
+  aion: 'aion',
+  aleo: 'aleo',
+  alephium: 'alephium',
+  sia: 'sia',
+  ergo: 'ergo',
+  arweave: 'arweave',
+  flow: 'flow',
+  internetcomputer: 'internetcomputer',
+  starknet: 'starknet',
+  hathor: 'hathor',
+  hive: 'hive',
+  concordium: 'concordium',
+  symbol: 'symbol',
+  everscale: 'everscale',
+  qrl: 'qrl',
+  ardor: 'ardor',
+  fio: 'fio',
   // ethereum clear-signing plugins — companions, not standalone APDU apps
   '1inch': 'ethereum-plugin',
   alkemi: 'ethereum-plugin',
@@ -235,6 +277,23 @@ const FAMILY_RULES: [RegExp, LedgerAppFamily][] = [
   [/^conflux$/i, 'conflux'],
   [/binance chain/i, 'binance'],
   [/^waves$/i, 'waves'],
+  [/^aion$/i, 'aion'],
+  [/^aleo$/i, 'aleo'],
+  [/^alephium$/i, 'alephium'],
+  [/^sia$/i, 'sia'],
+  [/^ergo$/i, 'ergo'],
+  [/^arweave$/i, 'arweave'],
+  [/^flow$/i, 'flow'],
+  [/internet\s*computer/i, 'internetcomputer'],
+  [/^starknet$/i, 'starknet'],
+  [/^hathor$/i, 'hathor'],
+  [/^hive$/i, 'hive'],
+  [/^concordium$/i, 'concordium'],
+  [/^symbol$/i, 'symbol'],
+  [/^everscale$/i, 'everscale'],
+  [/^qrl$/i, 'qrl'],
+  [/^ardor$/i, 'ardor'],
+  [/^fio$/i, 'fio'],
 ];
 
 export function inferLedgerFamily(name: string): LedgerAppFamily {
@@ -312,6 +371,23 @@ function chipFor(name: string, family: LedgerAppFamily): string {
       conflux: 'CONF',
       binance: 'BINA',
       waves: 'WAVE',
+      aion: 'AION',
+      aleo: 'ALEO',
+      alephium: 'ALEP',
+      sia: 'SIA',
+      ergo: 'ERGO',
+      arweave: 'ARWE',
+      flow: 'FLOW',
+      internetcomputer: 'INTE',
+      starknet: 'STAR',
+      hathor: 'HATH',
+      hive: 'HIVE',
+      concordium: 'CONC',
+      symbol: 'SYMB',
+      everscale: 'EVER',
+      qrl: 'QRL',
+      ardor: 'ARDO',
+      fio: 'FIO',
     };
     if (name.toLowerCase().includes('litecoin')) {
       return 'LTC';
