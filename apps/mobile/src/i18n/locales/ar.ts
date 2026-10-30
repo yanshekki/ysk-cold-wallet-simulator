@@ -330,6 +330,13 @@ export const ar: MessageTree = {
     noticeZeroHmac: 'HMAC الخاص بالسياسة أصفار بالكامل ولم يُفحص.',
     noticeHostHash: 'قدّم المضيف هذه التجزئة. ليست معاملة مفكوكة.',
     headlineHostHash: 'تجزئة قدّمها المضيف',
+    opaqueCalldata: 'استدعاء عقد خام. المبالغ داخل بيانات الاستدعاء لا تُعرض.',
+    rawSection: 'بيانات خام',
+    showRaw: 'عرض',
+    hideRaw: 'إخفاء',
+    copyRaw: 'نسخ',
+    copiedRaw: 'تم النسخ',
+    rawBytes: '{{n}} بايت',
     field: {
       chain: 'السلسلة',
       chainId: 'معرّف السلسلة',
@@ -364,6 +371,7 @@ export const ar: MessageTree = {
       bytes: 'بايت',
       payload: 'الحمولة',
       spender: 'المنفق',
+      recipient: 'المستلم',
     },
   },
   unlock: {

@@ -330,6 +330,13 @@ export const id: MessageTree = {
     noticeZeroHmac: 'HMAC kebijakan semuanya nol dan tidak diperiksa.',
     noticeHostHash: 'Host yang memasok hash ini. Ini bukan transaksi yang sudah didekode.',
     headlineHostHash: 'Hash dari host',
+    opaqueCalldata: 'Panggilan kontrak mentah. Jumlah di dalam data panggilan tidak ditampilkan.',
+    rawSection: 'Data mentah',
+    showRaw: 'Tampilkan',
+    hideRaw: 'Sembunyikan',
+    copyRaw: 'Salin',
+    copiedRaw: 'Disalin',
+    rawBytes: '{{n}} byte',
     field: {
       chain: 'Rantai',
       chainId: 'ID rantai',
@@ -364,6 +371,7 @@ export const id: MessageTree = {
       bytes: 'Byte',
       payload: 'Payload',
       spender: 'Pengguna kuasa',
+      recipient: 'Penerima',
     },
   },
   unlock: {

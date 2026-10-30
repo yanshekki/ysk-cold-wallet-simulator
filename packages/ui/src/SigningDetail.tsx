@@ -1,13 +1,16 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import {
   BTC_ZERO_HMAC_WARNING,
   HOST_SUPPLIED_HASH_WARNING,
+  OPAQUE_CALLDATA_NOTE,
   describeSigning,
   type SigningDetail,
   type SigningRequest,
 } from '@cws/contracts';
 import { formatHex } from './logFormat';
-import { colors, fonts, space } from './theme';
+import { layoutSigningDetail, type RawHexRow } from './signingLayout';
+import { colors, fonts, hairline, space } from './theme';
 
 export type SigningCopy = {
   decodeFailed?: string;
@@ -35,12 +38,22 @@ export type SigningCopy = {
   noticeZeroHmac?: string;
   noticeHostHash?: string;
   headlineHostHash?: string;
+  opaqueCalldata?: string;
+  rawSection?: string;
+  showRaw?: string;
+  hideRaw?: string;
+  copyRaw?: string;
+  copiedRaw?: string;
+  rawBytes?: string;
   fieldLabels?: Record<string, string>;
 };
+
+export type SigningHexCopy = (value: string) => void | boolean | Promise<void | boolean>;
 
 type Props = {
   request: SigningRequest;
   copy?: SigningCopy;
+  onCopyHex?: SigningHexCopy;
 };
 
 const HEADLINE_MAP: Array<{ match: string; key: keyof SigningCopy }> = [
@@ -94,6 +107,7 @@ function localizeFieldLabel(label: string, copy?: SigningCopy): string {
 function localize(detail: SigningDetail, request: SigningRequest, copy?: SigningCopy): SigningDetail {
   let headline = detail.headline;
   let warning = detail.warning;
+  let note = detail.note;
   if (detail.headline === 'EIP-7702 authorization' && copy?.notice7702) {
     warning = copy.notice7702;
   }
@@ -102,6 +116,12 @@ function localize(detail: SigningDetail, request: SigningRequest, copy?: Signing
   }
   if (warning === HOST_SUPPLIED_HASH_WARNING && copy?.noticeHostHash) {
     warning = copy.noticeHostHash;
+  }
+  if (warning === OPAQUE_CALLDATA_NOTE && copy?.opaqueCalldata) {
+    warning = copy.opaqueCalldata;
+  }
+  if (note === OPAQUE_CALLDATA_NOTE && copy?.opaqueCalldata) {
+    note = copy.opaqueCalldata;
   }
   if (detail.decodeFailed && copy?.decodeFailed) {
     headline = copy.decodeFailed;
@@ -128,6 +148,7 @@ function localize(detail: SigningDetail, request: SigningRequest, copy?: Signing
     ...detail,
     headline,
     warning,
+    note,
     fields: detail.fields.map((field) => ({
       ...field,
       label: localizeFieldLabel(field.label, copy),
@@ -135,17 +156,21 @@ function localize(detail: SigningDetail, request: SigningRequest, copy?: Signing
   };
 }
 
-export function SigningDetailView({ request, copy }: Props) {
+export function SigningDetailView({ request, copy, onCopyHex }: Props) {
   const detail = localize(describeSigning(request), request, copy);
   const purpose = purposeFor(request, copy);
   const selectable = request.kind !== 'export-seed';
+  const laid = layoutSigningDetail(detail, {
+    rawSection: copy?.rawSection ?? 'Raw data',
+    payload: copy?.payload ?? 'PAYLOAD',
+  });
   return (
     <View style={styles.box}>
       {purpose ? <Text style={styles.purpose}>{purpose}</Text> : null}
       <Text style={styles.headline}>{detail.headline}</Text>
       {detail.warning ? <Text style={styles.warning}>{detail.warning}</Text> : null}
       {detail.note ? <Text style={styles.note}>{detail.note}</Text> : null}
-      {detail.fields.map((field) => (
+      {laid.summary.map((field) => (
         <View key={`${field.label}:${field.value.slice(0, 24)}`} style={styles.row}>
           <Text style={styles.label}>{field.label}</Text>
           <Text style={field.mono ? styles.mono : styles.value} selectable={selectable}>
@@ -153,12 +178,104 @@ export function SigningDetailView({ request, copy }: Props) {
           </Text>
         </View>
       ))}
-      {detail.hex ? (
-        <View style={styles.row}>
-          <Text style={styles.label}>{copy?.payload ?? 'PAYLOAD'}</Text>
-          <Text style={styles.hex} selectable={selectable}>
-            {formatHex(detail.hex)}
-          </Text>
+      {laid.raw.length > 0 ? (
+        <View style={styles.rawSection} testID="signing-raw-section">
+          {laid.rawSection ? <Text style={styles.label}>{laid.rawSection}</Text> : null}
+          {laid.raw.map((row) => (
+            <HexBlock
+              key={row.id}
+              row={row}
+              selectable={selectable}
+              showLabel={copy?.showRaw ?? 'Show'}
+              hideLabel={copy?.hideRaw ?? 'Hide'}
+              copyLabel={copy?.copyRaw ?? 'Copy'}
+              copiedLabel={copy?.copiedRaw ?? 'Copied'}
+              byteTemplate={copy?.rawBytes ?? '{{n}} bytes'}
+              onCopy={onCopyHex}
+            />
+          ))}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function HexBlock({
+  row,
+  selectable,
+  showLabel,
+  hideLabel,
+  copyLabel,
+  copiedLabel,
+  byteTemplate,
+  onCopy,
+}: {
+  row: RawHexRow;
+  selectable: boolean;
+  showLabel: string;
+  hideLabel: string;
+  copyLabel: string;
+  copiedLabel: string;
+  byteTemplate: string;
+  onCopy?: SigningHexCopy;
+}) {
+  const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(0);
+  useEffect(() => {
+    if (copied === 0) {
+      return;
+    }
+    const timer = setTimeout(() => setCopied(0), 1500);
+    return () => clearTimeout(timer);
+  }, [copied]);
+  const text =
+    row.collapsed && !open ? row.preview : row.bytes == null ? row.value : formatHex(row.value);
+  const showBar = row.bytes != null || row.collapsed || Boolean(onCopy);
+  return (
+    <View style={styles.row}>
+      <Text style={styles.label}>{row.label}</Text>
+      <Text style={styles.hex} selectable={selectable}>
+        {text}
+      </Text>
+      {showBar ? (
+        <View style={styles.hexBar}>
+          {row.bytes != null ? (
+            <Text style={styles.hexMeta}>{byteTemplate.replace('{{n}}', String(row.bytes))}</Text>
+          ) : null}
+          <View style={styles.hexActions}>
+            {row.collapsed ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`${open ? hideLabel : showLabel} ${row.label}`}
+                accessibilityState={{ expanded: open }}
+                hitSlop={8}
+                onPress={() => setOpen((value) => !value)}
+                testID={`signing-hex-toggle-${row.id}`}
+              >
+                <Text style={styles.hexAction}>{open ? hideLabel : showLabel}</Text>
+              </Pressable>
+            ) : null}
+            {onCopy ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`${copyLabel} ${row.label}`}
+                hitSlop={8}
+                onPress={() => {
+                  void Promise.resolve()
+                    .then(() => onCopy(row.value))
+                    .then((result) => {
+                      if (result !== false) {
+                        setCopied((count) => count + 1);
+                      }
+                    })
+                    .catch(() => undefined);
+                }}
+                testID={`signing-hex-copy-${row.id}`}
+              >
+                <Text style={styles.hexAction}>{copied > 0 ? copiedLabel : copyLabel}</Text>
+              </Pressable>
+            ) : null}
+          </View>
         </View>
       ) : null}
     </View>
@@ -221,5 +338,34 @@ const styles = StyleSheet.create({
     fontFamily: fonts.mono,
     fontSize: 12,
     lineHeight: 18,
+  },
+  rawSection: {
+    gap: space.sm,
+    borderTopWidth: hairline,
+    borderTopColor: colors.border,
+    paddingTop: space.xs,
+  },
+  hexBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: space.sm,
+  },
+  hexActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.md,
+    marginLeft: 'auto',
+  },
+  hexMeta: {
+    color: colors.muted,
+    fontFamily: fonts.mono,
+    fontSize: 11,
+  },
+  hexAction: {
+    color: colors.ok,
+    fontFamily: fonts.monoMedium,
+    fontSize: 11,
+    letterSpacing: 0.4,
   },
 });

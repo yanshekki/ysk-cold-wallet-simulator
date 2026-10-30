@@ -1,6 +1,7 @@
 import { signingHoldLabel } from '@cws/contracts';
 import { SigningModal } from '@cws/ui';
 import { useT } from '../i18n';
+import { copyText } from '../lab/copy';
 import { SecretScreenshotBoundary } from '../seeds/secretScreenshot';
 import { useAppState } from '../state/AppState';
 
@@ -43,6 +44,7 @@ export function HostedSigningModal({ embedded = false }: Props) {
       }
       passphraseIdleLabel={t('signing.idle')}
       passphraseHostLabel={t('signing.hostPassphrase')}
+      onCopyHex={(value) => copyText(value)}
       copy={{
         decodeFailed: t('signing.decodeFailed'),
         personalMessage: t('signing.personalMessage'),
@@ -69,6 +71,13 @@ export function HostedSigningModal({ embedded = false }: Props) {
         noticeZeroHmac: t('signing.noticeZeroHmac'),
         noticeHostHash: t('signing.noticeHostHash'),
         headlineHostHash: t('signing.headlineHostHash'),
+        opaqueCalldata: t('signing.opaqueCalldata'),
+        rawSection: t('signing.rawSection'),
+        showRaw: t('signing.showRaw'),
+        hideRaw: t('signing.hideRaw'),
+        copyRaw: t('signing.copyRaw'),
+        copiedRaw: t('signing.copiedRaw'),
+        rawBytes: t('signing.rawBytes'),
         fieldLabels: {
           CHAIN: t('signing.field.chain'),
           'CHAIN ID': t('signing.field.chainId'),
@@ -103,6 +112,7 @@ export function HostedSigningModal({ embedded = false }: Props) {
           BYTES: t('signing.field.bytes'),
           PAYLOAD: t('signing.field.payload'),
           SPENDER: t('signing.field.spender'),
+          RECIPIENT: t('signing.field.recipient'),
         },
       }}
     />

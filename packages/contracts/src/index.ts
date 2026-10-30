@@ -65,6 +65,7 @@ export {
   describeHostSuppliedDigest,
   describeHostSuppliedHash,
   HOST_SUPPLIED_HASH_WARNING,
+  OPAQUE_CALLDATA_NOTE,
   describeEthMessage,
   describeEthTransaction,
   describeEthTypedData,
