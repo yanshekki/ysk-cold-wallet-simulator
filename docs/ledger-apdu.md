@@ -216,7 +216,7 @@ Reinstall the phone build that contains the Solana handler (routing + MORE ACK s
 
 Phase 1 expansion (30 Oct 2026). Every row in `LEDGER_MANAGER_SNAPSHOT` appears below. This table is the coverage checklist for the owner mandate. It does **not** claim handlers are complete. MATCH/FIXED/KEEP in sections above remain the wire-claim vocabulary for apps that were actually diffed; rows here use plan statuses when the firmware was not re-read.
 
-See also [ledger-apdu-plan.md](./ledger-apdu-plan.md) for the backlog and research citations.
+See also [ledger-apdu-plan.md](./ledger-apdu-plan.md) for the catalog matrix and [full-vendor-parity-plan.md](./full-vendor-parity-plan.md) for the post-#55 backlog (unknown apps, open KEEP, Proxy races, Trezor, OneKey, QR). Seeds are not absolutely safe.
 
 | App | Catalog family | Default version | Wire / plan status | Official INS summary |
 | --- | --- | --- | --- | --- |

@@ -2,7 +2,7 @@
 
 Research / plan date: 30 Oct 2026 (Asia/Hong_Kong).
 
-**Phase 1 (merged #49):** planning and matrix documentation only.
+**Phase 1 (merged #49):** planning and matrix documentation only. The post-#55 backlog (remaining unknown apps, open KEEP, Proxy HID/BLE races, Trezor, OneKey, and QR) is [full-vendor-parity-plan.md](full-vendor-parity-plan.md). This file stays the catalog matrix. Seeds are not absolutely safe.
 
 **Phase 2 item 1 (merged #50):** family-map expansion — catalog/`inferLedgerFamily` remaps ethereum CHAIN, bitcoin-like, cosmos-like, polkadot-like, and ethereum-plugin names. Do not read MATCH / FIXED from remapped rows as wire-complete.
 
