@@ -143,13 +143,13 @@ The phone handler already ACKs these with an empty `9000`. The proxy rule is the
 
 | Path | Chunk rule | Source |
 | --- | --- | --- |
-| Ethereum SIGN | P1 `00` then `80`, empty body until the RLP completes | app-ethereum; fixed on the phone in #43 |
-| Cardano v8 INIT / CHUNK | P1 `10` / `11`, body length 0 | app-cardano; phone returns empty `9000` |
-| Avalanche CLA `80` SIGN / SIGN_MSG | last chunk is empty `9000`; the signature is the later INS `04` | app-avalanche APDUSPEC |
-| Aptos SIGN | P2 `80` more | app-aptos COMMANDS |
-| Cosmos, Polkadot, Filecoin, Casper, Stacks, Binance | Zondax P1 `0` / `1` / `2` | Zondax `process_chunk` / APDUSPEC |
-| Tron, XRP, Stellar, TON | family chunk modes in `generic.ts` | hw-app-trx, hw-app-xrp, hw-app-str, app-ton |
-| NEAR | P1 `80` marks the last chunk; earlier chunks are empty `9000` | in-tree handler |
+| Ethereum SIGN | P1 `00` then `80`, empty body until the RLP completes | app-ethereum; fixed on the phone in #43. Proxy hold-forward test added |
+| Cardano v8 INIT / CHUNK | P1 `10` / `11`, body length 0 | app-cardano. Proxy hold-forward test covers INIT |
+| Avalanche CLA `80` SIGN / SIGN_MSG | last chunk is empty `9000`; the signature is the later INS `04` | app-avalanche APDUSPEC. Proxy hold-forward test covers SIGN init |
+| Aptos SIGN | P2 `80` more | app-aptos COMMANDS. Proxy hold-forward test added |
+| Cosmos, Polkadot, Filecoin, Casper, Stacks, Binance | Zondax P1 `0` / `1` / `2` | Zondax `process_chunk`. Proxy hold-forward test covers Cosmos init. The other Zondax apps share that ACK shape |
+| Tron, XRP, Stellar, TON | family chunk modes in `generic.ts` | Proxy hold-forward test covers XRP P1 more. Tron, Stellar, and TON use the same empty-`9000` hold |
+| NEAR | P1 `80` marks the last chunk; earlier chunks are empty `9000` | Proxy hold-forward test covers the mid-chunk |
 | Bitcoin CONTINUE | CLA `F8` INS `01` | app-bitcoin `doc/bitcoin.md`. Catalog cases exist. No unarmed-status adapter test |
 
 `hidStatusWord` only parses a status word when the HID length field is 2. A longer body is forwarded as a whole frame. The race that matters is the **empty** status, which is what a multi-chunk ACK is.
@@ -299,6 +299,8 @@ Each phase is its own pull request, squash-merged to `main`. Batch size follows 
 Docs only. No handler change. No USB install. No Proxy rebuild.
 
 ### Phase 1 — Proxy multi-chunk hold-forward
+
+**Status.** The seven chunk shapes in section 2 have an `adapters.test.ts` hold-forward case (Ethereum, Cardano v8 INIT, Avalanche SIGN, Aptos, Cosmos, XRP, NEAR), on top of the Solana case from #54. Bitcoin CONTINUE is still catalog-only.
 
 **Goal.** Adapter tests for every empty-`9000` path in the table in section 2.
 

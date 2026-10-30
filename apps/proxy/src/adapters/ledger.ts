@@ -351,11 +351,12 @@ export function attachLedger(
     const sw = hidStatusWord(reports[0] ?? new Uint8Array());
     // Status-only replies can arrive before receiveArmed flips true (phone
     // ACKs while the last BLE write is still resolving). Dropping them stalls
-    // the HID host. Solana SIGN MORE needs its empty 9000 so Solflare can send
-    // the final chunk and the phone can open the signing sheet. Stellar same-SW
-    // 6d00/6e00 retries need the same hold. True post-settle leftovers already
-    // hit !awaiting above. Matching lastStatusSw for 9000 avoids inventing a
-    // success when no prior empty OK exists; 6d00/6e00 always hold.
+    // the HID host. Every multi-chunk empty 9000 needs that ACK: Solana SIGN
+    // MORE, Ethereum SIGN, Cardano INIT, Avalanche SIGN, Aptos / Zondax /
+    // XRP / NEAR mid-chunks. Stellar same-SW 6d00/6e00 retries need the same
+    // hold. True post-settle leftovers already hit !awaiting above. Matching
+    // lastStatusSw for 9000 avoids inventing a success when no prior empty OK
+    // exists; 6d00/6e00 always hold.
     const holdStatus =
       sw === 0x6d00 ||
       sw === 0x6e00 ||
