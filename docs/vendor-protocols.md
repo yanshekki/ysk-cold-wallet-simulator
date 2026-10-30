@@ -28,6 +28,23 @@ The same Cardano ids were checked against [OneKeyHQ/firmware-pro `MessageType.py
 
 V1 framing (`3F2323`) and V2 chunked frames are what the OneKey handler already switches on. This pass did not find a second id mismatch.
 
+A Proxy test sends a V2 ping larger than one HID report and checks that `Success` still echoes the message. It does not decode 20106, 20107, 20120, or 10106.
+
+## Capture checklist (not MATCH)
+
+No Suite or OneKey App trace was saved for this list. Record the screen, then the bytes. Do not treat the id as implemented.
+
+| Host | Id | Screen to record |
+| --- | --- | --- |
+| Trezor Suite | 906–908 | Solana, Sign message |
+| Trezor Suite | 471 / 472 | Ethereum typed data that requests definitions before the signature |
+| Trezor Suite | Cardano stages beyond 314 / 317 / 319 | A Cardano transaction whose `CardanoTx*` sequence is not the one already tested |
+| OneKey App | 20106 / 20107 | Ethereum sign that acks `EthereumTxRequestOneKey` |
+| OneKey App | 20120 | Ethereum EIP-7702 authorization |
+| OneKey App | 10106 | Solana unsafe or off-chain message |
+| OneKey App | Sui tx ack | Sui transaction sign, including any ack id |
+| OneKey App | TON proof | TON proof or sign-data, not get-address |
+
 ## QR (BC-UR / Keystone)
 
 Type strings this tree encodes, checked against [KeystoneHQ/ur-registry `RegistryType.ts`](https://github.com/KeystoneHQ/ur-registry/blob/master/src/RegistryType.ts) and the tests in `packages/protocol-qr`:
