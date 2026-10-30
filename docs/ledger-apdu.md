@@ -1,6 +1,6 @@
 # Ledger APDU wire matrix
 
-**Phase 2 item 2 (KEEP re-diff follow-up):** Tron/XRP/Stellar/Cosmos/Polkadot/TON/Aptos handlers re-diffed against official firmware/hw-app; MATCH/FIXED only with citations + `family.test.ts` KEEP re-diff cases. Cardano CIP / Solana multi-path / Bitcoin policy / Eth clear-sign stream KEEP rows stay KEEP — official sources describe them but CWS still lacks the full parsers/tests.
+**Phase 2 item 2 (KEEP re-diff follow-up):** Tron/XRP/Stellar/Cosmos/Polkadot/TON/Aptos handlers re-diffed against official firmware/hw-app; MATCH/FIXED only with citations + `family.test.ts` KEEP re-diff cases. Cardano operational certificate is MATCH. Cardano CIP-36, address, native script, and CIP-8, plus Solana multi-path, Bitcoin policy, and Eth clear-sign stream, stay KEEP.
 
 **Phase 2 family map (follow-up to #49):** catalog/`inferLedgerFamily` remaps ethereum CHAIN, bitcoin-like, cosmos-like, polkadot-like, and `ethereum-plugin` names so Open App is not `unknown`. Remapped rows are **not** new wire MATCH/FIXED — only family routing changed.
 
@@ -107,10 +107,12 @@ The 32-byte v7 body is blake2b-256 of the concatenated stage payloads. That is n
 | --- | --- | --- | --- |
 | `11` DERIVE_ADDRESS | v8 P1 `01` returns raw address bytes; P1 `02` shows the address and returns an empty body | Always confirms and returns pubkey length, pubkey, address length, address text | KEEP. Address parameters are not a BIP32 path. Login uses `INS 10`, which is 64 bytes |
 | `12` native script hash | multi-stage, final body 28 bytes | `6D00` | KEEP |
-| `22` operational certificate | 64-byte signature | `6D00` | KEEP |
+| `22` operational certificate | 64-byte signature of KES ‖ issue counter ‖ KES period. Path is `m/1853'/1815'/0'/index'` | 64-byte Icarus signature after confirm | MATCH |
 | `23` CIP-36 vote | chunk ACKs then hash and signature | `6D00` | KEEP |
 | `24` CIP-8 message | init/chunk empty, confirm returns signature, pubkey, and address field | `6D00` | KEEP |
 | `15` | not an instruction in the v7 or v8 INS table | `6D00` | FIXED. It used to be treated as a finished signature |
+
+`INS 22` is one APDU. The device signs the KES public key, then the issue counter, then the KES period. That is the reverse of the APDU field order, and it is not a hash. A payload longer than 72 bytes, or bytes left after the path, returns `6B14`. A cut-short KES key, period, or issue counter returns `6B10`, `6B11`, or `6B12`. A path that does not parse returns `6B13`. A path that parses and is not a pool cold key returns `6982` and does not open a sheet. User rejection is `6985`. Source: LedgerHQ/app-cardano `doc/apdu_reference.md` §8.1, `src/opcert/opcert_parse.c`, and `src/handler/sign_opcert.c` (develop).
 
 The old `P2 & 0x02` "more data" bit is not how either Cardano major chunks `SIGN_TX`. Using it made INIT (`P1 10`, `P2 00` on 8.x) look finished and return a 64-byte Icarus signature. That is the Minswap `64 instead of 0` failure.
 

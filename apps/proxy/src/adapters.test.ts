@@ -13,9 +13,11 @@ import {
   LedgerProtocolHandler,
   SW_OK,
   TAG_APDU,
+  deriveIcarus,
   encodeAppAndVersion,
   encodeResponse,
   framePayload,
+  signIcarus,
   splitFramedPackets,
   unwrapHidReports,
   wrapHidApdu,
@@ -1169,6 +1171,53 @@ describe('attachLedger', () => {
     expect(Array.from(payload.subarray(0, payload.length - 2))).toEqual(body);
     expect((payload[payload.length - 2] << 8) | payload[payload.length - 1]).toBe(SW_OK);
     expect(device.getApp()).toBe(app);
+    adapter.close();
+  });
+
+  it('forwards a Cardano operational certificate over HID', async () => {
+    const device = new LedgerProtocolHandler({
+      model: LEDGER_MODELS.find((item) => item.id === 'nano-x')!,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy: entropy(),
+    });
+    device.setApp('cardano');
+    const kes = Uint8Array.from(
+      '3d24bc547388cf2403fd978fc3d3a93d1f39acf68a9c00e40512084dc05f2822'.match(/../g)!,
+      (byte) => Number.parseInt(byte, 16),
+    );
+    const period = Uint8Array.of(0, 0, 0, 0, 0, 0, 0, 0x2f);
+    const counter = Uint8Array.of(0, 0, 0, 0, 0, 0, 0, 0x2a);
+    const path = [0x8000073d, 0x80000717, 0x80000000, 0x80000000];
+    const data: number[] = [...kes, ...period, ...counter, path.length];
+    for (const component of path) {
+      data.push(
+        (component >>> 24) & 0xff,
+        (component >>> 16) & 0xff,
+        (component >>> 8) & 0xff,
+        component & 0xff,
+      );
+    }
+    const { host, gadget } = memoryHidPair();
+    const ble = bleToHandler(device, (framed) => splitFramedPackets(framed, DEFAULT_MTU));
+    const adapter = attachLedger(gadget, ble, DEFAULT_MTU, () => undefined);
+    const replies: Uint8Array[] = [];
+    host.onInput((report) => replies.push(report));
+    for (const report of wrapHidApdu(Uint8Array.of(0xd7, 0x22, 0x00, 0x00, data.length, ...data))) {
+      host.write(report);
+    }
+    await adapter.idle();
+    const payload = unwrapHidReports(replies).payload;
+    const signed = new Uint8Array(48);
+    signed.set(kes, 0);
+    signed.set(counter, 32);
+    signed.set(period, 40);
+    const node = deriveIcarus(entropy(), "m/1853'/1815'/0'/0'");
+    expect(Array.from(payload.subarray(0, payload.length - 2))).toEqual(
+      Array.from(signIcarus(node, signed)),
+    );
+    expect((payload[payload.length - 2] << 8) | payload[payload.length - 1]).toBe(SW_OK);
+    expect(device.getApp()).toBe('cardano');
     adapter.close();
   });
 });
