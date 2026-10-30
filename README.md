@@ -1,6 +1,6 @@
 # YSK Cold Wallet Simulator
 
-**Version 1.1.0 (build 6)** · YSK Limited
+**Version 1.1.1 (build 7)** · YSK Limited
 
 Phone bundle `hk.ysk.cws` · CWS Proxy bundle `hk.ysk.cws.proxy`
 
@@ -20,7 +20,7 @@ CWS is a simulator. It is not a secure element. Ledger, Trezor, and OneKey do no
 
 ## Downloads
 
-Version 1.1.0 (build 6). [GitHub Release v1.1.0](https://github.com/yanshekki/ysk-cold-wallet-simulator/releases/tag/v1.1.0) is notes only: no APK, IPA, or desktop package is attached. Ubuntu can build a `.deb` from this tree. macOS and Windows still have no installable package on that release.
+Version 1.1.1 (build 7). It includes the hot-wallet baseline from #70 and #71. Seeds are not hardware-wallet safe. [GitHub Release v1.1.0](https://github.com/yanshekki/ysk-cold-wallet-simulator/releases/tag/v1.1.0) is notes only: no APK, IPA, or desktop package is attached. Ubuntu can build a `.deb` from this tree. macOS and Windows still have no installable package on that release.
 
 | Product | Where to get it |
 | --- | --- |
@@ -112,7 +112,7 @@ On macOS, virtual HID is the signed CWS Proxy app, not `yarn proxy`:
 yarn workspace @cws/proxy app
 ```
 
-Product version **1.1.0** and build **6** come from `apps/mobile/app.json` (`version`, `versionCode`, `buildNumber`). Expo prebuild writes the Android `versionName` / `versionCode` and the iOS `CFBundleShortVersionString` / `CFBundleVersion`. Workspace packages that ship with the app are version `1.1.0`. The macOS proxy marketing version and build are the same numbers.
+Product version **1.1.1** and build **7** come from `apps/mobile/app.json` (`version`, `versionCode`, `buildNumber`). Expo prebuild writes the Android `versionName` / `versionCode` and the iOS `CFBundleShortVersionString` / `CFBundleVersion`. Workspace packages that ship with the app are version `1.1.1`. The macOS proxy marketing version and build are the same numbers.
 
 ## What it speaks
 
@@ -180,20 +180,20 @@ Litecoin and Dogecoin use the Bitcoin handler. A bundled Ledger app catalog lets
 
 Settings → Ledger catalog can pick a published version for each app. That is the version a host reads from the open app. It does not switch CWS to that older app’s commands. Update Ledger apps reloads names and versions from Ledger’s public catalog for the selected device. Until then, the list is the bundled catalog for that device.
 
-A transaction signature, a message signature, and a backup-seed export wait for press-and-hold on the phone and, on a release build, for the OS authenticator. Listing addresses and exporting an extended public key stay silent, because the wallets above list accounts that way. While the phone is advertising, the Device screen says that a connected host can derive addresses.
+A transaction signature, a message signature, and a backup-seed export wait for press-and-hold on the phone and, on a release build, for the OS authenticator. A public account or extended-public-key read also confirms. One confirm covers that read and the next 15 public reads for 60 seconds. It does not sign. While the phone is advertising, the Device screen says that a connected host can derive addresses.
 
 ## Security
 
-The secret is stored with `WHEN_UNLOCKED_THIS_DEVICE_ONLY` and is not written to the clipboard. A release build asks the OS authenticator before reveal, import, save, sign, and seed export. Android release builds set `FLAG_SECURE` on secret screens.
+The secret is stored with `WHEN_UNLOCKED_THIS_DEVICE_ONLY`. A release build also sets `requireAuthentication`. The phrase is not written to the clipboard. Import reads the clipboard only after Paste is confirmed. A release build asks the OS authenticator before reveal, import, save, sign, and seed export. Android release builds set `FLAG_SECURE` on secret screens. Those skips exist only when `__DEV__` is true.
 
-That is not absolute safety. Four compatibility choices stay open in 1.1.0:
+That is not hardware-wallet safety. Seeds are not hardware-wallet safe. Compatibility choices that stay open in 1.1.1:
 
 - WebHID forwards reports with no command allowlist.
 - The local trezord bridge on `127.0.0.1` reflects the request `Origin`.
-- Public-key and address listing stays silent, including an extended public key where the command carries a chain code.
-- The stored entropy item does not use `requireAuthentication`, because a prompt on every read breaks account listing.
+- iOS warns on capture and does not black the live image. That warn-only choice is intentional, because blanking also blanks mirroring.
+- iOS does not expose a BLE link key.
 
-iOS can warn on a capture. It does not black the live image. Anyone who can unlock the phone, debug the process, photograph the screen, or connect a host can reach more than the UI shows. Details, platform limits, and known host gaps are in [docs/security.md](docs/security.md).
+Anyone who can unlock the phone, debug the process, photograph the screen, or connect a host can reach more than the UI shows. Details, platform limits, and known host gaps are in [docs/security.md](docs/security.md). The 1.1.1 notes are [docs/releases/1.1.1.md](docs/releases/1.1.1.md).
 
 ## Testing
 
@@ -206,6 +206,7 @@ What was run, and what was not, is in [docs/testing.md](docs/testing.md). In Oct
 | [docs/zh-HK.md](docs/zh-HK.md) | 香港書面語：同一版本、警告、下載與已知缺口 |
 | [docs/security.md](docs/security.md) | Public security statement |
 | [docs/testing.md](docs/testing.md) | What was tested, and what was not |
+| [docs/releases/1.1.1.md](docs/releases/1.1.1.md) | Bilingual notes for 1.1.1 (build 7), the hot-wallet baseline |
 | [docs/releases/1.1.0.md](docs/releases/1.1.0.md) | Bilingual notes for 1.1.0 (build 6) |
 | [docs/store/README.md](docs/store/README.md) | Mac App Store screenshot index |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Engineering layout |
