@@ -217,6 +217,35 @@ function encodeGroups(groups: Group[], signed: boolean): Uint8Array {
   return concatBytes(...parts);
 }
 
+/** Minswap sends `ScriptRef.to_hex()`, which is already `#6.24(script)`. Ledger sends the raw script. */
+function isTag24ByteString(bytes: Uint8Array): boolean {
+  if (bytes.length < 3 || bytes[0] !== 0xd8 || bytes[1] !== 0x18) return false;
+  const info = bytes[2] & 0x1f;
+  const major = bytes[2] & 0xe0;
+  if (major !== 0x40) return false;
+  let length = 0;
+  let start = 3;
+  if (info < 24) length = info;
+  else if (info === 24 && bytes.length >= 4) {
+    length = bytes[3] ?? 0;
+    start = 4;
+  } else if (info === 25 && bytes.length >= 5) {
+    length = ((bytes[3] ?? 0) << 8) | (bytes[4] ?? 0);
+    start = 5;
+  } else return false;
+  return start + length === bytes.length;
+}
+
+function scriptRefField(bytes: Uint8Array): Uint8Array {
+  if (isTag24ByteString(bytes)) return concatBytes(cborUnsigned(3n), bytes);
+  return concatBytes(
+    cborUnsigned(3n),
+    cborType(6, BigInt(TAG_EMBEDDED)),
+    cborType(2, BigInt(bytes.length)),
+    bytes,
+  );
+}
+
 function encodeOutput(draft: Draft): Uint8Array | null {
   if (draft.groups.length !== draft.expectedGroups) return null;
   for (const group of draft.groups) {
@@ -225,6 +254,7 @@ function encodeOutput(draft: Draft): Uint8Array | null {
   if (draft.datumLeft !== 0 || draft.scriptLeft !== 0) return null;
   if (draft.includeDatum && draft.datum.length === 0) return null;
   if (draft.includeScript && draft.script.length === 0) return null;
+  const script = draft.script.length > 0 ? scriptRefField(draft.script) : new Uint8Array();
   const tokens = draft.expectedGroups === 0 ? new Uint8Array() : encodeGroups(draft.groups, false);
   const value =
     draft.expectedGroups === 0
@@ -248,7 +278,7 @@ function encodeOutput(draft: Draft): Uint8Array | null {
       cborUnsigned(1n),
       value,
       draft.datum,
-      draft.script,
+      script,
     );
   }
   return null;
@@ -755,12 +785,7 @@ export class CardanoV7Tx {
       return;
     }
     draft.scriptLeft = total - chunk.length;
-    draft.script = concatBytes(
-      cborUnsigned(3n),
-      cborType(6, BigInt(TAG_EMBEDDED)),
-      cborType(2, BigInt(total)),
-      chunk,
-    );
+    draft.script = chunk;
   }
 
   private readChunk(kind: 'datum' | 'script', data: Uint8Array): void {

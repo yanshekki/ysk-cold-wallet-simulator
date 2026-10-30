@@ -312,6 +312,51 @@ describe('Cardano 7.2.1 stage hash', () => {
     expect(Array.from(built ?? new Uint8Array())).toEqual(Array.from(body));
   });
 
+  it('keeps a Minswap script reference that is already tag 24', async () => {
+    const wrapped = Uint8Array.from([0xd8, 0x18, 0x47, 0x82, 0x02, 0x44, 0x4e, 0x4e, 0x4e, 0x4e]);
+    const raw = wrapped.slice(3);
+    const address = concatBytes(Uint8Array.of(0x01), new Uint8Array(28).fill(0x11), new Uint8Array(28).fill(0x22));
+    const expected = Buffer.from(
+      concatBytes(cborUnsigned(3n), cborMajor(6, 24n), cborBytes(raw)),
+    ).toString('hex');
+    for (const script of [wrapped, raw]) {
+      const init = concatBytes(
+        u64(1n),
+        Uint8Array.of(1),
+        u32(764824073),
+        Uint8Array.of(0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01),
+        Uint8Array.of(3),
+        u32(1),
+        u32(1),
+        u32(0),
+        u32(0),
+        u32(0),
+        u32(0),
+        u32(0),
+        u32(0),
+        u32(1),
+      );
+      const basic = concatBytes(
+        Uint8Array.of(1, 1),
+        u32(address.length),
+        address,
+        u64(1_000_000n),
+        u32(0),
+        Uint8Array.of(0x01, 0x02),
+      );
+      const machine = new CardanoV7Tx('7.2.1');
+      await machine.stage(0x01, 0, init, ctx());
+      await machine.stage(0x02, 0, concatBytes(new Uint8Array(32).fill(0x31), u32(0)), ctx());
+      await machine.stage(0x03, 0x30, basic, ctx());
+      await machine.stage(0x03, 0x36, concatBytes(u32(script.length), u32(script.length), script), ctx());
+      await machine.stage(0x03, 0x33, new Uint8Array(), ctx());
+      await machine.stage(0x04, 0, u64(170_000n), ctx());
+      const built = Buffer.from(machine.body() ?? new Uint8Array()).toString('hex');
+      expect(built.includes(expected)).toBe(true);
+      expect(built.includes('03d8184b')).toBe(false);
+    }
+  });
+
   it('fails closed on CIP-36 auxiliary data and on voting procedures', async () => {
     const { stages } = swap721();
     const cip = new CardanoV7Tx('7.2.1');
