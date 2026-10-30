@@ -1,6 +1,6 @@
 # Security
 
-**Version 1.1.1 (build 7).** This is the public statement of what CWS protects and what it leaves open. Seeds are not hardware-wallet safe.
+**Version 1.1.2 (build 8).** This is the public statement of what CWS protects and what it leaves open. Seeds are not hardware-wallet safe.
 
 **Seeds are not absolutely safe.** CWS has no secure element. Do not put a seed that controls real digital assets on the device.
 
@@ -31,7 +31,7 @@ This is progress toward Phantom, Rabby, and MetaMask mobile. It is not a secure 
 
 ## What stays open, on purpose
 
-Closing the items below would stop real wallets from connecting. They are residual risk. 1.1.1 does not claim to have removed them.
+Closing the items below would stop real wallets from connecting. They are residual risk. 1.1.2 does not claim to have removed them.
 
 ### WebHID
 

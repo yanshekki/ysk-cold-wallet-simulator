@@ -1,6 +1,6 @@
 # YSK Cold Wallet Simulator
 
-**Version 1.1.1 (build 7)** · YSK Limited
+**Version 1.1.2 (build 8)** · YSK Limited
 
 Phone bundle `hk.ysk.cws` · CWS Proxy bundle `hk.ysk.cws.proxy`
 
@@ -20,7 +20,7 @@ CWS is a simulator. It is not a secure element. Ledger, Trezor, and OneKey do no
 
 ## Downloads
 
-Version 1.1.1 (build 7). It includes the hot-wallet baseline from #70 and #71. Seeds are not hardware-wallet safe. [GitHub Release v1.1.0](https://github.com/yanshekki/ysk-cold-wallet-simulator/releases/tag/v1.1.0) is notes only: no APK, IPA, or desktop package is attached. Ubuntu can build a `.deb` from this tree. macOS and Windows still have no installable package on that release.
+Version 1.1.2 (build 8). It keeps the 1.1.1 hot-wallet baseline and adds the Cardano body hash (#73), the Trezor and OneKey transport tests (#74), and the QR preview settle (#75). Seeds are not hardware-wallet safe. [GitHub Release v1.1.0](https://github.com/yanshekki/ysk-cold-wallet-simulator/releases/tag/v1.1.0) is notes only: no APK, IPA, or desktop package is attached. Ubuntu can build a `.deb` from this tree. macOS and Windows still have no installable package on that release.
 
 | Product | Where to get it |
 | --- | --- |
@@ -112,7 +112,7 @@ On macOS, virtual HID is the signed CWS Proxy app, not `yarn proxy`:
 yarn workspace @cws/proxy app
 ```
 
-Product version **1.1.1** and build **7** come from `apps/mobile/app.json` (`version`, `versionCode`, `buildNumber`). Expo prebuild writes the Android `versionName` / `versionCode` and the iOS `CFBundleShortVersionString` / `CFBundleVersion`. Workspace packages that ship with the app are version `1.1.1`. The macOS proxy marketing version and build are the same numbers.
+Product version **1.1.2** and build **8** come from `apps/mobile/app.json` (`version`, `versionCode`, `buildNumber`). Expo prebuild writes the Android `versionName` / `versionCode` and the iOS `CFBundleShortVersionString` / `CFBundleVersion`. Workspace packages that ship with the app are version `1.1.2`. The macOS proxy marketing version and build are the same numbers.
 
 ## What it speaks
 
@@ -186,14 +186,14 @@ A transaction signature, a message signature, and a backup-seed export wait for 
 
 The secret is stored with `WHEN_UNLOCKED_THIS_DEVICE_ONLY`. A release build also sets `requireAuthentication`. The phrase is not written to the clipboard. Import reads the clipboard only after Paste is confirmed. A release build asks the OS authenticator before reveal, import, save, sign, and seed export. Android release builds set `FLAG_SECURE` on secret screens. Those skips exist only when `__DEV__` is true.
 
-That is not hardware-wallet safety. Seeds are not hardware-wallet safe. Compatibility choices that stay open in 1.1.1:
+That is not hardware-wallet safety. Seeds are not hardware-wallet safe. Compatibility choices that stay open in 1.1.2:
 
 - WebHID forwards reports with no command allowlist.
 - The local trezord bridge on `127.0.0.1` reflects the request `Origin`.
 - iOS warns on capture and does not black the live image. That warn-only choice is intentional, because blanking also blanks mirroring.
 - iOS does not expose a BLE link key.
 
-Anyone who can unlock the phone, debug the process, photograph the screen, or connect a host can reach more than the UI shows. Details, platform limits, and known host gaps are in [docs/security.md](docs/security.md). The 1.1.1 notes are [docs/releases/1.1.1.md](docs/releases/1.1.1.md).
+Anyone who can unlock the phone, debug the process, photograph the screen, or connect a host can reach more than the UI shows. Details, platform limits, and known host gaps are in [docs/security.md](docs/security.md). The 1.1.2 notes are [docs/releases/1.1.2.md](docs/releases/1.1.2.md).
 
 ## Testing
 
@@ -206,6 +206,7 @@ What was run, and what was not, is in [docs/testing.md](docs/testing.md). In Oct
 | [docs/zh-HK.md](docs/zh-HK.md) | 香港書面語：同一版本、警告、下載與已知缺口 |
 | [docs/security.md](docs/security.md) | Public security statement |
 | [docs/testing.md](docs/testing.md) | What was tested, and what was not |
+| [docs/releases/1.1.2.md](docs/releases/1.1.2.md) | Bilingual notes for 1.1.2 (build 8) |
 | [docs/releases/1.1.1.md](docs/releases/1.1.1.md) | Bilingual notes for 1.1.1 (build 7), the hot-wallet baseline |
 | [docs/releases/1.1.0.md](docs/releases/1.1.0.md) | Bilingual notes for 1.1.0 (build 6) |
 | [docs/store/README.md](docs/store/README.md) | Mac App Store screenshot index |
