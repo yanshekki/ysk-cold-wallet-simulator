@@ -98,6 +98,23 @@ describe('ledger app labels', () => {
     expect(inferLedgerFamily('Zcash')).toBe('unknown');
   });
 
+  it('maps backlog-4 researched apps onto families (ethereum clones, utilities, dedicated)', () => {
+    expect(inferLedgerFamily('VeChain')).toBe('ethereum');
+    expect(inferLedgerFamily('Aeternity')).toBe('ethereum');
+    expect(inferLedgerFamily('Exchange')).toBe('utility');
+    expect(inferLedgerFamily('Fido U2F')).toBe('utility');
+    expect(inferLedgerFamily('Security Key')).toBe('utility');
+    expect(inferLedgerFamily('Seed Tool')).toBe('utility');
+    expect(inferLedgerFamily('Recovery Check')).toBe('utility');
+    expect(inferLedgerFamily('Ledger Sync')).toBe('utility');
+    expect(inferLedgerFamily('Tezos Wallet')).toBe('tezos');
+    expect(inferLedgerFamily('Algorand')).toBe('algorand');
+    expect(inferLedgerFamily('MultiversX')).toBe('multiversx');
+    expect(inferLedgerFamily('Filecoin')).toBe('filecoin');
+    expect(inferLedgerFamily('Stacks')).toBe('stacks');
+    expect(inferLedgerFamily('Mina')).toBe('mina');
+  });
+
   it('stores remapped families on the bundled Manager snapshot', () => {
     const byName = Object.fromEntries(
       LEDGER_INSTALLED_APPS.map((app) => [app.openAppName, app.family]),
@@ -107,9 +124,12 @@ describe('ledger app labels', () => {
     expect(byName['Terra']).toBe('cosmos');
     expect(byName['Aleph Zero']).toBe('polkadot');
     expect(byName['Uniswap']).toBe('ethereum-plugin');
+    expect(byName['VeChain']).toBe('ethereum');
+    expect(byName['Tezos Wallet']).toBe('tezos');
+    expect(byName['Exchange']).toBe('utility');
     expect(byName['Zcash']).toBe('unknown');
     const known = LEDGER_INSTALLED_APPS.filter((app) => app.family !== 'unknown').length;
-    expect(known).toBe(128);
-    expect(LEDGER_INSTALLED_APPS.filter((app) => app.family === 'unknown').length).toBe(77);
+    expect(known).toBe(142);
+    expect(LEDGER_INSTALLED_APPS.filter((app) => app.family === 'unknown').length).toBe(63);
   });
 });

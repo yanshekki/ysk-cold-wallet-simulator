@@ -108,6 +108,7 @@ const FAMILY_PATHS: Record<string, readonly ChainPathId[]> = {
   Sui: ['sui'],
   Polkadot: ['dot'],
   Stellar: ['stellar'],
+  Tezos: ['tezos'],
 };
 
 function familyPath(ctx: FamilyContext, spec: FamilySpec, path: string): string {

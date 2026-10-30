@@ -4,6 +4,8 @@
 
 **Phase 2 family map (follow-up to #49):** catalog/`inferLedgerFamily` remaps ethereum CHAIN, bitcoin-like, cosmos-like, polkadot-like, and `ethereum-plugin` names so Open App is not `unknown`. Remapped rows are **not** new wire MATCH/FIXED — only family routing changed.
 
+**Phase 2 item 4 (unknown research):** catalog unknown 77→63 via utility family, VeChain/Aeternity→ethereum, and dedicated Tezos/Algorand/MultiversX/Filecoin/Stacks/Mina handlers (MATCH only proven VERSION/ADDR/CONF). Remaining 63 catalog-unknown documented in `ledger-apdu-plan.md` with search citations. Prior KEEP left unless proven.
+
 Research date: 30 Oct 2026. This is the wire contract CWS claims for each open Ledger app. BLE and the desktop Proxy (HID) carry the same APDU. A host assertion such as `unexpected response length: 64 instead of 0` is on the response body after the status word is removed. An intermediate chunk that must continue is an empty body and `9000`. The confirm sheet opens only on the stage the real app uses for review.
 
 The catalog pick is the version those bytes follow. `GET_VERSION` and `GET_APP_AND_VERSION` report that same pick. Where two app majors reuse one P1 for different stages, the handler branches. It does not load the firmware binary. Seeds are not absolutely safe.
