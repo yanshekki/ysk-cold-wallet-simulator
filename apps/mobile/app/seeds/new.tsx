@@ -307,7 +307,13 @@ export default function NewSeedScreen() {
                     : t('generate.sourceCsprng')}
               </Text>
               <Text style={styles.proofLabel}>{t('generate.hex')}</Text>
-              <Text selectable={false} style={styles.hex} onPress={() => setHexRefused(true)}>
+              <Text
+                accessible
+                accessibilityLabel={t('generate.hex')}
+                selectable={false}
+                style={styles.hex}
+                onPress={() => setHexRefused(true)}
+              >
                 {revealMeta.hex}
               </Text>
               {hexRefused ? (
@@ -354,7 +360,13 @@ export default function NewSeedScreen() {
         <View style={styles.words} testID="generate-shares">
           <Text style={styles.warn}>{t('generate.revealShares')}</Text>
           {shares.map((share, index) => (
-            <Text key={index} selectable={false} style={styles.mnemonic}>
+            <Text
+              key={index}
+              accessible
+              accessibilityLabel={`Recovery share ${index + 1}`}
+              selectable={false}
+              style={styles.mnemonic}
+            >
               {index + 1}. {share}
             </Text>
           ))}

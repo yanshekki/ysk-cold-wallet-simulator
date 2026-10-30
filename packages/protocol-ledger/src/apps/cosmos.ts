@@ -93,7 +93,7 @@ async function exportCosmosHrpAddress(
   ctx: FamilyContext,
   requested: CosmosHrpRequest,
 ): Promise<Uint8Array> {
-  if (apdu.p1 !== 0x00) {
+  if (apdu.p1 !== 0x00 || ctx.confirmSilentPublic) {
     const ok = await ctx.confirmation.confirm({
       brand: 'ledger',
       kind: 'address',

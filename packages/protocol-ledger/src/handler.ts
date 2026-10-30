@@ -104,6 +104,11 @@ export type LedgerHandlerOptions = {
   backup?: BackupKind;
   mtu?: number;
   onAppChange?: (app: LedgerApp) => void;
+  /**
+   * When set, public-key and address reads confirm even if firmware P1 is silent.
+   * The phone uses this for the hot-wallet baseline. Protocol tests leave it unset.
+   */
+  confirmSilentPublic?: boolean;
 };
 
 export class LedgerProtocolHandler implements ProtocolHandler {
@@ -116,6 +121,7 @@ export class LedgerProtocolHandler implements ProtocolHandler {
   private readonly entropy: Uint8Array;
   private readonly backup: BackupKind;
   private readonly onAppChange?: (app: LedgerApp) => void;
+  private readonly confirmSilentPublic: boolean;
   private readonly assembler = new BleReassembler();
   private readonly ethSession: EthSession = {};
   private readonly nearSession: NearSession = {};
@@ -134,6 +140,7 @@ export class LedgerProtocolHandler implements ProtocolHandler {
     this.entropy = options.entropy;
     this.backup = options.backup ?? 'bip39';
     this.onAppChange = options.onAppChange;
+    this.confirmSilentPublic = options.confirmSilentPublic === true;
     this.mtu = clampMtu(options.mtu ?? DEFAULT_MTU);
     this.models = [options.model.id];
   }
@@ -311,6 +318,7 @@ export class LedgerProtocolHandler implements ProtocolHandler {
         slotId: this.slotId,
         entropy: this.entropy,
         backup: this.backup,
+        confirmSilentPublic: this.confirmSilentPublic,
       };
       return handleTonApdu(apdu, ctx, this.familySession);
     }
@@ -325,6 +333,7 @@ export class LedgerProtocolHandler implements ProtocolHandler {
       slotId: this.slotId,
       entropy: this.entropy,
       backup: this.backup,
+      confirmSilentPublic: this.confirmSilentPublic,
     };
 
     if (family === 'ethereum' || (family === 'avalanche' && apdu.cla === 0xe0) || (family === 'filecoin' && apdu.cla === 0xe0) || (family === 'flare' && apdu.cla === 0xe0)) {

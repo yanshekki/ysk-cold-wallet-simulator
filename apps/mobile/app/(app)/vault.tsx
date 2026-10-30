@@ -173,7 +173,7 @@ export default function VaultScreen() {
     }
     try {
       if (slot.backup === 'slip39') {
-        const stored = await runWithLoading(t('common.loading'), () => loadShares(slot.id));
+        const stored = await runWithLoading(t('common.loading'), () => loadShares(slot.id, true));
         if (!stored || stored.length === 0) {
           Alert.alert(t('vault.backupShares'), t('vault.backupSlip39'));
           return;
@@ -182,7 +182,7 @@ export default function VaultScreen() {
         return;
       }
       await runWithLoading(t('common.loading'), async () => {
-        const entropy = await loadEntropy(slot.id);
+        const entropy = await loadEntropy(slot.id, true);
         setBackupWords(mnemonicFromEntropy(entropy));
       });
     } catch (err) {

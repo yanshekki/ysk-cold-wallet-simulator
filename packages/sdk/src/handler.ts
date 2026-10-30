@@ -28,6 +28,8 @@ export type CreateHandlerOptions = {
   onAppChange?: (app: LedgerApp) => void;
   rng?: (length: number) => Uint8Array;
   onTrace?: (note: string) => void;
+  /** Ledger only. Confirms silent public reads. Not a firmware MATCH. */
+  confirmSilentPublic?: boolean;
 };
 
 export function createHandler(options: CreateHandlerOptions): ProtocolHandler {

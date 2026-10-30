@@ -12,6 +12,12 @@ const BASE_OPTIONS = {
 } as const;
 
 let vaultAuthPrompt = 'Unlock';
+const unlockedSecrets = new Map<string, string>();
+
+/** Drops the in-memory copy. The keychain item stays. */
+export function lockVaultMemory(): void {
+  unlockedSecrets.clear();
+}
 
 export function setVaultAuthPrompt(value: string): void {
   vaultAuthPrompt = value;
@@ -80,36 +86,57 @@ async function writeSlots(slots: SeedSlot[]): Promise<void> {
   await SecureStore.setItemAsync(SLOTS_KEY, value, BASE_OPTIONS);
 }
 
+function secretWriteOptions() {
+  // Release items require the OS authenticator. Debug stays prompt-free for lab runs.
+  return isDevBuild() ? BASE_OPTIONS : authOptions();
+}
+
 async function writeSecret(key: string, value: string): Promise<void> {
   if (Platform.OS === 'web') {
     throw new Error('web vault refuses to store entropy');
   }
-  // KEEP: do not set requireAuthentication. expo-secure-store prompts on every
-  // read, and loadEntropy runs for silent address / xpub listing. That prompt
-  // breaks account listing and fails under iPhone Mirroring ("continue on
-  // iPhone"). WHEN_UNLOCKED_THIS_DEVICE_ONLY stays. Release OS reauth is the
-  // app-layer gate for reveal, import, and seed export.
-  await SecureStore.setItemAsync(key, value, BASE_OPTIONS);
+  await SecureStore.setItemAsync(key, value, secretWriteOptions());
+  unlockedSecrets.set(key, value);
 }
 
-async function readSecret(key: string): Promise<string | null> {
+async function readSecret(key: string, forceAuth = false): Promise<string | null> {
   if (Platform.OS === 'web') {
     return webGet(key);
   }
+  if (!forceAuth) {
+    const cached = unlockedSecrets.get(key);
+    if (cached) {
+      return cached;
+    }
+  }
+  if (isDevBuild()) {
+    try {
+      const stored = await SecureStore.getItemAsync(key, BASE_OPTIONS);
+      if (stored) {
+        unlockedSecrets.set(key, stored);
+      }
+      return stored;
+    } catch {
+      return null;
+    }
+  }
   try {
-    const stored = await SecureStore.getItemAsync(key, BASE_OPTIONS);
+    const stored = await SecureStore.getItemAsync(key, authOptions());
     if (stored) {
+      unlockedSecrets.set(key, stored);
       return stored;
     }
   } catch {
-    // Fall through to the authenticated copy of older slots.
-  }
-  if (isDevBuild()) {
-    // Debug builds skip OS authentication; authenticated SecureStore copies stay unread.
-    return null;
+    // An item saved before requireAuthentication still reads without the flag.
   }
   try {
-    return await SecureStore.getItemAsync(key, authOptions());
+    const legacy = await SecureStore.getItemAsync(key, BASE_OPTIONS);
+    if (!legacy) {
+      return null;
+    }
+    await SecureStore.setItemAsync(key, legacy, authOptions());
+    unlockedSecrets.set(key, legacy);
+    return legacy;
   } catch {
     return null;
   }
@@ -137,8 +164,8 @@ export async function saveSlot(
   return stored;
 }
 
-export async function loadShares(id: string): Promise<string[] | null> {
-  const raw = await readSecret(sharesKey(id));
+export async function loadShares(id: string, forceAuth = false): Promise<string[] | null> {
+  const raw = await readSecret(sharesKey(id), forceAuth);
   if (!raw) {
     return null;
   }
@@ -153,8 +180,8 @@ export async function loadShares(id: string): Promise<string[] | null> {
   }
 }
 
-export async function loadEntropy(id: string): Promise<Uint8Array> {
-  const raw = await readSecret(entropyKey(id));
+export async function loadEntropy(id: string, forceAuth = false): Promise<Uint8Array> {
+  const raw = await readSecret(entropyKey(id), forceAuth);
   if (!raw) {
     throw new Error('seed entropy not found');
   }
@@ -184,6 +211,8 @@ export async function deleteSlot(id: string): Promise<void> {
     webDelete(sharesKey(id));
     return;
   }
+  unlockedSecrets.delete(entropyKey(id));
+  unlockedSecrets.delete(sharesKey(id));
   try {
     await SecureStore.deleteItemAsync(entropyKey(id));
   } catch {

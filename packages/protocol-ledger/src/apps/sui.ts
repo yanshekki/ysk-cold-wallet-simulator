@@ -131,7 +131,7 @@ async function finishSuiCommand(
     } catch {
       return encodeResponse(new Uint8Array(), SW_WRONG_P1P2);
     }
-    if (ins === INS.GET_PUBKEY) {
+    if (ins === INS.GET_PUBKEY || ctx.confirmSilentPublic) {
       const ok = await ctx.confirmation.confirm({
         brand: 'ledger',
         kind: 'address',

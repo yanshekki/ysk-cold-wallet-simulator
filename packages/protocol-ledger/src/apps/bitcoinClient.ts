@@ -442,7 +442,7 @@ async function handleGetExtendedPubkey(apdu: Apdu, ctx: BtcContext): Promise<Uin
     return encodeResponse(new Uint8Array(), SW_WRONG_LENGTH);
   }
   const path = ctx.confirmation.resolvePath?.(parsed.path, ['btc-legacy', 'btc-nested', 'btc-native', 'btc-taproot']) ?? parsed.path;
-  if (parsed.display || apdu.p1 === 0x01) {
+  if (parsed.display || apdu.p1 === 0x01 || ctx.confirmSilentPublic) {
     const ok = await ctx.confirmation.confirm({
       brand: 'ledger',
       kind: 'address',
@@ -500,6 +500,19 @@ function officialAddressApdu(data: Uint8Array): {
 async function handleGetWalletAddress(apdu: Apdu, ctx: BtcContext): Promise<Uint8Array> {
   const official = officialAddressApdu(apdu.data);
   if (official) {
+    if (!official.display && apdu.p1 !== 0x01 && ctx.confirmSilentPublic) {
+      const ok = await ctx.confirmation.confirm({
+        brand: 'ledger',
+        kind: 'address',
+        title: 'Export Bitcoin address',
+        path: 'wallet',
+        message: 'Export Bitcoin address',
+        rawPayload: apdu.data,
+      });
+      if (!ok) {
+        return encodeResponse(new Uint8Array(), SW_DENY);
+      }
+    }
     try {
       const seed = await seedFor(ctx.confirmation, ctx.slotId, ctx.entropy, ctx.backup ?? 'bip39');
       return await runClientJob(ctx, {
@@ -524,7 +537,7 @@ async function handleGetWalletAddress(apdu: Apdu, ctx: BtcContext): Promise<Uint
     return encodeResponse(new Uint8Array(), SW_WRONG_LENGTH);
   }
   const path = ctx.confirmation.resolvePath?.(parsed.path, ['btc-legacy', 'btc-nested', 'btc-native', 'btc-taproot']) ?? parsed.path;
-  if (parsed.display || apdu.p1 === 0x01) {
+  if (parsed.display || apdu.p1 === 0x01 || ctx.confirmSilentPublic) {
     const ok = await ctx.confirmation.confirm({
       brand: 'ledger',
       kind: 'address',

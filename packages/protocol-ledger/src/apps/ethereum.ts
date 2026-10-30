@@ -84,6 +84,8 @@ export type EthContext = {
   session: EthSession;
   /** Open Ledger app. Avalanche C-Chain uses this handler on CLA 0xE0. */
   app?: string;
+  /** Phone hot-wallet policy. Firmware P1=0 stays silent when this is unset. */
+  confirmSilentPublic?: boolean;
 };
 
 export async function handleEthereumApdu(apdu: Apdu, ctx: EthContext): Promise<Uint8Array | null> {
@@ -133,7 +135,7 @@ async function handleGetAddress(apdu: Apdu, ctx: EthContext): Promise<Uint8Array
     return encodeResponse(new Uint8Array(), SW_WRONG_P1P2);
   }
   const path = ethPath(ctx, apduPath);
-  if (apdu.p1 === 0x01) {
+  if (apdu.p1 === 0x01 || ctx.confirmSilentPublic) {
     const request: SigningRequest = {
       brand: 'ledger',
       kind: 'address',

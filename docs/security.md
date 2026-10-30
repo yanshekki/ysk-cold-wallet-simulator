@@ -6,13 +6,28 @@
 
 Read this before you generate or import a secret. The short version is on the [README](../README.md). 中文要點在 [zh-HK.md](zh-HK.md).
 
+## Hot-wallet baseline
+
+This is progress toward Phantom, Rabby, and MetaMask mobile. It is not a secure element. Seeds are not hardware-wallet safe.
+
+| Item | Result | Residual |
+| --- | --- | --- |
+| Keychain `requireAuthentication` on entropy and shares in a release build | Pass | Debug builds omit the prompt so a lab session can run. The first successful read is cached in memory until lock. Reveal and backup force a fresh authenticator read. An item saved before this flag is rewritten on the next read |
+| No mnemonic or private key on the clipboard. System copy is off. Seed QR and backup wait for a confirm sheet | Pass | Import Paste can still read the clipboard when you press Paste. Console export is log text, not a seed |
+| Android `FLAG_SECURE` on secret screens in release. iOS app-switcher blur and a capture warning | Pass, with a gap | iOS does not black the live image. `preventScreenCapture` also blacks mirroring and Control Center, so CWS warns instead. Another camera can photograph the screen. Debug Android skips `FLAG_SECURE` |
+| Release manifest blocks `SYSTEM_ALERT_WINDOW` | Pass | Debug still allows cleartext traffic for Metro. Release does not merge that manifest |
+| Public account and xpub reads confirm on the phone | Pass for the phone policy | Firmware P1=0 stays silent in protocol tests. The phone sets `confirmSilentPublic`. A host that lists many accounts waits for a sheet each time. Trezor and OneKey already use a button request. This is not a Ledger wire MATCH |
+| BLE link key where the OS exposes it. Session cleared on disconnect | Pass, with a gap | iOS CoreBluetooth does not expose the bond, so those hosts use the phone confirm. Disconnect resets the link, the allowed central, and the pairing code. It does not wipe the vault |
+| VoiceOver and TalkBack do not speak the recovery words | Pass | The grid label is `Recovery word N`. The letters stay on screen for the person looking at it |
+| Proxy does not store a seed and redacts mnemonic-like lines and long hex in its log | Pass | The proxy still forwards every APDU the phone accepts. It is transport only |
+
 ## What the software does
 
 - A new BIP39 or SLIP-39 secret comes from the operating-system CSPRNG. The mnemonic and the SLIP-39 shares are shown so they can be written down. They are not written to the clipboard. The system copy menu is disabled on fields that hold a phrase, a share, entropy, a verify word, or a passphrase. Import can still read the clipboard when you press Paste.
-- The stored value is entropy, or the SLIP-39 secret, in `expo-secure-store`, with `WHEN_UNLOCKED_THIS_DEVICE_ONLY`. The web build refuses to store it. A passphrase stays in memory for the session and is wiped on lock.
-- A release build asks the OS authenticator (biometric or device passcode) before a secret is revealed, imported, saved, or applied as a passphrase, and again before a signature or a backup-seed QR is produced. Debug builds skip the reveal prompt so a lab session can run. Sign and seed export on a debug build follow the Settings toggle. A release build asks even when that toggle is off.
+- The stored value is entropy, or the SLIP-39 secret, in `expo-secure-store`, with `WHEN_UNLOCKED_THIS_DEVICE_ONLY`. A release build also sets `requireAuthentication`. The web build refuses to store it. A passphrase stays in memory for the session and is wiped on lock. `lockVaultMemory` drops the cached secret.
+- A release build asks the OS authenticator before a secret is revealed, imported, saved, or applied as a passphrase, and again before a signature or a backup-seed QR is produced. Debug builds skip the reveal prompt so a lab session can run. Sign and seed export on a debug build follow the Settings toggle. A release build asks even when that toggle is off.
 - Vault, import, generate, the passphrase sheet, a backup-seed QR, and the seed-export confirmation are secret screens. Android release sets `FLAG_SECURE` on those screens. Android debug does not, so a screenshot can be taken during QA. iOS blurs the app switcher and shows a warning when the OS reports a capture. iOS does not black the live image.
-- Masked passphrase fields expose the field name to accessibility, not the secret. Visible recovery words stay in the accessibility tree so they can be transcribed. A screen reader on an open secret screen can speak those words.
+- Recovery words are visible and are not an accessibility label. The spoken name is the word index. Masked passphrase fields expose the field name, not the secret.
 
 ## What stays open, on purpose
 
@@ -26,18 +41,19 @@ The proxy forwards HID reports to the phone as APDUs. There is no command allowl
 
 The local bridge listens on `127.0.0.1` and reflects the request `Origin` (or `*` when Origin is absent). Trezor-compatible wallets need that behaviour. Any browser origin on the same machine can talk to the bridge while it is running. Signatures still confirm on the phone.
 
-### Silent public-key export
+### Public export on the phone
 
-Vendor-compatible reads stay silent: Ethereum `GET_ADDRESS` with P1=0, a Solana public key with P1=0, a Bitcoin extended public key, and the same pattern on the other apps. Where the command includes a chain code, the host receives it and can derive further public children. That value is not the seed. A confirmation on every account is the prompt those wallets do not accept. Displaying an address (P1=1) still confirms. While the phone is advertising, the Device screen says that a connected host can derive addresses.
+The phone confirms each public account or xpub read, including firmware P1=0. Protocol tests without `confirmSilentPublic` still follow the silent firmware path. That flag is a hot-wallet policy. It is not a claim that the Ledger app confirms those reads. A chain code in the reply is still not the seed. Hosts that list many accounts wait on the sheet.
 
-### Keychain prompt on every read
+### Keychain
 
-`requireAuthentication` is not set on the entropy item. The Expo API would prompt on every read, and the app reads entropy while a host lists accounts. That prompt breaks account listing and fails under iPhone Mirroring. After the device is unlocked, the app process can read the blob without a fresh biometric. The session unlock, and the release reveal and sign prompts, are application checks. They are not a keychain access-control list.
+Release writes set `requireAuthentication`. After one successful read the value stays in process memory until lock, so a host session does not prompt the authenticator on every address. Reveal and backup pass `forceAuth` and read the keychain again. Debug builds do not set the flag. iPhone Mirroring can still fail a prompt that the OS raises. The in-memory copy is not a secure element.
 
 ## Platform limits
 
 - **iOS screenshots.** Calling the iOS capture block paints the live window black whenever the system reports a capture, including mirroring and Control Center. CWS does not do that. Another camera can photograph the screen. There is no polling loop.
-- **iOS BLE link key.** The operating system does not expose it. A signature still requires confirmation of the host when the link key is absent. The link is not bound to an OS pairing key on iOS.
+- **iOS BLE link key.** The operating system does not expose it. A signature still requires confirmation of the host when the link key is absent. Disconnect clears the link, the allowed central, and the pairing code. The link is not bound to an OS pairing key on iOS.
+- **Proxy.** The desktop app does not write a seed to disk. Its status log redacts a 12-or-more-word line and hex runs of 64 characters or more. It still forwards host APDUs to the phone.
 - **Debug builds.** `SYSTEM_ALERT_WINDOW` is absent from the debug manifest and from the release manifest. Debug still allows cleartext traffic so Metro can load the bundle. Release does not merge the debug manifest. The screenshot listener declares `DETECT_SCREEN_CAPTURE`. That is not an overlay permission.
 - **Release signing.** A Play upload build is signed from the publisher’s environment. This repository contains no keystore and no upload password. If that configuration is absent, release packaging fails instead of signing with the debug key. A debug phone does not prove the release authenticator prompt.
 
