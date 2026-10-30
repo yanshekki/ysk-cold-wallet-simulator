@@ -45,14 +45,17 @@ export type SuiBlocksSession = {
 
 /**
  * Cardano SIGN_TX stream. v7 and v8 reuse P1 values for different stages, so
- * the protocol tag is the catalog major version at the time the stream starts.
- * `body` is the bytes uploaded so far. It is not the canonical CBOR transaction.
+ * the protocol tag is fixed when the stream starts. `body` is the v8 raw
+ * upload. It is not the canonical CBOR transaction. v7 keeps its stage machine
+ * outside this type and stores only the resulting hash.
  */
 export type CardanoTxWire = {
   protocol: 'v7' | 'v8';
   body: Uint8Array;
   /** v8 `serializeTxInitData`. Absent on the v7 stage wire. */
   init?: Uint8Array;
+  /** True after v7 INIT until CONFIRM. Later 0x10 is a new v8 INIT. */
+  v7Open?: boolean;
   hash?: Uint8Array;
 };
 

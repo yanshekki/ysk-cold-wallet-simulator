@@ -107,7 +107,7 @@ Sources already cited in [ledger-apdu.md](ledger-apdu.md). Close a row only with
 | Area | Left open | Why it stays KEEP |
 | --- | --- | --- |
 | Cardano | v8 P1 `13` CIP-36 auxiliary; v7 P2 `34` CIP-36 registration (`6D00`) | [app-cardano APDU reference](https://github.com/LedgerHQ/app-cardano/blob/develop/doc/apdu_reference.md) describes them. Blocker: `aux_data_hash_builder` / CIP-36 registration CBOR is not built. Shelley and Byron `DERIVE_ADDRESS`, and CIP-8 Shelley address fields, are MATCH |
-| Cardano hash | v7 stage wire still returns `6A80` | v8 body hash is FIXED (`cardanoTxHash.test.ts`) from [tx_hash_builder.c](https://github.com/LedgerHQ/app-cardano/blob/main/src/transaction/tx_hash_builder.c). Pool registration, voting procedures, and CIP-36 aux type 1 still fail closed |
+| Cardano hash | pool registration, voting procedures, CIP-36 aux type 1, and app versions before 2.2 | v8 and v7 2.2 through 7.2.1 body hashes are FIXED (`cardanoTxHash.test.ts`, `cardanoTxV7.test.ts`) from [tx_hash_builder.c](https://github.com/LedgerHQ/app-cardano/blob/main/src/transaction/tx_hash_builder.c) and ledgerjs v7 `signTx.ts`. Minswap 7.2.1 is included |
 | Solana | INS `21` / `22` trusted name and dynamic descriptor | `6D00`. Blocker: `tlv_use_case_trusted_name` plus a Ledger PKI signature in `handle_provide_trusted_info.c`. INS `20` and `numPaths == 1` are MATCH |
 | Solana dashboard | Only `44'/501'` forces a switch | Other paths are accepted once Solana is open. They are not a probe |
 | Bitcoin | Wallet-policy HMAC and PSBT merkle proofs beyond `family.test.ts` and `handler.test.ts` | [app-bitcoin `doc/bitcoin.md`](https://github.com/LedgerHQ/app-bitcoin/blob/develop/doc/bitcoin.md). Blocker: `walletHmac` uses the CWS key `CWS/ledger-wallet-hmac`, not the app-bitcoin policy key. A zero HMAC stays host-unproven. CLA `F8` INS `01` has an unarmed hold-forward test |
@@ -334,7 +334,7 @@ Docs only. No handler change. No USB install. No Proxy rebuild.
 
 ### Phase 4 — High-host KEEP
 
-**Status.** `SIGN_OPCERT`, `SIGN_CVOTE`, native script hash, CIP-8 Shelley messages, and Shelley and Byron `DERIVE_ADDRESS` are MATCH. A valid Byron address inside CIP-8 is `6982`. Solana `numPaths` other than 1 is `6A80`. Solana INS `20` is a 4-byte challenge. CIP-36 auxiliary registration, Solana INS `21`/`22`, the Bitcoin policy HMAC, and Ethereum clear-sign stay KEEP with the blockers in section 1b. The v8 canonical transaction hash is FIXED. Snapshot unknown stays 27.
+**Status.** `SIGN_OPCERT`, `SIGN_CVOTE`, native script hash, CIP-8 Shelley messages, and Shelley and Byron `DERIVE_ADDRESS` are MATCH. A valid Byron address inside CIP-8 is `6982`. Solana `numPaths` other than 1 is `6A80`. Solana INS `20` is a 4-byte challenge. CIP-36 auxiliary registration, Solana INS `21`/`22`, the Bitcoin policy HMAC, and Ethereum clear-sign stay KEEP with the blockers in section 1b. The v8 and v7 2.2–7.2.1 canonical transaction hashes are FIXED. Snapshot unknown stays 27.
 
 1. Cardano CIP-36 auxiliary registration stays KEEP. Operational certificate, CIP-36 vote, native script hash, CIP-8 Shelley messages, Shelley and Byron `DERIVE_ADDRESS`, and the v8 canonical transaction hash are MATCH or FIXED.
 2. Solana `numPaths` other than 1 is `6A80`. INS `20` is MATCH. INS `21` / `22` stay KEEP (PKI TLV).
@@ -374,7 +374,7 @@ Checked on tip `dfb1f6d`. Nothing below is MATCH. Seeds are not absolutely safe.
 | Item | Blocker |
 | --- | --- |
 | Cardano CIP-36 auxiliary (v8 P1 `13`, v7 P2 `34`) | `aux_data_hash_builder` is not built. Reply stays `6D00`. An arbitrary aux hash already in the v8 init is body field 7 |
-| Cardano v7 SIGN_TX stages, pool registration, voting procedures | Fail closed with `6A80`. The v8 payment, swap, datum, token, collateral, and reference-input body hash is FIXED |
+| Cardano pool registration, voting procedures, and app versions before 2.2 | Fail closed with `6A80`. v7 2.2 through 7.2.1 and v8 payment, swap, datum, token, collateral, and reference-input body hashes are FIXED |
 | Solana INS `21` / `22` | `tlv_use_case_trusted_name` plus a Ledger PKI signature. INS `20` and `numPaths == 1` are MATCH |
 | Bitcoin wallet-policy HMAC | `walletHmac` uses `CWS/ledger-wallet-hmac`, not the app-bitcoin policy key. A zero HMAC stays host-unproven (`Policy HMAC is all zeros and was not checked.`) |
 | Bitcoin merkle PSBT beyond current tests | Cases in `family.test.ts` and `handler.test.ts` are the limit. CLA `F8` INS `01` has an unarmed hold-forward test. That test is not a policy-key MATCH |

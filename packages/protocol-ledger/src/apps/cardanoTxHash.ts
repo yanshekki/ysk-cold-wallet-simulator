@@ -146,7 +146,7 @@ class Cursor {
   }
 }
 
-function cborUnsigned(value: bigint): Uint8Array {
+export function cborUnsigned(value: bigint): Uint8Array {
   if (value < 0n) {
     throw new Error('cbor unsigned');
   }
@@ -178,14 +178,14 @@ function cborUnsigned(value: bigint): Uint8Array {
   return out;
 }
 
-function cborType(major: number, value: bigint): Uint8Array {
+export function cborType(major: number, value: bigint): Uint8Array {
   const head = cborUnsigned(value);
   const out = new Uint8Array(head);
   out[0] = (out[0] ?? 0) | ((major << 5) & 0xe0);
   return out;
 }
 
-function cborBytes(data: Uint8Array): Uint8Array {
+export function cborBytes(data: Uint8Array): Uint8Array {
   return concatBytes(cborType(2, BigInt(data.length)), data);
 }
 
@@ -193,7 +193,7 @@ function cborBytes(data: Uint8Array): Uint8Array {
  * `cbor_writeToken(CBOR_TYPE_NEGATIVE)` reinterprets the int64 bits, then
  * stores argument `-value - 1`. That is the canonical major-type-1 integer.
  */
-function cborSigned(value: bigint): Uint8Array {
+export function cborSigned(value: bigint): Uint8Array {
   if (value >= 0n) {
     return cborUnsigned(value);
   }

@@ -20,6 +20,7 @@ import { handleCardanoDeriveAddress } from './cardanoAddress';
 import { handleCardanoNativeScript } from './cardanoNativeScript';
 import { handleCardanoSignMsg } from './cardanoSignMsg';
 import { cardanoCanonicalTxHash } from './cardanoTxHash';
+import { CardanoV7Tx } from './cardanoTxV7';
 
 export type CardanoSession = FamilySession;
 
@@ -118,6 +119,20 @@ function emptyOk(): Uint8Array {
 /** Unparsed SIGN_TX body. Do not hash the raw APDU stream. */
 const SW_TX_BODY = 0x6a80;
 
+const v7Machines = new WeakMap<CardanoTxWire, CardanoV7Tx>();
+
+/**
+ * v7 INIT is P1 0x01. v8 INIT is P1 0x10. A host that only speaks 7.2.1,
+ * including Minswap, sends 0x01 even when the catalog default is 8.x.
+ */
+function signingV7(apdu: Apdu, session: CardanoSession): boolean {
+  if (apdu.p1 === V7_INIT) return true;
+  const tx = session.cardanoTx;
+  if (tx?.protocol === 'v7' && tx.v7Open) return true;
+  if (tx?.protocol === 'v7' && tx.hash && apdu.p1 === V7_WITNESS) return true;
+  return cardanoWireProtocol() === 'v7';
+}
+
 function openTx(session: CardanoSession, protocol: 'v7' | 'v8', reset: boolean): CardanoTxWire {
   if (reset || !session.cardanoTx || session.cardanoTx.protocol !== protocol) {
     session.cardanoTx = { protocol, body: new Uint8Array() };
@@ -137,9 +152,9 @@ async function signTransaction(
   ctx: FamilyContext,
   session: CardanoSession,
 ): Promise<Uint8Array> {
-  return cardanoWireProtocol() === 'v8'
-    ? signTransactionV8(apdu, ctx, session)
-    : signTransactionV7(apdu, ctx, session);
+  return signingV7(apdu, session)
+    ? signTransactionV7(apdu, ctx, session)
+    : signTransactionV8(apdu, ctx, session);
 }
 
 async function signTransactionV8(
@@ -188,28 +203,42 @@ async function signTransactionV7(
   ctx: FamilyContext,
   session: CardanoSession,
 ): Promise<Uint8Array> {
-  if (apdu.p1 === 0x08 && apdu.p2 === V7_AUX_CONFIRM_P2) {
+  if (apdu.p1 === P1_AUX_STAGE && apdu.p2 === V7_AUX_CONFIRM_P2) {
     return encodeResponse(new Uint8Array(), SW_INS_NOT_SUPPORTED);
   }
   if (apdu.p1 === V7_INIT) {
-    const tx = openTx(session, 'v7', true);
-    remember(tx, apdu.data);
+    const tx: CardanoTxWire = { protocol: 'v7', body: new Uint8Array(), v7Open: true };
+    const machine = new CardanoV7Tx(catalogVersion('cardano', '7.2.1'));
+    await machine.stage(apdu.p1, apdu.p2, apdu.data, ctx);
+    session.cardanoTx = tx;
+    v7Machines.set(tx, machine);
     return emptyOk();
   }
-  if (V7_EMPTY_P1.has(apdu.p1)) {
-    remember(openTx(session, 'v7', false), apdu.data);
-    return emptyOk();
+  if (!V7_EMPTY_P1.has(apdu.p1) && apdu.p1 !== V7_CONFIRM && apdu.p1 !== V7_WITNESS) {
+    return encodeResponse(new Uint8Array(), SW_WRONG_P1P2);
+  }
+  const tx = session.cardanoTx;
+  const machine = tx ? v7Machines.get(tx) : undefined;
+  if (!tx || tx.protocol !== 'v7' || !machine) {
+    return encodeResponse(new Uint8Array(), SW_WRONG_P1P2);
   }
   if (apdu.p1 === V7_CONFIRM) {
-    // The v7 stage wire is not the v8 raw blob. Hashing those stages was the
-    // SIGNATURE_INVALID bug. Refuse it instead of signing the wrong digest.
-    return encodeResponse(new Uint8Array(), SW_TX_BODY);
+    tx.v7Open = false;
+    const built = machine.body();
+    if (!built) return encodeResponse(new Uint8Array(), SW_TX_BODY);
+    const ok = await confirmTx(ctx, built);
+    if (!ok) return encodeResponse(new Uint8Array(), SW_DENY);
+    tx.hash = blake2b(built, { dkLen: 32 });
+    return encodeResponse(tx.hash, SW_OK);
   }
   if (apdu.p1 === V7_WITNESS) {
     return signWitness(apdu, ctx, session, 'v7');
   }
-  return encodeResponse(new Uint8Array(), SW_WRONG_P1P2);
+  await machine.stage(apdu.p1, apdu.p2, apdu.data, ctx);
+  return emptyOk();
 }
+
+const P1_AUX_STAGE = 0x08;
 
 async function confirmTx(ctx: FamilyContext, body: Uint8Array): Promise<boolean> {
   return confirm(ctx, {
