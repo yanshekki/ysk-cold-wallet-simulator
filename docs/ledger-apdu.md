@@ -1,5 +1,7 @@
 # Ledger APDU wire matrix
 
+**Phase 2 item 2 (KEEP re-diff follow-up):** Tron/XRP/Stellar/Cosmos/Polkadot/TON/Aptos handlers re-diffed against official firmware/hw-app; MATCH/FIXED only with citations + `family.test.ts` KEEP re-diff cases. Cardano CIP / Solana multi-path / Bitcoin policy / Eth clear-sign stream KEEP rows stay KEEP — official sources describe them but CWS still lacks the full parsers/tests.
+
 **Phase 2 family map (follow-up to #49):** catalog/`inferLedgerFamily` remaps ethereum CHAIN, bitcoin-like, cosmos-like, polkadot-like, and `ethereum-plugin` names so Open App is not `unknown`. Remapped rows are **not** new wire MATCH/FIXED — only family routing changed.
 
 Research date: 30 Oct 2026. This is the wire contract CWS claims for each open Ledger app. BLE and the desktop Proxy (HID) carry the same APDU. A host assertion such as `unexpected response length: 64 instead of 0` is on the response body after the status word is removed. An intermediate chunk that must continue is an empty body and `9000`. The confirm sheet opens only on the stage the real app uses for review.
@@ -24,9 +26,15 @@ Status values:
 | Ethereum | [LedgerHQ/app-ethereum `doc/apdu.md`](https://github.com/LedgerHQ/app-ethereum/blob/develop/doc/apdu.md) and `@ledgerhq/hw-app-eth` `Eth.js` (`signTransaction` uses P1 `0x00` then `0x80`, P2 `0x00`) |
 | Avalanche | [LedgerHQ/app-avalanche `docs/APDUSPEC.md`](https://github.com/LedgerHQ/app-avalanche/blob/develop/docs/APDUSPEC.md) |
 | Bitcoin 2.1+ | [LedgerHQ/app-bitcoin `doc/bitcoin.md`](https://github.com/LedgerHQ/app-bitcoin/blob/develop/doc/bitcoin.md) |
-| Aptos, TON | Firmware `src/constants.h` in aptos-labs/ledger-app-aptos and LedgerHQ/app-ton (CLA only; instruction tables were not in that header) |
+| Aptos | [aptos-labs/ledger-app-aptos `src/types.h`](https://github.com/aptos-labs/ledger-app-aptos/blob/main/src/types.h) + [LedgerHQ/app-aptos `doc/COMMANDS.md`](https://github.com/LedgerHQ/app-aptos/blob/develop/doc/COMMANDS.md) |
+| TON | [LedgerHQ/app-ton `src/types.h`](https://github.com/LedgerHQ/app-ton/blob/master/src/types.h) + [`doc/COMMANDS.md`](https://github.com/LedgerHQ/app-ton/blob/master/doc/COMMANDS.md) |
+| Tron | [@ledgerhq/hw-app-trx `Trx.ts`](https://github.com/LedgerHQ/ledger-live/blob/develop/libs/ledgerjs/packages/hw-app-trx/src/Trx.ts) |
+| XRP | [@ledgerhq/hw-app-xrp `Xrp.ts`](https://github.com/LedgerHQ/ledger-live/blob/develop/libs/ledgerjs/packages/hw-app-xrp/src/Xrp.ts) |
+| Stellar | [@ledgerhq/hw-app-str `Str.ts`](https://github.com/LedgerHQ/ledger-live/blob/develop/libs/ledgerjs/packages/hw-app-str/src/Str.ts) |
+| Cosmos | [Zondax ledger-cosmos `app_main.h` / `process_chunk`](https://github.com/Zondax/ledger-cosmos/blob/master/app/src/common/app_main.h) |
+| Polkadot | [Zondax ledger-polkadot `docs/APDUSPEC.md`](https://github.com/Zondax/ledger-polkadot/blob/master/docs/APDUSPEC.md) |
 
-NEAR, Tron, XRP, Stellar, Cosmos, Polkadot, and Sui rows below describe the handler that is already in this tree and the host packages it was written against. This pass did not re-read those firmware trees line by line. Gaps that were not re-checked are marked KEEP rather than MATCH.
+NEAR and Sui rows below describe the handler that is already in this tree and the host packages it was written against where a fresh firmware re-diff was not completed this pass. Tron, XRP, Stellar, Cosmos, Polkadot, TON, and Aptos were re-diffed 30 Oct 2026 against official LedgerHQ / Zondax / aptos-labs sources (see Other open apps); MATCH/FIXED there require the cited tests in `family.test.ts`.
 
 ## Transport
 
@@ -171,17 +179,22 @@ KEEP: wallet policies and PSBT merkle proofs beyond the cases in `family.test.ts
 
 ## Other open apps
 
-These handlers share a generic chunk rule: P2 bit `02` means more data, the first byte is a BIP32 depth, the sheet opens on the last chunk, and the last body is a signature. That rule is **not** used for Cardano or for Solana sign. It remains for the apps below. This pass did not re-read each firmware, so the rows are the in-tree contract plus an explicit KEEP where the generic rule is only a stand-in.
+Family SIGN chunking is no longer one shared P2-bit-`02` rule for every app below. Each row cites the official chunk mode landed in this re-diff (`FamilyChunkMode` in `generic.ts`) plus remaining KEEP gaps.
 
-| App | CLA | Version INS | Sign INS | Final sign body | Status |
+| App | CLA | Version INS / body | Sign INS | Sign body | Status |
 | --- | --- | --- | --- | --- | --- |
-| Tron | `E0` | `06` (flags, major, minor, patch) | `04` | 65, keccak of the payload | KEEP the generic chunk rule until app-tron is diffed again. Pubkey export is silent (P1 forced to 0) |
-| XRP | `E0` | `06` (3 bytes) | `04` | 65, double sha256 | KEEP, same generic chunk rule |
-| Stellar | `E0` | `06` (hash-sign flag, major, minor, patch). An empty body selects this app from Tron | `04`, `08`, `0A`, `0C` | 64 | KEEP, same generic chunk rule. Confirm-on-address is P2 on the real app; export here stays silent |
-| Cosmos | `55` | `00` | `02` | 65, sha256 | KEEP, same generic chunk rule |
-| Polkadot | `F9` or `90` | `00` | `02` | 64 | KEEP. Zondax apps use their own chunk and scale encoding |
-| TON | `E0` | `03` (and `01`) | `06`, `08`, `09` | 64 | KEEP. `04` with an empty body is the app name `TON`. `05` is a 32-byte public key and must not be signed. CLA matches LedgerHQ/app-ton `constants.h` |
-| Aptos | `5B` | `00` | `0A`, `02` | 64 | KEEP. CLA matches aptos-labs/ledger-app-aptos `constants.h`. Instruction bytes were not in that header |
+| Tron | `E0` | `06` (flags, major, minor, patch) | `04`, `05` (hash), `08` (message) | 65, keccak (hash INS uses 32-byte digest as-is) | FIXED chunking to hw-app-trx P1 startBytes (`10` single / `00` first / `80` mid / `90` last). Pubkey export stays silent (P1 forced to 0). KEEP: ECDH `0A` peer-key UX; TIP-712 |
+| XRP | `E0` | `06` (flags + major/minor/patch = 4 bytes so host `response[1..3]` matches) | `04` | 65, double sha256 | FIXED chunking to hw-app-xrp P1 `(isFirst?0:1)|(hasMore?0x80:0)`. KEEP: ed25519 curve mask path (`P2 0x80`) not exercised in unit tests |
+| Stellar | `E0` | `06` (hash-sign flag, major, minor, patch). Empty body still selects this app from Tron | `04`, `08`, `0A`, `0C` | 64 | FIXED chunking to hw-app-str P1 `00`/`80` + P2 `00`/`80`. Confirm-on-address is P2 on the real app; export here stays silent. KEEP: maxDataSize trailing bytes on newer GET_CONF |
+| Cosmos | `55` | `00` → 9 bytes (`test|maj|min|patch|locked|target_id`) | `02` | 65, sha256 | FIXED version layout + Zondax P1 `0/1/2` chunk with fixed-5 path (no length byte) per `process_chunk`. KEEP: GET_ADDR HRP-prefixed request / pk|addr response without length prefixes (still length-prefixed BIP32 helper for hosts that send it) |
+| Polkadot | `F9` or `90` | `00` → 12 bytes (u16 maj/min/patch layout) | `02`, `03` (raw) | 65 (`00`|ed25519 sig) | FIXED version + Zondax P1 chunk + 65-byte sig envelope per APDUSPEC. KEEP: SCALE/metadata proof parsing; SS58 prefix from path payload |
+| TON | `E0` | `03` (and legacy `01`) | `06`, `08`, `09` | 98 = `len|sig64|len|hash32` | FIXED P2 first/more (`03`/`02`/`00`) + length-prefixed sig|hash per COMMANDS.md; `0A` GET_APP_SETTINGS returns `00`. KEEP: BOC/cell hash (hash field is sha256 of uploaded bytes, not parsed cell hash); proof/sign-data field parse |
+| Aptos | `5B` | `03` (legacy `00` alias) | `06` (legacy `0A`/`02` aliases) | `len|sig` | FIXED INS table + P2 `0x80` more + path-only first chunk + pubkey `len|pk|len|chain` per COMMANDS.md / types.h. KEEP: none on core INS — chain_code is 32 zero bytes |
+| Sui | `00` | `00` | `03`, plus the Mysten block protocol | block replies, not a raw 64-byte APDU | MATCH for the OKX/Mysten block exchange already tested. A second Sui version with a different block tag is not branched |
+
+load |
+| TON | `E0` | `03` (and legacy `01`) | `06`, `08`, `09` | 98 = `len|sig64|len|hash32` | FIXED P2 first/more (`03`/`02`/`00`) + length-prefixed sig|hash per COMMANDS.md; `0A` GET_APP_SETTINGS returns `00`. KEEP: BOC/cell hash (hash field is sha256 of uploaded bytes, not parsed cell hash); proof/sign-data field parse |
+| Aptos | `5B` | `03` (legacy `00` alias) | `06` (legacy `0A`/`02` aliases) | `len|sig` | FIXED INS table + P2 `0x80` more + path-only first chunk + pubkey `len|pk|len|chain` per COMMANDS.md / types.h. KEEP: none on core INS — chain_code is 32 zero bytes |
 | Sui | `00` | `00` | `03`, plus the Mysten block protocol | block replies, not a raw 64-byte APDU | MATCH for the OKX/Mysten block exchange already tested. A second Sui version with a different block tag is not branched |
 
 ## What this pass changed
@@ -214,7 +227,7 @@ See also [ledger-apdu-plan.md](./ledger-apdu-plan.md) for the backlog and resear
 | Algorand | `unknown` | 2.7.4 | unknown — needs firmware research | unknown — needs firmware research |
 | Alkemi | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | Angle | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
-| Aptos | `aptos` | 0.10.2 | see Other open apps (KEEP) | CLA 5B (INS table incomplete in constants.h) |
+| Aptos | `aptos` | 0.10.2 | see Other open apps (FIXED INS/chunk) | CLA 5B: 03/04/05/06 (types.h + COMMANDS.md) |
 | APWine | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | Ardor | `unknown` | 1.1.1 | unknown — needs firmware research | unknown — needs firmware research |
 | Ark | `unknown` | 2.3.1 | unknown — needs firmware research | unknown — needs firmware research |
@@ -246,7 +259,7 @@ See also [ledger-apdu-plan.md](./ledger-apdu-plan.md) for the backlog and resear
 | Concordium | `unknown` | 5.7.0 | unknown — needs firmware research | unknown — needs firmware research |
 | Conflux | `unknown` | 2.2.2 | unknown — needs firmware research | unknown — needs firmware research |
 | Core | `unknown` | 0.1.1 | unknown — needs firmware research | unknown — needs firmware research |
-| Cosmos | `cosmos` | 2.39.2 | see Other open apps (KEEP) | CLA 55: 00/01/02/04 (Zondax pattern) |
+| Cosmos | `cosmos` | 2.39.2 | see Other open apps (FIXED version/chunk; KEEP GET_ADDR HRP) | CLA 55: 00/02/04 (Zondax app_main.h) |
 | COTI | `unknown` | 1.3.1 | unknown — needs firmware research | unknown — needs firmware research |
 | Cronos POS Chain | `cosmos` | 2.19.1 | family-mapped — catalog `cosmos` (reuses cosmos handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA 55: 00/01/02/04 (Zondax pattern) |
 | Dash | `bitcoin` | 2.4.13 | family-mapped — catalog `bitcoin` (reuses bitcoin handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
@@ -343,8 +356,8 @@ See also [ledger-apdu-plan.md](./ledger-apdu-plan.md) for the backlog and resear
 | Persistence | `cosmos` | 2.18.0 | family-mapped — catalog `cosmos` (reuses cosmos handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA 55: 00/01/02/04 (Zondax pattern) |
 | Pirl | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | PivX | `bitcoin` | 2.4.13 | family-mapped — catalog `bitcoin` (reuses bitcoin handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
-| Polkadot | `polkadot` | 100.0.30 | see Other open apps (KEEP) | CLA F9/90: 00/01/02 (Zondax pattern) |
-| Polkadot Migration | `polkadot` | 100.0.27 | polkadot family — see Other open apps (KEEP) | CLA F9/90: 00/01/02 (Zondax pattern) |
+| Polkadot | `polkadot` | 100.0.30 | see Other open apps (FIXED version/chunk/sig) | CLA F9/90: 00/01/02/03 (APDUSPEC) |
+| Polkadot Migration | `polkadot` | 100.0.27 | polkadot family — see Other open apps (FIXED; coin params may differ) | CLA F9/90: 00/01/02/03 (APDUSPEC) |
 | Polymesh | `polkadot` | 8.8000001.7 | family-mapped — catalog `polkadot` (reuses polkadot handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA F9/90: 00/01/02 (Zondax pattern) |
 | QRL | `unknown` | 1.1.5 | unknown — needs firmware research | unknown — needs firmware research |
 | Qubic | `unknown` | 0.1.7 | unknown — needs firmware research | unknown — needs firmware research |
@@ -361,7 +374,7 @@ See also [ledger-apdu-plan.md](./ledger-apdu-plan.md) for the backlog and resear
 | Security Key | `unknown` | 1.7.7 | unknown — needs firmware research | unknown — needs firmware research |
 | Seed Tool | `unknown` | 1.8.4 | unknown — needs firmware research | unknown — needs firmware research |
 | Sei | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
-| Sei - Cosmos | `cosmos` | 1.1.2 | cosmos family — see Other open apps (KEEP) | CLA 55: 00/01/02/04 (Zondax pattern) |
+| Sei - Cosmos | `cosmos` | 1.1.2 | cosmos family — see Other open apps (FIXED version/chunk; KEEP GET_ADDR HRP) | CLA 55: 00/02/04 (Zondax app_main.h) |
 | Shiden EVM | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | Shimmer | `unknown` | 0.8.8 | unknown — needs firmware research | unknown — needs firmware research |
 | Sia | `unknown` | 2.2.1 | unknown — needs firmware research | unknown — needs firmware research |
@@ -377,7 +390,7 @@ See also [ledger-apdu-plan.md](./ledger-apdu-plan.md) for the backlog and resear
 | StakeDAO | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | StakeKit | `ethereum-plugin` | 1.5.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | Starknet | `unknown` | 2.4.3 | unknown — needs firmware research | unknown — needs firmware research |
-| Stellar | `stellar` | 6.1.0 | see Other open apps (KEEP) | CLA E0: 02/04/06/08/0A/0C |
+| Stellar | `stellar` | 6.1.0 | see Other open apps (FIXED chunk) | CLA E0: 02/04/06/08/0A/0C |
 | Stratis | `bitcoin` | 2.4.13 | family-mapped — catalog `bitcoin` (reuses bitcoin handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
 | Sui | `sui` | 1.5.13 | see Other open apps (MATCH for tested Mysten path; KEEP version branch) | CLA 00 block: 00/01/02/03 |
 | Swell | `ethereum-plugin` | 2.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
@@ -388,8 +401,8 @@ See also [ledger-apdu-plan.md](./ledger-apdu-plan.md) for the backlog and resear
 | THORChain | `cosmos` | 2.5.2 | family-mapped — catalog `cosmos` (reuses cosmos handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA 55: 00/01/02/04 (Zondax pattern) |
 | ThunderCore | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | TomoChain | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
-| TON | `ton` | 2.9.1 | see Other open apps (KEEP) | CLA E0: 01/03/02/05/04/06/08/09 |
-| Tron | `tron` | 0.7.10 | see Other open apps (KEEP) | CLA E0: 02/04/05/06/08/0A |
+| TON | `ton` | 2.9.1 | see Other open apps (FIXED chunk/response; KEEP cell hash) | CLA E0: 03/04/05/06/08/09/0A (+ legacy 01) |
+| Tron | `tron` | 0.7.10 | see Other open apps (FIXED chunk; KEEP ECDH/TIP-712) | CLA E0: 02/04/05/06/08/0A |
 | Ubiq | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | Uniswap | `ethereum-plugin` | 1.5.1 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | VeChain | `unknown` | 1.3.3 | unknown — needs firmware research | unknown — needs firmware research |
@@ -404,7 +417,7 @@ See also [ledger-apdu-plan.md](./ledger-apdu-plan.md) for the backlog and resear
 | XAH | `unknown` | 1.1.1 | unknown — needs firmware research | unknown — needs firmware research |
 | XDC Network | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | xRhodium | `bitcoin` | 2.4.13 | family-mapped — catalog `bitcoin` (reuses bitcoin handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
-| XRP | `xrp` | 2.8.2 | see Other open apps (KEEP) | CLA E0: 02/04/06 |
+| XRP | `xrp` | 2.8.2 | see Other open apps (FIXED chunk/version) | CLA E0: 02/04/06 |
 | xx network | `polkadot` | 1.203.3 | family-mapped — catalog `polkadot` (reuses polkadot handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA F9/90: 00/01/02 (Zondax pattern) |
 | Yearn | `ethereum-plugin` | 1.4.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | Zcash | `unknown` | 3.9.4 | unknown — needs firmware research | unknown — needs firmware research |

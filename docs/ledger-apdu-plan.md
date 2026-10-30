@@ -4,7 +4,9 @@ Research / plan date: 30 Oct 2026 (Asia/Hong_Kong).
 
 **Phase 1 (merged #49):** planning and matrix documentation only.
 
-**Phase 2 item 1 (this follow-up):** family-map expansion — catalog/`inferLedgerFamily` remaps ethereum CHAIN, bitcoin-like, cosmos-like, polkadot-like, and ethereum-plugin names. Do not read MATCH / FIXED from remapped rows as wire-complete; handler reuse is scheduled, not a fresh APDU re-diff.
+**Phase 2 item 1 (merged #50):** family-map expansion — catalog/`inferLedgerFamily` remaps ethereum CHAIN, bitcoin-like, cosmos-like, polkadot-like, and ethereum-plugin names. Do not read MATCH / FIXED from remapped rows as wire-complete.
+
+**Phase 2 item 2 (this follow-up):** KEEP re-diff — Tron, XRP, Stellar, Cosmos, Polkadot, TON, Aptos handlers aligned to official INS/chunk/version bodies with unit tests. Cardano CIP / Solana multi-path / Bitcoin policy / Eth clear-sign KEEP left with citations. Unknown catalog apps remain 77 (backlog item 4).
 
 **Owner mandate:** full official align of every Manager catalog app and feature — every bundled name gets a row; honest statuses preferred over invented MATCH.
 
@@ -41,8 +43,8 @@ Research / plan date: 30 Oct 2026 (Asia/Hong_Kong).
 
 ## Backlog phases (after this PR)
 
-1. **Family map fix** — **DONE (this PR):** expanded `FAMILY_BY_OPEN_NAME` / `FAMILY_RULES` / snapshot `family` for ethereum CHAIN variants, bitcoin-like UTXO forks, cosmos-like, polkadot-like, and `ethereum-plugin` companions so Open App no longer classifies them as `unknown` standalone signers.
-2. **Handler harden** — re-diff KEEP rows in `docs/ledger-apdu.md` against current firmware for Tron, XRP, Stellar, Cosmos, Polkadot, TON, Aptos; close Cardano CIP / Solana multi-path / Bitcoin policy gaps only with tests.
+1. **Family map fix** — **DONE (#50):** expanded `FAMILY_BY_OPEN_NAME` / `FAMILY_RULES` / snapshot `family` for ethereum CHAIN variants, bitcoin-like UTXO forks, cosmos-like, polkadot-like, and `ethereum-plugin` companions so Open App no longer classifies them as `unknown` standalone signers.
+2. **Handler harden** — **DONE (this PR) for Tron/XRP/Stellar/Cosmos/Polkadot/TON/Aptos** core INS/chunk/version. Remaining KEEP: Tron ECDH/TIP-712; XRP ed25519 curve; Stellar maxDataSize; Cosmos GET_ADDR HRP wire; Polkadot SCALE/metadata; TON BOC/cell hash; Cardano CIP-36/native-script/opcert/vote/msg; Solana multi-path; Bitcoin wallet-policy/PSBT proofs; Eth clear-sign stream INS (`22`/`32`/`36`/`38`/`3A`).
 3. **Plugin path** — document that plugin catalog names are clear-signing companions; hosts open Ethereum (or the EVM chain app). CWS does not implement plugin internal IPC in Phase 1.
 4. **Unknown apps** — per-app firmware / `hw-app-*` research for each remaining name; do not invent MATCH.
 5. **Version branching** — where majors diverge (Cardano 7 vs 8 already), continue per picked catalog version, not one hard-coded format.
@@ -73,7 +75,7 @@ Research / plan date: 30 Oct 2026 (Asia/Hong_Kong).
 | Algorand | `unknown` | `unknown` | 2.7.4 | unknown — needs firmware research | blocked — unknown — needs firmware research (no LedgerHQ hw-app-* / app-* INS table confirmed this pass) |
 | Alkemi | `ethereum-plugin` | `ethereum-plugin` | 1.1.0 | none (not a standalone APDU app) — Ethereum app owns CLA/INS; plugin is invoked internally for clear-signing UI | blocked — Ethereum clear-signing plugin; catalog family remapped to ethereum-plugin (not a standalone signer; hosts open Ethereum) |
 | Angle | `ethereum-plugin` | `ethereum-plugin` | 1.1.0 | none (not a standalone APDU app) — Ethereum app owns CLA/INS; plugin is invoked internally for clear-signing UI | blocked — Ethereum clear-signing plugin; catalog family remapped to ethereum-plugin (not a standalone signer; hosts open Ethereum) |
-| Aptos | `aptos` | `aptos` | 0.10.2 | CLA 5B: CLA researched from aptos-labs/ledger-app-aptos `constants.h`. Instruction bytes not in that header — CWS currently uses 00 version / 05 pubkey / 0A\|02 sign as working host contract (not claimed MATCH to firmware enum) (source: aptos-labs/ledger-app-aptos `src/constants.h` (CLA only)) | researched — official/host INS listed; CWS handler exists but ledger-apdu.md marks KEEP pending fresh firmware diff |
+| Aptos | `aptos` | `aptos` | 0.10.2 | CLA 5B: 03 GET_VERSION; 04 GET_APP_NAME; 05 GET_PUBLIC_KEY; 06 SIGN_TX (source: aptos-labs/ledger-app-aptos `src/types.h`; LedgerHQ/app-aptos `doc/COMMANDS.md`) | researched — Phase 2 item 2 FIXED INS/chunk/response with family.test.ts |
 | APWine | `ethereum-plugin` | `ethereum-plugin` | 1.1.0 | none (not a standalone APDU app) — Ethereum app owns CLA/INS; plugin is invoked internally for clear-signing UI | blocked — Ethereum clear-signing plugin; catalog family remapped to ethereum-plugin (not a standalone signer; hosts open Ethereum) |
 | Ardor | `unknown` | `unknown` | 1.1.1 | unknown — needs firmware research | blocked — unknown — needs firmware research (no LedgerHQ hw-app-* / app-* INS table confirmed this pass) |
 | Ark | `unknown` | `unknown` | 2.3.1 | unknown — needs firmware research | blocked — unknown — needs firmware research (no LedgerHQ hw-app-* / app-* INS table confirmed this pass) |

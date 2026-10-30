@@ -4,6 +4,7 @@ import { concatBytes, bytesToHex } from '../bytes';
 import {
   encodeResponse,
   parseBip32Path,
+  pathToString,
   SW_CLA_NOT_SUPPORTED,
   SW_DENY,
   SW_INS_NOT_SUPPORTED,
@@ -54,6 +55,20 @@ export type FamilySession = {
   cardanoTx?: CardanoTxWire;
 };
 
+/**
+ * How SIGN chunks mark "more data follows".
+ * Official sources differ: Solana/legacy generic use P2 bit 0x02; Aptos uses P2 0x80;
+ * XRP/Tron/Stellar/TON/Zondax use P1 (and sometimes P2) schemas documented per app.
+ */
+export type FamilyChunkMode =
+  | 'p2-bit02'
+  | 'p2-bit80'
+  | 'p1-xrp'
+  | 'p1-tron'
+  | 'p1-stellar'
+  | 'p1-zondax'
+  | 'p2-ton';
+
 export type FamilySpec = {
   name: string;
   clas: number[];
@@ -67,6 +82,20 @@ export type FamilySpec = {
   /** Extra confirm copy for encodings that are not a full on-chain StateInit. */
   exportNote?: string;
   preview?: (message: Uint8Array) => string;
+  /** Default `p2-bit02` (legacy generic). Prefer an official mode when re-diffing. */
+  chunkMode?: FamilyChunkMode;
+  /**
+   * First SIGN chunk carries path only (Aptos COMMANDS.md / TON COMMANDS.md).
+   * Later chunks are payload bytes without a path prefix.
+   */
+  signPathOnlyFirst?: boolean;
+  /** Wrap the raw signature before returning (Aptos/TON length prefixes). */
+  encodeSignResponse?: (signature: Uint8Array, message: Uint8Array) => Uint8Array;
+  /**
+   * Zondax apps use a fixed 5-component path with no length byte on SIGN init
+   * (ledger-cosmos process_chunk / Polkadot APDUSPEC).
+   */
+  signPathMode?: 'bip32-len' | 'zondax-fixed5';
 };
 
 const FAMILY_PATHS: Record<string, readonly ChainPathId[]> = {
@@ -517,26 +546,110 @@ async function exportKey(apdu: Apdu, spec: FamilySpec, ctx: FamilyContext): Prom
   return encodeResponse(spec.encodePubkey(publicKey, path), SW_OK);
 }
 
+function chunkHasMore(mode: FamilyChunkMode | undefined, p1: number, p2: number): boolean {
+  switch (mode ?? 'p2-bit02') {
+    case 'p2-bit02':
+      return (p2 & 0x02) !== 0;
+    case 'p2-bit80':
+      return (p2 & 0x80) !== 0;
+    case 'p1-xrp':
+      return (p1 & 0x80) !== 0;
+    case 'p1-tron':
+      // hw-app-trx startBytes: 0x10 single; 0x00 first; 0x80 mid; 0x90 last; 0xa0|token mid.
+      if (p1 === 0x10) {
+        return false;
+      }
+      if ((p1 & 0x90) === 0x90) {
+        return false;
+      }
+      if ((p1 & 0xa8) === 0xa8) {
+        return false;
+      }
+      return true;
+    case 'p1-stellar':
+      return (p2 & 0x80) !== 0;
+    case 'p1-zondax':
+      return p1 !== 0x02;
+    case 'p2-ton':
+      return (p2 & 0x02) !== 0 || (p2 & 0x03) === 0x03;
+    default:
+      return (p2 & 0x02) !== 0;
+  }
+}
+
+function chunkStartsSign(
+  mode: FamilyChunkMode | undefined,
+  p1: number,
+  p2: number,
+  session: FamilySession,
+): boolean {
+  switch (mode ?? 'p2-bit02') {
+    case 'p1-xrp':
+      return (p1 & 0x01) === 0;
+    case 'p1-tron':
+      return p1 === 0x00 || p1 === 0x10 || !session.pendingSign;
+    case 'p1-stellar':
+      return (p1 & 0x80) === 0 || !session.pendingSign;
+    case 'p1-zondax':
+      return p1 === 0x00;
+    case 'p2-ton':
+      return (p2 & 0x01) !== 0; // 0x03 = first&more; later chunks use 0x02/0x00
+    case 'p2-bit80':
+      return p1 === 0x00 || !session.pendingSign;
+    case 'p2-bit02':
+    default:
+      return !session.pendingSign || p1 === 0x00;
+  }
+}
+
+function parseZondaxFixed5(data: Uint8Array): { path: string; rest: Uint8Array } {
+  if (data.length < 20) {
+    throw new Error('truncated Zondax path');
+  }
+  const components: number[] = [];
+  for (let i = 0; i < 5; i++) {
+    const offset = i * 4;
+    components.push(
+      ((data[offset]! << 24) | (data[offset + 1]! << 16) | (data[offset + 2]! << 8) | data[offset + 3]!) >>> 0,
+    );
+  }
+  return { path: pathToString(components), rest: data.slice(20) };
+}
+
 async function signPayload(
   apdu: Apdu,
   spec: FamilySpec,
   ctx: FamilyContext,
   session: FamilySession,
 ): Promise<Uint8Array | null> {
-  const hasMore = (apdu.p2 & 0x02) !== 0;
-  if (!session.pendingSign || apdu.p1 === 0x00) {
+  const mode = spec.chunkMode;
+  const hasMore = chunkHasMore(mode, apdu.p1, apdu.p2);
+  const starts = chunkStartsSign(mode, apdu.p1, apdu.p2, session);
+  if (starts) {
     let path: string;
     let rest: Uint8Array;
     try {
-      const parsed = parseBip32Path(apdu.data);
-      path = familyPath(ctx, spec, parsed.path);
-      rest = parsed.rest;
+      if (spec.signPathMode === 'zondax-fixed5') {
+        const parsed = parseZondaxFixed5(apdu.data);
+        path = familyPath(ctx, spec, parsed.path);
+        rest = parsed.rest;
+      } else {
+        const parsed = parseBip32Path(apdu.data);
+        path = familyPath(ctx, spec, parsed.path);
+        rest = parsed.rest;
+      }
     } catch {
       return encodeResponse(new Uint8Array(), SW_WRONG_P1P2);
     }
+    // Aptos/TON: first chunk is path-only when MORE is set (COMMANDS.md).
+    if (spec.signPathOnlyFirst && hasMore) {
+      rest = new Uint8Array();
+    }
     session.pendingSign = { path, payload: rest };
-  } else {
+  } else if (session.pendingSign) {
     session.pendingSign.payload = concatBytes(session.pendingSign.payload, apdu.data);
+  } else {
+    return encodeResponse(new Uint8Array(), SW_WRONG_P1P2);
   }
   if (hasMore) {
     return encodeResponse(new Uint8Array(), SW_OK);
@@ -569,7 +682,8 @@ async function signPayload(
     spec.curve === 'ed25519'
       ? signEd25519(deriveEd25519PrivateKeyFromSeed(seed, pending.path), message)
       : signSecp256k1Recoverable(derivePrivateKeyFromSeed(seed, pending.path), message);
-  return encodeResponse(signature, SW_OK);
+  const body = spec.encodeSignResponse ? spec.encodeSignResponse(signature, pending.payload) : signature;
+  return encodeResponse(body, SW_OK);
 }
 
 export function versionTriple(version: string): Uint8Array {

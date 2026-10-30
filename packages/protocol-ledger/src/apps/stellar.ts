@@ -11,6 +11,10 @@ import {
 
 export type StellarSession = FamilySession;
 
+/**
+ * CLA/INS/chunking from @ledgerhq/hw-app-str `Str.ts` (Ledger Live develop):
+ * P1_FIRST=0x00 P1_MORE=0x80; P2_LAST=0x00 P2_MORE=0x80.
+ */
 function spec(): FamilySpec {
   return {
     name: 'Stellar',
@@ -21,11 +25,11 @@ function spec(): FamilySpec {
     curve: 'ed25519',
     versionBytes: () => {
       const version = versionTriple(catalogVersion('stellar', '6.1.0'));
-      // hw-app-str: hashSigningEnabled || major || minor || patch
-      return Uint8Array.of(0x00, version[0], version[1], version[2]);
+      return Uint8Array.of(0x00, version[0]!, version[1]!, version[2]!);
     },
     encodePubkey: (publicKey) => publicKey,
     preview: previewStellarEnvelope,
+    chunkMode: 'p1-stellar',
   };
 }
 

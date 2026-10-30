@@ -161,10 +161,11 @@ const FAMILIES: FamilyCase[] = [
   {
     app: 'aptos',
     cla: 0x5b,
-    versionIns: 0x00,
+    versionIns: 0x03,
     pubkeyIns: 0x05,
     path: [0x8000002c, 0x8000027d, 0x80000000, 0x80000000, 0x80000000],
-    address: (value) => value.startsWith('0x') && value.length === 66,
+    // COMMANDS.md: len(pk)||pk||len(chain_code)||chain_code — not an auth-key address string
+    rawPubkey: 66,
   },
   {
     app: 'sui',
@@ -926,5 +927,129 @@ describe('Ledger family APDU bodies', () => {
     const silent = await mystenExchange(deny, 0x02, [encodePathLE(SUI_PATH)]);
     expect(swOf(silent)).toBe(SW_OK);
     expect(suiBlockOf(silent).body[0]).toBe(32);
+  });
+});
+
+
+describe('KEEP re-diff official chunk / version bodies', () => {
+  function encodeFixed5(components: number[]): number[] {
+    const out: number[] = [];
+    for (const component of components) {
+      out.push((component >>> 24) & 0xff, (component >>> 16) & 0xff, (component >>> 8) & 0xff, component & 0xff);
+    }
+    return out;
+  }
+
+  it('Aptos GET_VERSION is INS 03 and SIGN uses P2 0x80 more with length-prefixed signature', async () => {
+    const device = handler();
+    device.setApp('aptos');
+    const version = await exchange(device, apdu([0x5b, 0x03, 0x00, 0x00, 0x00]));
+    expect(swOf(version)).toBe(SW_OK);
+    expect(version.length).toBe(5); // 3 + SW
+
+    const pathBytes = encodePath([0x8000002c, 0x8000027d, 0x80000000, 0x80000000, 0x80000000]);
+    const first = await exchange(device, apdu([0x5b, 0x06, 0x00, 0x80, pathBytes.length, ...pathBytes]));
+    expect(swOf(first)).toBe(SW_OK);
+    expect(first.length).toBe(2);
+
+    const payload = [0x11, 0x22, 0x33, 0x44];
+    const done = await exchange(device, apdu([0x5b, 0x06, 0x01, 0x00, payload.length, ...payload]));
+    expect(swOf(done)).toBe(SW_OK);
+    const body = done.subarray(0, done.length - 2);
+    expect(body[0]).toBe(64);
+    expect(body.length).toBe(65);
+  });
+
+  it('XRP SIGN chunks on P1 more-bit 0x80 (not P2 bit 0x02)', async () => {
+    const device = handler();
+    device.setApp('xrp');
+    const pathBytes = encodePath([0x8000002c, 0x80000090, 0x80000000, 0, 0]);
+    const head = [...pathBytes, 0xaa, 0xbb];
+    const more = await exchange(device, apdu([0xe0, 0x04, 0x80, 0x40, head.length, ...head]));
+    expect(swOf(more)).toBe(SW_OK);
+    expect(more.length).toBe(2);
+    const done = await exchange(device, apdu([0xe0, 0x04, 0x01, 0x40, 2, 0xcc, 0xdd]));
+    expect(swOf(done)).toBe(SW_OK);
+    expect(done.length).toBe(67); // 65-byte secp sig + SW
+  });
+
+  it('Tron single-chunk SIGN uses P1 0x10', async () => {
+    const device = handler();
+    device.setApp('tron');
+    const pathBytes = encodePath([0x8000002c, 0x800000c3, 0x80000000, 0, 0]);
+    const data = [...pathBytes, 0x0a, 0x02, 0xf5, 0x94];
+    const done = await exchange(device, apdu([0xe0, 0x04, 0x10, 0x00, data.length, ...data]));
+    expect(swOf(done)).toBe(SW_OK);
+    expect(done.length).toBe(67);
+  });
+
+  it('Stellar SIGN more uses P2 0x80', async () => {
+    const device = handler();
+    device.setApp('stellar');
+    const pathBytes = encodePath([0x8000002c, 0x80000094, 0x80000000]);
+    const head = [...pathBytes, 0x00, 0x00, 0x00, 0x02];
+    const more = await exchange(device, apdu([0xe0, 0x04, 0x00, 0x80, head.length, ...head]));
+    expect(swOf(more)).toBe(SW_OK);
+    expect(more.length).toBe(2);
+    const done = await exchange(device, apdu([0xe0, 0x04, 0x80, 0x00, 4, 0x11, 0x22, 0x33, 0x44]));
+    expect(swOf(done)).toBe(SW_OK);
+    expect(done.length).toBe(66); // 64 + SW
+  });
+
+  it('Cosmos GET_VERSION is 9 bytes; SIGN uses Zondax P1 0/2 and fixed-5 path', async () => {
+    const device = handler();
+    device.setApp('cosmos');
+    const version = await exchange(device, apdu([0x55, 0x00, 0x00, 0x00, 0x00]));
+    expect(swOf(version)).toBe(SW_OK);
+    expect(version.length).toBe(11); // 9 + SW
+
+    const path = encodeFixed5([0x8000002c, 0x80000076, 0x80000000, 0, 0]);
+    const init = await exchange(device, apdu([0x55, 0x02, 0x00, 0x00, path.length, ...path]));
+    expect(swOf(init)).toBe(SW_OK);
+    expect(init.length).toBe(2);
+    const doc = Array.from(new TextEncoder().encode('{"chain_id":"cosmoshub-4"}'));
+    const last = await exchange(device, apdu([0x55, 0x02, 0x02, 0x00, doc.length, ...doc]));
+    expect(swOf(last)).toBe(SW_OK);
+    expect(last.length).toBe(67);
+  });
+
+  it('Polkadot GET_VERSION is 12 bytes; SIGN returns 65-byte ed25519 envelope', async () => {
+    const device = handler();
+    device.setApp('polkadot');
+    const version = await exchange(device, apdu([0xf9, 0x00, 0x00, 0x00, 0x00]));
+    expect(swOf(version)).toBe(SW_OK);
+    expect(version.length).toBe(14); // 12 + SW
+
+    const path = encodeFixed5([0x8000002c, 0x80000162, 0x80000000, 0x80000000, 0x80000000]);
+    const init = await exchange(device, apdu([0xf9, 0x02, 0x00, 0x00, path.length + 2, ...path, 0x00, 0x04]));
+    expect(swOf(init)).toBe(SW_OK);
+    const last = await exchange(device, apdu([0xf9, 0x02, 0x02, 0x00, 4, 0xaa, 0xbb, 0xcc, 0xdd]));
+    expect(swOf(last)).toBe(SW_OK);
+    expect(last.length).toBe(67); // 0x00 || 64-sig + SW
+    expect(last[0]).toBe(0x00);
+  });
+
+  it('TON SIGN uses P2 0x03 first then 0x00 last; response is sig||hash length-prefixed', async () => {
+    const device = handler();
+    device.setApp('ton');
+    const pathBytes = encodePath([0x8000002c, 0x8000025f, 0x80000000]);
+    const first = await exchange(device, apdu([0xe0, 0x06, 0x00, 0x03, pathBytes.length, ...pathBytes]));
+    expect(swOf(first)).toBe(SW_OK);
+    expect(first.length).toBe(2);
+    const payload = [0x01, 0x02, 0x03, 0x04];
+    const done = await exchange(device, apdu([0xe0, 0x06, 0x00, 0x00, payload.length, ...payload]));
+    expect(swOf(done)).toBe(SW_OK);
+    const body = done.subarray(0, done.length - 2);
+    expect(body[0]).toBe(64);
+    expect(body[65]).toBe(32);
+    expect(body.length).toBe(98);
+  });
+
+  it('TON GET_APP_SETTINGS returns 1 flag byte', async () => {
+    const device = handler();
+    device.setApp('ton');
+    const settings = await exchange(device, apdu([0xe0, 0x0a, 0x00, 0x00, 0x00]));
+    expect(swOf(settings)).toBe(SW_OK);
+    expect(Array.from(settings.subarray(0, settings.length - 2))).toEqual([0x00]);
   });
 });
