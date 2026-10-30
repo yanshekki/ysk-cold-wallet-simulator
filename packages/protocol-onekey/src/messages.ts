@@ -49,9 +49,12 @@ export const MessageType = {
   CardanoGetAddress: 307,
   CardanoAddress: 308,
   CardanoTxItemAck: 313,
-  CardanoTxHostAck: 314,
+  /** Device → host. Not the host ack. OneKey firmware-pro uses 317 to finish. */
+  CardanoTxAuxiliaryDataSupplement: 314,
   CardanoTxWitnessRequest: 315,
   CardanoTxWitnessResponse: 316,
+  CardanoTxHostAck: 317,
+  CardanoTxBodyHash: 318,
   CardanoSignTxFinished: 319,
   CardanoSignTxInit: 320,
   CardanoTxInput: 321,

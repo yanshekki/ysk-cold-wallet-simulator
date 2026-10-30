@@ -210,6 +210,7 @@ What was run, and what was not, is in [docs/testing.md](docs/testing.md). In Oct
 | [docs/store/README.md](docs/store/README.md) | Mac App Store screenshot index |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Engineering layout |
 | [docs/ledger-apdu.md](docs/ledger-apdu.md) | Ledger APDU stages, response lengths, and what CWS still does not implement |
+| [docs/vendor-protocols.md](docs/vendor-protocols.md) | Trezor, OneKey, and QR type strings, including what is not implemented |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Review, tests, and secrets to keep out of git |
 | [LICENSE](LICENSE) | Copyright YSK Limited. All rights reserved. |
 
