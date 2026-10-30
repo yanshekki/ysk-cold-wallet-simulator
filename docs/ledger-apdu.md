@@ -205,10 +205,11 @@ load |
 | --- | --- | --- |
 | Minswap send, `unexpected response length: 64 instead of 0` | `INS 21` treated a missing P2 more-bit as the end of the signature and returned 64 bytes on v8 INIT | v8 and v7 stage maps above. Tests cover both majors |
 | Raydium / Solflare, no sheet, first `E0 06` chunk | Dashboard (and Ethereum) treated data-bearing `E0 06` as Ethereum `GET_APP_CONFIGURATION`. The path parser also read `numPaths` as a BIP32 depth | Route a `44'/501'` sign chunk to Solana. Parse `numPaths`, ACK an empty `9000` while P2 MORE is set, open the sheet on the last chunk |
+| Solflare swap, HID shows `e0/06` MORE then hangs, phone never opens sheet | CWS Proxy dropped an unarmed empty `9000` as "leftover" when `lastStatusSw` was already `9000` (race before `receiveArmed`). Solflare never got the MORE ACK, so it never sent the final chunk where the sheet opens | Hold-forward empty `9000` like `6d00`/`6e00` while awaiting; true post-settle leftovers still hit `!awaiting` |
 
 ## Retry
 
-Reinstall the phone build that contains this handler. The Proxy only forwards APDUs. An old phone build still answers Cardano INIT with 64 bytes and still treats a Solana sign chunk as an Ethereum version.
+Reinstall the phone build that contains the Solana handler (routing + MORE ACK sheet on last chunk). Rebuild and restart **CWS Proxy** for the unarmed empty-`9000` hold-forward: that race lives in the desktop proxy, not on the phone. An old phone build still answers Cardano INIT with 64 bytes and still treats a Solana sign chunk as an Ethereum version.
 
 ## Catalog coverage (every Manager app)
 
