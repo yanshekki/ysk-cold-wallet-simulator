@@ -389,6 +389,12 @@ export class LedgerProtocolHandler implements ProtocolHandler {
       return handleStellarApdu(apdu, ctx, this.familySession);
     }
 
+    // ethereum-plugin: clear-signing companion only. Hosts must open Ethereum (or an
+    // EVM chain app). No standalone INS — fall through like unknown.
+    if (family === 'ethereum-plugin') {
+      return encodeResponse(new Uint8Array(), SW_INS_NOT_SUPPORTED);
+    }
+
     if (apdu.cla !== 0xe0 && apdu.cla !== 0xb0) {
       return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
     }

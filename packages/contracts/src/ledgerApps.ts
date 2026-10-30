@@ -20,6 +20,7 @@ export type LedgerInstalledAppId =
 export type LedgerAppFamily =
   | 'bitcoin'
   | 'ethereum'
+  | 'ethereum-plugin'
   | 'avalanche'
   | 'solana'
   | 'xrp'
@@ -50,6 +51,126 @@ export type LedgerInstalledApp = {
   family: LedgerAppFamily;
 };
 
+/**
+ * Exact Manager openAppName → family for Phase 2 remaps.
+ * Covers ethereum CHAIN variants, bitcoin-like UTXO forks, cosmos-like,
+ * polkadot-like, and ethereum clear-signing plugins (not standalone signers).
+ * Keys are lowercased openAppName strings from the Nano X Manager snapshot.
+ */
+const FAMILY_BY_OPEN_NAME: Readonly<Record<string, LedgerAppFamily>> = {
+  // ethereum CHAIN variants (app-ethereum makefile_conf/chain)
+  akroma: 'ethereum',
+  'artis sigma1': 'ethereum',
+  atheios: 'ethereum',
+  callisto: 'ethereum',
+  dexon: 'ethereum',
+  ellaism: 'ethereum',
+  energywebchain: 'ethereum',
+  'ether-1': 'ethereum',
+  ethergem: 'ethereum',
+  ethersocial: 'ethereum',
+  expanse: 'ethereum',
+  gochain: 'ethereum',
+  harmony: 'ethereum',
+  hpb: 'ethereum',
+  id4good: 'ethereum',
+  iotex: 'ethereum',
+  mix: 'ethereum',
+  moonbeam: 'ethereum',
+  moonriver: 'ethereum',
+  musicoin: 'ethereum',
+  oasys: 'ethereum',
+  pirl: 'ethereum',
+  reosc: 'ethereum',
+  rsk: 'ethereum',
+  sei: 'ethereum',
+  'shiden evm': 'ethereum',
+  songbird: 'ethereum',
+  sonic: 'ethereum',
+  tecracoin: 'ethereum',
+  thundercore: 'ethereum',
+  tomochain: 'ethereum',
+  ubiq: 'ethereum',
+  wanchain: 'ethereum',
+  webchain: 'ethereum',
+  wethio: 'ethereum',
+  'xdc network': 'ethereum',
+  // bitcoin-like UTXO forks (reuse bitcoin handler; coin params differ)
+  dash: 'bitcoin',
+  digibyte: 'bitcoin',
+  firo: 'bitcoin',
+  gamecredits: 'bitcoin',
+  horizen: 'bitcoin',
+  hydra: 'bitcoin',
+  komodo: 'bitcoin',
+  lbry: 'bitcoin',
+  nix: 'bitcoin',
+  peercoin: 'bitcoin',
+  pivx: 'bitcoin',
+  ravencoin: 'bitcoin',
+  stratis: 'bitcoin',
+  vertcoin: 'bitcoin',
+  viacoin: 'bitcoin',
+  xrhodium: 'bitcoin',
+  zclassic: 'bitcoin',
+  // cosmos-like (Zondax CLA 55 pattern)
+  'cronos pos chain': 'cosmos',
+  desmos: 'cosmos',
+  iov: 'cosmos',
+  oasis: 'cosmos',
+  persistence: 'cosmos',
+  secret: 'cosmos',
+  terra: 'cosmos',
+  thorchain: 'cosmos',
+  // polkadot / substrate-like
+  'aleph zero': 'polkadot',
+  avail: 'polkadot',
+  peaq: 'polkadot',
+  polymesh: 'polkadot',
+  'xx network': 'polkadot',
+  // ethereum clear-signing plugins — companions, not standalone APDU apps
+  '1inch': 'ethereum-plugin',
+  alkemi: 'ethereum-plugin',
+  angle: 'ethereum-plugin',
+  apwine: 'ethereum-plugin',
+  artblocks: 'ethereum-plugin',
+  berachain: 'ethereum-plugin',
+  'brick towers': 'ethereum-plugin',
+  cbridge: 'ethereum-plugin',
+  chorusone: 'ethereum-plugin',
+  cian: 'ethereum-plugin',
+  coinbase: 'ethereum-plugin',
+  eigenlayer: 'ethereum-plugin',
+  ens: 'ethereum-plugin',
+  figment: 'ethereum-plugin',
+  harvest: 'ethereum-plugin',
+  hyperliquid: 'ethereum-plugin',
+  kelp: 'ethereum-plugin',
+  kiln: 'ethereum-plugin',
+  lens: 'ethereum-plugin',
+  libertify: 'ethereum-plugin',
+  morpho: 'ethereum-plugin',
+  nested: 'ethereum-plugin',
+  'okx web3': 'ethereum-plugin',
+  origin: 'ethereum-plugin',
+  'p2p.org': 'ethereum-plugin',
+  paraswap: 'ethereum-plugin',
+  quickswap: 'ethereum-plugin',
+  rarible: 'ethereum-plugin',
+  ribbon: 'ethereum-plugin',
+  'rocket pool': 'ethereum-plugin',
+  spool: 'ethereum-plugin',
+  squid: 'ethereum-plugin',
+  staderlabs: 'ethereum-plugin',
+  stakedao: 'ethereum-plugin',
+  stakekit: 'ethereum-plugin',
+  swell: 'ethereum-plugin',
+  uniswap: 'ethereum-plugin',
+  velora: 'ethereum-plugin',
+  yearn: 'ethereum-plugin',
+};
+
+/** Regex fallbacks for Manager overlay names that share a family prefix/suffix. */
 const FAMILY_RULES: [RegExp, LedgerAppFamily][] = [
   [/^bitcoin/i, 'bitcoin'],
   [/litecoin/i, 'bitcoin'],
@@ -59,9 +180,9 @@ const FAMILY_RULES: [RegExp, LedgerAppFamily][] = [
   [/solana/i, 'solana'],
   [/^(xrp|ripple)/i, 'xrp'],
   [/cardano/i, 'cardano'],
-  [/polkadot|kusama/i, 'polkadot'],
+  [/polkadot|kusama|aleph zero|polymesh|xx network/i, 'polkadot'],
   [/^tron/i, 'tron'],
-  [/cosmos|osmosis|akash|juno|secret network/i, 'cosmos'],
+  [/cosmos|osmosis|akash|juno|secret network|thorchain|cronos pos/i, 'cosmos'],
   [/^near/i, 'near'],
   [/^ton$/i, 'ton'],
   [/aptos/i, 'aptos'],
@@ -71,12 +192,28 @@ const FAMILY_RULES: [RegExp, LedgerAppFamily][] = [
 
 export function inferLedgerFamily(name: string): LedgerAppFamily {
   const trimmed = name.trim();
+  if (!trimmed) {
+    return 'unknown';
+  }
+  const exact = FAMILY_BY_OPEN_NAME[trimmed.toLowerCase()];
+  if (exact) {
+    return exact;
+  }
   for (const [pattern, family] of FAMILY_RULES) {
     if (pattern.test(trimmed)) {
       return family;
     }
   }
   return 'unknown';
+}
+
+/** True when the catalog name is an Ethereum clear-signing plugin companion. */
+export function isLedgerEthereumPlugin(nameOrFamily: string): boolean {
+  const trimmed = nameOrFamily.trim();
+  if (trimmed === 'ethereum-plugin') {
+    return true;
+  }
+  return inferLedgerFamily(trimmed) === 'ethereum-plugin';
 }
 
 export function slugLedgerApp(name: string): string {
@@ -96,7 +233,10 @@ export function slugLedgerApp(name: string): string {
 
 function chipFor(name: string, family: LedgerAppFamily): string {
   if (family !== 'unknown') {
-    const chips: Record<Exclude<LedgerAppFamily, 'unknown'>, string> = {
+    if (family === 'ethereum-plugin') {
+      return name.replace(/[^A-Za-z0-9]/g, '').slice(0, 4).toUpperCase() || 'PLUG';
+    }
+    const chips: Record<Exclude<LedgerAppFamily, 'unknown' | 'ethereum-plugin'>, string> = {
       bitcoin: 'BTC',
       ethereum: 'ETH',
       avalanche: 'AVAX',

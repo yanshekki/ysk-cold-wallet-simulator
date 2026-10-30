@@ -3,6 +3,7 @@ import {
   LEDGER_APPS,
   LEDGER_INSTALLED_APPS,
   inferLedgerFamily,
+  isLedgerEthereumPlugin,
   ledgerAppChip,
   ledgerAppLabel,
   ledgerPickerApps,
@@ -52,5 +53,63 @@ describe('ledger app labels', () => {
     expect(inferLedgerFamily('Helium-Solana')).toBe('solana');
     expect(inferLedgerFamily('Stellar')).toBe('stellar');
     expect(slugLedgerApp('Cardano ADA')).toBe('cardano');
+  });
+
+  it('maps ethereum CHAIN variants onto the ethereum handler family', () => {
+    expect(inferLedgerFamily('Moonbeam')).toBe('ethereum');
+    expect(inferLedgerFamily('Moonriver')).toBe('ethereum');
+    expect(inferLedgerFamily('Harmony')).toBe('ethereum');
+    expect(inferLedgerFamily('RSK')).toBe('ethereum');
+    expect(inferLedgerFamily('XDC Network')).toBe('ethereum');
+    expect(inferLedgerFamily('Sei')).toBe('ethereum');
+    expect(inferLedgerFamily('ARTIS sigma1')).toBe('ethereum');
+    expect(inferLedgerFamily('Ethereum Classic')).toBe('ethereum');
+  });
+
+  it('maps bitcoin-like UTXO forks onto the bitcoin handler family', () => {
+    expect(inferLedgerFamily('Dash')).toBe('bitcoin');
+    expect(inferLedgerFamily('Digibyte')).toBe('bitcoin');
+    expect(inferLedgerFamily('Ravencoin')).toBe('bitcoin');
+    expect(inferLedgerFamily('ZClassic')).toBe('bitcoin');
+    expect(inferLedgerFamily('Bitcoin Cash')).toBe('bitcoin');
+    expect(inferLedgerFamily('Litecoin')).toBe('bitcoin');
+  });
+
+  it('maps cosmos-like and polkadot-like names onto existing handlers', () => {
+    expect(inferLedgerFamily('Terra')).toBe('cosmos');
+    expect(inferLedgerFamily('THORChain')).toBe('cosmos');
+    expect(inferLedgerFamily('Cronos POS Chain')).toBe('cosmos');
+    expect(inferLedgerFamily('Secret')).toBe('cosmos');
+    expect(inferLedgerFamily('Sei - Cosmos')).toBe('cosmos');
+    expect(inferLedgerFamily('Aleph Zero')).toBe('polkadot');
+    expect(inferLedgerFamily('Avail')).toBe('polkadot');
+    expect(inferLedgerFamily('xx network')).toBe('polkadot');
+    expect(inferLedgerFamily('Polymesh')).toBe('polkadot');
+  });
+
+  it('marks ethereum clear-signing plugins without treating them as unknown signers', () => {
+    expect(inferLedgerFamily('Uniswap')).toBe('ethereum-plugin');
+    expect(inferLedgerFamily('1inch')).toBe('ethereum-plugin');
+    expect(inferLedgerFamily('OKX Web3')).toBe('ethereum-plugin');
+    expect(inferLedgerFamily('Rocket Pool')).toBe('ethereum-plugin');
+    expect(isLedgerEthereumPlugin('Uniswap')).toBe(true);
+    expect(isLedgerEthereumPlugin('ethereum-plugin')).toBe(true);
+    expect(isLedgerEthereumPlugin('Ethereum')).toBe(false);
+    expect(inferLedgerFamily('Zcash')).toBe('unknown');
+  });
+
+  it('stores remapped families on the bundled Manager snapshot', () => {
+    const byName = Object.fromEntries(
+      LEDGER_INSTALLED_APPS.map((app) => [app.openAppName, app.family]),
+    );
+    expect(byName['Moonbeam']).toBe('ethereum');
+    expect(byName['Dash']).toBe('bitcoin');
+    expect(byName['Terra']).toBe('cosmos');
+    expect(byName['Aleph Zero']).toBe('polkadot');
+    expect(byName['Uniswap']).toBe('ethereum-plugin');
+    expect(byName['Zcash']).toBe('unknown');
+    const known = LEDGER_INSTALLED_APPS.filter((app) => app.family !== 'unknown').length;
+    expect(known).toBe(128);
+    expect(LEDGER_INSTALLED_APPS.filter((app) => app.family === 'unknown').length).toBe(77);
   });
 });
