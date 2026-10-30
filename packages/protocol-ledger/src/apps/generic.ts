@@ -66,12 +66,25 @@ export type CardanoNativeScriptWire = {
   cbor: Uint8Array;
 };
 
+/** CIP-8 message. `message` is the raw bytes. The signature is over the COSE structure. */
+export type CardanoSignMsgWire = {
+  state: 'chunk' | 'confirm';
+  hashPayload: boolean;
+  isAscii: boolean;
+  message: Uint8Array;
+  filled: number;
+  path: string;
+  pubkey: Uint8Array;
+  keyHash: Uint8Array;
+};
+
 export type FamilySession = {
   pendingSign?: { path: string; payload: Uint8Array };
   suiBlocks?: SuiBlocksSession;
   cardanoTx?: CardanoTxWire;
   cardanoCvote?: CardanoCvoteWire;
   cardanoNativeScript?: CardanoNativeScriptWire;
+  cardanoSignMsg?: CardanoSignMsgWire;
 };
 
 /**

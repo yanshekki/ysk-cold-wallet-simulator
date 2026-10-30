@@ -285,10 +285,6 @@ describe('Cardano SIGN_TX body lengths follow the reported app version', () => {
     expect(statusOf(denied)).toBe(SW_DENY);
     expect(bodyOf(denied).length).toBe(0);
     expect(confirms()).toBe(1);
-    for (const ins of [0x24]) {
-      const reply = await exchange(device, apdu([0xd7, ins, 0x00, 0x00, 0x00]));
-      expect(statusOf(reply)).toBe(SW_INS_NOT_SUPPORTED);
-    }
     const aux = await exchange(device, apdu([0xd7, 0x21, 0x13, 0x36, 0x00]));
     expect(statusOf(aux)).toBe(SW_INS_NOT_SUPPORTED);
   });
@@ -470,6 +466,97 @@ describe('Cardano native script hash is blake2b-224 of 0x00 and CBOR', () => {
     expect(confirms()).toBe(1);
     const next = await exchange(device, scriptApdu(0x01, [0x01, ...u32bytes(1)]));
     expect(statusOf(next)).toBe(0x6980);
+  });
+});
+
+function cip8Apdu(p1: number, data: number[]): Uint8Array {
+  return apdu([0xd7, 0x24, p1, 0x00, data.length, ...data]);
+}
+
+function cip8Structure(keyHash: Uint8Array, payload: Uint8Array): Uint8Array {
+  const header = concatBytes(
+    Uint8Array.of(0xa2, 0x01, 0x27, 0x67),
+    Uint8Array.from('address', (char) => char.charCodeAt(0)),
+    Uint8Array.of(0x58, 0x1c),
+    keyHash,
+  );
+  const payloadHead = payload.length < 24 ? Uint8Array.of(0x40 | payload.length) : Uint8Array.of(0x58, payload.length);
+  return concatBytes(
+    Uint8Array.of(0x84, 0x6a),
+    Uint8Array.from('Signature1', (char) => char.charCodeAt(0)),
+    Uint8Array.of(0x58, header.length),
+    header,
+    Uint8Array.of(0x40),
+    payloadHead,
+    payload,
+  );
+}
+
+describe('Cardano CIP-8 key-hash messages sign the COSE structure', () => {
+  const message = Uint8Array.from('Hi', (char) => char.charCodeAt(0));
+
+  async function signHi(hashFlag: number): Promise<{ body: Uint8Array; confirms: number }> {
+    const { device, confirms } = handler();
+    device.setApp('cardano');
+    const init = await exchange(
+      device,
+      cip8Apdu(0x01, [...u32be(message.length), ...encodePath(ADA_PATH), hashFlag, 0x02, 0x02]),
+    );
+    expect(statusOf(init)).toBe(SW_OK);
+    expect(bodyOf(init).length).toBe(0);
+    expect(confirms()).toBe(0);
+    const chunk = await exchange(device, cip8Apdu(0x02, [...u32be(message.length), ...message]));
+    expect(bodyOf(chunk).length).toBe(0);
+    expect(confirms()).toBe(0);
+    const done = await exchange(device, cip8Apdu(0x03, []));
+    expect(statusOf(done)).toBe(SW_OK);
+    expect(confirms()).toBe(1);
+    return { body: bodyOf(done), confirms: confirms() };
+  }
+
+  it('a raw ASCII message is signed as Sig_structure, not as the message', async () => {
+    const { body } = await signHi(0x01);
+    const node = deriveIcarus(entropy(), "m/1852'/1815'/0'/0/0");
+    const keyHash = blake2b(node.publicKey, { dkLen: 28 });
+    expect(body.length).toBe(64 + 32 + 4 + 28);
+    expect(Array.from(body.subarray(64, 96))).toEqual(Array.from(node.publicKey));
+    expect(Array.from(body.subarray(96, 100))).toEqual([0, 0, 0, 28]);
+    expect(Array.from(body.subarray(100))).toEqual(Array.from(keyHash));
+    const structure = cip8Structure(keyHash, message);
+    expect(Array.from(body.subarray(0, 64))).toEqual(Array.from(signIcarus(node, structure)));
+    expect(Array.from(body.subarray(0, 64))).not.toEqual(Array.from(signIcarus(node, message)));
+  });
+
+  it('a hashed payload signs blake2b-224 of the message', async () => {
+    const { body } = await signHi(0x02);
+    const node = deriveIcarus(entropy(), "m/1852'/1815'/0'/0/0");
+    const keyHash = blake2b(node.publicKey, { dkLen: 28 });
+    const payload = blake2b(message, { dkLen: 28 });
+    expect(Array.from(body.subarray(0, 64))).toEqual(Array.from(signIcarus(node, cip8Structure(keyHash, payload))));
+  });
+
+  it('rejects a CIP-36 path, a non-ASCII flagged message, and an address field', async () => {
+    const { device, confirms } = handler();
+    device.setApp('cardano');
+    const vote = await exchange(
+      device,
+      cip8Apdu(0x01, [...u32be(2), ...encodePath(CVOTE_PATH), 0x01, 0x02, 0x02]),
+    );
+    expect(statusOf(vote)).toBe(0x6982);
+    expect(confirms()).toBe(0);
+    const init = await exchange(
+      device,
+      cip8Apdu(0x01, [...u32be(1), ...encodePath(ADA_PATH), 0x01, 0x02, 0x02]),
+    );
+    expect(statusOf(init)).toBe(SW_OK);
+    const bad = await exchange(device, cip8Apdu(0x02, [...u32be(1), 0x01]));
+    expect(statusOf(bad)).toBe(0x6b69);
+    const address = await exchange(
+      device,
+      cip8Apdu(0x01, [...u32be(2), ...encodePath(ADA_PATH), 0x01, 0x02, 0x01]),
+    );
+    expect(statusOf(address)).toBe(SW_INS_NOT_SUPPORTED);
+    expect(confirms()).toBe(0);
   });
 });
 

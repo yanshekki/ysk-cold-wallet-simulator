@@ -106,7 +106,7 @@ Sources already cited in [ledger-apdu.md](ledger-apdu.md). Close a row only with
 
 | Area | Left open | Why it stays KEEP |
 | --- | --- | --- |
-| Cardano | v8 P1 `13` CIP-36 auxiliary; v7 P2 `34` CIP-36 registration (`6D00`); INS `11` DERIVE_ADDRESS; `24` CIP-8 message | [app-cardano APDU reference](https://github.com/LedgerHQ/app-cardano/blob/develop/doc/apdu_reference.md) describes them. CWS returns `6D00` or the wrong body. INS `22`, INS `23`, and INS `12` native script hash are MATCH |
+| Cardano | v8 P1 `13` CIP-36 auxiliary; v7 P2 `34` CIP-36 registration (`6D00`); INS `11` DERIVE_ADDRESS; INS `24` address field `01` | [app-cardano APDU reference](https://github.com/LedgerHQ/app-cardano/blob/develop/doc/apdu_reference.md) describes them. CWS returns `6D00` or the wrong body. INS `22`, `23`, `12`, and CIP-8 key-hash field `02` are MATCH |
 | Cardano hash | v7 and v8 confirm body is blake2b-256 of uploaded chunks | Firmware hashes the canonical transaction. A host that checks the tx id will reject it |
 | Solana | One signature when `numPaths` > 1; extra paths are skipped | [hw-app-solana](https://github.com/LedgerHQ/ledger-live/blob/develop/libs/ledgerjs/packages/hw-app-solana/src/Solana.ts) and [app-solana `apdu.h`](https://github.com/LedgerHQ/app-solana/blob/master/src/apdu.h) |
 | Solana | INS `20` / `21` / `22` challenge, trusted name, dynamic descriptor | `6D00`. Not implemented |
@@ -336,11 +336,11 @@ Docs only. No handler change. No USB install. No Proxy rebuild.
 
 ### Phase 4 — High-host KEEP
 
-**Status.** `SIGN_OPCERT` (INS `22`) and `SIGN_CVOTE` (INS `23`) are MATCH. `DERIVE_NATIVE_SCRIPT_HASH` (INS `12`) returns blake2b-224 of `0x00 ‖` the firmware CBOR script. CIP-36 auxiliary, DERIVE_ADDRESS, CIP-8, and the canonical transaction hash stay KEEP. Solana multi-path, Bitcoin policy HMAC, and Ethereum clear-sign are still open. Snapshot unknown stays 27.
+**Status.** `SIGN_OPCERT`, `SIGN_CVOTE`, and native script hash are MATCH. `SIGN_MSG` key-hash field `02` signs the COSE `Sig_structure`. The full-address field, DERIVE_ADDRESS, CIP-36 auxiliary, and the canonical transaction hash stay KEEP. Solana multi-path, Bitcoin policy HMAC, and Ethereum clear-sign are still open. Snapshot unknown stays 27.
 
 One PR per row, or a pair that shares a parser:
 
-1. Cardano CIP-36 auxiliary, CIP-8 message, DERIVE_ADDRESS. Operational certificate, CIP-36 vote, and native script hash are MATCH. Canonical transaction hash stays KEEP until CWS builds the firmware encoding.
+1. Cardano CIP-36 auxiliary, DERIVE_ADDRESS, and CIP-8 address field `01`. Operational certificate, CIP-36 vote, native script hash, and CIP-8 key-hash messages are MATCH. Canonical transaction hash stays KEEP until CWS builds the firmware encoding.
 2. Solana `numPaths` > 1, then INS `20` / `21` / `22` if hw-app-solana sends them.
 3. Bitcoin wallet-policy HMAC and merkle PSBT beyond the current tests. A zero HMAC stays labeled host-unproven.
 4. Ethereum clear-sign INS `22` / `32` / `36` / `38` / `3A`, only the commands `@ledgerhq/hw-app-eth` sends.
