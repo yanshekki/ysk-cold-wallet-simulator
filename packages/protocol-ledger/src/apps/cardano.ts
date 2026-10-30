@@ -14,9 +14,9 @@ import {
   type Apdu,
 } from '../apdu';
 import { versionTriple, type CardanoTxWire, type FamilyContext, type FamilySession } from './generic';
-import { cardanoEnterprise, encodePubAndAddress } from './addresses';
 import { icarusRootFor } from '../crypto';
 import { deriveIcarus, deriveIcarusFromRoot, signIcarus } from './icarus';
+import { handleCardanoDeriveAddress } from './cardanoAddress';
 import { handleCardanoNativeScript } from './cardanoNativeScript';
 import { handleCardanoSignMsg } from './cardanoSignMsg';
 
@@ -44,7 +44,7 @@ export async function handleCardanoApdu(
     return exportExtPubkey(apdu, ctx);
   }
   if (apdu.ins === 0x11) {
-    return exportAddress(apdu, ctx);
+    return handleCardanoDeriveAddress(apdu, ctx);
   }
   if (apdu.ins === 0x12) {
     return handleCardanoNativeScript(apdu, ctx, session);
@@ -461,22 +461,6 @@ async function exportExtPubkey(apdu: Apdu, ctx: FamilyContext): Promise<Uint8Arr
   }
   const node = await icarusAt(ctx, path);
   return encodeResponse(concatBytes(node.publicKey, node.chainCode), SW_OK);
-}
-
-async function exportAddress(apdu: Apdu, ctx: FamilyContext): Promise<Uint8Array> {
-  const path = parsePath(apdu, ctx);
-  const ok = await confirm(ctx, {
-    kind: 'address',
-    title: 'Export Cardano address',
-    path,
-    message: `Export Cardano enterprise address (CIP-3 Icarus)\n${path}`,
-    rawPayload: apdu.data,
-  });
-  if (!ok) {
-    return encodeResponse(new Uint8Array(), SW_DENY);
-  }
-  const node = await icarusAt(ctx, path);
-  return encodeResponse(encodePubAndAddress(node.publicKey, cardanoEnterprise(node.publicKey)), SW_OK);
 }
 
 function parsePath(apdu: Apdu, ctx: FamilyContext): string {

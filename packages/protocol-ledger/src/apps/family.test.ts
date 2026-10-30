@@ -179,9 +179,9 @@ const FAMILIES: FamilyCase[] = [
     app: 'cardano',
     cla: 0xd7,
     versionIns: 0x00,
-    pubkeyIns: 0x11,
+    pubkeyIns: 0x10,
     path: [0x8000073c, 0x80000717, 0x80000000, 0, 0],
-    address: (value) => value.startsWith('addr1'),
+    rawPubkey: 64,
   },
   {
     app: 'polkadot',
