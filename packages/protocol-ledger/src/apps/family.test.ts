@@ -1,4 +1,6 @@
+import { secp256k1 } from '@noble/curves/secp256k1';
 import { sha256 } from '@noble/hashes/sha2';
+import { keccak_256 } from '@noble/hashes/sha3';
 import { base58 } from '@scure/base';
 import { mnemonicToEntropy, mnemonicToSeedSync } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
@@ -19,7 +21,14 @@ import {
   walletHmac,
   walletIdOf,
 } from '../index';
-import { deriveEd25519PrivateKey, ed25519PublicKey, signEd25519 } from '../crypto';
+import {
+  deriveEd25519PrivateKey,
+  derivePrivateKey,
+  ed25519PublicKey,
+  publicKeyUncompressed,
+  signEd25519,
+  signSecp256k1Recoverable,
+} from '../crypto';
 import { BleReassembler, DEFAULT_MTU, framePayload, splitFramedPackets, TAG_APDU } from '../framing';
 import { LedgerProtocolHandler } from '../handler';
 import { bytesToHex, concatBytes } from '../bytes';
@@ -1257,6 +1266,48 @@ describe('KEEP re-diff official chunk / version bodies', () => {
     const done = await exchange(device, apdu([0xe0, 0x04, 0x10, 0x00, data.length, ...data]));
     expect(swOf(done)).toBe(SW_OK);
     expect(done.length).toBe(67);
+  });
+
+  it('Tron ECDH returns the uncompressed shared point after confirm', async () => {
+    const device = handler();
+    device.setApp('tron');
+    const path = [0x8000002c, 0x800000c3, 0x80000000, 0, 0];
+    const pathBytes = encodePath(path);
+    const peer = publicKeyUncompressed(derivePrivateKey(entropyFromMnemonic(FOUNDATION), "m/44'/60'/0'/0/0"));
+    const data = [...pathBytes, ...peer];
+    const wrongP2 = await exchange(device, apdu([0xe0, 0x0a, 0x00, 0x00, data.length, ...data]));
+    expect(swOf(wrongP2)).toBe(0x6b00);
+    const short = await exchange(device, apdu([0xe0, 0x0a, 0x00, 0x01, pathBytes.length, ...pathBytes, 0x04]));
+    expect(swOf(short)).toBe(0x6700);
+    const done = await exchange(device, apdu([0xe0, 0x0a, 0x00, 0x01, data.length, ...data]));
+    expect(swOf(done)).toBe(SW_OK);
+    const expected = secp256k1.getSharedSecret(
+      derivePrivateKey(entropyFromMnemonic(FOUNDATION), "m/44'/195'/0'/0/0"),
+      peer,
+      false,
+    );
+    expect(Array.from(done.subarray(0, 65))).toEqual(Array.from(expected));
+  });
+
+  it('Tron TIP-712 signs keccak256(0x1901 || domain || message)', async () => {
+    const device = handler();
+    device.setApp('tron');
+    const pathBytes = encodePath([0x8000002c, 0x800000c3, 0x80000000, 0, 0]);
+    const domain = new Uint8Array(32).fill(0x11);
+    const message = new Uint8Array(32).fill(0x22);
+    const foreign = encodePath([0x8000002c, 0x80000001, 0x80000000, 0, 0]);
+    expect(swOf(await exchange(device, apdu([0xe0, 0x0c, 0x00, 0x00, foreign.length + 64, ...foreign, ...domain, ...message])))).toBe(
+      0x6a80,
+    );
+    const data = [...pathBytes, ...domain, ...message];
+    const done = await exchange(device, apdu([0xe0, 0x0c, 0x00, 0x00, data.length, ...data]));
+    expect(swOf(done)).toBe(SW_OK);
+    const digest = keccak_256(Uint8Array.of(0x19, 0x01, ...domain, ...message));
+    const expected = signSecp256k1Recoverable(
+      derivePrivateKey(entropyFromMnemonic(FOUNDATION), "m/44'/195'/0'/0/0"),
+      digest,
+    );
+    expect(Array.from(done.subarray(0, 65))).toEqual(Array.from(expected));
   });
 
   it('Stellar SIGN more uses P2 0x80', async () => {
