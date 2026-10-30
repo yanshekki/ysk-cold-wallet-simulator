@@ -99,3 +99,49 @@ export function cameraSettleReason(input: {
   }
   return 'present';
 }
+
+/**
+ * The settle clock starts when the camera permission is granted and the
+ * modal is on screen. Time spent on the denied sheet does not count, so a
+ * timer that already fired before the grant cannot mount the preview on
+ * the grant frame.
+ */
+export function canStartCameraSettle(input: {
+  visible: boolean;
+  granted: boolean;
+  presented: boolean;
+  appActive: boolean;
+}): boolean {
+  return input.visible && input.granted && input.presented && input.appActive;
+}
+
+export function cameraSettledAfterGrant(input: {
+  granted: boolean;
+  visible: boolean;
+  presented: boolean;
+  appActive: boolean;
+  reason: CameraSettleReason | null;
+  elapsedSinceGrantMs: number;
+}): boolean {
+  if (!canStartCameraSettle(input) || input.reason == null) {
+    return false;
+  }
+  return input.elapsedSinceGrantMs >= cameraSettleMs(input.reason);
+}
+
+export function shouldMountPreviewAfterGrant(input: {
+  visible: boolean;
+  granted: boolean;
+  presented: boolean;
+  appActive: boolean;
+  reason: CameraSettleReason | null;
+  elapsedSinceGrantMs: number;
+}): boolean {
+  return shouldMountCameraPreview({
+    visible: input.visible,
+    granted: input.granted,
+    presented: input.presented,
+    appActive: input.appActive,
+    settled: cameraSettledAfterGrant(input),
+  });
+}

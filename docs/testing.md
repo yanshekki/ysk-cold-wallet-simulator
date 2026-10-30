@@ -61,7 +61,7 @@ The near.com phone was an iPhone running 1.1.0 (build 6). That tree includes the
 
 Core connected to a Ledger identity on CWS through CWS Proxy. The host path in this report is the proxy. Core finished the export/import round-trip across C-Chain, X-Chain, and P-Chain in the order above. The row records core.app on CWS Proxy for that sequence. Other Avalanche hosts are outside this report. The separate gap remains: Avalanche Core may not list X and P accounts end to end. See the list below and [security.md](security.md).
 
-Rabby Wallet, the browser extension, signed one trade on lfj.gg (Trader Joe / LFJ). The phone was an iPhone running 1.1.0 (build 6) after tip 0fbbf4c (#43). The device path is the Core Proxy setup: a Ledger identity on CWS through CWS Proxy, wired HID on the host forwarded to the phone over BLE. The person reported that the trade succeeded (「成功係 lfj.gg 交易」). Before that commit, this path stopped with no confirm sheet: an open Ethereum SIGN chunk (e0/04) drew no ACK. This row is the success reported after that ACK. It records that one Rabby trade on lfj.gg through CWS Proxy. Other exchanges, and Rabby over Bluetooth without the proxy, are outside this report. The static account PNG is covered by `apps/mobile/src/qr/qrPng.test.ts` (ECC M, four-module quiet zone, 8 px modules, full black-on-white contrast). Rabby was not shown scanning that PNG. See [security.md](security.md). `apps/mobile/.maestro/device-qr-scan-close.yaml` waits for `device-qr-scanner-preview` before close.
+Rabby Wallet, the browser extension, signed one trade on lfj.gg (Trader Joe / LFJ). The phone was an iPhone running 1.1.0 (build 6) after tip 0fbbf4c (#43). The device path is the Core Proxy setup: a Ledger identity on CWS through CWS Proxy, wired HID on the host forwarded to the phone over BLE. The person reported that the trade succeeded (「成功係 lfj.gg 交易」). Before that commit, this path stopped with no confirm sheet: an open Ethereum SIGN chunk (e0/04) drew no ACK. This row is the success reported after that ACK. It records that one Rabby trade on lfj.gg through CWS Proxy. Other exchanges, and Rabby over Bluetooth without the proxy, are outside this report. The static account PNG layout is covered by `apps/mobile/src/qr/qrPng.test.ts` (ECC M, four-module quiet zone, 8 px modules, full black-on-white contrast). A host attempt on 2026-10-31 is KEEP and is written below. It is not a Rabby, OneKey, or Keystone scan. See [security.md](security.md). `apps/mobile/.maestro/device-qr-scan-close.yaml` allows the camera, waits for `device-qr-scanner-preview`, then asserts that preview is visible and `device-qr-scanner-waiting` is not. The flow fails if the preview never mounts after the grant.
 
 app.rhea.finance (Rhea Finance) connected to a CWS iPhone that advertised as Ledger over Bluetooth. The host path in this report is that BLE session. Login succeeded, and one transaction succeeded. The person reported that login and the transaction succeeded (「成功用 ledger 藍牙登入及交易成功」). This row records that login and that transaction on app.rhea.finance. CWS Proxy is outside this report. Other Near hosts and other DEX hosts are outside this report. Seeds are not absolutely safe. See [security.md](security.md).
 
@@ -69,5 +69,23 @@ app.rhea.finance (Rhea Finance) connected to a CWS iPhone that advertised as Led
 
 - A release build’s OS authenticator prompt was not shown on a device for 1.1.0.
 - iOS screenshot behaviour was not re-checked on a device for this version note. The iOS limit is described in [security.md](security.md).
-- Phantom unlock, a live Rabby scan of the static account PNG, Avalanche Core X/P listing, and OKX asset display were not closed. The PNG layout itself is tested. See known host gaps in the security document.
+- Phantom unlock, a live Rabby scan of the static account PNG, Avalanche Core X/P listing, and OKX asset display were not closed. The 2026-10-31 attempt below is host-only KEEP. The PNG layout itself is tested. See known host gaps in the security document.
 - The automated suites, the October Android handset checks, and the Ubuntu package checks did not use a secret that controls real funds. Do not add one.
+
+## Static account PNG, 2026-10-31
+
+KEEP. This is not a MATCH. Seeds are not absolutely safe.
+
+Host `ki-mac-mini`. The PNG is the current `encodeQrPng` default for the OneKey and Keystone account profiles (`crypto-hdkey`, public test mnemonic): ECC M, four-module quiet zone, 8 px modules, black on white. Both symbols are 61 modules and 552 px wide. The files were not committed.
+
+Local decoder only. `zbarimg` 0.23.95 read each file as one uppercase `UR:CRYPTO-HDKEY` payload, 316 bytes for OneKey and 320 bytes for Keystone, byte-identical to `payloadForQr` of that encoder. That check is not Rabby, OneKey, or Keystone.
+
+Wallet hosts that did not scan it:
+
+- Google Chrome is installed. Reading `~/Library/Application Support/Google/Chrome/Default/Extensions` returned `Operation not permitted`. Rabby was not opened. An unpacked Rabby 0.94.13 tree at `Documents/cws-test-screenshots/chrome-ext/rabby` was not loaded. There is no Rabby app.
+- OneKey.app 6.6.3 (build 2026102381) is installed. No OneKey scan or import window was opened.
+- No Keystone wallet app is installed.
+
+Camera. AVFoundation listed OBS Virtual Camera, Shek Ki的iPhone的相機 (iPhone18,3 Continuity Camera), Shek Ki的iPhone桌上視角攝影機, and Capture screen 0. Preview showed the OneKey PNG. ffmpeg wrote no frame. A 5 fps open was rejected. A yuv420p open was rejected. The desk-view camera rejected 1280x720. A second open at 30 fps, pixel format uyvy422, 1280x720 for the iPhone camera and 1920x1440 for desk view, timed out at 15 seconds each. Screen capture was not used as a scan. Continuity Camera did not deliver a frame, and it was not attached to a Rabby or OneKey window.
+
+Classification: host-only KEEP.

@@ -23,10 +23,16 @@ tags:
     visible:
       id: "device-qr-scanner"
     timeout: 12000
+# camera: allow must settle into a mounted preview. This wait is not
+# optional: the flow fails when device-qr-scanner-preview never appears.
 - extendedWaitUntil:
     visible:
       id: "device-qr-scanner-preview"
     timeout: 12000
+- assertVisible:
+    id: "device-qr-scanner-preview"
+- assertNotVisible:
+    id: "device-qr-scanner-waiting"
 - tapOn:
     id: "device-qr-scanner-close"
 - extendedWaitUntil:

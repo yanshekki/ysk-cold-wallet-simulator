@@ -385,7 +385,7 @@ Capture checklist (record the OneKey App screen, then the V1 or V2 bytes):
 
 **Status.** KEEP for every registry type this tree does not already encode. No new type was added. Rabby, MetaMask, OKX, Sparrow, and the Keystone app were not shown scanning an unimplemented type in this pass. The types CWS already encodes stay MATCH in [vendor-protocols.md](vendor-protocols.md). Fountain tests cover multipart. Seed QR still confirms. No proxy UR bridge.
 
-Static single-account UR PNG (`apps/mobile/src/qr/qrPng.ts`, `qrPng.test.ts`): ECC level M, four-module quiet zone, default 8 px modules, pixels only `0x00` and `0xFF`. There is no brightness control because the bitmap is already full contrast. Rabby was not shown scanning that PNG in this pass. That host-camera gap stays open. The PNG layout is not the open item.
+Static single-account UR PNG (`apps/mobile/src/qr/qrPng.ts`, `qrPng.test.ts`): ECC level M, four-module quiet zone, default 8 px modules, pixels only `0x00` and `0xFF`. There is no brightness control because the bitmap is already full contrast. On 2026-10-31, host `ki-mac-mini` encoded that PNG for the OneKey and Keystone account profiles. Local `zbarimg` 0.23.95 decoded both files. Rabby was not opened (Chrome’s extension directory is blocked by macOS). OneKey.app 6.6.3 was not given a scan session. No Keystone wallet app is installed. Continuity Camera is enumerated as the lab iPhone, and ffmpeg timed out without a frame while Preview showed the PNG. That attempt is host-only KEEP in [testing.md](testing.md). It is not a host PASS.
 
 ## Honest KEEP after #68
 

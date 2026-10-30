@@ -7,9 +7,11 @@ import {
   cameraPreviewKey,
   cameraSettleMs,
   cameraSettleReason,
+  canStartCameraSettle,
   isCameraAppActive,
   nextCameraGeneration,
   shouldMountCameraPreview,
+  shouldMountPreviewAfterGrant,
   shouldPromptCameraPermission,
   shouldRemountAfterFailure,
   shouldRunCameraSession,
@@ -141,6 +143,64 @@ describe('camera session lifecycle after Continuity / WebRTC', () => {
     expect(cameraSettleMs('app-focus')).toBe(CAMERA_FOCUS_SETTLE_MS);
     expect(cameraSettleMs('mount-error')).toBe(CAMERA_MOUNT_ERROR_SETTLE_MS);
     expect(CAMERA_FOCUS_SETTLE_MS).toBeGreaterThan(CAMERA_PRESENT_SETTLE_MS);
+  });
+
+  it('mounts only after permission grant and the settle for that reason', () => {
+    const ready = {
+      visible: true,
+      presented: true,
+      appActive: true,
+    };
+    expect(canStartCameraSettle({ ...ready, granted: false })).toBe(false);
+    expect(
+      shouldMountPreviewAfterGrant({
+        ...ready,
+        granted: false,
+        reason: 'present',
+        elapsedSinceGrantMs: CAMERA_PRESENT_SETTLE_MS,
+      }),
+    ).toBe(false);
+    expect(
+      shouldMountPreviewAfterGrant({
+        ...ready,
+        granted: true,
+        reason: 'present',
+        elapsedSinceGrantMs: CAMERA_PRESENT_SETTLE_MS - 1,
+      }),
+    ).toBe(false);
+    expect(
+      shouldMountPreviewAfterGrant({
+        ...ready,
+        granted: true,
+        reason: 'present',
+        elapsedSinceGrantMs: CAMERA_PRESENT_SETTLE_MS,
+      }),
+    ).toBe(true);
+    expect(
+      shouldMountPreviewAfterGrant({
+        ...ready,
+        granted: true,
+        reason: 'app-focus',
+        elapsedSinceGrantMs: CAMERA_FOCUS_SETTLE_MS - 1,
+      }),
+    ).toBe(false);
+    expect(
+      shouldMountPreviewAfterGrant({
+        ...ready,
+        granted: true,
+        reason: 'app-focus',
+        elapsedSinceGrantMs: CAMERA_FOCUS_SETTLE_MS,
+      }),
+    ).toBe(true);
+    expect(
+      shouldMountPreviewAfterGrant({
+        ...ready,
+        appActive: false,
+        granted: true,
+        reason: 'app-focus',
+        elapsedSinceGrantMs: CAMERA_FOCUS_SETTLE_MS,
+      }),
+    ).toBe(false);
   });
 
   it('caps automatic remounts after a dead session', () => {
