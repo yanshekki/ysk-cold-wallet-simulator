@@ -827,6 +827,76 @@ describe('attachLedger', () => {
     adapter.close();
   });
 
+  it.each([
+    {
+      name: 'Ethereum SIGN first chunk',
+      apdu: Uint8Array.of(0xe0, 0x04, 0x00, 0x00, 0x02, 0xf8, 0x01),
+    },
+    {
+      name: 'Cardano v8 SIGN_TX INIT',
+      apdu: Uint8Array.of(0xd7, 0x21, 0x10, 0x00, 0x00),
+    },
+    {
+      name: 'Avalanche SIGN init',
+      apdu: Uint8Array.of(0x80, 0x05, 0x00, 0x00, 0x00),
+    },
+    {
+      name: 'Aptos SIGN with P2 more',
+      apdu: Uint8Array.of(0x5b, 0x06, 0x00, 0x80, 0x00),
+    },
+    {
+      name: 'Cosmos SIGN Zondax init',
+      apdu: Uint8Array.of(0x55, 0x02, 0x00, 0x00, 0x00),
+    },
+    {
+      name: 'XRP SIGN with P1 more',
+      apdu: Uint8Array.of(0xe0, 0x04, 0x80, 0x00, 0x00),
+    },
+    {
+      name: 'NEAR SIGN mid-chunk',
+      apdu: Uint8Array.of(0x80, 0x02, 0x00, 0x00, 0x00),
+    },
+  ])('hold-forwards an unarmed empty 9000 for $name', async ({ apdu }) => {
+    const { host, gadget } = memoryHidPair();
+    let notify: ((packet: Uint8Array) => void) | undefined;
+    let writes = 0;
+    const status9000 = Uint8Array.of(0x05, 0x00, 0x00, 0x00, 0x02, 0x90, 0x00);
+    const ble = {
+      async write() {
+        writes += 1;
+        notify?.(status9000);
+      },
+      onNotify(callback: (packet: Uint8Array) => void) {
+        notify = callback;
+        return () => undefined;
+      },
+      async close() {
+        return;
+      },
+    };
+    const logs: string[] = [];
+    const adapter = attachLedger(gadget, ble, DEFAULT_MTU, (line) => logs.push(line));
+    const replies: Uint8Array[] = [];
+    host.onInput((report) => replies.push(report));
+    for (const report of wrapHidApdu(Uint8Array.of(0xe0, 0x04, 0x00, 0x00, 0x00))) {
+      host.write(report);
+    }
+    await adapter.idle();
+    expect(replies[0]?.[7]).toBe(0x90);
+    replies.length = 0;
+    logs.length = 0;
+    for (const report of wrapHidApdu(apdu)) {
+      host.write(report);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    await adapter.idle();
+    expect(writes).toBeGreaterThanOrEqual(2);
+    expect(replies.some((report) => report[7] === 0x90 && report[8] === 0x00)).toBe(true);
+    expect(logs.some((line) => line.includes('holding 0x9000'))).toBe(true);
+    expect(logs.some((line) => line.includes('ignored leftover'))).toBe(false);
+    adapter.close();
+  });
+
   it('ignores an all-zero HID probe without forwarding BLE', async () => {
     const { host, gadget } = memoryHidPair();
     const writes: Uint8Array[] = [];
