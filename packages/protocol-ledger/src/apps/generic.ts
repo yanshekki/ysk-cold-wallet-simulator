@@ -75,7 +75,7 @@ export type CardanoSignMsgWire = {
   filled: number;
   path: string;
   pubkey: Uint8Array;
-  keyHash: Uint8Array;
+  addressField: Uint8Array;
 };
 
 export type FamilySession = {
