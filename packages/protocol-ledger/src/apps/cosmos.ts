@@ -9,7 +9,9 @@ import {
   type FamilySpec,
 } from './generic';
 import { cosmosBech32, encodePubAndAddress } from './addresses';
-import type { Apdu } from '../apdu';
+import { encodeResponse, pathToString, SW_DENY, SW_OK, type Apdu } from '../apdu';
+import { encodeAscii } from '../bytes';
+import { derivePrivateKeyFromSeed, publicKeyCompressed, seedFor } from '../crypto';
 
 export type CosmosSession = FamilySession;
 
@@ -41,5 +43,77 @@ function spec(): FamilySpec {
 }
 
 export function handleCosmosApdu(apdu: Apdu, ctx: FamilyContext, session: CosmosSession) {
+  if (apdu.ins === 0x04) {
+    const requested = parseCosmosHrpRequest(apdu.data);
+    if (requested) {
+      return exportCosmosHrpAddress(apdu, ctx, requested);
+    }
+  }
   return handleFamilyApdu(apdu, spec(), ctx, session);
+}
+
+type CosmosHrpRequest = { hrp: string; path: string };
+
+/**
+ * hw-app-cosmos `serializeHRP` + `serializePath`: one HRP length byte, the HRP,
+ * then five little-endian path components. `crypto_fillAddress` returns the
+ * 33-byte compressed key and the bech32 text with no length prefixes.
+ * A BIP32 length-prefixed body is left to the generic helper.
+ */
+function parseCosmosHrpRequest(data: Uint8Array): CosmosHrpRequest | undefined {
+  if (data.length < 22) {
+    return undefined;
+  }
+  const hrpLen = data[0]!;
+  if (hrpLen < 1 || hrpLen > 83 || data.length !== 1 + hrpLen + 20) {
+    return undefined;
+  }
+  const hrpBytes = data.subarray(1, 1 + hrpLen);
+  for (const byte of hrpBytes) {
+    if (byte < 0x21 || byte > 0x7e) {
+      return undefined;
+    }
+  }
+  const components: number[] = [];
+  for (let index = 0; index < 5; index += 1) {
+    const offset = 1 + hrpLen + index * 4;
+    components.push(
+      (data[offset]! | (data[offset + 1]! << 8) | (data[offset + 2]! << 16) | (data[offset + 3]! << 24)) >>> 0,
+    );
+  }
+  return { hrp: encodeAsciiToString(hrpBytes), path: pathToString(components) };
+}
+
+function encodeAsciiToString(bytes: Uint8Array): string {
+  return Array.from(bytes, (byte) => String.fromCharCode(byte)).join('');
+}
+
+async function exportCosmosHrpAddress(
+  apdu: Apdu,
+  ctx: FamilyContext,
+  requested: CosmosHrpRequest,
+): Promise<Uint8Array> {
+  if (apdu.p1 !== 0x00) {
+    const ok = await ctx.confirmation.confirm({
+      brand: 'ledger',
+      kind: 'address',
+      title: 'Export Cosmos address',
+      path: requested.path,
+      message: `Export Cosmos address\n${requested.hrp}\n${requested.path}`,
+    });
+    if (!ok) {
+      return encodeResponse(new Uint8Array(), SW_DENY);
+    }
+  }
+  const seed = await seedFor(ctx.confirmation, ctx.slotId, ctx.entropy, ctx.backup ?? 'bip39');
+  const compressed = publicKeyCompressed(derivePrivateKeyFromSeed(seed, requested.path));
+  const address = encodeAscii(cosmosBech32(compressed, requested.hrp));
+  return encodeResponse(concatPubkey(compressed, address), SW_OK);
+}
+
+function concatPubkey(publicKey: Uint8Array, address: Uint8Array): Uint8Array {
+  const out = new Uint8Array(publicKey.length + address.length);
+  out.set(publicKey, 0);
+  out.set(address, publicKey.length);
+  return out;
 }

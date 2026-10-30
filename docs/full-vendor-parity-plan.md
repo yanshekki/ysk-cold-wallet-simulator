@@ -114,7 +114,7 @@ Sources already cited in [ledger-apdu.md](ledger-apdu.md). Close a row only with
 | Ethereum | INS `22` `32` `36` `38` `3A` (domain, simulation, safe account, gated signing, map entry) | [app-ethereum `doc/apdu.md`](https://github.com/LedgerHQ/app-ethereum/blob/develop/doc/apdu.md). hw-app-eth `Eth.ts` sends only `22` (`provideDomainName`) from this set. Blocker: the TLV is CAL-signed. Empty `9000` would accept an unsigned domain. `32` / `36` / `38` / `3A` are not written by that host package. All five stay `6D00`. `12` / `16` / `1E` acknowledge and store nothing |
 | Tron | sign-by-hash setting word `6A8C` | ECDH `0A` and TIP-712 `0C` are MATCH. [app-tron `ui_globals.c`](https://github.com/LedgerHQ/app-tron/blob/develop/src/ui/ui_globals.c). CWS does not model the off switch, so `E_MISSING_SETTING_SIGN_BY_HASH` is not returned |
 | XRP | ed25519 when P2 is `80` | [hw-app-xrp](https://github.com/LedgerHQ/ledger-live/blob/develop/libs/ledgerjs/packages/hw-app-xrp/src/Xrp.ts). Not exercised |
-| Cosmos | GET_ADDR HRP request and `pk\|addr` without length prefixes | [Zondax ledger-cosmos](https://github.com/Zondax/ledger-cosmos/blob/master/app/src/common/app_main.h). The length-prefixed helper is still what some hosts send |
+| Cosmos | length-prefixed GET_ADDR helper | HRP requests are MATCH (`pk` ‖ bech32, no length prefixes) from [hw-app-cosmos](https://github.com/LedgerHQ/ledger-live/blob/develop/libs/ledgerjs/packages/hw-app-cosmos/src/Cosmos.ts) and `crypto_fillAddress`. A length-prefixed BIP32 body is still accepted for older hosts |
 | Polkadot | SCALE / metadata proof; SS58 prefix taken from the payload | [Zondax ledger-polkadot APDUSPEC](https://github.com/Zondax/ledger-polkadot/blob/master/docs/APDUSPEC.md) |
 | TON | BOC / cell hash; proof and sign-data fields | [app-ton COMMANDS](https://github.com/LedgerHQ/app-ton/blob/master/doc/COMMANDS.md). The hash field is sha256 of the uploaded bytes |
 | NEAR | Fresh firmware diff | The handler matches the near.com path already in the tree. This pass did not re-read app-near |
@@ -347,7 +347,7 @@ Docs only. No handler change. No USB install. No Proxy rebuild.
 
 One family, or a small set that shares a chunk mode, per PR. Official chunk mode, response length, and a confirm sheet. Algorand Ed25519 stays KEEP if the source is HDW_NORMAL and CWS would sign SLIP-10. XMSS (QRL), RSA (Arweave), Mina field, and Curve25519 (Waves) stay KEEP when the curve is not the one CWS derives. Proxy test in the same PR.
 
-XRP ed25519, Cosmos HRP GET_ADDR, Polkadot SCALE, and TON cell hash are still this phase. They already have a core handler. Stellar `maxDataSize` is MATCH (Nano X `4096`, other models `8192`). Tron ECDH and TIP-712 are MATCH. TIP-712 does not return firmware `6A8C` for a disabled sign-by-hash setting.
+XRP ed25519, Polkadot SCALE, and TON cell hash are still this phase. They already have a core handler. Stellar `maxDataSize` is MATCH (Nano X `4096`, other models `8192`). Tron ECDH and TIP-712 are MATCH. TIP-712 does not return firmware `6A8C` for a disabled sign-by-hash setting. Cosmos HRP GET_ADDR is MATCH. A length-prefixed Cosmos address body is still accepted.
 
 ### Phase 6 — Trezor gaps Safe 7 hosts send
 
