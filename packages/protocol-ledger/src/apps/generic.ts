@@ -37,9 +37,21 @@ export type SuiBlocksSession = {
   payloads: Uint8Array[];
 };
 
+/**
+ * Cardano SIGN_TX stream. v7 and v8 reuse P1 values for different stages, so
+ * the protocol tag is the catalog major version at the time the stream starts.
+ * `body` is the bytes uploaded so far. It is not the canonical CBOR transaction.
+ */
+export type CardanoTxWire = {
+  protocol: 'v7' | 'v8';
+  body: Uint8Array;
+  hash?: Uint8Array;
+};
+
 export type FamilySession = {
   pendingSign?: { path: string; payload: Uint8Array };
   suiBlocks?: SuiBlocksSession;
+  cardanoTx?: CardanoTxWire;
 };
 
 export type FamilySpec = {

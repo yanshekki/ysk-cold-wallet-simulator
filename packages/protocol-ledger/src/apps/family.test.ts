@@ -370,7 +370,7 @@ describe('Ledger family APDU bodies', () => {
     );
     const path = [0x8000002c, 0x800001f5, 0x80000000];
     const pathBytes = encodePath(path);
-    const data = [...pathBytes, ...message];
+    const data = [0x01, ...pathBytes, ...message];
     const seen: SigningRequest[] = [];
     const nanoX = LEDGER_MODELS.find((model) => model.id === 'nano-x')!;
     const device = new LedgerProtocolHandler({
@@ -402,14 +402,12 @@ describe('Ledger family APDU bodies', () => {
     const pathBytes = encodePath([0x8000002c, 0x800001f5, 0x80000000]);
     const first = [0x11, 0x22, 0x33, 0x44];
     const rest = [0x55, 0x66, 0x77, 0x88];
-    const more = await exchange(
-      device,
-      apdu([0xe0, 0x06, 0x01, 0x02, pathBytes.length + first.length, ...pathBytes, ...first]),
-    );
+    const head = [0x01, ...pathBytes, ...first];
+    const more = await exchange(device, apdu([0xe0, 0x06, 0x01, 0x02, head.length, ...head]));
     expect(swOf(more)).toBe(SW_OK);
     expect(more.length).toBe(2);
 
-    const done = await exchange(device, apdu([0xe0, 0x06, 0x01, 0x00, rest.length, ...rest]));
+    const done = await exchange(device, apdu([0xe0, 0x06, 0x01, 0x01, rest.length, ...rest]));
     expect(swOf(done)).toBe(SW_OK);
     expect(done.length).toBe(66);
     const message = Uint8Array.from([...first, ...rest]);
@@ -420,21 +418,15 @@ describe('Ledger family APDU bodies', () => {
     expect(Array.from(done.subarray(0, 64))).toEqual(Array.from(expected));
   });
 
-  it('Cardano MORE ACKs empty 9000 then signs on last', async () => {
+  it('Cardano v8 INIT and CHUNK ACK empty 9000', async () => {
     const device = handler();
     device.setApp('cardano');
-    const pathBytes = encodePath([0x8000073c, 0x80000717, 0x80000000, 0, 0]);
-    const first = [0x11, 0x22];
-    const rest = [0x33, 0x44];
-    const more = await exchange(
-      device,
-      apdu([0xd7, 0x21, 0x00, 0x02, pathBytes.length + first.length, ...pathBytes, ...first]),
-    );
-    expect(swOf(more)).toBe(SW_OK);
-    expect(more.length).toBe(2);
-    const done = await exchange(device, apdu([0xd7, 0x21, 0x01, 0x00, rest.length, ...rest]));
-    expect(swOf(done)).toBe(SW_OK);
-    expect(done.length).toBeGreaterThan(2);
+    const init = await exchange(device, apdu([0xd7, 0x21, 0x10, 0x00, 0x04, 0, 0, 0, 1]));
+    expect(swOf(init)).toBe(SW_OK);
+    expect(init.length).toBe(2);
+    const chunk = await exchange(device, apdu([0xd7, 0x21, 0x11, 0x00, 0x02, 0x11, 0x22]));
+    expect(swOf(chunk)).toBe(SW_OK);
+    expect(chunk.length).toBe(2);
   });
 
   it('Bitcoin TX assembly INS 0x44 ACKs a 1-in start then 0x48 signs', async () => {

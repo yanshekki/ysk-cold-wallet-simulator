@@ -209,6 +209,7 @@ What was run, and what was not, is in [docs/testing.md](docs/testing.md). In Oct
 | [docs/releases/1.1.0.md](docs/releases/1.1.0.md) | Bilingual notes for 1.1.0 (build 6) |
 | [docs/store/README.md](docs/store/README.md) | Mac App Store screenshot index |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Engineering layout |
+| [docs/ledger-apdu.md](docs/ledger-apdu.md) | Ledger APDU stages, response lengths, and what CWS still does not implement |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Review, tests, and secrets to keep out of git |
 | [LICENSE](LICENSE) | Copyright YSK Limited. All rights reserved. |
 

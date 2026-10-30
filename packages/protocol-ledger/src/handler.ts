@@ -42,7 +42,7 @@ import { coinFromAppId, handleBitcoinApdu, type BtcSession } from './apps/bitcoi
 import { CLA_FRAMEWORK, handleBitcoinClientApdu } from './apps/bitcoinClient';
 import { handleEthereumApdu, type EthSession } from './apps/ethereum';
 import { handleNearApdu, type NearSession } from './apps/near';
-import { handleSolanaApdu } from './apps/solana';
+import { handleSolanaApdu, isSolanaSignPayload } from './apps/solana';
 import { handleXrpApdu } from './apps/xrp';
 import { handleCardanoApdu } from './apps/cardano';
 import { handlePolkadotApdu } from './apps/polkadot';
@@ -130,6 +130,7 @@ export class LedgerProtocolHandler implements ProtocolHandler {
     this.avaxSession.signChunks = undefined;
     this.familySession.pendingSign = undefined;
     this.familySession.suiBlocks = undefined;
+    this.familySession.cardanoTx = undefined;
     this.btcSession.version = undefined;
     this.btcSession.prevouts = undefined;
     this.btcSession.prevout = undefined;
@@ -153,6 +154,7 @@ export class LedgerProtocolHandler implements ProtocolHandler {
     this.avaxSession.signChunks = undefined;
     this.familySession.pendingSign = undefined;
     this.familySession.suiBlocks = undefined;
+    this.familySession.cardanoTx = undefined;
     this.onAppChange?.(app);
   }
 
@@ -198,6 +200,7 @@ export class LedgerProtocolHandler implements ProtocolHandler {
         this.avaxSession.signChunks = undefined;
         this.familySession.pendingSign = undefined;
         this.familySession.suiBlocks = undefined;
+        this.familySession.cardanoTx = undefined;
         return framePayload(TAG_INIT, new Uint8Array(), this.mtu);
       case TAG_APDU: {
         const response = await this.handleApdu(payload);
@@ -480,6 +483,18 @@ function inferAppFromApdu(app: LedgerApp, apdu: ReturnType<typeof parseApdu>): L
   // phone shows Near and never opens an export confirm sheet.
   if (family === 'avalanche' && (apdu.cla === 0x80 || apdu.cla === 0xe0)) {
     return undefined;
+  }
+  // Ethereum INS 0x06 is an empty GET_APP_CONFIGURATION. A data-bearing E0 06/07
+  // whose first bytes are a Solana path count plus 44'/501' is SIGN_MESSAGE /
+  // SIGN_OFFCHAIN. Leaving it on the dashboard (or on Ethereum) returns version
+  // bytes, so the host never sends the rest of the transaction.
+  if (
+    apdu.cla === 0xe0 &&
+    (apdu.ins === 0x06 || apdu.ins === 0x07) &&
+    apdu.data.length > 0 &&
+    isSolanaSignPayload(apdu.data)
+  ) {
+    return family === 'solana' ? undefined : 'solana';
   }
   const fromPath = inferAppFromPath(apdu);
   if (fromPath && ledgerAppFamily(fromPath) !== family) {

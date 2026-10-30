@@ -1,5 +1,6 @@
 import type { SigningRequest } from '@cws/contracts';
 import { catalogVersion } from '@cws/contracts';
+import { blake2b } from '@noble/hashes/blake2b';
 import { concatBytes } from '../bytes';
 import {
   encodeResponse,
@@ -8,9 +9,11 @@ import {
   SW_DENY,
   SW_INS_NOT_SUPPORTED,
   SW_OK,
+  SW_WRONG_LENGTH,
+  SW_WRONG_P1P2,
   type Apdu,
 } from '../apdu';
-import { versionTriple, type FamilyContext, type FamilySession } from './generic';
+import { versionTriple, type CardanoTxWire, type FamilyContext, type FamilySession } from './generic';
 import { cardanoEnterprise, encodePubAndAddress } from './addresses';
 import { icarusRootFor } from '../crypto';
 import { deriveIcarus, deriveIcarusFromRoot, signIcarus } from './icarus';
@@ -41,10 +44,199 @@ export async function handleCardanoApdu(
   if (apdu.ins === 0x11) {
     return exportAddress(apdu, ctx);
   }
-  if (apdu.ins === 0x21 || apdu.ins === 0x15) {
-    return signPayload(apdu, ctx, session);
+  if (apdu.ins === 0x21) {
+    return signTransaction(apdu, ctx, session);
   }
   return encodeResponse(new Uint8Array(), SW_INS_NOT_SUPPORTED);
+}
+
+/**
+ * @cardano-foundation/ledgerjs-hw-app-cardano `isV8App`: major >= 8.
+ * major <= 7 uses the v7 stage map, including 7.0 through 7.2.1.
+ */
+export function cardanoWireProtocol(version = catalogVersion('cardano', '8.0.8')): 'v7' | 'v8' {
+  const major = Number.parseInt(version.split('.')[0] ?? '', 10);
+  return Number.isFinite(major) && major >= 8 ? 'v8' : 'v7';
+}
+
+const V8_WITNESS = 0x0f;
+const V8_INIT = 0x10;
+const V8_CHUNK = 0x11;
+const V8_CONFIRM = 0x12;
+
+const V7_INIT = 0x01;
+const V7_CONFIRM = 0x0a;
+const V7_WITNESS = 0x0f;
+/** CIP-36 registration confirm. Host expects 32-byte hash || 64-byte signature. */
+const V7_AUX_CONFIRM_P2 = 0x34;
+
+/**
+ * v7 SIGN_TX stages that return an empty body. 0x10/0x11/0x12 are total
+ * collateral, reference inputs, and collateral output — not the v8 stream.
+ */
+const V7_EMPTY_P1 = new Set([
+  V7_INIT,
+  0x02,
+  0x03,
+  0x04,
+  0x05,
+  0x06,
+  0x07,
+  0x08,
+  0x09,
+  0x0b,
+  0x0c,
+  0x0d,
+  0x0e,
+  0x10,
+  0x11,
+  0x12,
+  0x13,
+  0x15,
+  0x16,
+]);
+
+function emptyOk(): Uint8Array {
+  return encodeResponse(new Uint8Array(), SW_OK);
+}
+
+function txHash(body: Uint8Array): Uint8Array {
+  return blake2b(body, { dkLen: 32 });
+}
+
+function openTx(session: CardanoSession, protocol: 'v7' | 'v8', reset: boolean): CardanoTxWire {
+  if (reset || !session.cardanoTx || session.cardanoTx.protocol !== protocol) {
+    session.cardanoTx = { protocol, body: new Uint8Array() };
+  }
+  return session.cardanoTx;
+}
+
+function remember(tx: CardanoTxWire, data: Uint8Array): void {
+  if (data.length > 0) {
+    tx.body = concatBytes(tx.body, data);
+    tx.hash = undefined;
+  }
+}
+
+async function signTransaction(
+  apdu: Apdu,
+  ctx: FamilyContext,
+  session: CardanoSession,
+): Promise<Uint8Array> {
+  return cardanoWireProtocol() === 'v8'
+    ? signTransactionV8(apdu, ctx, session)
+    : signTransactionV7(apdu, ctx, session);
+}
+
+async function signTransactionV8(
+  apdu: Apdu,
+  ctx: FamilyContext,
+  session: CardanoSession,
+): Promise<Uint8Array> {
+  if (apdu.p1 === V8_INIT) {
+    openTx(session, 'v8', true);
+    return emptyOk();
+  }
+  if (apdu.p1 === V8_CHUNK) {
+    remember(openTx(session, 'v8', false), apdu.data);
+    return emptyOk();
+  }
+  if (apdu.p1 === V8_CONFIRM) {
+    const tx = openTx(session, 'v8', false);
+    remember(tx, apdu.data);
+    if (tx.body.length === 0) {
+      return encodeResponse(new Uint8Array(), SW_WRONG_LENGTH);
+    }
+    const ok = await confirmTx(ctx, tx.body);
+    if (!ok) {
+      return encodeResponse(new Uint8Array(), SW_DENY);
+    }
+    tx.hash = txHash(tx.body);
+    return encodeResponse(tx.hash, SW_OK);
+  }
+  if (apdu.p1 === V8_WITNESS) {
+    return signWitness(apdu, ctx, session, 'v8');
+  }
+  // P1 0x13 is the CIP-36 auxiliary sub-flow. The last APDU is 96 bytes.
+  // That parser is not implemented; do not answer it with a witness signature.
+  if (apdu.p1 === 0x13) {
+    return encodeResponse(new Uint8Array(), SW_INS_NOT_SUPPORTED);
+  }
+  return encodeResponse(new Uint8Array(), SW_WRONG_P1P2);
+}
+
+async function signTransactionV7(
+  apdu: Apdu,
+  ctx: FamilyContext,
+  session: CardanoSession,
+): Promise<Uint8Array> {
+  if (apdu.p1 === 0x08 && apdu.p2 === V7_AUX_CONFIRM_P2) {
+    return encodeResponse(new Uint8Array(), SW_INS_NOT_SUPPORTED);
+  }
+  if (apdu.p1 === V7_INIT) {
+    const tx = openTx(session, 'v7', true);
+    remember(tx, apdu.data);
+    return emptyOk();
+  }
+  if (V7_EMPTY_P1.has(apdu.p1)) {
+    remember(openTx(session, 'v7', false), apdu.data);
+    return emptyOk();
+  }
+  if (apdu.p1 === V7_CONFIRM) {
+    const tx = openTx(session, 'v7', false);
+    remember(tx, apdu.data);
+    const ok = await confirmTx(ctx, tx.body);
+    if (!ok) {
+      return encodeResponse(new Uint8Array(), SW_DENY);
+    }
+    tx.hash = txHash(tx.body);
+    return encodeResponse(tx.hash, SW_OK);
+  }
+  if (apdu.p1 === V7_WITNESS) {
+    return signWitness(apdu, ctx, session, 'v7');
+  }
+  return encodeResponse(new Uint8Array(), SW_WRONG_P1P2);
+}
+
+async function confirmTx(ctx: FamilyContext, body: Uint8Array): Promise<boolean> {
+  return confirm(ctx, {
+    kind: 'sign',
+    title: 'Sign Cardano',
+    path: 'cardano-tx',
+    message: 'Sign Cardano transaction',
+    rawPayload: body,
+  });
+}
+
+async function signWitness(
+  apdu: Apdu,
+  ctx: FamilyContext,
+  session: CardanoSession,
+  protocol: 'v7' | 'v8',
+): Promise<Uint8Array> {
+  const tx = session.cardanoTx;
+  if (!tx || tx.protocol !== protocol || !tx.hash) {
+    return encodeResponse(new Uint8Array(), SW_WRONG_P1P2);
+  }
+  let path: string;
+  try {
+    path = parseBip32Path(apdu.data).path;
+  } catch {
+    return encodeResponse(new Uint8Array(), SW_WRONG_LENGTH);
+  }
+  path = ctx.confirmation.resolvePath?.(path, ['ada']) ?? path;
+  const ok = await confirm(ctx, {
+    kind: 'sign',
+    title: 'Sign Cardano witness',
+    path,
+    message: `Sign Cardano witness\n${path}`,
+    rawPayload: tx.hash,
+  });
+  if (!ok) {
+    return encodeResponse(new Uint8Array(), SW_DENY);
+  }
+  const node = await icarusAt(ctx, path);
+  return encodeResponse(signIcarus(node, tx.hash), SW_OK);
 }
 
 async function exportExtPubkey(apdu: Apdu, ctx: FamilyContext): Promise<Uint8Array> {
@@ -77,43 +269,6 @@ async function exportAddress(apdu: Apdu, ctx: FamilyContext): Promise<Uint8Array
   }
   const node = await icarusAt(ctx, path);
   return encodeResponse(encodePubAndAddress(node.publicKey, cardanoEnterprise(node.publicKey)), SW_OK);
-}
-
-async function signPayload(
-  apdu: Apdu,
-  ctx: FamilyContext,
-  session: CardanoSession,
-): Promise<Uint8Array | null> {
-  const hasMore = (apdu.p2 & 0x02) !== 0;
-  if (!session.pendingSign || apdu.p1 === 0x00) {
-    const parsed = parseBip32PathSafe(apdu.data);
-    session.pendingSign = {
-      path: ctx.confirmation.resolvePath?.(parsed.path, ['ada']) ?? parsed.path,
-      payload: parsed.rest,
-    };
-  } else {
-    session.pendingSign.payload = concatBytes(session.pendingSign.payload, apdu.data);
-  }
-  if (hasMore) {
-    return encodeResponse(new Uint8Array(), SW_OK);
-  }
-  const pending = session.pendingSign;
-  session.pendingSign = undefined;
-  if (!pending) {
-    return encodeResponse(new Uint8Array(), SW_INS_NOT_SUPPORTED);
-  }
-  const ok = await confirm(ctx, {
-    kind: 'sign',
-    title: 'Sign Cardano',
-    path: pending.path,
-    message: `Sign Cardano\n${pending.path}`,
-    rawPayload: pending.payload,
-  });
-  if (!ok) {
-    return encodeResponse(new Uint8Array(), SW_DENY);
-  }
-  const node = await icarusAt(ctx, pending.path);
-  return encodeResponse(signIcarus(node, pending.payload), SW_OK);
 }
 
 function parsePath(apdu: Apdu, ctx: FamilyContext): string {
