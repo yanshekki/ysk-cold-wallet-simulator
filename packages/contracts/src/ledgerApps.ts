@@ -70,6 +70,10 @@ export type LedgerAppFamily =
   | 'nervos'
   | 'namada'
   | 'spacemesh'
+  | 'qubic'
+  | 'solar'
+  | 'lto'
+  | 'factom'
   | 'utility'
   | 'unknown';
 
@@ -215,6 +219,10 @@ const FAMILY_BY_OPEN_NAME: Readonly<Record<string, LedgerAppFamily>> = {
   namada: 'namada',
   nervos: 'nervos',
   spacemesh: 'spacemesh',
+  qubic: 'qubic',
+  solar: 'solar',
+  'lto network': 'lto',
+  factom: 'factom',
   // ethereum clear-signing plugins — companions, not standalone APDU apps
   '1inch': 'ethereum-plugin',
   alkemi: 'ethereum-plugin',
@@ -312,6 +320,10 @@ const FAMILY_RULES: [RegExp, LedgerAppFamily][] = [
   [/^namada$/i, 'namada'],
   [/^nervos$/i, 'nervos'],
   [/^spacemesh$/i, 'spacemesh'],
+  [/^qubic$/i, 'qubic'],
+  [/^solar$/i, 'solar'],
+  [/^lto network$/i, 'lto'],
+  [/^factom$/i, 'factom'],
 ];
 
 export function inferLedgerFamily(name: string): LedgerAppFamily {
@@ -412,6 +424,10 @@ function chipFor(name: string, family: LedgerAppFamily): string {
       nervos: 'NERV',
       namada: 'NAMA',
       spacemesh: 'SPAC',
+      qubic: 'QUBI',
+      solar: 'SOLA',
+      lto: 'LTON',
+      factom: 'FACT',
     };
     if (name.toLowerCase().includes('litecoin')) {
       return 'LTC';

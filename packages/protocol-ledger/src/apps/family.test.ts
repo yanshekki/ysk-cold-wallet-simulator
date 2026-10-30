@@ -1553,3 +1553,56 @@ describe('Phase 2 version MATCH for previously unknown apps', () => {
     expect(swOf(sign)).toBe(SW_INS_NOT_SUPPORTED);
   });
 });
+
+describe('Phase 3 version MATCH where the firmware states the body', () => {
+  it('Qubic GET_VERSION is 3 bytes; a bad P1 is 6A86; SIGN stays 6D00', async () => {
+    const device = handler();
+    device.setApp('qubic');
+    const version = await exchange(device, apdu([0xe0, 0x03, 0x00, 0x00, 0x00]));
+    expect(swOf(version)).toBe(SW_OK);
+    expect(Array.from(version.subarray(0, version.length - 2))).toEqual([0x00, 0x01, 0x07]);
+    const bad = await exchange(device, apdu([0xe0, 0x03, 0x01, 0x00, 0x00]));
+    expect(swOf(bad)).toBe(SW_WRONG_P1P2);
+    const sign = await exchange(device, apdu([0xe0, 0x06, 0x00, 0x00, 0x00]));
+    expect(swOf(sign)).toBe(SW_INS_NOT_SUPPORTED);
+    expect(device.getApp()).toBe('qubic');
+  });
+
+  it('Solar GET_VERSION is 3 bytes on INS 0xA2', async () => {
+    const device = handler();
+    device.setApp('solar');
+    const version = await exchange(device, apdu([0xe0, 0xa2, 0x00, 0x00, 0x00]));
+    expect(swOf(version)).toBe(SW_OK);
+    expect(Array.from(version.subarray(0, version.length - 2))).toEqual([0x01, 0x03, 0x01]);
+    const name = await exchange(device, apdu([0xe0, 0xa1, 0x00, 0x00, 0x00]));
+    expect(swOf(name)).toBe(SW_INS_NOT_SUPPORTED);
+    expect(device.getApp()).toBe('solar');
+  });
+
+  it('LTO GET_APP_CONFIGURATION is 3 bytes and does not become NEAR', async () => {
+    const device = handler();
+    device.setApp('lto-network');
+    const version = await exchange(device, apdu([0x80, 0x06, 0x00, 0x00, 0x00]));
+    expect(swOf(version)).toBe(SW_OK);
+    expect(Array.from(version.subarray(0, version.length - 2))).toEqual([0x02, 0x02, 0x03]);
+    const sign = await exchange(device, apdu([0x80, 0x02, 0x00, 0x00, 0x00]));
+    expect(swOf(sign)).toBe(SW_INS_NOT_SUPPORTED);
+    expect(device.getApp()).toBe('lto-network');
+  });
+
+  it('Factom GET_APP_CONFIGURATION repeats major and does not become Tron', async () => {
+    const device = handler();
+    device.setApp('factom');
+    const version = await exchange(device, apdu([0xe0, 0x06, 0x00, 0x00, 0x00]));
+    expect(swOf(version)).toBe(SW_OK);
+    expect(Array.from(version.subarray(0, version.length - 2))).toEqual([0x00, 0x01, 0x02, 0x01]);
+    expect(device.getApp()).toBe('factom');
+  });
+
+  it('an empty E0 06 on the dashboard is still Tron', async () => {
+    const device = handler();
+    const version = await exchange(device, apdu([0xe0, 0x06, 0x00, 0x00, 0x00]));
+    expect(swOf(version)).toBe(SW_OK);
+    expect(device.getApp()).toBe('tron');
+  });
+});

@@ -98,7 +98,7 @@ Searched 30 Oct 2026. HTTP 404:
 | Partisia Blockchain | `LedgerHQ/app-partisia` and `LedgerHQ/app-partisia-blockchain` 404 |
 | Venom | `LedgerHQ/app-venom` 404 |
 
-Eight apps stay blocked. Twenty-nine of the original 37 unknown rows have a public repository. Canton, Kaspa, IOTA, Nervos, Namada, and Spacemesh now have a GET_VERSION handler and a test. Their pubkey and SIGN commands stay KEEP. The other 23 repositories are still not MATCH.
+Eight apps stay blocked. Twenty-nine of the original 37 unknown rows have a public repository. Canton, Kaspa, IOTA, Nervos, Namada, and Spacemesh have a GET_VERSION handler. Qubic, Solar, LTO Network, and Factom do too. Pubkey and SIGN on all of those stay KEEP. The other repositories in the tables below are still not MATCH.
 
 ## 1b. Ledger KEEP that is still open
 
@@ -325,6 +325,8 @@ Docs only. No handler change. No USB install. No Proxy rebuild.
 **Tests.** `yarn workspace @cws/protocol-ledger test` and `yarn workspace @cws/contracts test`. Proxy tests when routing changes. Release USB install to the lab iPhone when the phone binary must match the tip.
 
 ### Phase 3 — Unknown apps with a repo and no extracted command list
+
+**Status.** Qubic, Solar, LTO Network, and Factom answer the version command cited below. Pubkey and SIGN stay `6D00`. Snapshot unknown is 27. Factom's fourth version byte is major again, because that is what `handleGetAppConfiguration` writes. Elastos and Nimiq have INS tables and no version command, so they stay unknown. Babylon's commands are the bitcoin-client set and are not a bitcoin MATCH. Monero and Zcash stay out. Groestlcoin, Particl, Shimmer, IOTA Legacy, and XAH were not remapped.
 
 **Goal.** Read `main.c` / `commands.h` / `COMMANDS.md` for Ark, Babylon, COTI, Decred, Elastos, Groestlcoin, IOTA Legacy, Monero, Nano, Nano's sibling Banano only if a real firmware appears, NEM, Particl, Radix Babylon, Shimmer, Core, Factom, LTO, MobileCoin (the linked ledger-mob page), Nimiq, Pepecoin, Qubic, Solar, XAH.
 
