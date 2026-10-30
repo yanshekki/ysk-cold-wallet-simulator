@@ -328,6 +328,13 @@ export const en = {
     noticeZeroHmac: 'Policy HMAC is all zeros and was not checked.',
     noticeHostHash: 'The host supplied this hash. It is not a decoded transaction.',
     headlineHostHash: 'Host-supplied hash',
+    opaqueCalldata: 'Raw contract call. Amounts inside the call data are not shown.',
+    rawSection: 'Raw data',
+    showRaw: 'Show',
+    hideRaw: 'Hide',
+    copyRaw: 'Copy',
+    copiedRaw: 'Copied',
+    rawBytes: '{{n}} bytes',
     field: {
       chain: 'Chain',
       chainId: 'Chain ID',
@@ -362,6 +369,7 @@ export const en = {
       bytes: 'Bytes',
       payload: 'Payload',
       spender: 'Spender',
+      recipient: 'Recipient',
     },
   },
   unlock: {

@@ -330,6 +330,13 @@ export const es: MessageTree = {
     noticeZeroHmac: 'El HMAC de la política es todo ceros y no se comprobó.',
     noticeHostHash: 'El host aportó este hash. No es una transacción decodificada.',
     headlineHostHash: 'Hash aportado por el host',
+    opaqueCalldata: 'Llamada de contrato en bruto. Los importes de los datos de llamada no se muestran.',
+    rawSection: 'Datos en bruto',
+    showRaw: 'Mostrar',
+    hideRaw: 'Ocultar',
+    copyRaw: 'Copiar',
+    copiedRaw: 'Copiado',
+    rawBytes: '{{n}} bytes',
     field: {
       chain: 'Cadena',
       chainId: 'ID de cadena',
@@ -364,6 +371,7 @@ export const es: MessageTree = {
       bytes: 'Bytes',
       payload: 'Carga',
       spender: 'Gastador',
+      recipient: 'Destinatario',
     },
   },
   unlock: {

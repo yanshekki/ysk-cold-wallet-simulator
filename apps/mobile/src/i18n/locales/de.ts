@@ -330,6 +330,13 @@ export const de: MessageTree = {
     noticeZeroHmac: 'Der Policy-HMAC ist nur Nullen und wurde nicht geprüft.',
     noticeHostHash: 'Diesen Hash hat der Host geliefert. Es ist keine dekodierte Transaktion.',
     headlineHostHash: 'Vom Host gelieferter Hash',
+    opaqueCalldata: 'Roher Vertragsaufruf. Beträge in den Aufrufdaten werden nicht angezeigt.',
+    rawSection: 'Rohdaten',
+    showRaw: 'Anzeigen',
+    hideRaw: 'Ausblenden',
+    copyRaw: 'Kopieren',
+    copiedRaw: 'Kopiert',
+    rawBytes: '{{n}} Bytes',
     field: {
       chain: 'Kette',
       chainId: 'Ketten-ID',
@@ -364,6 +371,7 @@ export const de: MessageTree = {
       bytes: 'Bytes',
       payload: 'Nutzlast',
       spender: 'Freigegebener',
+      recipient: 'Empfänger',
     },
   },
   unlock: {
