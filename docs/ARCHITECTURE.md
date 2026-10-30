@@ -1,7 +1,7 @@
 # YSK Cold Wallet Simulator — Architecture Document
 
 **Project:** `ysk-cold-wallet-simulator`  
-**Product:** YSK Cold Wallet Simulator (CWS), version 1.1.1 (build 7)  
+**Product:** YSK Cold Wallet Simulator (CWS), version 1.1.2 (build 8)  
 **Publisher:** YSK Limited  
 **Layout:** Expo TypeScript monorepo  
 **Scope:** The phone acts as a Bluetooth hardware-wallet peripheral for selected Ledger, Trezor, and OneKey models. USB HID is bridged by `apps/proxy` and `packages/native-proxy`. Air-gap QR lives in `packages/protocol-qr`.  
