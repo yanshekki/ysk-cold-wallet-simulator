@@ -349,13 +349,18 @@ export function attachLedger(
       return;
     }
     const sw = hidStatusWord(reports[0] ?? new Uint8Array());
-    if (!receiveArmed && sw === 0x9000 && sw === lastStatusSw) {
-      log(`hid => ignored leftover 0x${sw.toString(16)} from previous APDU`);
-      return;
-    }
-    if (sw === 0x6d00 || sw === 0x6e00) {
-      // Same-SW retries (Stellar e0 06 after a 6d00) arrive before receiveArmed.
-      // Dropping them as leftover stalls the HID queue; hold-forward instead.
+    // Status-only replies can arrive before receiveArmed flips true (phone
+    // ACKs while the last BLE write is still resolving). Dropping them stalls
+    // the HID host. Solana SIGN MORE needs its empty 9000 so Solflare can send
+    // the final chunk and the phone can open the signing sheet. Stellar same-SW
+    // 6d00/6e00 retries need the same hold. True post-settle leftovers already
+    // hit !awaiting above. Matching lastStatusSw for 9000 avoids inventing a
+    // success when no prior empty OK exists; 6d00/6e00 always hold.
+    const holdStatus =
+      sw === 0x6d00 ||
+      sw === 0x6e00 ||
+      (!receiveArmed && sw === 0x9000 && sw === lastStatusSw);
+    if (holdStatus) {
       log(
         `hid => holding 0x${sw.toString(16)} while waiting for cla=${(outstanding?.cla ?? 0).toString(16).padStart(2, '0')} ins=${(outstanding?.ins ?? 0).toString(16).padStart(2, '0')}`,
       );

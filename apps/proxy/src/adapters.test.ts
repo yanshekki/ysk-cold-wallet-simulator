@@ -728,7 +728,7 @@ describe('attachLedger', () => {
     adapter.close();
   });
 
-  it('does not treat a leftover QUIT 9000 as OpenApp success', async () => {
+  it('hold-forwards an unarmed OpenApp 9000 after QUIT so app cache updates', async () => {
     const { host, gadget } = memoryHidPair();
     let notify: ((packet: Uint8Array) => void) | undefined;
     let writes = 0;
@@ -740,6 +740,7 @@ describe('attachLedger', () => {
           notify?.(status9000);
           return;
         }
+        // OpenApp success arrives before receiveArmed (same race as Solana MORE).
         notify?.(status9000);
       },
       onNotify(callback: (packet: Uint8Array) => void) {
@@ -762,24 +763,67 @@ describe('attachLedger', () => {
     for (const report of wrapHidApdu(Uint8Array.of(0xe0, 0xd8, 0x00, 0x00, solName.length, ...solName))) {
       host.write(report);
     }
-    for (let i = 0; i < 20 && writes < 2; i += 1) {
-      await Promise.resolve();
-    }
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    await adapter.idle();
     expect(writes).toBe(2);
-    expect(replies).toEqual([]);
+    expect(replies.some((report) => report[7] === 0x90 && report[8] === 0x00)).toBe(true);
+    replies.length = 0;
     for (const report of wrapHidApdu(Uint8Array.of(0xb0, 0x01, 0x00, 0x00, 0x00))) {
       host.write(report);
     }
-    expect(replies).toEqual([]);
-    await Promise.resolve();
-    await Promise.resolve();
-    notify?.(status9000);
     await adapter.idle();
     const flushed = replies.map((report) => unwrapHidReports([report]).payload);
-    expect(flushed.some((payload) => payload[0] === 0x90 && payload[1] === 0x00)).toBe(true);
     expect(
       flushed.some((payload) => Array.from(payload, (b) => String.fromCharCode(b)).join('').includes('Solana')),
     ).toBe(true);
+    adapter.close();
+  });
+
+
+  it('hold-forwards an unarmed Solana SIGN MORE 9000 after a prior empty OK', async () => {
+    const { host, gadget } = memoryHidPair();
+    let notify: ((packet: Uint8Array) => void) | undefined;
+    let writes = 0;
+    const status9000 = Uint8Array.of(0x05, 0x00, 0x00, 0x00, 0x02, 0x90, 0x00);
+    const ble = {
+      async write() {
+        writes += 1;
+        // Every reply is an empty 9000 that arrives before receiveArmed.
+        // After the first exchange lastStatusSw is 9000; the old leftover
+        // drop swallowed the Solana SIGN MORE ACK and Solflare never sent
+        // the final chunk (no phone signing sheet).
+        notify?.(status9000);
+      },
+      onNotify(callback: (packet: Uint8Array) => void) {
+        notify = callback;
+        return () => undefined;
+      },
+      async close() {
+        return;
+      },
+    };
+    const logs: string[] = [];
+    const adapter = attachLedger(gadget, ble, DEFAULT_MTU, (line) => logs.push(line));
+    const replies: Uint8Array[] = [];
+    host.onInput((report) => replies.push(report));
+    for (const report of wrapHidApdu(Uint8Array.of(0xe0, 0x04, 0x00, 0x00, 0x00))) {
+      host.write(report);
+    }
+    await adapter.idle();
+    expect(replies[0]?.[7]).toBe(0x90);
+    replies.length = 0;
+    logs.length = 0;
+    const path = [0x03, 0x80, 0x00, 0x00, 0x2c, 0x80, 0x00, 0x01, 0xf5, 0x80, 0x00, 0x00, 0x00];
+    const head = [0x01, ...path, 0x11, 0x22];
+    for (const report of wrapHidApdu(Uint8Array.of(0xe0, 0x06, 0x01, 0x02, head.length, ...head))) {
+      host.write(report);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    await adapter.idle();
+    expect(writes).toBeGreaterThanOrEqual(2);
+    expect(replies.some((report) => report[7] === 0x90 && report[8] === 0x00)).toBe(true);
+    expect(logs.some((line) => line.includes('holding 0x9000'))).toBe(true);
+    expect(logs.some((line) => line.includes('ignored leftover'))).toBe(false);
     adapter.close();
   });
 
