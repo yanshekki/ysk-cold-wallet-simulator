@@ -227,7 +227,20 @@ Reinstall the phone build that contains the Solana handler (routing + MORE ACK s
 
 Phase 1 expansion (30 Oct 2026). Every row in `LEDGER_MANAGER_SNAPSHOT` appears below. This table is the coverage checklist for the owner mandate. It does **not** claim handlers are complete. MATCH/FIXED/KEEP in sections above remain the wire-claim vocabulary for apps that were actually diffed; rows here use plan statuses when the firmware was not re-read.
 
-See also [ledger-apdu-plan.md](./ledger-apdu-plan.md) for the catalog matrix and [full-vendor-parity-plan.md](./full-vendor-parity-plan.md) for the post-#55 backlog (unknown apps, open KEEP, Proxy races, Trezor, OneKey, QR). Seeds are not absolutely safe.
+See also [ledger-apdu-plan.md](./ledger-apdu-plan.md) for the catalog matrix and [full-vendor-parity-plan.md](./full-vendor-parity-plan.md) for the post-#55 backlog. The honest KEEP list after #68, with one blocker line each, is in that plan. Seeds are not absolutely safe.
+
+Ledger rows that stay KEEP, and why:
+
+- Cardano CIP-36 auxiliary and the canonical transaction hash. `aux_data_hash_builder` and `txHashBuilder` are not built.
+- Solana INS `21` / `22`. The trusted-name check is PKI. INS `20` and a path count of 1 are MATCH.
+- Bitcoin wallet HMAC. The sheet says a zero HMAC was not checked. That label is host-unproven. The key is `CWS/ledger-wallet-hmac`, not the app-bitcoin policy key. CLA `F8` INS `01` has an unarmed hold-forward test.
+- Ethereum INS `22` / `32` / `36` / `38` / `3A`. They stay `6D00`. The domain TLV is CAL-signed.
+- Tron `6A8C`. ECDH and TIP-712 are MATCH. The disabled sign-by-hash setting is not modeled.
+- XRP P2 `80`. The signature would be 64-byte EdDSA over `STX\0` ‖ tx. The SDK derivation call is not copied.
+- Stellar `maxDataSize` is MATCH (Nano X `4096`, other models `8192`).
+- Polkadot SCALE and the metadata proof are not parsed.
+- TON cell hash is still sha256 of the uploaded bytes.
+- Newer-family SIGN stays KEEP when the firmware curve is not the one CWS derives.
 
 | App | Catalog family | Default version | Wire / plan status | Official INS summary |
 | --- | --- | --- | --- | --- |

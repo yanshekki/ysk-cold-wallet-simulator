@@ -115,8 +115,8 @@ Sources already cited in [ledger-apdu.md](ledger-apdu.md). Close a row only with
 | Tron | sign-by-hash setting word `6A8C` | ECDH `0A` and TIP-712 `0C` are MATCH. [app-tron `ui_globals.c`](https://github.com/LedgerHQ/app-tron/blob/develop/src/ui/ui_globals.c). CWS does not model the off switch, so `E_MISSING_SETTING_SIGN_BY_HASH` is not returned |
 | XRP | ed25519 when P2 is `80` | [app-xrp `sign_transaction.c`](https://github.com/LedgerHQ/app-xrp/blob/develop/src/apdu/messages/sign_transaction.c). Blocker: `cx_eddsa_sign` is SHA-512 over `STX\0` ‖ tx and the body is 64 bytes, but `bip32_derive_init_privkey_256(CX_CURVE_Ed25519)` lives in the SDK. CWS will not sign that path with SLIP-10 until that HDW call is copied |
 | Cosmos | length-prefixed GET_ADDR helper | HRP requests are MATCH (`pk` ‖ bech32, no length prefixes) from [hw-app-cosmos](https://github.com/LedgerHQ/ledger-live/blob/develop/libs/ledgerjs/packages/hw-app-cosmos/src/Cosmos.ts) and `crypto_fillAddress`. A length-prefixed BIP32 body is still accepted for older hosts |
-| Polkadot | SCALE / metadata proof; SS58 prefix taken from the payload | [Zondax ledger-polkadot APDUSPEC](https://github.com/Zondax/ledger-polkadot/blob/master/docs/APDUSPEC.md) |
-| TON | BOC / cell hash; proof and sign-data fields | [app-ton COMMANDS](https://github.com/LedgerHQ/app-ton/blob/master/doc/COMMANDS.md). The hash field is sha256 of the uploaded bytes |
+| Polkadot | SCALE / metadata proof; SS58 prefix taken from the payload | Blocker: the Zondax [APDUSPEC](https://github.com/Zondax/ledger-polkadot/blob/master/docs/APDUSPEC.md) metadata proof is not parsed |
+| TON | BOC / cell hash; proof and sign-data fields | Blocker: [app-ton COMMANDS](https://github.com/LedgerHQ/app-ton/blob/master/doc/COMMANDS.md). The hash field is sha256 of the uploaded bytes, not a parsed cell hash |
 | NEAR | Fresh firmware diff | The handler matches the near.com path already in the tree. This pass did not re-read app-near |
 | Sui | A second block-tag version | The OKX / Mysten exchange already tested is MATCH. A different tag is not branched |
 | Newer families (#52–#55) | Pubkey and SIGN | VERSION or CONFIG is MATCH. SIGN is KEEP: Aion, Aleo, Alephium, Algorand (HDW_NORMAL Ed25519 is not SLIP-10), Ardor, Arweave (RSA), Concordium, Conflux, Eos (WIF and stream), Ergo, Everscale, FIO, Filecoin raw and personal, Flare address and sign, Flow, Hathor, Hedera, Hive, Internet Computer address and sign, Mina (secp field), MultiversX sign, NEO sign and GET_SIGNED_PUBLIC_KEY, QRL (XMSS), Sia, Stacks auth / JWT / fingerprint, Starknet pubkey and tx, Symbol, Tezos Micheline, Waves (Curve25519), Binance SHOW_ADDR, VeChain SIGN_CERTIFICATE `09` |
@@ -366,6 +366,27 @@ Ethereum tx ack 20106/20107, EIP-7702 20120, Solana unsafe message 10106, Sui tx
 ### Phase 8 — QR registry types hosts scan
 
 **Status.** KEEP for every registry type this tree does not already encode. No new type was added. Rabby, MetaMask, OKX, Sparrow, and the Keystone app were not shown scanning an unimplemented type in this pass. The types CWS already encodes stay MATCH in [vendor-protocols.md](vendor-protocols.md). Fountain tests cover multipart. Seed QR still confirms. No proxy UR bridge.
+
+## Honest KEEP after #68
+
+Checked on tip `dfb1f6d`. Nothing below is MATCH. Seeds are not absolutely safe.
+
+| Item | Blocker |
+| --- | --- |
+| Cardano CIP-36 auxiliary (v8 P1 `13`, v7 P2 `34`) | `aux_data_hash_builder` is not built. Reply stays `6D00` |
+| Cardano canonical tx hash | `txHashBuilder` hashes the parsed body. CWS hashes the uploaded chunks |
+| Solana INS `21` / `22` | `tlv_use_case_trusted_name` plus a Ledger PKI signature. INS `20` and `numPaths == 1` are MATCH |
+| Bitcoin wallet-policy HMAC | `walletHmac` uses `CWS/ledger-wallet-hmac`, not the app-bitcoin policy key. A zero HMAC stays host-unproven (`Policy HMAC is all zeros and was not checked.`) |
+| Bitcoin merkle PSBT beyond current tests | Cases in `family.test.ts` and `handler.test.ts` are the limit. CLA `F8` INS `01` has an unarmed hold-forward test. That test is not a policy-key MATCH |
+| Ethereum INS `22` / `32` / `36` / `38` / `3A` | hw-app-eth sends only `22`. The TLV is CAL-signed. All five stay `6D00` |
+| Tron sign-by-hash word `6A8C` | ECDH and TIP-712 are MATCH. CWS has no off switch, so `E_MISSING_SETTING_SIGN_BY_HASH` is not returned |
+| XRP ed25519 P2 `80` | `sign_transaction.c` signs SHA-512 of `STX\0` ‖ tx (64 bytes). The key is SDK `bip32_derive_init_privkey_256`. CWS will not guess SLIP-10 |
+| Polkadot SCALE / metadata | The Zondax metadata proof is not parsed |
+| TON cell hash | The hash field is sha256 of the uploaded bytes, not a parsed BOC cell hash |
+| Newer-family SIGN | The firmware curve is not the one CWS derives. See the section 1b list (HDW_NORMAL, XMSS, RSA, Mina field, Curve25519, and the rest) |
+| Trezor `1032`/`1033`, `1040`/`1041`, `906`, `471`/`472`, extra Cardano stages | No Suite trace selects them. Protobuf layouts are not decoded |
+| OneKey `20106`/`20107`, `20120`, `10106`, Sui tx, TON proof | Ids exist in firmware. No desktop or mobile capture of the bytes |
+| QR types not already encoded | No Rabby, MetaMask, OKX, Sparrow, or Keystone scan of an unimplemented registry type |
 
 ---
 
