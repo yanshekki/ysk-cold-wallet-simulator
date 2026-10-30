@@ -872,6 +872,10 @@ describe('attachLedger', () => {
       name: 'NEAR SIGN mid-chunk',
       apdu: Uint8Array.of(0x80, 0x02, 0x00, 0x00, 0x00),
     },
+    {
+      name: 'Bitcoin CONTINUE',
+      apdu: Uint8Array.of(0xf8, 0x01, 0x00, 0x00, 0x00),
+    },
   ])('hold-forwards an unarmed empty 9000 for $name', async ({ apdu }) => {
     const { host, gadget } = memoryHidPair();
     let notify: ((packet: Uint8Array) => void) | undefined;

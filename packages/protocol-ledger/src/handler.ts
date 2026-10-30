@@ -172,6 +172,7 @@ export class LedgerProtocolHandler implements ProtocolHandler {
     this.familySession.pendingSign = undefined;
     this.familySession.suiBlocks = undefined;
     this.familySession.cardanoTx = undefined;
+    this.familySession.solanaChallenge = undefined;
     this.btcSession.version = undefined;
     this.btcSession.prevouts = undefined;
     this.btcSession.prevout = undefined;
@@ -196,6 +197,7 @@ export class LedgerProtocolHandler implements ProtocolHandler {
     this.familySession.pendingSign = undefined;
     this.familySession.suiBlocks = undefined;
     this.familySession.cardanoTx = undefined;
+    this.familySession.solanaChallenge = undefined;
     this.onAppChange?.(app);
   }
 
@@ -242,6 +244,7 @@ export class LedgerProtocolHandler implements ProtocolHandler {
         this.familySession.pendingSign = undefined;
         this.familySession.suiBlocks = undefined;
         this.familySession.cardanoTx = undefined;
+        this.familySession.solanaChallenge = undefined;
         return framePayload(TAG_INIT, new Uint8Array(), this.mtu);
       case TAG_APDU: {
         const response = await this.handleApdu(payload);
@@ -429,7 +432,7 @@ export class LedgerProtocolHandler implements ProtocolHandler {
       if (apdu.cla !== 0xe0) {
         return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
       }
-      return handleStellarApdu(apdu, ctx, this.familySession);
+      return handleStellarApdu(apdu, ctx, this.familySession, this.model.id);
     }
 
     if (family === 'tezos') {
