@@ -1,5 +1,6 @@
+import { secp256k1 } from '@noble/curves/secp256k1';
 import { blake2b } from '@noble/hashes/blake2b';
-import { sha3_256 } from '@noble/hashes/sha3';
+import { keccak_256, sha3_256 } from '@noble/hashes/sha3';
 import { mnemonicToEntropy } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
 import { describe, expect, it } from 'vitest';
@@ -14,6 +15,8 @@ import {
   DEFAULT_MTU,
   LedgerProtocolHandler,
   SW_OK,
+  derivePrivateKey,
+  signSecp256k1Recoverable,
   TAG_APDU,
   deriveIcarus,
   encodeAppAndVersion,
@@ -1452,6 +1455,70 @@ describe('attachLedger', () => {
             : Uint8Array.of(26, (crc >>> 24) & 0xff, (crc >>> 16) & 0xff, (crc >>> 8) & 0xff, crc & 0xff);
     const expected = Uint8Array.of(0x82, 0xd8, 0x18, 0x58, inner.length, ...inner, ...checksum);
     expect(Array.from(body)).toEqual(Array.from(expected));
+    expect((payload[payload.length - 2] << 8) | payload[payload.length - 1]).toBe(SW_OK);
+    adapter.close();
+  });
+
+  it('forwards a Tron TIP-712 signature over HID', async () => {
+    const device = new LedgerProtocolHandler({
+      model: LEDGER_MODELS.find((item) => item.id === 'nano-x')!,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy: entropy(),
+    });
+    device.setApp('tron');
+    const path = [0x8000002c, 0x800000c3, 0x80000000, 0, 0];
+    const data: number[] = [path.length];
+    for (const component of path) {
+      data.push((component >>> 24) & 0xff, (component >>> 16) & 0xff, (component >>> 8) & 0xff, component & 0xff);
+    }
+    const domain = new Array(32).fill(0x11);
+    const message = new Array(32).fill(0x22);
+    data.push(...domain, ...message);
+    const { host, gadget } = memoryHidPair();
+    const ble = bleToHandler(device, (framed) => splitFramedPackets(framed, DEFAULT_MTU));
+    const adapter = attachLedger(gadget, ble, DEFAULT_MTU, () => undefined);
+    const replies: Uint8Array[] = [];
+    host.onInput((report) => replies.push(report));
+    for (const report of wrapHidApdu(Uint8Array.of(0xe0, 0x0c, 0x00, 0x00, data.length, ...data))) {
+      host.write(report);
+    }
+    await adapter.idle();
+    const payload = unwrapHidReports(replies).payload;
+    const digest = keccak_256(Uint8Array.of(0x19, 0x01, ...domain, ...message));
+    const expected = signSecp256k1Recoverable(derivePrivateKey(entropy(), "m/44'/195'/0'/0/0"), digest);
+    expect(Array.from(payload.subarray(0, 65))).toEqual(Array.from(expected));
+    expect((payload[payload.length - 2] << 8) | payload[payload.length - 1]).toBe(SW_OK);
+    adapter.close();
+  });
+
+  it('forwards a Tron ECDH shared point over HID', async () => {
+    const device = new LedgerProtocolHandler({
+      model: LEDGER_MODELS.find((item) => item.id === 'nano-x')!,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy: entropy(),
+    });
+    device.setApp('tron');
+    const path = [0x8000002c, 0x800000c3, 0x80000000, 0, 0];
+    const data: number[] = [path.length];
+    for (const component of path) {
+      data.push((component >>> 24) & 0xff, (component >>> 16) & 0xff, (component >>> 8) & 0xff, component & 0xff);
+    }
+    const peer = secp256k1.getPublicKey(derivePrivateKey(entropy(), "m/44'/60'/0'/0/0"), false);
+    data.push(...peer);
+    const { host, gadget } = memoryHidPair();
+    const ble = bleToHandler(device, (framed) => splitFramedPackets(framed, DEFAULT_MTU));
+    const adapter = attachLedger(gadget, ble, DEFAULT_MTU, () => undefined);
+    const replies: Uint8Array[] = [];
+    host.onInput((report) => replies.push(report));
+    for (const report of wrapHidApdu(Uint8Array.of(0xe0, 0x0a, 0x00, 0x01, data.length, ...data))) {
+      host.write(report);
+    }
+    await adapter.idle();
+    const payload = unwrapHidReports(replies).payload;
+    const expected = secp256k1.getSharedSecret(derivePrivateKey(entropy(), "m/44'/195'/0'/0/0"), peer, false);
+    expect(Array.from(payload.subarray(0, 65))).toEqual(Array.from(expected));
     expect((payload[payload.length - 2] << 8) | payload[payload.length - 1]).toBe(SW_OK);
     adapter.close();
   });

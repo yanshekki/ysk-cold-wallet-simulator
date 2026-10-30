@@ -112,7 +112,7 @@ Sources already cited in [ledger-apdu.md](ledger-apdu.md). Close a row only with
 | Solana dashboard | Only `44'/501'` forces a switch | Other paths are accepted once Solana is open. They are not a probe |
 | Bitcoin | Wallet-policy HMAC and PSBT merkle proofs beyond `family.test.ts` and `handler.test.ts` | [app-bitcoin `doc/bitcoin.md`](https://github.com/LedgerHQ/app-bitcoin/blob/develop/doc/bitcoin.md). Blocker: `walletHmac` uses the CWS key `CWS/ledger-wallet-hmac`, not the app-bitcoin policy key. A zero HMAC stays host-unproven. CLA `F8` INS `01` has an unarmed hold-forward test |
 | Ethereum | INS `22` `32` `36` `38` `3A` (domain, simulation, safe account, gated signing, map entry) | [app-ethereum `doc/apdu.md`](https://github.com/LedgerHQ/app-ethereum/blob/develop/doc/apdu.md). hw-app-eth `Eth.ts` sends only `22` (`provideDomainName`) from this set. Blocker: the TLV is CAL-signed. Empty `9000` would accept an unsigned domain. `32` / `36` / `38` / `3A` are not written by that host package. All five stay `6D00`. `12` / `16` / `1E` acknowledge and store nothing |
-| Tron | ECDH `0A`; TIP-712 | [hw-app-trx](https://github.com/LedgerHQ/ledger-live/blob/develop/libs/ledgerjs/packages/hw-app-trx/src/Trx.ts) |
+| Tron | sign-by-hash setting word `6A8C` | ECDH `0A` and TIP-712 `0C` are MATCH. [app-tron `ui_globals.c`](https://github.com/LedgerHQ/app-tron/blob/develop/src/ui/ui_globals.c). CWS does not model the off switch, so `E_MISSING_SETTING_SIGN_BY_HASH` is not returned |
 | XRP | ed25519 when P2 is `80` | [hw-app-xrp](https://github.com/LedgerHQ/ledger-live/blob/develop/libs/ledgerjs/packages/hw-app-xrp/src/Xrp.ts). Not exercised |
 | Cosmos | GET_ADDR HRP request and `pk\|addr` without length prefixes | [Zondax ledger-cosmos](https://github.com/Zondax/ledger-cosmos/blob/master/app/src/common/app_main.h). The length-prefixed helper is still what some hosts send |
 | Polkadot | SCALE / metadata proof; SS58 prefix taken from the payload | [Zondax ledger-polkadot APDUSPEC](https://github.com/Zondax/ledger-polkadot/blob/master/docs/APDUSPEC.md) |
@@ -347,7 +347,7 @@ Docs only. No handler change. No USB install. No Proxy rebuild.
 
 One family, or a small set that shares a chunk mode, per PR. Official chunk mode, response length, and a confirm sheet. Algorand Ed25519 stays KEEP if the source is HDW_NORMAL and CWS would sign SLIP-10. XMSS (QRL), RSA (Arweave), Mina field, and Curve25519 (Waves) stay KEEP when the curve is not the one CWS derives. Proxy test in the same PR.
 
-Tron ECDH / TIP-712, XRP ed25519, Cosmos HRP GET_ADDR, Polkadot SCALE, and TON cell hash are this phase too. They already have a core handler. Stellar `maxDataSize` is MATCH (Nano X `4096`, other models `8192`).
+XRP ed25519, Cosmos HRP GET_ADDR, Polkadot SCALE, and TON cell hash are still this phase. They already have a core handler. Stellar `maxDataSize` is MATCH (Nano X `4096`, other models `8192`). Tron ECDH and TIP-712 are MATCH. TIP-712 does not return firmware `6A8C` for a disabled sign-by-hash setting.
 
 ### Phase 6 — Trezor gaps Safe 7 hosts send
 
