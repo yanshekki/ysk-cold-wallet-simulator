@@ -1,5 +1,7 @@
 # Ledger APDU wire matrix
 
+**Phase 2 family map (follow-up to #49):** catalog/`inferLedgerFamily` remaps ethereum CHAIN, bitcoin-like, cosmos-like, polkadot-like, and `ethereum-plugin` names so Open App is not `unknown`. Remapped rows are **not** new wire MATCH/FIXED — only family routing changed.
+
 Research date: 30 Oct 2026. This is the wire contract CWS claims for each open Ledger app. BLE and the desktop Proxy (HID) carry the same APDU. A host assertion such as `unexpected response length: 64 instead of 0` is on the response body after the status word is removed. An intermediate chunk that must continue is an empty body and `9000`. The confirm sheet opens only on the stage the real app uses for review.
 
 The catalog pick is the version those bytes follow. `GET_VERSION` and `GET_APP_AND_VERSION` report that same pick. Where two app majors reuse one P1 for different stages, the handler branches. It does not load the firmware binary. Seeds are not absolutely safe.
@@ -202,119 +204,119 @@ See also [ledger-apdu-plan.md](./ledger-apdu-plan.md) for the backlog and resear
 
 | App | Catalog family | Default version | Wire / plan status | Official INS summary |
 | --- | --- | --- | --- | --- |
-| 1inch | `unknown` | 2.2.2 | blocked — Ethereum plugin (no standalone APDU) | none — plugin |
+| 1inch | `ethereum-plugin` | 2.2.2 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | Aeternity | `unknown` | 0.4.5 | unknown — needs firmware research | unknown — needs firmware research |
 | Aion | `unknown` | 1.0.4 | unknown — needs firmware research | unknown — needs firmware research |
-| Akroma | `unknown` | 1.22.5 | to-implement — ethereum CHAIN variant (app-ethereum makefile_conf/chain); map family then reuse Ethereum handler | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
+| Akroma | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | Aleo | `unknown` | 1.4.0 | unknown — needs firmware research | unknown — needs firmware research |
-| Aleph Zero | `unknown` | 18.73.5 | to-implement — polkadot/substrate-like; map family then reuse Polkadot handler after firmware confirm | CLA F9/90: 00/01/02 (Zondax pattern) |
+| Aleph Zero | `polkadot` | 18.73.5 | family-mapped — catalog `polkadot` (reuses polkadot handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA F9/90: 00/01/02 (Zondax pattern) |
 | Alephium | `unknown` | 0.4.7 | unknown — needs firmware research | unknown — needs firmware research |
 | Algorand | `unknown` | 2.7.4 | unknown — needs firmware research | unknown — needs firmware research |
-| Alkemi | `unknown` | 1.1.0 | blocked — Ethereum plugin (no standalone APDU) | none — plugin |
-| Angle | `unknown` | 1.1.0 | blocked — Ethereum plugin (no standalone APDU) | none — plugin |
+| Alkemi | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
+| Angle | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | Aptos | `aptos` | 0.10.2 | see Other open apps (KEEP) | CLA 5B (INS table incomplete in constants.h) |
-| APWine | `unknown` | 1.1.0 | blocked — Ethereum plugin (no standalone APDU) | none — plugin |
+| APWine | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | Ardor | `unknown` | 1.1.1 | unknown — needs firmware research | unknown — needs firmware research |
 | Ark | `unknown` | 2.3.1 | unknown — needs firmware research | unknown — needs firmware research |
-| ArtBlocks | `unknown` | 1.1.0 | blocked — Ethereum plugin (no standalone APDU) | none — plugin |
-| ARTIS sigma1 | `unknown` | 1.22.5 | to-implement — ethereum CHAIN variant (app-ethereum makefile_conf/chain); map family then reuse Ethereum handler | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
+| ArtBlocks | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
+| ARTIS sigma1 | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | Arweave | `unknown` | 1.0.26 | unknown — needs firmware research | unknown — needs firmware research |
 | Astar Polkadot EVM | `polkadot` | 1.22.5 | catalog polkadot; also listed in app-ethereum chain mk — confirm host CLA before claiming MATCH | CLA F9/90: 00/01/02 (Zondax pattern) |
-| Atheios | `unknown` | 1.22.5 | to-implement — ethereum CHAIN variant (app-ethereum makefile_conf/chain); map family then reuse Ethereum handler | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
-| Avail | `unknown` | 1.39.6 | to-implement — polkadot/substrate-like; map family then reuse Polkadot handler after firmware confirm | CLA F9/90: 00/01/02 (Zondax pattern) |
+| Atheios | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
+| Avail | `polkadot` | 1.39.6 | family-mapped — catalog `polkadot` (reuses polkadot handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA F9/90: 00/01/02 (Zondax pattern) |
 | Avalanche | `avalanche` | 1.4.22 | see Avalanche section (MATCH) | CLA 80: 00–06; plus E0 eth set |
 | Babylon BTC Staking | `unknown` | 1.0.1 | unknown — needs firmware research | unknown — needs firmware research |
 | Banano | `unknown` | 1.3.1 | unknown — needs firmware research | unknown — needs firmware research |
-| Berachain | `unknown` | 1.2.0 | blocked — Ethereum plugin (no standalone APDU) | none — plugin |
+| Berachain | `ethereum-plugin` | 1.2.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | Binance Chain | `unknown` | 2.1.1 | unknown — needs firmware research | unknown — needs firmware research |
 | Bitcoin | `bitcoin` | 2.5.1 | see Bitcoin section (MATCH/KEEP) | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
 | Bitcoin Cash | `bitcoin` | 2.4.13 | bitcoin family — see Bitcoin section; coin params differ | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
 | Bitcoin Gold | `bitcoin` | 2.4.13 | bitcoin family — see Bitcoin section; coin params differ | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
 | Bitcoin Private | `bitcoin` | 2.4.13 | bitcoin family — see Bitcoin section; coin params differ | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
-| Brick Towers | `unknown` | 1.1.0 | blocked — Ethereum plugin (no standalone APDU) | none — plugin |
-| Callisto | `unknown` | 1.22.5 | to-implement — ethereum CHAIN variant (app-ethereum makefile_conf/chain); map family then reuse Ethereum handler | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
+| Brick Towers | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
+| Callisto | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | Canton | `unknown` | 3.5.1 | unknown — needs firmware research | unknown — needs firmware research |
 | Cardano ADA | `cardano` | 8.0.8 | see Cardano section (MATCH/FIXED/KEEP) | CLA D7: 00/01/04/10/11/12/21/22/23/24 |
 | Casper | `unknown` | 3.1.9 | unknown — needs firmware research | unknown — needs firmware research |
-| cBridge | `unknown` | 1.1.0 | blocked — Ethereum plugin (no standalone APDU) | none — plugin |
+| cBridge | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | Celo | `unknown` | 1.8.3 | unknown — needs firmware research | unknown — needs firmware research |
-| ChorusOne | `unknown` | 1.1.0 | blocked — Ethereum plugin (no standalone APDU) | none — plugin |
-| CIAN | `unknown` | 1.1.0 | blocked — Ethereum plugin (no standalone APDU) | none — plugin |
-| Coinbase | `unknown` | 2.1.0 | blocked — Ethereum plugin (no standalone APDU) | none — plugin |
+| ChorusOne | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
+| CIAN | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
+| Coinbase | `ethereum-plugin` | 2.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | Concordium | `unknown` | 5.7.0 | unknown — needs firmware research | unknown — needs firmware research |
 | Conflux | `unknown` | 2.2.2 | unknown — needs firmware research | unknown — needs firmware research |
 | Core | `unknown` | 0.1.1 | unknown — needs firmware research | unknown — needs firmware research |
 | Cosmos | `cosmos` | 2.39.2 | see Other open apps (KEEP) | CLA 55: 00/01/02/04 (Zondax pattern) |
 | COTI | `unknown` | 1.3.1 | unknown — needs firmware research | unknown — needs firmware research |
-| Cronos POS Chain | `unknown` | 2.19.1 | to-implement — cosmos-like; map family then reuse Cosmos handler after firmware confirm | CLA 55: 00/01/02/04 (Zondax pattern) |
-| Dash | `unknown` | 2.4.13 | to-implement — bitcoin-like UTXO fork; map family then reuse Bitcoin handler | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
+| Cronos POS Chain | `cosmos` | 2.19.1 | family-mapped — catalog `cosmos` (reuses cosmos handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA 55: 00/01/02/04 (Zondax pattern) |
+| Dash | `bitcoin` | 2.4.13 | family-mapped — catalog `bitcoin` (reuses bitcoin handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
 | Decred | `unknown` | 1.4.2 | unknown — needs firmware research | unknown — needs firmware research |
-| Desmos | `unknown` | 2.18.4 | to-implement — cosmos-like; map family then reuse Cosmos handler after firmware confirm | CLA 55: 00/01/02/04 (Zondax pattern) |
-| DEXON | `unknown` | 1.22.5 | to-implement — ethereum CHAIN variant (app-ethereum makefile_conf/chain); map family then reuse Ethereum handler | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
-| Digibyte | `unknown` | 2.4.13 | to-implement — bitcoin-like UTXO fork; map family then reuse Bitcoin handler | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
+| Desmos | `cosmos` | 2.18.4 | family-mapped — catalog `cosmos` (reuses cosmos handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA 55: 00/01/02/04 (Zondax pattern) |
+| DEXON | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
+| Digibyte | `bitcoin` | 2.4.13 | family-mapped — catalog `bitcoin` (reuses bitcoin handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
 | Dogecoin | `bitcoin` | 2.4.13 | bitcoin family — see Bitcoin section; coin params differ | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
-| EigenLayer | `unknown` | 1.1.0 | blocked — Ethereum plugin (no standalone APDU) | none — plugin |
+| EigenLayer | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | Elastos | `unknown` | 1.1.5 | unknown — needs firmware research | unknown — needs firmware research |
-| Ellaism | `unknown` | 1.22.5 | to-implement — ethereum CHAIN variant (app-ethereum makefile_conf/chain); map family then reuse Ethereum handler | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
-| EnergyWebChain | `unknown` | 1.22.5 | to-implement — ethereum CHAIN variant (app-ethereum makefile_conf/chain); map family then reuse Ethereum handler | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
-| ENS | `unknown` | 2.1.0 | blocked — Ethereum plugin (no standalone APDU) | none — plugin |
+| Ellaism | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
+| EnergyWebChain | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
+| ENS | `ethereum-plugin` | 2.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | Eos | `unknown` | 1.6.1 | unknown — needs firmware research | unknown — needs firmware research |
 | Ergo | `unknown` | 0.0.10 | unknown — needs firmware research | unknown — needs firmware research |
-| Ether-1 | `unknown` | 1.22.5 | to-implement — ethereum CHAIN variant (app-ethereum makefile_conf/chain); map family then reuse Ethereum handler | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
+| Ether-1 | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | Ethereum | `ethereum` | 1.22.5 | see Ethereum section (MATCH/KEEP) | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | Ethereum Classic | `ethereum` | 1.22.5 | ethereum family — same CLA E0 INS as Ethereum; catalog family ethereum | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
-| EtherGem | `unknown` | 1.22.5 | to-implement — ethereum CHAIN variant (app-ethereum makefile_conf/chain); map family then reuse Ethereum handler | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
-| Ethersocial | `unknown` | 1.22.5 | to-implement — ethereum CHAIN variant (app-ethereum makefile_conf/chain); map family then reuse Ethereum handler | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
+| EtherGem | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
+| Ethersocial | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | Everscale | `unknown` | 1.1.8 | unknown — needs firmware research | unknown — needs firmware research |
 | Exchange | `unknown` | 4.4.4 | unknown — needs firmware research | unknown — needs firmware research |
-| Expanse | `unknown` | 1.22.5 | to-implement — ethereum CHAIN variant (app-ethereum makefile_conf/chain); map family then reuse Ethereum handler | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
+| Expanse | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | Factom | `unknown` | 1.2.4 | unknown — needs firmware research | unknown — needs firmware research |
 | Fido U2F | `unknown` | 1.3.8 | unknown — needs firmware research | unknown — needs firmware research |
-| Figment | `unknown` | 1.1.0 | blocked — Ethereum plugin (no standalone APDU) | none — plugin |
+| Figment | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | Filecoin | `unknown` | 2.3.15 | unknown — needs firmware research | unknown — needs firmware research |
 | FIO | `unknown` | 1.0.9 | unknown — needs firmware research | unknown — needs firmware research |
-| Firo | `unknown` | 2.4.13 | to-implement — bitcoin-like UTXO fork; map family then reuse Bitcoin handler | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
+| Firo | `bitcoin` | 2.4.13 | family-mapped — catalog `bitcoin` (reuses bitcoin handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
 | Flare Network | `unknown` | 2.6.7 | unknown — needs firmware research | unknown — needs firmware research |
 | Flow | `unknown` | 0.15.1 | unknown — needs firmware research | unknown — needs firmware research |
-| GameCredits | `unknown` | 2.4.13 | to-implement — bitcoin-like UTXO fork; map family then reuse Bitcoin handler | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
-| GoChain | `unknown` | 1.22.5 | to-implement — ethereum CHAIN variant (app-ethereum makefile_conf/chain); map family then reuse Ethereum handler | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
+| GameCredits | `bitcoin` | 2.4.13 | family-mapped — catalog `bitcoin` (reuses bitcoin handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
+| GoChain | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | Groestlcoin | `unknown` | 1.3.12 | unknown — needs firmware research | unknown — needs firmware research |
-| Harmony | `unknown` | 1.22.5 | to-implement — ethereum CHAIN variant (app-ethereum makefile_conf/chain); map family then reuse Ethereum handler | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
-| Harvest | `unknown` | 1.1.0 | blocked — Ethereum plugin (no standalone APDU) | none — plugin |
+| Harmony | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
+| Harvest | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | Hathor | `unknown` | 1.1.2 | unknown — needs firmware research | unknown — needs firmware research |
 | Hedera | `unknown` | 1.9.3 | unknown — needs firmware research | unknown — needs firmware research |
 | Hive | `unknown` | 1.1.2 | unknown — needs firmware research | unknown — needs firmware research |
-| Horizen | `unknown` | 2.4.13 | to-implement — bitcoin-like UTXO fork; map family then reuse Bitcoin handler | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
-| HPB | `unknown` | 1.22.5 | to-implement — ethereum CHAIN variant (app-ethereum makefile_conf/chain); map family then reuse Ethereum handler | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
-| Hydra | `unknown` | 2.4.13 | to-implement — bitcoin-like UTXO fork; map family then reuse Bitcoin handler | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
-| Hyperliquid | `unknown` | 1.1.0 | blocked — Ethereum plugin (no standalone APDU) | none — plugin |
+| Horizen | `bitcoin` | 2.4.13 | family-mapped — catalog `bitcoin` (reuses bitcoin handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
+| HPB | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
+| Hydra | `bitcoin` | 2.4.13 | family-mapped — catalog `bitcoin` (reuses bitcoin handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
+| Hyperliquid | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | ICON | `unknown` | 1.0.9 | unknown — needs firmware research | unknown — needs firmware research |
-| ID4Good | `unknown` | 1.22.5 | to-implement — ethereum CHAIN variant (app-ethereum makefile_conf/chain); map family then reuse Ethereum handler | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
+| ID4Good | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | InternetComputer | `unknown` | 4.2.17 | unknown — needs firmware research | unknown — needs firmware research |
 | IOTA | `unknown` | 1.0.4 | unknown — needs firmware research | unknown — needs firmware research |
 | IOTA Legacy | `unknown` | 0.5.9 | unknown — needs firmware research | unknown — needs firmware research |
-| IoTeX | `unknown` | 1.22.5 | to-implement — ethereum CHAIN variant (app-ethereum makefile_conf/chain); map family then reuse Ethereum handler | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
-| IOV | `unknown` | 2.16.7 | to-implement — cosmos-like; map family then reuse Cosmos handler after firmware confirm | CLA 55: 00/01/02/04 (Zondax pattern) |
+| IoTeX | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
+| IOV | `cosmos` | 2.16.7 | family-mapped — catalog `cosmos` (reuses cosmos handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA 55: 00/01/02/04 (Zondax pattern) |
 | Kaspa | `unknown` | 1.2.2 | unknown — needs firmware research | unknown — needs firmware research |
-| Kelp | `unknown` | 1.1.0 | blocked — Ethereum plugin (no standalone APDU) | none — plugin |
-| Kiln | `unknown` | 2.2.0 | blocked — Ethereum plugin (no standalone APDU) | none — plugin |
-| Komodo | `unknown` | 2.4.13 | to-implement — bitcoin-like UTXO fork; map family then reuse Bitcoin handler | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
-| LBRY | `unknown` | 2.4.13 | to-implement — bitcoin-like UTXO fork; map family then reuse Bitcoin handler | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
+| Kelp | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
+| Kiln | `ethereum-plugin` | 2.2.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
+| Komodo | `bitcoin` | 2.4.13 | family-mapped — catalog `bitcoin` (reuses bitcoin handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
+| LBRY | `bitcoin` | 2.4.13 | family-mapped — catalog `bitcoin` (reuses bitcoin handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
 | Ledger Sync | `unknown` | 1.2.2 | unknown — needs firmware research | unknown — needs firmware research |
-| Lens | `unknown` | 1.1.0 | blocked — Ethereum plugin (no standalone APDU) | none — plugin |
-| libertify | `unknown` | 1.1.0 | blocked — Ethereum plugin (no standalone APDU) | none — plugin |
+| Lens | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
+| libertify | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | Litecoin | `bitcoin` | 2.4.13 | bitcoin family — see Bitcoin section; coin params differ | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
 | LTO Network | `unknown` | 2.2.3 | unknown — needs firmware research | unknown — needs firmware research |
 | MimbleWimble Coin | `unknown` | 7.7.0 | unknown — needs firmware research | unknown — needs firmware research |
 | Mina | `unknown` | 1.6.10 | unknown — needs firmware research | unknown — needs firmware research |
-| Mix | `unknown` | 1.22.5 | to-implement — ethereum CHAIN variant (app-ethereum makefile_conf/chain); map family then reuse Ethereum handler | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
+| Mix | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | MobileCoin | `unknown` | 0.16.3 | unknown — needs firmware research | unknown — needs firmware research |
 | Monero | `unknown` | 2.2.4 | unknown — needs firmware research | unknown — needs firmware research |
-| Moonbeam | `unknown` | 1.22.5 | to-implement — ethereum CHAIN variant (app-ethereum makefile_conf/chain); map family then reuse Ethereum handler | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
-| Moonriver | `unknown` | 1.22.5 | to-implement — ethereum CHAIN variant (app-ethereum makefile_conf/chain); map family then reuse Ethereum handler | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
-| Morpho | `unknown` | 3.1.0 | blocked — Ethereum plugin (no standalone APDU) | none — plugin |
+| Moonbeam | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
+| Moonriver | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
+| Morpho | `ethereum-plugin` | 3.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | MultiversX | `unknown` | 1.3.1 | unknown — needs firmware research | unknown — needs firmware research |
-| Musicoin | `unknown` | 1.22.5 | to-implement — ethereum CHAIN variant (app-ethereum makefile_conf/chain); map family then reuse Ethereum handler | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
+| Musicoin | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | Namada | `unknown` | 3.0.6 | unknown — needs firmware research | unknown — needs firmware research |
 | Nano | `unknown` | 1.3.1 | unknown — needs firmware research | unknown — needs firmware research |
 | NEAR | `near` | 2.4.3 | see NEAR section (KEEP) | CLA 80: 00/02/04/05/06/07/08 |
@@ -322,90 +324,90 @@ See also [ledger-apdu-plan.md](./ledger-apdu-plan.md) for the backlog and resear
 | NEO | `unknown` | 1.5.1 | unknown — needs firmware research | unknown — needs firmware research |
 | NEO N3 | `unknown` | 0.6.1 | unknown — needs firmware research | unknown — needs firmware research |
 | Nervos | `unknown` | 0.6.3 | unknown — needs firmware research | unknown — needs firmware research |
-| Nested | `unknown` | 1.2.0 | blocked — Ethereum plugin (no standalone APDU) | none — plugin |
+| Nested | `ethereum-plugin` | 1.2.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | Nimiq | `unknown` | 2.1.1 | unknown — needs firmware research | unknown — needs firmware research |
-| NIX | `unknown` | 2.4.13 | to-implement — bitcoin-like UTXO fork; map family then reuse Bitcoin handler | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
+| NIX | `bitcoin` | 2.4.13 | family-mapped — catalog `bitcoin` (reuses bitcoin handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
 | NOS | `unknown` | 1.3.1 | unknown — needs firmware research | unknown — needs firmware research |
-| Oasis | `unknown` | 2.8.12 | to-implement — cosmos-like; map family then reuse Cosmos handler after firmware confirm | CLA 55: 00/01/02/04 (Zondax pattern) |
-| Oasys | `unknown` | 1.22.5 | to-implement — ethereum CHAIN variant (app-ethereum makefile_conf/chain); map family then reuse Ethereum handler | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
-| OKX Web3 | `unknown` | 1.1.1 | blocked — Ethereum plugin (no standalone APDU) | none — plugin |
+| Oasis | `cosmos` | 2.8.12 | family-mapped — catalog `cosmos` (reuses cosmos handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA 55: 00/01/02/04 (Zondax pattern) |
+| Oasys | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
+| OKX Web3 | `ethereum-plugin` | 1.1.1 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | ONT | `unknown` | 2.0.1 | unknown — needs firmware research | unknown — needs firmware research |
-| Origin | `unknown` | 1.1.0 | blocked — Ethereum plugin (no standalone APDU) | none — plugin |
-| P2P.org | `unknown` | 1.1.0 | blocked — Ethereum plugin (no standalone APDU) | none — plugin |
-| Paraswap | `unknown` | 2.3.0 | blocked — Ethereum plugin (no standalone APDU) | none — plugin |
+| Origin | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
+| P2P.org | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
+| Paraswap | `ethereum-plugin` | 2.3.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | Particl | `unknown` | 1.2.14 | unknown — needs firmware research | unknown — needs firmware research |
 | Partisia Blockchain | `unknown` | 1.0.2 | unknown — needs firmware research | unknown — needs firmware research |
-| peaq | `unknown` | 1.1.6 | to-implement — polkadot/substrate-like; map family then reuse Polkadot handler after firmware confirm | CLA F9/90: 00/01/02 (Zondax pattern) |
-| Peercoin | `unknown` | 2.4.13 | to-implement — bitcoin-like UTXO fork; map family then reuse Bitcoin handler | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
+| peaq | `polkadot` | 1.1.6 | family-mapped — catalog `polkadot` (reuses polkadot handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA F9/90: 00/01/02 (Zondax pattern) |
+| Peercoin | `bitcoin` | 2.4.13 | family-mapped — catalog `bitcoin` (reuses bitcoin handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
 | Pepecoin | `unknown` | 2.0.4 | unknown — needs firmware research | unknown — needs firmware research |
-| Persistence | `unknown` | 2.18.0 | to-implement — cosmos-like; map family then reuse Cosmos handler after firmware confirm | CLA 55: 00/01/02/04 (Zondax pattern) |
-| Pirl | `unknown` | 1.22.5 | to-implement — ethereum CHAIN variant (app-ethereum makefile_conf/chain); map family then reuse Ethereum handler | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
-| PivX | `unknown` | 2.4.13 | to-implement — bitcoin-like UTXO fork; map family then reuse Bitcoin handler | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
+| Persistence | `cosmos` | 2.18.0 | family-mapped — catalog `cosmos` (reuses cosmos handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA 55: 00/01/02/04 (Zondax pattern) |
+| Pirl | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
+| PivX | `bitcoin` | 2.4.13 | family-mapped — catalog `bitcoin` (reuses bitcoin handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
 | Polkadot | `polkadot` | 100.0.30 | see Other open apps (KEEP) | CLA F9/90: 00/01/02 (Zondax pattern) |
 | Polkadot Migration | `polkadot` | 100.0.27 | polkadot family — see Other open apps (KEEP) | CLA F9/90: 00/01/02 (Zondax pattern) |
-| Polymesh | `unknown` | 8.8000001.7 | to-implement — polkadot/substrate-like; map family then reuse Polkadot handler after firmware confirm | CLA F9/90: 00/01/02 (Zondax pattern) |
+| Polymesh | `polkadot` | 8.8000001.7 | family-mapped — catalog `polkadot` (reuses polkadot handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA F9/90: 00/01/02 (Zondax pattern) |
 | QRL | `unknown` | 1.1.5 | unknown — needs firmware research | unknown — needs firmware research |
 | Qubic | `unknown` | 0.1.7 | unknown — needs firmware research | unknown — needs firmware research |
-| QuickSwap | `unknown` | 1.1.0 | blocked — Ethereum plugin (no standalone APDU) | none — plugin |
+| QuickSwap | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | Radix Babylon | `unknown` | 0.7.35 | unknown — needs firmware research | unknown — needs firmware research |
-| Rarible | `unknown` | 1.2.1 | blocked — Ethereum plugin (no standalone APDU) | none — plugin |
-| Ravencoin | `unknown` | 2.4.13 | to-implement — bitcoin-like UTXO fork; map family then reuse Bitcoin handler | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
+| Rarible | `ethereum-plugin` | 1.2.1 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
+| Ravencoin | `bitcoin` | 2.4.13 | family-mapped — catalog `bitcoin` (reuses bitcoin handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
 | Recovery Check | `unknown` | 1.5.5 | unknown — needs firmware research | unknown — needs firmware research |
-| REOSC | `unknown` | 1.22.5 | to-implement — ethereum CHAIN variant (app-ethereum makefile_conf/chain); map family then reuse Ethereum handler | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
-| Ribbon | `unknown` | 1.2.0 | blocked — Ethereum plugin (no standalone APDU) | none — plugin |
-| Rocket Pool | `unknown` | 1.1.0 | blocked — Ethereum plugin (no standalone APDU) | none — plugin |
-| RSK | `unknown` | 1.22.5 | to-implement — ethereum CHAIN variant (app-ethereum makefile_conf/chain); map family then reuse Ethereum handler | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
-| Secret | `unknown` | 2.34.4 | to-implement — cosmos-like; map family then reuse Cosmos handler after firmware confirm | CLA 55: 00/01/02/04 (Zondax pattern) |
+| REOSC | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
+| Ribbon | `ethereum-plugin` | 1.2.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
+| Rocket Pool | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
+| RSK | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
+| Secret | `cosmos` | 2.34.4 | family-mapped — catalog `cosmos` (reuses cosmos handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA 55: 00/01/02/04 (Zondax pattern) |
 | Security Key | `unknown` | 1.7.7 | unknown — needs firmware research | unknown — needs firmware research |
 | Seed Tool | `unknown` | 1.8.4 | unknown — needs firmware research | unknown — needs firmware research |
-| Sei | `unknown` | 1.22.5 | to-implement — ethereum CHAIN variant (app-ethereum makefile_conf/chain); map family then reuse Ethereum handler | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
+| Sei | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | Sei - Cosmos | `cosmos` | 1.1.2 | cosmos family — see Other open apps (KEEP) | CLA 55: 00/01/02/04 (Zondax pattern) |
-| Shiden EVM | `unknown` | 1.22.5 | to-implement — ethereum CHAIN variant (app-ethereum makefile_conf/chain); map family then reuse Ethereum handler | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
+| Shiden EVM | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | Shimmer | `unknown` | 0.8.8 | unknown — needs firmware research | unknown — needs firmware research |
 | Sia | `unknown` | 2.2.1 | unknown — needs firmware research | unknown — needs firmware research |
 | Solana | `solana` | 1.17.1 | see Solana section (MATCH/FIXED/KEEP) | CLA E0: 04/05/06/07 |
 | Solar | `unknown` | 1.3.1 | unknown — needs firmware research | unknown — needs firmware research |
-| Songbird | `unknown` | 1.22.5 | to-implement — ethereum CHAIN variant (app-ethereum makefile_conf/chain); map family then reuse Ethereum handler | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
-| Sonic | `unknown` | 1.22.5 | to-implement — ethereum CHAIN variant (app-ethereum makefile_conf/chain); map family then reuse Ethereum handler | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
+| Songbird | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
+| Sonic | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | Spacemesh | `unknown` | 0.0.16 | unknown — needs firmware research | unknown — needs firmware research |
-| Spool | `unknown` | 1.1.0 | blocked — Ethereum plugin (no standalone APDU) | none — plugin |
-| Squid | `unknown` | 1.1.0 | blocked — Ethereum plugin (no standalone APDU) | none — plugin |
+| Spool | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
+| Squid | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | Stacks | `unknown` | 0.26.19 | unknown — needs firmware research | unknown — needs firmware research |
-| Staderlabs | `unknown` | 1.5.0 | blocked — Ethereum plugin (no standalone APDU) | none — plugin |
-| StakeDAO | `unknown` | 1.1.0 | blocked — Ethereum plugin (no standalone APDU) | none — plugin |
-| StakeKit | `unknown` | 1.5.0 | blocked — Ethereum plugin (no standalone APDU) | none — plugin |
+| Staderlabs | `ethereum-plugin` | 1.5.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
+| StakeDAO | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
+| StakeKit | `ethereum-plugin` | 1.5.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | Starknet | `unknown` | 2.4.3 | unknown — needs firmware research | unknown — needs firmware research |
 | Stellar | `stellar` | 6.1.0 | see Other open apps (KEEP) | CLA E0: 02/04/06/08/0A/0C |
-| Stratis | `unknown` | 2.4.13 | to-implement — bitcoin-like UTXO fork; map family then reuse Bitcoin handler | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
+| Stratis | `bitcoin` | 2.4.13 | family-mapped — catalog `bitcoin` (reuses bitcoin handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
 | Sui | `sui` | 1.5.13 | see Other open apps (MATCH for tested Mysten path; KEEP version branch) | CLA 00 block: 00/01/02/03 |
-| Swell | `unknown` | 2.1.0 | blocked — Ethereum plugin (no standalone APDU) | none — plugin |
+| Swell | `ethereum-plugin` | 2.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | Symbol | `unknown` | 1.1.12 | unknown — needs firmware research | unknown — needs firmware research |
-| TecraCoin | `unknown` | 1.22.5 | to-implement — ethereum CHAIN variant (app-ethereum makefile_conf/chain); map family then reuse Ethereum handler | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
-| Terra | `unknown` | 1.2.2 | to-implement — cosmos-like; map family then reuse Cosmos handler after firmware confirm | CLA 55: 00/01/02/04 (Zondax pattern) |
+| TecraCoin | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
+| Terra | `cosmos` | 1.2.2 | family-mapped — catalog `cosmos` (reuses cosmos handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA 55: 00/01/02/04 (Zondax pattern) |
 | Tezos Wallet | `unknown` | 3.2.4 | unknown — needs firmware research | unknown — needs firmware research |
-| THORChain | `unknown` | 2.5.2 | to-implement — cosmos-like; map family then reuse Cosmos handler after firmware confirm | CLA 55: 00/01/02/04 (Zondax pattern) |
-| ThunderCore | `unknown` | 1.22.5 | to-implement — ethereum CHAIN variant (app-ethereum makefile_conf/chain); map family then reuse Ethereum handler | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
-| TomoChain | `unknown` | 1.22.5 | to-implement — ethereum CHAIN variant (app-ethereum makefile_conf/chain); map family then reuse Ethereum handler | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
+| THORChain | `cosmos` | 2.5.2 | family-mapped — catalog `cosmos` (reuses cosmos handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA 55: 00/01/02/04 (Zondax pattern) |
+| ThunderCore | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
+| TomoChain | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | TON | `ton` | 2.9.1 | see Other open apps (KEEP) | CLA E0: 01/03/02/05/04/06/08/09 |
 | Tron | `tron` | 0.7.10 | see Other open apps (KEEP) | CLA E0: 02/04/05/06/08/0A |
-| Ubiq | `unknown` | 1.22.5 | to-implement — ethereum CHAIN variant (app-ethereum makefile_conf/chain); map family then reuse Ethereum handler | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
-| Uniswap | `unknown` | 1.5.1 | blocked — Ethereum plugin (no standalone APDU) | none — plugin |
+| Ubiq | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
+| Uniswap | `ethereum-plugin` | 1.5.1 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | VeChain | `unknown` | 1.3.3 | unknown — needs firmware research | unknown — needs firmware research |
-| Velora | `unknown` | 2.5.0 | blocked — Ethereum plugin (no standalone APDU) | none — plugin |
+| Velora | `ethereum-plugin` | 2.5.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | Venom | `unknown` | 1.1.8 | unknown — needs firmware research | unknown — needs firmware research |
-| Vertcoin | `unknown` | 2.4.13 | to-implement — bitcoin-like UTXO fork; map family then reuse Bitcoin handler | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
-| Viacoin | `unknown` | 2.4.13 | to-implement — bitcoin-like UTXO fork; map family then reuse Bitcoin handler | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
-| Wanchain | `unknown` | 1.22.5 | to-implement — ethereum CHAIN variant (app-ethereum makefile_conf/chain); map family then reuse Ethereum handler | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
+| Vertcoin | `bitcoin` | 2.4.13 | family-mapped — catalog `bitcoin` (reuses bitcoin handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
+| Viacoin | `bitcoin` | 2.4.13 | family-mapped — catalog `bitcoin` (reuses bitcoin handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
+| Wanchain | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | Waves | `unknown` | 1.2.2 | unknown — needs firmware research | unknown — needs firmware research |
-| Webchain | `unknown` | 1.22.5 | to-implement — ethereum CHAIN variant (app-ethereum makefile_conf/chain); map family then reuse Ethereum handler | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
-| Wethio | `unknown` | 1.22.5 | to-implement — ethereum CHAIN variant (app-ethereum makefile_conf/chain); map family then reuse Ethereum handler | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
+| Webchain | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
+| Wethio | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | XAH | `unknown` | 1.1.1 | unknown — needs firmware research | unknown — needs firmware research |
-| XDC Network | `unknown` | 1.22.5 | to-implement — ethereum CHAIN variant (app-ethereum makefile_conf/chain); map family then reuse Ethereum handler | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
-| xRhodium | `unknown` | 2.4.13 | to-implement — bitcoin-like UTXO fork; map family then reuse Bitcoin handler | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
+| XDC Network | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
+| xRhodium | `bitcoin` | 2.4.13 | family-mapped — catalog `bitcoin` (reuses bitcoin handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
 | XRP | `xrp` | 2.8.2 | see Other open apps (KEEP) | CLA E0: 02/04/06 |
-| xx network | `unknown` | 1.203.3 | to-implement — polkadot/substrate-like; map family then reuse Polkadot handler after firmware confirm | CLA F9/90: 00/01/02 (Zondax pattern) |
-| Yearn | `unknown` | 1.4.0 | blocked — Ethereum plugin (no standalone APDU) | none — plugin |
+| xx network | `polkadot` | 1.203.3 | family-mapped — catalog `polkadot` (reuses polkadot handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA F9/90: 00/01/02 (Zondax pattern) |
+| Yearn | `ethereum-plugin` | 1.4.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | Zcash | `unknown` | 3.9.4 | unknown — needs firmware research | unknown — needs firmware research |
-| ZClassic | `unknown` | 2.4.13 | to-implement — bitcoin-like UTXO fork; map family then reuse Bitcoin handler | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
+| ZClassic | `bitcoin` | 2.4.13 | family-mapped — catalog `bitcoin` (reuses bitcoin handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
 
 Catalog total: **205**. Catalog known-family: **23**. Catalog unknown: **182**. Rows with an official INS summary (not placeholder/plugin-none/unknown): **89**. Placeholder / plugin-none / unknown command rows: **116**.

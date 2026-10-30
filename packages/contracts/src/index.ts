@@ -120,6 +120,7 @@ export {
   catalogVersion,
   fromManagerRow,
   inferLedgerFamily,
+  isLedgerEthereumPlugin,
   ledgerAppChip,
   ledgerAppFamily,
   ledgerAppLabel,
