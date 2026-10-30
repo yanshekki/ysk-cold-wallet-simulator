@@ -22,7 +22,7 @@ MATCH and FIXED are allowed only when an official LedgerHQ, Zondax, Trezor, OneK
 | #52, #53, #55 | Unknown catalog cuts. Snapshot `family: 'unknown'` is **37** |
 | #54 | Proxy hold-forward of an unarmed Solana SIGN MORE empty `9000` |
 
-Counts on this tip: 205 catalog apps, 168 with a known catalog family, 37 `unknown` in `packages/contracts/src/ledgerCatalog.snapshot.ts`. This plan does not change those counts.
+Counts when this plan was opened: 205 catalog apps, 168 with a known catalog family, 37 `unknown`. Version handlers for Canton, IOTA, Kaspa, Namada, Nervos, and Spacemesh move that unknown count to 31. Zcash stays unknown. A version MATCH is not a signer.
 
 ## Status words
 
@@ -98,7 +98,7 @@ Searched 30 Oct 2026. HTTP 404:
 | Partisia Blockchain | `LedgerHQ/app-partisia` and `LedgerHQ/app-partisia-blockchain` 404 |
 | Venom | `LedgerHQ/app-venom` 404 |
 
-Eight apps stay blocked. Twenty-nine of the 37 unknown rows have a public repository. None of those 29 are MATCH until a handler test lands.
+Eight apps stay blocked. Twenty-nine of the original 37 unknown rows have a public repository. Canton, Kaspa, IOTA, Nervos, Namada, and Spacemesh now have a GET_VERSION handler and a test. Their pubkey and SIGN commands stay KEEP. The other 23 repositories are still not MATCH.
 
 ## 1b. Ledger KEEP that is still open
 
@@ -313,6 +313,8 @@ Docs only. No handler change. No USB install. No Proxy rebuild.
 **KEEP.** None of these tests close a protocol KEEP. They prove the proxy forwards the ACK the phone already sends.
 
 ### Phase 2 — Unknown apps whose command list was read
+
+**Status.** Canton, Kaspa, IOTA, Nervos, Namada, and Spacemesh answer GET_VERSION only. Pubkey and SIGN stay `6D00`. Snapshot unknown is 31. Zcash is still unknown. IOTA block framing is still KEEP. Namada's version body includes the 4-byte target id because `docs/APDUSPEC.md` lists it. Spacemesh's table does not, so that body stops at the locked byte.
 
 **Goal.** Handlers for Canton, IOTA, Kaspa, Namada, Nervos, Spacemesh. Zcash only after LedgerHQ/app-zcash is compared with Zondax/ledger-zcash. MATCH is `GET_VERSION` (and `GET_PUBLIC_KEY` only when the response body is copied from the spec and tested). SIGN stays KEEP.
 

@@ -1124,6 +1124,49 @@ describe('attachLedger', () => {
     expect(unwrapHidReports([replies[1]!]).payload).toEqual(encodeAppAndVersion('Avalanche', '1.4.22'));
     adapter.close();
   });
+
+  it.each([
+    { app: 'canton', command: Uint8Array.of(0xe0, 0x03, 0x00, 0x00, 0x00), body: [0x03, 0x05, 0x01] },
+    { app: 'kaspa', command: Uint8Array.of(0xe0, 0x03, 0x00, 0x00, 0x00), body: [0x01, 0x02, 0x02] },
+    {
+      app: 'iota',
+      command: Uint8Array.of(0x00, 0x00, 0x00, 0x00, 0x00),
+      body: [0x01, 0x00, 0x04, 0x69, 0x6f, 0x74, 0x61],
+    },
+    { app: 'nervos', command: Uint8Array.of(0x80, 0x00, 0x00, 0x00, 0x00), body: [0x00, 0x06, 0x03] },
+    {
+      app: 'namada',
+      command: Uint8Array.of(0x57, 0x00, 0x00, 0x00, 0x00),
+      body: [0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x06, 0x00, 0x33, 0x00, 0x00, 0x04],
+    },
+    {
+      app: 'spacemesh',
+      command: Uint8Array.of(0x45, 0x00, 0x00, 0x00, 0x00),
+      body: [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00],
+    },
+  ])('forwards $app GET_VERSION over HID', async ({ app, command, body }) => {
+    const device = new LedgerProtocolHandler({
+      model: LEDGER_MODELS.find((item) => item.id === 'nano-x')!,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy: entropy(),
+    });
+    device.setApp(app);
+    const { host, gadget } = memoryHidPair();
+    const ble = bleToHandler(device, (framed) => splitFramedPackets(framed, DEFAULT_MTU));
+    const adapter = attachLedger(gadget, ble, DEFAULT_MTU, () => undefined);
+    const replies: Uint8Array[] = [];
+    host.onInput((report) => replies.push(report));
+    for (const report of wrapHidApdu(command)) {
+      host.write(report);
+    }
+    await adapter.idle();
+    const payload = unwrapHidReports(replies).payload;
+    expect(Array.from(payload.subarray(0, payload.length - 2))).toEqual(body);
+    expect((payload[payload.length - 2] << 8) | payload[payload.length - 1]).toBe(SW_OK);
+    expect(device.getApp()).toBe(app);
+    adapter.close();
+  });
 });
 
 describe('attachOneKey', () => {

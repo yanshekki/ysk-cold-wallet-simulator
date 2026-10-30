@@ -179,9 +179,16 @@ describe('ledger app labels', () => {
     expect(byName['QRL']).toBe('qrl');
     expect(byName['Ardor']).toBe('ardor');
     expect(byName['FIO']).toBe('fio');
+    expect(byName['Canton']).toBe('canton');
+    expect(byName['IOTA']).toBe('iota');
+    expect(byName['Kaspa']).toBe('kaspa');
+    expect(byName['Namada']).toBe('namada');
+    expect(byName['Nervos']).toBe('nervos');
+    expect(byName['Spacemesh']).toBe('spacemesh');
+    expect(inferLedgerFamily('IOTA Legacy')).toBe('unknown');
     expect(byName['Zcash']).toBe('unknown');
     const known = LEDGER_INSTALLED_APPS.filter((app) => app.family !== 'unknown').length;
-    expect(known).toBe(168);
-    expect(LEDGER_INSTALLED_APPS.filter((app) => app.family === 'unknown').length).toBe(37);
+    expect(known).toBe(174);
+    expect(LEDGER_INSTALLED_APPS.filter((app) => app.family === 'unknown').length).toBe(31);
   });
 });
