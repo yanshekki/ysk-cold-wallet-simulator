@@ -4,7 +4,7 @@
 
 **Phase 2 family map (follow-up to #49):** catalog/`inferLedgerFamily` remaps ethereum CHAIN, bitcoin-like, cosmos-like, polkadot-like, and `ethereum-plugin` names so Open App is not `unknown`. Remapped rows are **not** new wire MATCH/FIXED — only family routing changed.
 
-**Phase 2 item 4 (unknown research):** catalog unknown 77→63 (#52) then 63→54 (this PR) via Eos/Hedera/NEO(+N3)/Casper/Flare/Conflux/Binance Chain/Waves dedicated handlers (MATCH only proven VERSION/ADDR/CONF/pubkey shapes). Remaining 54 catalog-unknown in `ledger-apdu-plan.md`. Prior KEEP left unless proven.
+**Phase 2 item 4 (unknown research):** catalog unknown 77→63 (#52) →54 (#53) →37 (this PR) via Eos/Hedera/NEO/Casper/Flare/Conflux/Binance/Waves then Aion/Aleo/Alephium/Sia/Ergo/Arweave/Flow/InternetComputer/Starknet/Hathor/Hive/Concordium/Symbol/Everscale/QRL/Ardor/FIO dedicated handlers (MATCH only proven VERSION/CONFIG shapes). Remaining 37 catalog-unknown in `ledger-apdu-plan.md`. Prior KEEP left unless proven.
 
 Research date: 30 Oct 2026. This is the wire contract CWS claims for each open Ledger app. BLE and the desktop Proxy (HID) carry the same APDU. A host assertion such as `unexpected response length: 64 instead of 0` is on the response body after the status word is removed. An intermediate chunk that must continue is an empty body and `9000`. The confirm sheet opens only on the stage the real app uses for review.
 
@@ -221,22 +221,22 @@ See also [ledger-apdu-plan.md](./ledger-apdu-plan.md) for the backlog and resear
 | App | Catalog family | Default version | Wire / plan status | Official INS summary |
 | --- | --- | --- | --- | --- |
 | 1inch | `ethereum-plugin` | 2.2.2 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
-| Aeternity | `unknown` | 0.4.5 | unknown — needs firmware research | unknown — needs firmware research |
-| Aion | `unknown` | 1.0.4 | unknown — needs firmware research | unknown — needs firmware research |
+| Aeternity | `ethereum` | 0.4.5 | family remap ethereum (#52); wire via ethereum handler | family remap ethereum (#52); wire via ethereum handler |
+| Aion | `aion` | 1.0.4 | MATCH GET_APP_CONFIGURATION (CLA E0 INS 06) 4-byte; pubkey/sign KEEP — LedgerHQ/app-aion | MATCH GET_APP_CONFIGURATION (CLA E0 INS 06) 4-byte; pubkey/sign KEEP — LedgerHQ/app-aion |
 | Akroma | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
-| Aleo | `unknown` | 1.4.0 | unknown — needs firmware research | unknown — needs firmware research |
+| Aleo | `aleo` | 1.4.0 | MATCH GET_VERSION (CLA E0 INS 03) 3-byte; address/sign/view-key KEEP — LedgerHQ/app-aleo | MATCH GET_VERSION (CLA E0 INS 03) 3-byte; address/sign/view-key KEEP — LedgerHQ/app-aleo |
 | Aleph Zero | `polkadot` | 18.73.5 | family-mapped — catalog `polkadot` (reuses polkadot handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA F9/90: 00/01/02 (Zondax pattern) |
-| Alephium | `unknown` | 0.4.7 | unknown — needs firmware research | unknown — needs firmware research |
-| Algorand | `unknown` | 2.7.4 | unknown — needs firmware research | unknown — needs firmware research |
+| Alephium | `alephium` | 0.4.7 | MATCH GetVersion (CLA 80 INS 00) 3-byte; pubkey/sign KEEP — LedgerHQ/app-alephium | MATCH GetVersion (CLA 80 INS 00) 3-byte; pubkey/sign KEEP — LedgerHQ/app-alephium |
+| Algorand | `algorand` | 2.7.4 | MATCH GET_VERSION; pubkey/sign KEEP — LedgerHQ/app-algorand (#52) | MATCH GET_VERSION; pubkey/sign KEEP — LedgerHQ/app-algorand (#52) |
 | Alkemi | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | Angle | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | Aptos | `aptos` | 0.10.2 | see Other open apps (FIXED INS/chunk) | CLA 5B: 03/04/05/06 (types.h + COMMANDS.md) |
 | APWine | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
-| Ardor | `unknown` | 1.1.1 | unknown — needs firmware research | unknown — needs firmware research |
+| Ardor | `ardor` | 1.1.1 | MATCH GET_VERSION (CLA E0 INS 01) 7-byte; sign/pubkey KEEP — LedgerHQ/app-ardor | MATCH GET_VERSION (CLA E0 INS 01) 7-byte; sign/pubkey KEEP — LedgerHQ/app-ardor |
 | Ark | `unknown` | 2.3.1 | unknown — needs firmware research | unknown — needs firmware research |
 | ArtBlocks | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | ARTIS sigma1 | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
-| Arweave | `unknown` | 1.0.26 | unknown — needs firmware research | unknown — needs firmware research |
+| Arweave | `arweave` | 1.0.26 | MATCH GET_VERSION (CLA 44 INS 00) 5-byte Zondax; ADDR/SIGN KEEP — LedgerHQ/app-arweave | MATCH GET_VERSION (CLA 44 INS 00) 5-byte Zondax; ADDR/SIGN KEEP — LedgerHQ/app-arweave |
 | Astar Polkadot EVM | `polkadot` | 1.22.5 | catalog polkadot; also listed in app-ethereum chain mk — confirm host CLA before claiming MATCH | CLA F9/90: 00/01/02 (Zondax pattern) |
 | Atheios | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | Avail | `polkadot` | 1.39.6 | family-mapped — catalog `polkadot` (reuses polkadot handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA F9/90: 00/01/02 (Zondax pattern) |
@@ -244,7 +244,7 @@ See also [ledger-apdu-plan.md](./ledger-apdu-plan.md) for the backlog and resear
 | Babylon BTC Staking | `unknown` | 1.0.1 | unknown — needs firmware research | unknown — needs firmware research |
 | Banano | `unknown` | 1.3.1 | unknown — needs firmware research | unknown — needs firmware research |
 | Berachain | `ethereum-plugin` | 1.2.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
-| Binance Chain | `unknown` | 2.1.1 | unknown — needs firmware research | unknown — needs firmware research |
+| Binance Chain | `binance` | 2.1.1 | MATCH VERSION/ADDR/SIGN; SHOW_ADDR KEEP — LedgerHQ/app-binance (#53) | MATCH VERSION/ADDR/SIGN; SHOW_ADDR KEEP — LedgerHQ/app-binance (#53) |
 | Bitcoin | `bitcoin` | 2.5.1 | see Bitcoin section (MATCH/KEEP) | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
 | Bitcoin Cash | `bitcoin` | 2.4.13 | bitcoin family — see Bitcoin section; coin params differ | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
 | Bitcoin Gold | `bitcoin` | 2.4.13 | bitcoin family — see Bitcoin section; coin params differ | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
@@ -253,14 +253,14 @@ See also [ledger-apdu-plan.md](./ledger-apdu-plan.md) for the backlog and resear
 | Callisto | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | Canton | `unknown` | 3.5.1 | unknown — needs firmware research | unknown — needs firmware research |
 | Cardano ADA | `cardano` | 8.0.8 | see Cardano section (MATCH/FIXED/KEEP) | CLA D7: 00/01/04/10/11/12/21/22/23/24 |
-| Casper | `unknown` | 3.1.9 | unknown — needs firmware research | unknown — needs firmware research |
+| Casper | `casper` | 3.1.9 | MATCH VERSION/ADDR/SIGN — LedgerHQ/app-casper (#53) | MATCH VERSION/ADDR/SIGN — LedgerHQ/app-casper (#53) |
 | cBridge | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | Celo | `unknown` | 1.8.3 | unknown — needs firmware research | unknown — needs firmware research |
 | ChorusOne | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | CIAN | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | Coinbase | `ethereum-plugin` | 2.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
-| Concordium | `unknown` | 5.7.0 | unknown — needs firmware research | unknown — needs firmware research |
-| Conflux | `unknown` | 2.2.2 | unknown — needs firmware research | unknown — needs firmware research |
+| Concordium | `concordium` | 5.7.0 | MATCH Get app version (CLA E0 INS 40) 3-byte; other INS KEEP — LedgerHQ/app-concordium | MATCH Get app version (CLA E0 INS 40) 3-byte; other INS KEEP — LedgerHQ/app-concordium |
+| Conflux | `conflux` | 2.2.2 | MATCH CONFIG/pubkey — LedgerHQ/app-conflux (#53) | MATCH CONFIG/pubkey — LedgerHQ/app-conflux (#53) |
 | Core | `unknown` | 0.1.1 | unknown — needs firmware research | unknown — needs firmware research |
 | Cosmos | `cosmos` | 2.39.2 | see Other open apps (FIXED version/chunk; KEEP GET_ADDR HRP) | CLA 55: 00/02/04 (Zondax app_main.h) |
 | COTI | `unknown` | 1.3.1 | unknown — needs firmware research | unknown — needs firmware research |
@@ -276,39 +276,39 @@ See also [ledger-apdu-plan.md](./ledger-apdu-plan.md) for the backlog and resear
 | Ellaism | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | EnergyWebChain | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | ENS | `ethereum-plugin` | 2.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
-| Eos | `unknown` | 1.6.1 | unknown — needs firmware research | unknown — needs firmware research |
-| Ergo | `unknown` | 0.0.10 | unknown — needs firmware research | unknown — needs firmware research |
+| Eos | `eos` | 1.6.1 | MATCH GET_APP_CONFIGURATION; pubkey/sign KEEP — LedgerHQ/app-eos (#53) | MATCH GET_APP_CONFIGURATION; pubkey/sign KEEP — LedgerHQ/app-eos (#53) |
+| Ergo | `ergo` | 0.0.10 | MATCH GET_APP_VERSION (CLA E0 INS 01) 4-byte; xpub/addr/sign KEEP — LedgerHQ/app-ergo | MATCH GET_APP_VERSION (CLA E0 INS 01) 4-byte; xpub/addr/sign KEEP — LedgerHQ/app-ergo |
 | Ether-1 | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | Ethereum | `ethereum` | 1.22.5 | see Ethereum section (MATCH/KEEP) | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | Ethereum Classic | `ethereum` | 1.22.5 | ethereum family — same CLA E0 INS as Ethereum; catalog family ethereum | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | EtherGem | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | Ethersocial | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
-| Everscale | `unknown` | 1.1.8 | unknown — needs firmware research | unknown — needs firmware research |
+| Everscale | `everscale` | 1.1.8 | MATCH GET_APP_CONFIGURATION (CLA E0 INS 01) 3-byte; pubkey/sign KEEP — LedgerHQ/app-everscale | MATCH GET_APP_CONFIGURATION (CLA E0 INS 01) 3-byte; pubkey/sign KEEP — LedgerHQ/app-everscale |
 | Exchange | `unknown` | 4.4.4 | unknown — needs firmware research | unknown — needs firmware research |
 | Expanse | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | Factom | `unknown` | 1.2.4 | unknown — needs firmware research | unknown — needs firmware research |
 | Fido U2F | `unknown` | 1.3.8 | unknown — needs firmware research | unknown — needs firmware research |
 | Figment | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
-| Filecoin | `unknown` | 2.3.15 | unknown — needs firmware research | unknown — needs firmware research |
-| FIO | `unknown` | 1.0.9 | unknown — needs firmware research | unknown — needs firmware research |
+| Filecoin | `filecoin` | 2.3.15 | MATCH Zondax VERSION/ADDR/SIGN; ETH dual path — LedgerHQ/app-filecoin (#52) | MATCH Zondax VERSION/ADDR/SIGN; ETH dual path — LedgerHQ/app-filecoin (#52) |
+| FIO | `fio` | 1.0.9 | MATCH getVersion (CLA D7 INS 00) 4-byte; pubkey/sign KEEP — LedgerHQ/app-fio | MATCH getVersion (CLA D7 INS 00) 4-byte; pubkey/sign KEEP — LedgerHQ/app-fio |
 | Firo | `bitcoin` | 2.4.13 | family-mapped — catalog `bitcoin` (reuses bitcoin handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
-| Flare Network | `unknown` | 2.6.7 | unknown — needs firmware research | unknown — needs firmware research |
-| Flow | `unknown` | 0.15.1 | unknown — needs firmware research | unknown — needs firmware research |
+| Flare Network | `flare` | 2.6.7 | MATCH CONFIG — LedgerHQ/app-flare (#53) | MATCH CONFIG — LedgerHQ/app-flare (#53) |
+| Flow | `flow` | 0.15.1 | MATCH GET_VERSION (CLA 33 INS 00) 5-byte Zondax; pubkey/sign KEEP — LedgerHQ/app-flow | MATCH GET_VERSION (CLA 33 INS 00) 5-byte Zondax; pubkey/sign KEEP — LedgerHQ/app-flow |
 | GameCredits | `bitcoin` | 2.4.13 | family-mapped — catalog `bitcoin` (reuses bitcoin handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
 | GoChain | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | Groestlcoin | `unknown` | 1.3.12 | unknown — needs firmware research | unknown — needs firmware research |
 | Harmony | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | Harvest | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
-| Hathor | `unknown` | 1.1.2 | unknown — needs firmware research | unknown — needs firmware research |
-| Hedera | `unknown` | 1.9.3 | unknown — needs firmware research | unknown — needs firmware research |
-| Hive | `unknown` | 1.1.2 | unknown — needs firmware research | unknown — needs firmware research |
+| Hathor | `hathor` | 1.1.2 | MATCH GET_VERSION (CLA E0 INS 03) 6-byte HTR||ver; addr/xpub/sign KEEP — LedgerHQ/app-hathor | MATCH GET_VERSION (CLA E0 INS 03) 6-byte HTR||ver; addr/xpub/sign KEEP — LedgerHQ/app-hathor |
+| Hedera | `hedera` | 1.9.3 | MATCH GET_APP_CONFIGURATION; pubkey/sign KEEP — LedgerHQ/app-hedera (#53) | MATCH GET_APP_CONFIGURATION; pubkey/sign KEEP — LedgerHQ/app-hedera (#53) |
+| Hive | `hive` | 1.1.2 | MATCH GET_VERSION (CLA D4 INS 06) 3-byte; pubkey/sign KEEP — LedgerHQ/app-hive | MATCH GET_VERSION (CLA D4 INS 06) 3-byte; pubkey/sign KEEP — LedgerHQ/app-hive |
 | Horizen | `bitcoin` | 2.4.13 | family-mapped — catalog `bitcoin` (reuses bitcoin handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
 | HPB | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | Hydra | `bitcoin` | 2.4.13 | family-mapped — catalog `bitcoin` (reuses bitcoin handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
 | Hyperliquid | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | ICON | `unknown` | 1.0.9 | unknown — needs firmware research | unknown — needs firmware research |
 | ID4Good | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
-| InternetComputer | `unknown` | 4.2.17 | unknown — needs firmware research | unknown — needs firmware research |
+| InternetComputer | `internetcomputer` | 4.2.17 | MATCH GET_VERSION (CLA 11 INS 00) 5-byte Zondax; ADDR/SIGN KEEP — Zondax/ledger-icp | MATCH GET_VERSION (CLA 11 INS 00) 5-byte Zondax; ADDR/SIGN KEEP — Zondax/ledger-icp |
 | IOTA | `unknown` | 1.0.4 | unknown — needs firmware research | unknown — needs firmware research |
 | IOTA Legacy | `unknown` | 0.5.9 | unknown — needs firmware research | unknown — needs firmware research |
 | IoTeX | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
@@ -324,21 +324,21 @@ See also [ledger-apdu-plan.md](./ledger-apdu-plan.md) for the backlog and resear
 | Litecoin | `bitcoin` | 2.4.13 | bitcoin family — see Bitcoin section; coin params differ | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
 | LTO Network | `unknown` | 2.2.3 | unknown — needs firmware research | unknown — needs firmware research |
 | MimbleWimble Coin | `unknown` | 7.7.0 | unknown — needs firmware research | unknown — needs firmware research |
-| Mina | `unknown` | 1.6.10 | unknown — needs firmware research | unknown — needs firmware research |
+| Mina | `mina` | 1.6.10 | MATCH GET_CONF; GET_ADDR/SIGN KEEP — LedgerHQ/app-mina (#52) | MATCH GET_CONF; GET_ADDR/SIGN KEEP — LedgerHQ/app-mina (#52) |
 | Mix | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | MobileCoin | `unknown` | 0.16.3 | unknown — needs firmware research | unknown — needs firmware research |
 | Monero | `unknown` | 2.2.4 | unknown — needs firmware research | unknown — needs firmware research |
 | Moonbeam | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | Moonriver | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | Morpho | `ethereum-plugin` | 3.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
-| MultiversX | `unknown` | 1.3.1 | unknown — needs firmware research | unknown — needs firmware research |
+| MultiversX | `multiversx` | 1.3.1 | MATCH VERSION + GET_ADDR; SIGN KEEP — LedgerHQ/app-multiversx (#52) | MATCH VERSION + GET_ADDR; SIGN KEEP — LedgerHQ/app-multiversx (#52) |
 | Musicoin | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | Namada | `unknown` | 3.0.6 | unknown — needs firmware research | unknown — needs firmware research |
 | Nano | `unknown` | 1.3.1 | unknown — needs firmware research | unknown — needs firmware research |
 | NEAR | `near` | 2.4.3 | see NEAR section (KEEP) | CLA 80: 00/02/04/05/06/07/08 |
 | NEM | `unknown` | 0.0.13 | unknown — needs firmware research | unknown — needs firmware research |
-| NEO | `unknown` | 1.5.1 | unknown — needs firmware research | unknown — needs firmware research |
-| NEO N3 | `unknown` | 0.6.1 | unknown — needs firmware research | unknown — needs firmware research |
+| NEO | `neo` | 1.5.1 | MATCH GET_PUBLIC_KEY 65-byte P-256; SIGN KEEP — LedgerHQ/app-neo (#53) | MATCH GET_PUBLIC_KEY 65-byte P-256; SIGN KEEP — LedgerHQ/app-neo (#53) |
+| NEO N3 | `neo` | 0.6.1 | MATCH GET_PUBLIC_KEY; SIGN KEEP — LedgerHQ/app-neo (#53) | MATCH GET_PUBLIC_KEY; SIGN KEEP — LedgerHQ/app-neo (#53) |
 | Nervos | `unknown` | 0.6.3 | unknown — needs firmware research | unknown — needs firmware research |
 | Nested | `ethereum-plugin` | 1.2.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | Nimiq | `unknown` | 2.1.1 | unknown — needs firmware research | unknown — needs firmware research |
@@ -362,7 +362,7 @@ See also [ledger-apdu-plan.md](./ledger-apdu-plan.md) for the backlog and resear
 | Polkadot | `polkadot` | 100.0.30 | see Other open apps (FIXED version/chunk/sig) | CLA F9/90: 00/01/02/03 (APDUSPEC) |
 | Polkadot Migration | `polkadot` | 100.0.27 | polkadot family — see Other open apps (FIXED; coin params may differ) | CLA F9/90: 00/01/02/03 (APDUSPEC) |
 | Polymesh | `polkadot` | 8.8000001.7 | family-mapped — catalog `polkadot` (reuses polkadot handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA F9/90: 00/01/02 (Zondax pattern) |
-| QRL | `unknown` | 1.1.5 | unknown — needs firmware research | unknown — needs firmware research |
+| QRL | `qrl` | 1.1.5 | MATCH VERSION (CLA 77 INS 00) 4-byte; XMSS pubkey/sign KEEP — LedgerHQ/app-qrl | MATCH VERSION (CLA 77 INS 00) 4-byte; XMSS pubkey/sign KEEP — LedgerHQ/app-qrl |
 | Qubic | `unknown` | 0.1.7 | unknown — needs firmware research | unknown — needs firmware research |
 | QuickSwap | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | Radix Babylon | `unknown` | 0.7.35 | unknown — needs firmware research | unknown — needs firmware research |
@@ -380,7 +380,7 @@ See also [ledger-apdu-plan.md](./ledger-apdu-plan.md) for the backlog and resear
 | Sei - Cosmos | `cosmos` | 1.1.2 | cosmos family — see Other open apps (FIXED version/chunk; KEEP GET_ADDR HRP) | CLA 55: 00/02/04 (Zondax app_main.h) |
 | Shiden EVM | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | Shimmer | `unknown` | 0.8.8 | unknown — needs firmware research | unknown — needs firmware research |
-| Sia | `unknown` | 2.2.1 | unknown — needs firmware research | unknown — needs firmware research |
+| Sia | `sia` | 2.2.1 | MATCH GET_VERSION (CLA E0 INS 01) 3-byte; pubkey/sign KEEP — LedgerHQ/app-sia | MATCH GET_VERSION (CLA E0 INS 01) 3-byte; pubkey/sign KEEP — LedgerHQ/app-sia |
 | Solana | `solana` | 1.17.1 | see Solana section (MATCH/FIXED/KEEP) | CLA E0: 04/05/06/07 |
 | Solar | `unknown` | 1.3.1 | unknown — needs firmware research | unknown — needs firmware research |
 | Songbird | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
@@ -388,16 +388,16 @@ See also [ledger-apdu-plan.md](./ledger-apdu-plan.md) for the backlog and resear
 | Spacemesh | `unknown` | 0.0.16 | unknown — needs firmware research | unknown — needs firmware research |
 | Spool | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | Squid | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
-| Stacks | `unknown` | 0.26.19 | unknown — needs firmware research | unknown — needs firmware research |
+| Stacks | `stacks` | 0.26.19 | MATCH VERSION/ADDR/SIGN — LedgerHQ/app-stacks (#52) | MATCH VERSION/ADDR/SIGN — LedgerHQ/app-stacks (#52) |
 | Staderlabs | `ethereum-plugin` | 1.5.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | StakeDAO | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | StakeKit | `ethereum-plugin` | 1.5.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
-| Starknet | `unknown` | 2.4.3 | unknown — needs firmware research | unknown — needs firmware research |
+| Starknet | `starknet` | 2.4.3 | MATCH GetVersion (CLA 5A INS 00) 3-byte; pubkey/tx KEEP — LedgerHQ/app-starknet | MATCH GetVersion (CLA 5A INS 00) 3-byte; pubkey/tx KEEP — LedgerHQ/app-starknet |
 | Stellar | `stellar` | 6.1.0 | see Other open apps (FIXED chunk) | CLA E0: 02/04/06/08/0A/0C |
 | Stratis | `bitcoin` | 2.4.13 | family-mapped — catalog `bitcoin` (reuses bitcoin handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
 | Sui | `sui` | 1.5.13 | see Other open apps (MATCH for tested Mysten path; KEEP version branch) | CLA 00 block: 00/01/02/03 |
 | Swell | `ethereum-plugin` | 2.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
-| Symbol | `unknown` | 1.1.12 | unknown — needs firmware research | unknown — needs firmware research |
+| Symbol | `symbol` | 1.1.12 | MATCH GET_VERSION (CLA E0 INS 06) flags||ver 4-byte; pubkey/sign KEEP — LedgerHQ/app-symbol | MATCH GET_VERSION (CLA E0 INS 06) flags||ver 4-byte; pubkey/sign KEEP — LedgerHQ/app-symbol |
 | TecraCoin | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | Terra | `cosmos` | 1.2.2 | family-mapped — catalog `cosmos` (reuses cosmos handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA 55: 00/01/02/04 (Zondax pattern) |
 | Tezos Wallet | `unknown` | 3.2.4 | unknown — needs firmware research | unknown — needs firmware research |
@@ -414,7 +414,7 @@ See also [ledger-apdu-plan.md](./ledger-apdu-plan.md) for the backlog and resear
 | Vertcoin | `bitcoin` | 2.4.13 | family-mapped — catalog `bitcoin` (reuses bitcoin handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
 | Viacoin | `bitcoin` | 2.4.13 | family-mapped — catalog `bitcoin` (reuses bitcoin handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
 | Wanchain | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
-| Waves | `unknown` | 1.2.2 | unknown — needs firmware research | unknown — needs firmware research |
+| Waves | `waves` | 1.2.2 | MATCH GET_APP_CONFIGURATION; pubkey/sign KEEP — LedgerHQ/app-waves (#53) | MATCH GET_APP_CONFIGURATION; pubkey/sign KEEP — LedgerHQ/app-waves (#53) |
 | Webchain | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | Wethio | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | XAH | `unknown` | 1.1.1 | unknown — needs firmware research | unknown — needs firmware research |

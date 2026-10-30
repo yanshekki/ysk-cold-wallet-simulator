@@ -66,6 +66,23 @@ import { handleFlareApdu } from './apps/flare';
 import { handleConfluxApdu } from './apps/conflux';
 import { handleBinanceApdu } from './apps/binance';
 import { handleWavesApdu } from './apps/waves';
+import { handleAionApdu } from './apps/aion';
+import { handleAleoApdu } from './apps/aleo';
+import { handleAlephiumApdu } from './apps/alephium';
+import { handleSiaApdu } from './apps/sia';
+import { handleErgoApdu } from './apps/ergo';
+import { handleArweaveApdu } from './apps/arweave';
+import { handleFlowApdu } from './apps/flow';
+import { handleInternetComputerApdu } from './apps/internetcomputer';
+import { handleStarknetApdu } from './apps/starknet';
+import { handleHathorApdu } from './apps/hathor';
+import { handleHiveApdu } from './apps/hive';
+import { handleConcordiumApdu } from './apps/concordium';
+import { handleSymbolApdu } from './apps/symbol';
+import { handleEverscaleApdu } from './apps/everscale';
+import { handleQrlApdu } from './apps/qrl';
+import { handleArdorApdu } from './apps/ardor';
+import { handleFioApdu } from './apps/fio';
 import type { FamilySession } from './apps/generic';
 import { replaceSeedCache, wrapSeedPort, type SeedCache } from './crypto';
 
@@ -490,6 +507,108 @@ export class LedgerProtocolHandler implements ProtocolHandler {
       }
       return handleWavesApdu(apdu, ctx, this.familySession);
     }
+    if (family === 'aion') {
+      if (apdu.cla !== 0xe0) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleAionApdu(apdu, ctx, this.familySession);
+    }
+    if (family === 'aleo') {
+      if (apdu.cla !== 0xe0) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleAleoApdu(apdu, ctx, this.familySession);
+    }
+    if (family === 'alephium') {
+      if (apdu.cla !== 0x80) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleAlephiumApdu(apdu, ctx, this.familySession);
+    }
+    if (family === 'sia') {
+      if (apdu.cla !== 0xe0) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleSiaApdu(apdu, ctx, this.familySession);
+    }
+    if (family === 'ergo') {
+      if (apdu.cla !== 0xe0) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleErgoApdu(apdu, ctx, this.familySession);
+    }
+    if (family === 'arweave') {
+      if (apdu.cla !== 0x44) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleArweaveApdu(apdu, ctx, this.familySession);
+    }
+    if (family === 'flow') {
+      if (apdu.cla !== 0x33) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleFlowApdu(apdu, ctx, this.familySession);
+    }
+    if (family === 'internetcomputer') {
+      if (apdu.cla !== 0x11) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleInternetComputerApdu(apdu, ctx, this.familySession);
+    }
+    if (family === 'starknet') {
+      if (apdu.cla !== 0x5a) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleStarknetApdu(apdu, ctx, this.familySession);
+    }
+    if (family === 'hathor') {
+      if (apdu.cla !== 0xe0) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleHathorApdu(apdu, ctx, this.familySession);
+    }
+    if (family === 'hive') {
+      if (apdu.cla !== 0xd4) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleHiveApdu(apdu, ctx, this.familySession);
+    }
+    if (family === 'concordium') {
+      if (apdu.cla !== 0xe0) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleConcordiumApdu(apdu, ctx, this.familySession);
+    }
+    if (family === 'symbol') {
+      if (apdu.cla !== 0xe0) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleSymbolApdu(apdu, ctx, this.familySession);
+    }
+    if (family === 'everscale') {
+      if (apdu.cla !== 0xe0) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleEverscaleApdu(apdu, ctx, this.familySession);
+    }
+    if (family === 'qrl') {
+      if (apdu.cla !== 0x77) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleQrlApdu(apdu, ctx, this.familySession);
+    }
+    if (family === 'ardor') {
+      if (apdu.cla !== 0xe0) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleArdorApdu(apdu, ctx, this.familySession);
+    }
+    if (family === 'fio') {
+      if (apdu.cla !== 0xd7) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleFioApdu(apdu, ctx, this.familySession);
+    }
 
     // ethereum-plugin / utility: not standalone coin APDU targets.
     if (family === 'ethereum-plugin' || family === 'utility') {
@@ -616,7 +735,9 @@ function inferAppFromApdu(app: LedgerApp, apdu: ReturnType<typeof parseApdu>): L
     family !== 'conflux' &&
     family !== 'hedera' &&
     family !== 'mina' &&
-    family !== 'flare'
+    family !== 'flare' &&
+    family !== 'aleo' &&
+    family !== 'hathor'
   ) {
     return family === 'ton' ? undefined : 'ton';
   }
@@ -635,7 +756,13 @@ function inferAppFromApdu(app: LedgerApp, apdu: ReturnType<typeof parseApdu>): L
     return 'solana';
   }
   if (apdu.cla === 0xe0 && apdu.ins === 0x06 && empty) {
-    if (family === 'ethereum' || family === 'xrp' || family === 'stellar') {
+    if (
+      family === 'ethereum' ||
+      family === 'xrp' ||
+      family === 'stellar' ||
+      family === 'symbol' ||
+      family === 'aion'
+    ) {
       return undefined;
     }
     if (family === 'tron') {
@@ -644,7 +771,10 @@ function inferAppFromApdu(app: LedgerApp, apdu: ReturnType<typeof parseApdu>): L
     return 'tron';
   }
   if (apdu.cla === 0xe0 && apdu.ins === 0x40) {
-    return family === 'bitcoin' ? undefined : 'bitcoin';
+    if (family === 'bitcoin' || family === 'concordium') {
+      return undefined;
+    }
+    return 'bitcoin';
   }
   if (apdu.cla === 0xe1 || (apdu.cla === 0xf8 && apdu.ins === 0x01)) {
     return family === 'bitcoin' ? undefined : 'bitcoin';
@@ -664,7 +794,8 @@ function inferAppFromApdu(app: LedgerApp, apdu: ReturnType<typeof parseApdu>): L
     family !== 'tezos' &&
     family !== 'algorand' &&
     family !== 'neo' &&
-    family !== 'waves'
+    family !== 'waves' &&
+    family !== 'alephium'
   ) {
     return family === 'near' ? undefined : 'near';
   }

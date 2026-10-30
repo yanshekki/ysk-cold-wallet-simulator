@@ -1264,3 +1264,202 @@ describe('KEEP re-diff official chunk / version bodies', () => {
     expect(Array.from(settings.subarray(0, settings.length - 2))).toEqual([0x00]);
   });
 });
+
+
+describe('Phase 2 item 4 — unknown catalog VERSION MATCH (round after #53)', () => {
+  it('Aion GET_APP_CONFIGURATION is flags||version', async () => {
+    const device = handler();
+    device.setApp('aion');
+    const version = await exchange(device, apdu([0xe0, 0x06, 0x00, 0x00, 0x00]));
+    expect(swOf(version)).toBe(SW_OK);
+    const [maj, min, patch] = catalogVersion('aion', '1.0.4')
+      .split('.')
+      .map((part) => Number.parseInt(part, 10) || 0);
+    expect(Array.from(version.subarray(0, version.length - 2))).toEqual([0x01, maj, min, patch]);
+  });
+
+  it('Aleo GET_VERSION is maj||min||patch', async () => {
+    const device = handler();
+    device.setApp('aleo');
+    const version = await exchange(device, apdu([0xe0, 0x03, 0x00, 0x00, 0x00]));
+    expect(swOf(version)).toBe(SW_OK);
+    const [maj, min, patch] = catalogVersion('aleo', '1.4.0')
+      .split('.')
+      .map((part) => Number.parseInt(part, 10) || 0);
+    expect(Array.from(version.subarray(0, version.length - 2))).toEqual([maj, min, patch]);
+  });
+
+  it('Alephium GetVersion is maj||min||patch on CLA 0x80', async () => {
+    const device = handler();
+    device.setApp('alephium');
+    const version = await exchange(device, apdu([0x80, 0x00, 0x00, 0x00, 0x00]));
+    expect(swOf(version)).toBe(SW_OK);
+    const [maj, min, patch] = catalogVersion('alephium', '0.4.7')
+      .split('.')
+      .map((part) => Number.parseInt(part, 10) || 0);
+    expect(Array.from(version.subarray(0, version.length - 2))).toEqual([maj, min, patch]);
+  });
+
+  it('Sia GET_VERSION is maj||min||patch', async () => {
+    const device = handler();
+    device.setApp('sia');
+    const version = await exchange(device, apdu([0xe0, 0x01, 0x00, 0x00, 0x00]));
+    expect(swOf(version)).toBe(SW_OK);
+    const [maj, min, patch] = catalogVersion('sia', '2.2.1')
+      .split('.')
+      .map((part) => Number.parseInt(part, 10) || 0);
+    expect(Array.from(version.subarray(0, version.length - 2))).toEqual([maj, min, patch]);
+  });
+
+  it('Ergo GET_APP_VERSION is maj||min||patch||debug0', async () => {
+    const device = handler();
+    device.setApp('ergo');
+    const version = await exchange(device, apdu([0xe0, 0x01, 0x00, 0x00, 0x00]));
+    expect(swOf(version)).toBe(SW_OK);
+    const [maj, min, patch] = catalogVersion('ergo', '0.0.10')
+      .split('.')
+      .map((part) => Number.parseInt(part, 10) || 0);
+    expect(Array.from(version.subarray(0, version.length - 2))).toEqual([maj, min, patch, 0x00]);
+  });
+
+  it('Arweave GET_VERSION is Zondax 5-byte', async () => {
+    const device = handler();
+    device.setApp('arweave');
+    const version = await exchange(device, apdu([0x44, 0x00, 0x00, 0x00, 0x00]));
+    expect(swOf(version)).toBe(SW_OK);
+    expect(version.length).toBe(5 + 2);
+    const [maj, min, patch] = catalogVersion('arweave', '1.0.26')
+      .split('.')
+      .map((part) => Number.parseInt(part, 10) || 0);
+    expect(Array.from(version.subarray(0, version.length - 2))).toEqual([0x00, maj, min, patch, 0x00]);
+  });
+
+  it('Flow GET_VERSION is Zondax 5-byte', async () => {
+    const device = handler();
+    device.setApp('flow');
+    const version = await exchange(device, apdu([0x33, 0x00, 0x00, 0x00, 0x00]));
+    expect(swOf(version)).toBe(SW_OK);
+    const [maj, min, patch] = catalogVersion('flow', '0.15.1')
+      .split('.')
+      .map((part) => Number.parseInt(part, 10) || 0);
+    expect(Array.from(version.subarray(0, version.length - 2))).toEqual([0x00, maj, min, patch, 0x00]);
+  });
+
+  it('InternetComputer GET_VERSION is Zondax 5-byte', async () => {
+    const device = handler();
+    device.setApp('internetcomputer');
+    const version = await exchange(device, apdu([0x11, 0x00, 0x00, 0x00, 0x00]));
+    expect(swOf(version)).toBe(SW_OK);
+    const [maj, min, patch] = catalogVersion('internetcomputer', '4.2.17')
+      .split('.')
+      .map((part) => Number.parseInt(part, 10) || 0);
+    expect(Array.from(version.subarray(0, version.length - 2))).toEqual([0x00, maj, min, patch, 0x00]);
+  });
+
+  it('Starknet GetVersion is maj||min||patch', async () => {
+    const device = handler();
+    device.setApp('starknet');
+    const version = await exchange(device, apdu([0x5a, 0x00, 0x00, 0x00, 0x00]));
+    expect(swOf(version)).toBe(SW_OK);
+    const [maj, min, patch] = catalogVersion('starknet', '2.4.3')
+      .split('.')
+      .map((part) => Number.parseInt(part, 10) || 0);
+    expect(Array.from(version.subarray(0, version.length - 2))).toEqual([maj, min, patch]);
+  });
+
+  it("Hathor GET_VERSION is 'HTR'||version", async () => {
+    const device = handler();
+    device.setApp('hathor');
+    const version = await exchange(device, apdu([0xe0, 0x03, 0x00, 0x00, 0x00]));
+    expect(swOf(version)).toBe(SW_OK);
+    const [maj, min, patch] = catalogVersion('hathor', '1.1.2')
+      .split('.')
+      .map((part) => Number.parseInt(part, 10) || 0);
+    expect(Array.from(version.subarray(0, version.length - 2))).toEqual([0x48, 0x54, 0x52, maj, min, patch]);
+  });
+
+  it('Hive GET_VERSION is maj||min||patch on CLA 0xD4', async () => {
+    const device = handler();
+    device.setApp('hive');
+    const version = await exchange(device, apdu([0xd4, 0x06, 0x00, 0x00, 0x00]));
+    expect(swOf(version)).toBe(SW_OK);
+    const [maj, min, patch] = catalogVersion('hive', '1.1.2')
+      .split('.')
+      .map((part) => Number.parseInt(part, 10) || 0);
+    expect(Array.from(version.subarray(0, version.length - 2))).toEqual([maj, min, patch]);
+  });
+
+  it('Concordium Get app version is maj||min||patch INS 0x40', async () => {
+    const device = handler();
+    device.setApp('concordium');
+    const version = await exchange(device, apdu([0xe0, 0x40, 0x00, 0x00, 0x00]));
+    expect(swOf(version)).toBe(SW_OK);
+    const [maj, min, patch] = catalogVersion('concordium', '5.7.0')
+      .split('.')
+      .map((part) => Number.parseInt(part, 10) || 0);
+    expect(Array.from(version.subarray(0, version.length - 2))).toEqual([maj, min, patch]);
+  });
+
+  it('Symbol GET_VERSION is flags||version', async () => {
+    const device = handler();
+    device.setApp('symbol');
+    const version = await exchange(device, apdu([0xe0, 0x06, 0x00, 0x00, 0x00]));
+    expect(swOf(version)).toBe(SW_OK);
+    const [maj, min, patch] = catalogVersion('symbol', '1.1.12')
+      .split('.')
+      .map((part) => Number.parseInt(part, 10) || 0);
+    expect(Array.from(version.subarray(0, version.length - 2))).toEqual([0x00, maj, min, patch]);
+  });
+
+  it('Everscale GET_APP_CONFIGURATION is maj||min||patch', async () => {
+    const device = handler();
+    device.setApp('everscale');
+    const version = await exchange(device, apdu([0xe0, 0x01, 0x00, 0x00, 0x00]));
+    expect(swOf(version)).toBe(SW_OK);
+    const [maj, min, patch] = catalogVersion('everscale', '1.1.8')
+      .split('.')
+      .map((part) => Number.parseInt(part, 10) || 0);
+    expect(Array.from(version.subarray(0, version.length - 2))).toEqual([maj, min, patch]);
+  });
+
+  it('QRL INS_VERSION is test||maj||min||patch', async () => {
+    const device = handler();
+    device.setApp('qrl');
+    const version = await exchange(device, apdu([0x77, 0x00, 0x00, 0x00, 0x00]));
+    expect(swOf(version)).toBe(SW_OK);
+    const [maj, min, patch] = catalogVersion('qrl', '1.1.5')
+      .split('.')
+      .map((part) => Number.parseInt(part, 10) || 0);
+    expect(Array.from(version.subarray(0, version.length - 2))).toEqual([0x00, maj, min, patch]);
+  });
+
+  it('Ardor GET_VERSION is version||flags||BA BE 00', async () => {
+    const device = handler();
+    device.setApp('ardor');
+    const version = await exchange(device, apdu([0xe0, 0x01, 0x00, 0x00, 0x00]));
+    expect(swOf(version)).toBe(SW_OK);
+    const [maj, min, patch] = catalogVersion('ardor', '1.1.1')
+      .split('.')
+      .map((part) => Number.parseInt(part, 10) || 0);
+    expect(Array.from(version.subarray(0, version.length - 2))).toEqual([
+      maj,
+      min,
+      patch,
+      0x00,
+      0xba,
+      0xbe,
+      0x00,
+    ]);
+  });
+
+  it('FIO getVersion is maj||min||patch||flags on CLA 0xD7', async () => {
+    const device = handler();
+    device.setApp('fio');
+    const version = await exchange(device, apdu([0xd7, 0x00, 0x00, 0x00, 0x00]));
+    expect(swOf(version)).toBe(SW_OK);
+    const [maj, min, patch] = catalogVersion('fio', '1.0.9')
+      .split('.')
+      .map((part) => Number.parseInt(part, 10) || 0);
+    expect(Array.from(version.subarray(0, version.length - 2))).toEqual([maj, min, patch, 0x00]);
+  });
+});
