@@ -285,7 +285,7 @@ describe('Cardano SIGN_TX body lengths follow the reported app version', () => {
     expect(statusOf(denied)).toBe(SW_DENY);
     expect(bodyOf(denied).length).toBe(0);
     expect(confirms()).toBe(1);
-    for (const ins of [0x12, 0x23, 0x24]) {
+    for (const ins of [0x12, 0x24]) {
       const reply = await exchange(device, apdu([0xd7, ins, 0x00, 0x00, 0x00]));
       expect(statusOf(reply)).toBe(SW_INS_NOT_SUPPORTED);
     }
@@ -304,6 +304,94 @@ describe('Cardano SIGN_TX body lengths follow the reported app version', () => {
     const witness = await exchange(device, apdu([0xd7, 0x21, 0x0f, 0x00, pathBytes.length, ...pathBytes]));
     expect(statusOf(witness)).toBe(SW_WRONG_P1P2);
     expect(bodyOf(witness).length).toBe(0);
+  });
+});
+
+const CVOTE_PATH = [0x8000069e, 0x80000717, 0x80000000, 0, 0];
+
+function u32be(value: number): number[] {
+  return [(value >>> 24) & 0xff, (value >>> 16) & 0xff, (value >>> 8) & 0xff, value & 0xff];
+}
+
+function cvoteApdu(p1: number, data: number[], p2 = 0x00): Uint8Array {
+  return apdu([0xd7, 0x23, p1, p2, data.length, ...data]);
+}
+
+function votecast(length: number): Uint8Array {
+  const body = new Uint8Array(length);
+  body.fill(0x5a);
+  return body;
+}
+
+describe('Cardano SIGN_CVOTE hashes the raw votecast', () => {
+  it('INIT stays empty and CONFIRM returns the hash and an Icarus signature', async () => {
+    const { device, confirms } = handler();
+    device.setApp('cardano');
+    const body = votecast(34);
+    const init = await exchange(device, cvoteApdu(0x50, [...u32be(34), ...body]));
+    expect(statusOf(init)).toBe(SW_OK);
+    expect(bodyOf(init).length).toBe(0);
+    expect(confirms()).toBe(0);
+    const path = encodePath(CVOTE_PATH);
+    const reply = await exchange(device, cvoteApdu(0x52, path));
+    expect(statusOf(reply)).toBe(SW_OK);
+    expect(bodyOf(reply).length).toBe(96);
+    expect(confirms()).toBe(1);
+    const hash = blake2b(body, { dkLen: 32 });
+    expect(Array.from(bodyOf(reply).subarray(0, 32))).toEqual(Array.from(hash));
+    const node = deriveIcarus(entropy(), "m/1694'/1815'/0'/0/0");
+    expect(Array.from(bodyOf(reply).subarray(32))).toEqual(Array.from(signIcarus(node, hash)));
+  });
+
+  it('a votecast longer than 250 bytes needs a CHUNK before CONFIRM', async () => {
+    const { device, confirms } = handler();
+    device.setApp('cardano');
+    const body = votecast(251);
+    const init = await exchange(device, cvoteApdu(0x50, [...u32be(251), ...body.subarray(0, 250)]));
+    expect(statusOf(init)).toBe(SW_OK);
+    expect(confirms()).toBe(0);
+    const early = await exchange(device, cvoteApdu(0x52, encodePath(CVOTE_PATH)));
+    expect(statusOf(early)).toBe(0x6980);
+    const again = await exchange(device, cvoteApdu(0x50, [...u32be(251), ...body.subarray(0, 250)]));
+    expect(statusOf(again)).toBe(SW_OK);
+    const chunk = await exchange(device, cvoteApdu(0x51, [body[250]!]));
+    expect(statusOf(chunk)).toBe(SW_OK);
+    expect(bodyOf(chunk).length).toBe(0);
+    expect(confirms()).toBe(0);
+    const reply = await exchange(device, cvoteApdu(0x52, encodePath(CVOTE_PATH)));
+    expect(statusOf(reply)).toBe(SW_OK);
+    const hash = blake2b(body, { dkLen: 32 });
+    expect(Array.from(bodyOf(reply).subarray(0, 32))).toEqual(Array.from(hash));
+    expect(confirms()).toBe(1);
+  });
+
+  it('SIGN_CVOTE rejects a non-CIP-36 path and a short plan id before the sheet', async () => {
+    const { device, confirms } = handler();
+    device.setApp('cardano');
+    const body = votecast(34);
+    await exchange(device, cvoteApdu(0x50, [...u32be(34), ...body]));
+    const denied = await exchange(device, cvoteApdu(0x52, encodePath(ADA_PATH)));
+    expect(statusOf(denied)).toBe(0x6982);
+    expect(bodyOf(denied).length).toBe(0);
+    expect(confirms()).toBe(0);
+    const short = await exchange(device, cvoteApdu(0x50, [...u32be(10), ...votecast(10)]));
+    expect(statusOf(short)).toBe(0x6b51);
+    expect(statusOf(await exchange(device, cvoteApdu(0x50, [])))).toBe(0x6b54);
+    expect(statusOf(await exchange(device, cvoteApdu(0x50, u32be(0))))).toBe(0x6a87);
+    expect(confirms()).toBe(0);
+  });
+
+  it('a denied SIGN_CVOTE returns 6985 and drops the vote', async () => {
+    const { device, confirms } = handler(async () => false);
+    device.setApp('cardano');
+    const body = votecast(34);
+    await exchange(device, cvoteApdu(0x50, [...u32be(34), ...body]));
+    const denied = await exchange(device, cvoteApdu(0x52, encodePath(CVOTE_PATH)));
+    expect(statusOf(denied)).toBe(SW_DENY);
+    expect(bodyOf(denied).length).toBe(0);
+    expect(confirms()).toBe(1);
+    const again = await exchange(device, cvoteApdu(0x52, encodePath(CVOTE_PATH)));
+    expect(statusOf(again)).toBe(0x6980);
   });
 });
 

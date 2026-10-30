@@ -49,10 +49,18 @@ export type CardanoTxWire = {
   hash?: Uint8Array;
 };
 
+/** CIP-36 vote cast. `body` is the raw votecast bytes. The 4-byte length is not included. */
+export type CardanoCvoteWire = {
+  state: 'chunk' | 'confirm';
+  remaining: number;
+  body: Uint8Array;
+};
+
 export type FamilySession = {
   pendingSign?: { path: string; payload: Uint8Array };
   suiBlocks?: SuiBlocksSession;
   cardanoTx?: CardanoTxWire;
+  cardanoCvote?: CardanoCvoteWire;
 };
 
 /**

@@ -839,6 +839,10 @@ describe('attachLedger', () => {
       apdu: Uint8Array.of(0xd7, 0x21, 0x10, 0x00, 0x00),
     },
     {
+      name: 'Cardano SIGN_CVOTE INIT',
+      apdu: Uint8Array.of(0xd7, 0x23, 0x50, 0x00, 0x00),
+    },
+    {
       name: 'Avalanche SIGN init',
       apdu: Uint8Array.of(0x80, 0x05, 0x00, 0x00, 0x00),
     },
@@ -1216,6 +1220,55 @@ describe('attachLedger', () => {
     expect(Array.from(payload.subarray(0, payload.length - 2))).toEqual(
       Array.from(signIcarus(node, signed)),
     );
+    expect((payload[payload.length - 2] << 8) | payload[payload.length - 1]).toBe(SW_OK);
+    expect(device.getApp()).toBe('cardano');
+    adapter.close();
+  });
+
+  it('forwards a Cardano CIP-36 vote over HID', async () => {
+    const device = new LedgerProtocolHandler({
+      model: LEDGER_MODELS.find((item) => item.id === 'nano-x')!,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy: entropy(),
+    });
+    device.setApp('cardano');
+    const votecast = new Uint8Array(34).fill(0x5a);
+    const init = Uint8Array.of(0xd7, 0x23, 0x50, 0x00, 38, 0, 0, 0, 34, ...votecast);
+    const path = [0x8000069e, 0x80000717, 0x80000000, 0, 0];
+    const confirmData: number[] = [path.length];
+    for (const component of path) {
+      confirmData.push(
+        (component >>> 24) & 0xff,
+        (component >>> 16) & 0xff,
+        (component >>> 8) & 0xff,
+        component & 0xff,
+      );
+    }
+    const { host, gadget } = memoryHidPair();
+    const ble = bleToHandler(device, (framed) => splitFramedPackets(framed, DEFAULT_MTU));
+    const adapter = attachLedger(gadget, ble, DEFAULT_MTU, () => undefined);
+    const replies: Uint8Array[] = [];
+    host.onInput((report) => replies.push(report));
+    for (const report of wrapHidApdu(init)) {
+      host.write(report);
+    }
+    await adapter.idle();
+    const started = unwrapHidReports(replies).payload;
+    expect(started.length).toBe(2);
+    expect((started[0] << 8) | started[1]).toBe(SW_OK);
+    replies.length = 0;
+    for (const report of wrapHidApdu(
+      Uint8Array.of(0xd7, 0x23, 0x52, 0x00, confirmData.length, ...confirmData),
+    )) {
+      host.write(report);
+    }
+    await adapter.idle();
+    const payload = unwrapHidReports(replies).payload;
+    const body = payload.subarray(0, payload.length - 2);
+    expect(body.length).toBe(96);
+    const node = deriveIcarus(entropy(), "m/1694'/1815'/0'/0/0");
+    expect(Array.from(body.subarray(32))).toEqual(Array.from(signIcarus(node, body.subarray(0, 32))));
     expect((payload[payload.length - 2] << 8) | payload[payload.length - 1]).toBe(SW_OK);
     expect(device.getApp()).toBe('cardano');
     adapter.close();
