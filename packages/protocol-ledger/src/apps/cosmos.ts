@@ -100,6 +100,7 @@ async function exportCosmosHrpAddress(
       title: 'Export Cosmos address',
       path: requested.path,
       message: `Export Cosmos address\n${requested.hrp}\n${requested.path}`,
+      rawPayload: apdu.data,
     });
     if (!ok) {
       return encodeResponse(new Uint8Array(), SW_DENY);

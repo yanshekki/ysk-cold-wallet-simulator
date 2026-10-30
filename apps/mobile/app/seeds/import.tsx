@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { mergeChainPaths } from '@cws/contracts';
 import {
   combineSlip39,
@@ -12,7 +12,8 @@ import {
 } from '@cws/sdk';
 import { Button, Screen, colors, fonts, hairline, radius, secretInputProps, space } from '@cws/ui';
 import { useT } from '../../src/i18n';
-import { readClipboard } from '../../src/lab/copy';
+import { clearClipboard, readClipboard } from '../../src/lab/copy';
+import { shouldClearConsumedClipboard } from '../../src/lab/importPaste';
 import { reauthBeforeReveal } from '../../src/passkeys/secretReauth';
 import { newSlotId } from '../../src/seeds/generate';
 import {
@@ -36,6 +37,7 @@ export default function ImportSeedScreen() {
   const [slipPass, setSlipPass] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [known, setKnown] = useState(false);
+  const [consumedClipboard, setConsumedClipboard] = useState<string | null>(null);
   useSecretScreenshotWarning();
 
   const analysis = useMemo(() => analyzeImport([draft, ...extraShares]), [draft, extraShares]);
@@ -60,17 +62,41 @@ export default function ImportSeedScreen() {
     setDraft(value);
   };
 
-  const onPaste = async () => {
+  const readConfirmedPaste = async () => {
     try {
-      const parts = splitShares(await readClipboard());
-      if (parts.length === 0) {
+      const text = await readClipboard();
+      const parts = splitShares(text);
+      if (parts.length === 0 || !text.trim()) {
         setError(t('import.paste'));
         return;
       }
+      setConsumedClipboard(text);
       applyParts(parts);
     } catch {
       setError(t('import.paste'));
     }
+  };
+
+  const onPaste = () => {
+    Alert.alert(t('import.pasteConfirmTitle'), t('import.pasteConfirmBody'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('import.pasteClipboard'), onPress: () => void readConfirmedPaste() },
+    ]);
+  };
+
+  const clearConsumedClipboard = async () => {
+    if (!consumedClipboard) {
+      return;
+    }
+    try {
+      const current = await readClipboard();
+      if (shouldClearConsumedClipboard(consumedClipboard, current)) {
+        await clearClipboard();
+      }
+    } catch {
+      // Leaving the clipboard is safer than failing a saved import.
+    }
+    setConsumedClipboard(null);
   };
 
   const onImport = async () => {
@@ -114,6 +140,7 @@ export default function ImportSeedScreen() {
           );
           selectSeed(saved);
         });
+        await clearConsumedClipboard();
         if (router.canDismiss()) {
           router.dismiss();
         } else {
@@ -143,6 +170,7 @@ export default function ImportSeedScreen() {
         );
         selectSeed(saved);
       });
+      await clearConsumedClipboard();
       if (router.canDismiss()) {
         router.dismiss();
       } else {

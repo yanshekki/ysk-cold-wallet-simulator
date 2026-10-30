@@ -3,6 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 import type { SeedSlot } from '@cws/contracts';
 import { wordCountFromEntropy } from '@cws/sdk';
 import { isDevBuild } from '../passkeys/devFlag';
+import { keychainRequiresAuthentication } from '../passkeys/releaseGates';
 import { entropyKey, LEGACY_SLOTS_KEY, sharesKey, SLOTS_KEY } from './vaultKeys';
 
 export { entropyKey, secureStoreKey, SLOTS_KEY } from './vaultKeys';
@@ -87,8 +88,8 @@ async function writeSlots(slots: SeedSlot[]): Promise<void> {
 }
 
 function secretWriteOptions() {
-  // Release items require the OS authenticator. Debug stays prompt-free for lab runs.
-  return isDevBuild() ? BASE_OPTIONS : authOptions();
+  // Release (__DEV__ false) always sets requireAuthentication. Debug does not.
+  return keychainRequiresAuthentication(isDevBuild()) ? authOptions() : BASE_OPTIONS;
 }
 
 async function writeSecret(key: string, value: string): Promise<void> {
@@ -109,7 +110,7 @@ async function readSecret(key: string, forceAuth = false): Promise<string | null
       return cached;
     }
   }
-  if (isDevBuild()) {
+  if (!keychainRequiresAuthentication(isDevBuild())) {
     try {
       const stored = await SecureStore.getItemAsync(key, BASE_OPTIONS);
       if (stored) {

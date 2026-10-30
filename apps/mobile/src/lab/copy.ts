@@ -14,6 +14,10 @@ export async function readClipboard(): Promise<string> {
   return Clipboard.getStringAsync();
 }
 
+export async function clearClipboard(): Promise<void> {
+  await Clipboard.setStringAsync('');
+}
+
 export async function exportText(filename: string, value: string): Promise<void> {
   if (Platform.OS === 'web') {
     const doc = (globalThis as { document?: Document }).document;

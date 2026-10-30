@@ -165,6 +165,8 @@ export const en = {
     title: 'Import seed',
     paste: 'BIP39 or SLIP-39',
     pasteClipboard: 'Paste',
+    pasteConfirmTitle: 'Paste recovery phrase?',
+    pasteConfirmBody: 'This reads the clipboard into the import field. It does not run by itself.',
     invalid: 'Invalid word or checksum',
     checksumOk: 'Checksum valid',
     checksumBad: 'Checksum invalid',
@@ -298,6 +300,8 @@ export const en = {
     noticeVerify: 'Authenticity check.',
     holdSign: 'Hold to sign',
     holdExport: 'Hold to export',
+    publicBatch:
+      'This confirm also allows the next {{extra}} public reads for {{seconds}} seconds. It does not sign.',
     holdVerify: 'Hold to verify',
     holdAllow: 'Hold to allow',
     holdPair: 'Hold to pair',
