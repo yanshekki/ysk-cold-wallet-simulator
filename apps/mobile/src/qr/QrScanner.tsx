@@ -135,26 +135,28 @@ export function QrScanner({
     >
       <View style={styles.root} testID="device-qr-scanner" collapsable={false}>
         {mountPreview ? (
-          <CameraView
-            key={cameraPreviewKey(generation)}
-            style={styles.preview}
-            facing="back"
-            active={shouldRunCameraSession({ appActive })}
-            barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-            onMountError={() => {
-              if (!shouldRemountAfterFailure({ remountsThisPresentation: remountsRef.current })) {
-                return;
-              }
-              remountsRef.current += 1;
-              setGeneration((current) => nextCameraGeneration(current, 'mount-error'));
-              setRetryNonce((nonce) => nonce + 1);
-            }}
-            onBarcodeScanned={({ data }) => {
-              if (data) {
-                onPart(data);
-              }
-            }}
-          />
+          <View testID="device-qr-scanner-preview" style={styles.preview} collapsable={false}>
+            <CameraView
+              key={cameraPreviewKey(generation)}
+              style={StyleSheet.absoluteFill}
+              facing="back"
+              active={shouldRunCameraSession({ appActive })}
+              barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+              onMountError={() => {
+                if (!shouldRemountAfterFailure({ remountsThisPresentation: remountsRef.current })) {
+                  return;
+                }
+                remountsRef.current += 1;
+                setGeneration((current) => nextCameraGeneration(current, 'mount-error'));
+                setRetryNonce((nonce) => nonce + 1);
+              }}
+              onBarcodeScanned={({ data }) => {
+                if (data) {
+                  onPart(data);
+                }
+              }}
+            />
+          </View>
         ) : granted ? (
           <View style={styles.waiting} testID="device-qr-scanner-waiting">
             <ActivityIndicator color={colors.ok} />

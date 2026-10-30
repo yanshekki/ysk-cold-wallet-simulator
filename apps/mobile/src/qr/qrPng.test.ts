@@ -95,5 +95,6 @@ describe('encodeQrPng', () => {
     expect(payloadForQr(encoded.ur)).toBe(encoded.ur.toUpperCase());
     expect(png.modules).toBe(QRCode.create(payloadForQr(encoded.ur), { errorCorrectionLevel: 'M' }).modules.size);
     expect(png.modules).toBeLessThan(lower.modules.size);
+    expect(png.width).toBe((png.modules + QR_QUIET_MODULES * 2) * 8);
   });
 });

@@ -62,7 +62,7 @@ Release writes set `requireAuthentication`. The decision is `keychainRequiresAut
 These behaviours are not finished in 1.1.0. They are usability gaps. They are not a reason to drop the public-read confirm.
 
 - Phantom may not complete unlock after connect.
-- Rabby’s camera may fail to scan the phone QR in some setups.
+- Rabby’s camera may still fail to scan the phone QR. The static account PNG is ECC M, a four-module quiet zone, 8 px modules, and black-on-white (`qrPng.ts`). That layout was not rescanned with Rabby in this pass. Unimplemented Keystone UR types stay out of the export.
 - Avalanche Core may not list Avalanche X and P accounts end to end.
 - OKX may not show asset balances for an imported account.
 

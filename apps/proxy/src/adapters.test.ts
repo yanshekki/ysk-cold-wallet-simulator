@@ -34,15 +34,23 @@ import {
   V2FrameAssembler,
   V2MessageType,
   decodeFeatures as decodeOneKeyFeatures,
+  decodeFrame,
   decodeUsbV1,
   encodeProtobufFrame,
+  encodeString,
   encodeUsbV1,
+  isAckFrame,
   splitOneKeyV1,
 } from '@cws/protocol-onekey';
 import {
+  ButtonRequestType,
   MessageType,
   TrezorThpProtocolHandler,
+  decodeButtonRequest,
+  decodeEthereumAddress,
   decodeFeatures,
+  encodeRepeatedUint32,
+  encodeUint32,
   splitThpPackets,
   unwrapUsbHidReports,
   wrapUsbHid,
@@ -93,6 +101,16 @@ function getAddress(): Uint8Array {
     );
   }
   return Uint8Array.of(0xe0, 0x02, 0x01, 0x00, data.length, ...data);
+}
+
+function concatParts(...parts: Uint8Array[]): Uint8Array {
+  const out = new Uint8Array(parts.reduce((sum, part) => sum + part.length, 0));
+  let offset = 0;
+  for (const part of parts) {
+    out.set(part, offset);
+    offset += part.length;
+  }
+  return out;
 }
 
 function splitMtu(bytes: Uint8Array, mtu: number): Uint8Array[] {
@@ -1607,6 +1625,42 @@ describe('attachOneKey', () => {
     expect(frames.length).toBeGreaterThan(0);
     adapter.close();
   });
+
+  it('round-trips a sign-sized V2 frame that spans HID reports', async () => {
+    const device = new OneKeyV1ProtocolHandler({
+      model: ONEKEY_MODELS.find((item) => item.id === 'pro2')!,
+      confirmation: autoConfirm(),
+      slotId: 'slot',
+      entropy: entropy(),
+    });
+    const { host, gadget } = memoryHidPair();
+    const ble = bleToHandler(device, (framed) => splitMtu(framed, 20));
+    const adapter = attachOneKey(gadget, ble, 'onekey-v2', 20, () => undefined);
+    const replies: Uint8Array[] = [];
+    host.onInput((report) => replies.push(report));
+    // usbHid.ts wrapPrefixedHid puts 63 payload bytes in each 64-byte report.
+    const message = `CWS-ONEKEY-V2-${'X'.repeat(160)}`;
+    const frame = encodeProtobufFrame(V2MessageType.Ping, encodeString(1, message), 0, 1, 3);
+    const reports = wrapPrefixedHid(frame);
+    expect(frame.length).toBeGreaterThan(63);
+    expect(reports.length).toBeGreaterThan(1);
+    for (const report of reports) {
+      host.write(report);
+    }
+    await adapter.idle();
+    expect(replies.length).toBeGreaterThan(1);
+    const stream = replies.reduce((all, report) => {
+      const next = new Uint8Array(all.length + report.length - 1);
+      next.set(all);
+      next.set(report.subarray(1), all.length);
+      return next;
+    }, new Uint8Array());
+    const frames = new V2FrameAssembler().drain(stream).filter((item) => !isAckFrame(item));
+    const success = frames.map((item) => decodeFrame(item)).find((item) => item.messageTypeId === V2MessageType.Success);
+    expect(success).toBeDefined();
+    expect(new TextDecoder().decode(success!.pbPayload)).toContain(message);
+    adapter.close();
+  });
 });
 
 describe('Trezor USB terminator', () => {
@@ -1632,6 +1686,43 @@ describe('Trezor USB terminator', () => {
     const message = unwrapUsbHidReports(replies);
     expect(message.type).toBe(MessageType.Features);
     expect(decodeFeatures(message.payload).vendor).toBe('trezor.io');
+    adapter.close();
+    thp.close();
+  });
+
+  it('exports the Ethereum address over USB HID after ButtonAck', async () => {
+    const confirmation = autoConfirm();
+    const device = new TrezorThpProtocolHandler({
+      model: TREZOR_MODELS.find((item) => item.id === 'safe-7')!,
+      confirmation,
+      slotId: 'slot',
+      entropy: entropy(),
+    });
+    const ble = bleToHandler(device, (framed) => splitThpPackets(framed, 20));
+    const thp = new ThpClient(ble, () => undefined, async () => confirmation.pairingCode ?? '', 8_000);
+    await thp.start();
+    const { host, gadget } = memoryHidPair();
+    const adapter = attachTrezor(gadget, thp, () => undefined);
+    const replies: Uint8Array[] = [];
+    host.onInput((report) => replies.push(report));
+    const address = concatParts(
+      encodeRepeatedUint32(1, [0x8000002c, 0x8000003c, 0x80000000, 0, 0]),
+      encodeUint32(2, 1),
+    );
+    const send = async (type: number, payload: Uint8Array) => {
+      replies.length = 0;
+      for (const report of wrapUsbHid(type, payload)) {
+        host.write(report);
+      }
+      await adapter.idle();
+      return unwrapUsbHidReports(replies);
+    };
+    const button = await send(MessageType.EthereumGetAddress, address);
+    expect(button.type).toBe(MessageType.ButtonRequest);
+    expect(decodeButtonRequest(button.payload)).toBe(ButtonRequestType.Address);
+    const reply = await send(MessageType.ButtonAck, new Uint8Array());
+    expect(reply.type).toBe(MessageType.EthereumAddress);
+    expect(decodeEthereumAddress(reply.payload).toLowerCase()).toBe(`0x${EXPECTED_ADDRESS.toLowerCase()}`);
     adapter.close();
     thp.close();
   });

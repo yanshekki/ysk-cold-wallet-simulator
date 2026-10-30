@@ -353,19 +353,39 @@ XRP blocker: [app-xrp `sign_transaction.c`](https://github.com/LedgerHQ/app-xrp/
 
 ### Phase 6 — Trezor gaps Safe 7 hosts send
 
-**Status.** KEEP. No Suite trace in this pass selects these messages, so none were implemented.
+**Status.** KEEP. No Suite trace was recorded for the messages below, so none of those protobufs were decoded. A Proxy USB HID test now sends `EthereumGetAddress` (56), which the handler already answers, and checks `EthereumAddress` after `ButtonAck`. That test is not a MATCH for 906, 471, or 472. `trezord` forwards the same already-implemented call. WebHID allowlist and trezord Origin reflection were not tightened.
 
-QR pairing (1032/1033) and NFC pairing (1040/1041) stay KEEP until a Safe 7 host selects `ThpPairingMethod` QrCode or NFC. Solana sign-message 906 and Ethereum definitions 471/472 are names in trezor-firmware `MessageType.py`. CWS does not decode those protobufs. Cardano stages Suite sends beyond the ids already tested stay KEEP. Stellar op-by-op and Monero stay KEEP until a trace exists. Proxy `attachTrezor` does not need a new test until one of those messages is decoded.
+QR pairing (1032/1033) and NFC pairing (1040/1041) stay KEEP until a Safe 7 host selects `ThpPairingMethod` QrCode or NFC. Stellar op-by-op and Monero stay KEEP until a trace exists.
+
+Capture checklist (record the Suite screen, then the USB or THP bytes; do not mark MATCH from the name alone):
+
+| Id | What to record |
+| --- | --- |
+| 906–908 | Suite Solana app, Sign message. Capture `SolanaSignMessage` through `SolanaMessageSignature`. |
+| 471 / 472 | Suite Ethereum, a typed-data or definition request that asks the host for `EthereumDefinitions` / `EthereumDefinitionAck` before the signature. |
+| Cardano extra stages | Suite Cardano, a transaction that is not the stages already tested (witness path, auxiliary supplement 314, host ack 317, finished 319). Record each `CardanoTx*` id in order. |
 
 ### Phase 7 — OneKey gaps the OneKey app sends
 
-**Status.** KEEP. The ids are present in OneKey firmware. This pass did not capture the desktop or mobile app writing them, and CWS does not decode those protobufs.
+**Status.** KEEP. The ids are present in OneKey firmware. No OneKey desktop or mobile capture was taken, and CWS does not decode those protobufs. A Proxy test now sends a sign-sized V2 ping that spans 64-byte HID reports (`usbHid.ts` `wrapPrefixedHid`, 63 payload bytes per report) and checks the echoed `Success`. That is a transport test, not a MATCH for 20106 or 20107.
 
-Ethereum tx ack 20106/20107, EIP-7702 20120, Solana unsafe message 10106, Sui tx request/ack, and TON proof and sign-data stay KEEP until a capture shows the bytes. Algorand, Filecoin, Kaspa, and the long tail stay KEEP for the same reason. A V2 multi-chunk adapter test waits until a frame that spans reports is implemented.
+Ethereum tx ack 20106/20107, EIP-7702 20120, Solana unsafe message 10106, Sui tx request/ack, and TON proof and sign-data stay KEEP until a capture shows the bytes. Algorand, Filecoin, Kaspa, and the long tail stay KEEP for the same reason.
+
+Capture checklist (record the OneKey App screen, then the V1 or V2 bytes):
+
+| Id | What to record |
+| --- | --- |
+| 20106 / 20107 | OneKey Ethereum, sign a transaction that returns `EthereumTxRequestOneKey` and waits for `EthereumTxAckOneKey`. |
+| 20120 | OneKey Ethereum, an EIP-7702 authorization or set-code transaction. |
+| 10106 | OneKey Solana, sign an off-chain or unsafe message (`SolanaSignUnsafeMessage` or the id the app actually writes). |
+| Sui tx ack | OneKey Sui, sign a transaction. Record the request id and the ack id if the app chunks the transaction. |
+| TON proof | OneKey TON, a proof or sign-data screen, not a simple get-address. |
 
 ### Phase 8 — QR registry types hosts scan
 
 **Status.** KEEP for every registry type this tree does not already encode. No new type was added. Rabby, MetaMask, OKX, Sparrow, and the Keystone app were not shown scanning an unimplemented type in this pass. The types CWS already encodes stay MATCH in [vendor-protocols.md](vendor-protocols.md). Fountain tests cover multipart. Seed QR still confirms. No proxy UR bridge.
+
+Static single-account UR PNG (`apps/mobile/src/qr/qrPng.ts`, `qrPng.test.ts`): ECC level M, four-module quiet zone, default 8 px modules, pixels only `0x00` and `0xFF`. There is no brightness control because the bitmap is already full contrast. Rabby was not shown scanning that PNG in this pass. That host-camera gap stays open. The PNG layout is not the open item.
 
 ## Honest KEEP after #68
 

@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { unwrapPrefixedHid } from '@cws/contracts';
+import { collectPrefixedHid, unwrapPrefixedHid } from '@cws/contracts';
 import { bytesToHex } from './bytes';
 import { DEFAULT_MTU, frameV1, splitOneKeyV1 } from './framing';
-import { encodeProtobufFrame } from './v2';
+import { V2FrameAssembler, V2MessageType, decodeFrame, encodeAck, encodeProtobufFrame, isAckFrame } from './v2';
 import { OneKeyUsbBleBridge, bleV1ToUsbStream, decodeUsbV1, encodeUsbV1, usbStreamToBleV1 } from './usbHid';
+import { encodeString } from './proto';
 
 describe('OneKey USB HID 0x3F', () => {
   it('round-trips a V1 Initialize through HID reports and BLE chunks', () => {
@@ -62,6 +63,18 @@ describe('OneKey USB HID 0x3F', () => {
     }
     expect(ble).not.toBeNull();
     expect(concat(ble!)[0]).toBe(0x5a);
+  });
+
+  it('keeps a V2 reply that starts in the same notify as the ACK', () => {
+    const ping = encodeProtobufFrame(V2MessageType.Ping, encodeString(1, 'x'.repeat(40)));
+    const bridge = new OneKeyUsbBleBridge('onekey-v2', 64);
+    const first = bridge.pushBle(concat([encodeAck(1), ping.subarray(0, 10)]));
+    expect(first).toBeNull();
+    const rest = bridge.pushBle(ping.subarray(10));
+    expect(rest).not.toBeNull();
+    const frames = new V2FrameAssembler().drain(collectPrefixedHid(rest!)).filter((frame) => !isAckFrame(frame));
+    const decoded = frames.map((frame) => decodeFrame(frame));
+    expect(decoded.some((frame) => frame.messageTypeId === V2MessageType.Ping)).toBe(true);
   });
 
   it('maps 3F2323 BLE magic to 2323 after the USB 0x3F prefix', () => {

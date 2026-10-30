@@ -14,16 +14,21 @@ tags:
       id: "device-qr-scan"
     direction: DOWN
     timeout: 12000
+- setPermissions:
+    permissions:
+      camera: allow
 - tapOn:
     id: "device-qr-scan"
 - extendedWaitUntil:
     visible:
       id: "device-qr-scanner"
     timeout: 12000
-    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "device-qr-scanner-preview"
+    timeout: 12000
 - tapOn:
     id: "device-qr-scanner-close"
-    optional: true
 - extendedWaitUntil:
     visible:
       id: "tab-device"
