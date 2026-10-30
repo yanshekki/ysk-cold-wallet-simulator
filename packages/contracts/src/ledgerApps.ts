@@ -33,6 +33,13 @@ export type LedgerAppFamily =
   | 'aptos'
   | 'sui'
   | 'stellar'
+  | 'tezos'
+  | 'algorand'
+  | 'multiversx'
+  | 'filecoin'
+  | 'stacks'
+  | 'mina'
+  | 'utility'
   | 'unknown';
 
 export type LedgerApp = 'dashboard' | string;
@@ -128,6 +135,23 @@ const FAMILY_BY_OPEN_NAME: Readonly<Record<string, LedgerAppFamily>> = {
   peaq: 'polkadot',
   polymesh: 'polkadot',
   'xx network': 'polkadot',
+  // ethereum APDU clones (CLA E0 core INS align; coin/path/extra INS may differ)
+  vechain: 'ethereum',
+  aeternity: 'ethereum',
+  // Manager utility / non-signer apps (no standalone coin APDU target)
+  exchange: 'utility',
+  'fido u2f': 'utility',
+  'security key': 'utility',
+  'seed tool': 'utility',
+  'recovery check': 'utility',
+  'ledger sync': 'utility',
+  // dedicated families researched this pass (official CLA/INS)
+  'tezos wallet': 'tezos',
+  algorand: 'algorand',
+  multiversx: 'multiversx',
+  filecoin: 'filecoin',
+  stacks: 'stacks',
+  mina: 'mina',
   // ethereum clear-signing plugins — companions, not standalone APDU apps
   '1inch': 'ethereum-plugin',
   alkemi: 'ethereum-plugin',
@@ -188,6 +212,12 @@ const FAMILY_RULES: [RegExp, LedgerAppFamily][] = [
   [/aptos/i, 'aptos'],
   [/^sui/i, 'sui'],
   [/stellar/i, 'stellar'],
+  [/tezos/i, 'tezos'],
+  [/algorand/i, 'algorand'],
+  [/multiversx|elrond/i, 'multiversx'],
+  [/filecoin/i, 'filecoin'],
+  [/stacks/i, 'stacks'],
+  [/^mina$/i, 'mina'],
 ];
 
 export function inferLedgerFamily(name: string): LedgerAppFamily {
@@ -233,10 +263,10 @@ export function slugLedgerApp(name: string): string {
 
 function chipFor(name: string, family: LedgerAppFamily): string {
   if (family !== 'unknown') {
-    if (family === 'ethereum-plugin') {
-      return name.replace(/[^A-Za-z0-9]/g, '').slice(0, 4).toUpperCase() || 'PLUG';
+    if (family === 'ethereum-plugin' || family === 'utility') {
+      return name.replace(/[^A-Za-z0-9]/g, '').slice(0, 4).toUpperCase() || 'UTIL';
     }
-    const chips: Record<Exclude<LedgerAppFamily, 'unknown' | 'ethereum-plugin'>, string> = {
+    const chips: Record<Exclude<LedgerAppFamily, 'unknown' | 'ethereum-plugin' | 'utility'>, string> = {
       bitcoin: 'BTC',
       ethereum: 'ETH',
       avalanche: 'AVAX',
@@ -251,6 +281,12 @@ function chipFor(name: string, family: LedgerAppFamily): string {
       aptos: 'APT',
       sui: 'SUI',
       stellar: 'XLM',
+      tezos: 'XTZ',
+      algorand: 'ALGO',
+      multiversx: 'EGLD',
+      filecoin: 'FIL',
+      stacks: 'STX',
+      mina: 'MINA',
     };
     if (name.toLowerCase().includes('litecoin')) {
       return 'LTC';

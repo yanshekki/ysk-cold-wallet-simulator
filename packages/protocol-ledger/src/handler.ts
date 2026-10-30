@@ -52,6 +52,12 @@ import { handleTonApdu } from './apps/ton';
 import { handleAptosApdu } from './apps/aptos';
 import { handleSuiApdu } from './apps/sui';
 import { handleStellarApdu } from './apps/stellar';
+import { handleTezosApdu } from './apps/tezos';
+import { handleAlgorandApdu } from './apps/algorand';
+import { handleMultiversXApdu } from './apps/multiversx';
+import { handleFilecoinApdu } from './apps/filecoin';
+import { handleStacksApdu } from './apps/stacks';
+import { handleMinaApdu } from './apps/mina';
 import type { FamilySession } from './apps/generic';
 import { replaceSeedCache, wrapSeedPort, type SeedCache } from './crypto';
 
@@ -232,7 +238,9 @@ export class LedgerProtocolHandler implements ProtocolHandler {
     if (apdu.cla === 0xe0 && apdu.ins === 0xd8) {
       return this.openApp(apdu.data);
     }
-    if (apdu.cla === 0xe0 && apdu.ins === 0x01) {
+    // BOLOS firmware GET_VERSION is E0 01 on the dashboard. Mina (and any
+    // future app) reuses INS 0x01 inside the open app — do not steal it.
+    if (apdu.cla === 0xe0 && apdu.ins === 0x01 && this.app === 'dashboard') {
       return getFirmwareVersion(this.model.id, this.managerAllowed);
     }
     if (apdu.cla === 0xe0 && apdu.ins === 0xd2) {
@@ -281,7 +289,7 @@ export class LedgerProtocolHandler implements ProtocolHandler {
       backup: this.backup,
     };
 
-    if (family === 'ethereum' || (family === 'avalanche' && apdu.cla === 0xe0)) {
+    if (family === 'ethereum' || (family === 'avalanche' && apdu.cla === 0xe0) || (family === 'filecoin' && apdu.cla === 0xe0)) {
       if (apdu.cla !== 0xe0) {
         if (family === 'avalanche' && apdu.cla === 0x80) {
           return handleAvalancheApdu(apdu, {
@@ -389,9 +397,45 @@ export class LedgerProtocolHandler implements ProtocolHandler {
       return handleStellarApdu(apdu, ctx, this.familySession);
     }
 
-    // ethereum-plugin: clear-signing companion only. Hosts must open Ethereum (or an
-    // EVM chain app). No standalone INS — fall through like unknown.
-    if (family === 'ethereum-plugin') {
+    if (family === 'tezos') {
+      if (apdu.cla !== 0x80) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleTezosApdu(apdu, ctx, this.familySession);
+    }
+    if (family === 'algorand') {
+      if (apdu.cla !== 0x80) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleAlgorandApdu(apdu, ctx, this.familySession);
+    }
+    if (family === 'multiversx') {
+      if (apdu.cla !== 0xed) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleMultiversXApdu(apdu, ctx, this.familySession);
+    }
+    if (family === 'filecoin') {
+      if (apdu.cla === 0x06) {
+        return handleFilecoinApdu(apdu, ctx, this.familySession);
+      }
+      return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+    }
+    if (family === 'stacks') {
+      if (apdu.cla !== 0x09) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleStacksApdu(apdu, ctx, this.familySession);
+    }
+    if (family === 'mina') {
+      if (apdu.cla !== 0xe0) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleMinaApdu(apdu, ctx, this.familySession);
+    }
+
+    // ethereum-plugin / utility: not standalone coin APDU targets.
+    if (family === 'ethereum-plugin' || family === 'utility') {
       return encodeResponse(new Uint8Array(), SW_INS_NOT_SUPPORTED);
     }
 

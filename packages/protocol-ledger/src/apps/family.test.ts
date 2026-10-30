@@ -199,6 +199,30 @@ const FAMILIES: FamilyCase[] = [
     path: [0x8000002c, 0x8000018d, 0x80000000, 0x80000000, 0x80000001],
     rawPubkey: 32,
   },
+  {
+    app: 'tezos-wallet',
+    cla: 0x80,
+    versionIns: 0x00,
+    pubkeyIns: 0x02,
+    path: [0x8000002c, 0x800006c1, 0x80000000, 0x80000000],
+    rawPubkey: 33, // len||ed25519
+  },
+  {
+    app: 'filecoin',
+    cla: 0x06,
+    versionIns: 0x00,
+    pubkeyIns: 0x01,
+    path: [0x8000002c, 0x800001cd, 0x80000000, 0, 0],
+    address: (value) => value.startsWith('f1'),
+  },
+  {
+    app: 'stacks',
+    cla: 0x09,
+    versionIns: 0x00,
+    pubkeyIns: 0x01,
+    path: [0x8000002c, 0x8000167d, 0x80000000, 0, 0],
+    address: (value) => value.startsWith('SP'),
+  },
 ];
 
 describe('Ledger family APDU bodies', () => {
@@ -223,6 +247,63 @@ describe('Ledger family APDU bodies', () => {
 
     const unknown = await exchange(device, apdu([item.cla, 0x99, 0x00, 0x00, 0x00]));
     expect(swOf(unknown)).toBe(SW_INS_NOT_SUPPORTED);
+  });
+
+  it('Algorand GET_VERSION is 12-byte Zondax u16 layout; pubkey/sign KEEP (HDW_NORMAL)', async () => {
+    const device = handler();
+    device.setApp('algorand');
+    const version = await exchange(device, apdu([0x80, 0x00, 0x00, 0x00, 0x00]));
+    expect(swOf(version)).toBe(SW_OK);
+    expect(version.length).toBe(12 + 2);
+    const pubkey = await exchange(device, apdu([0x80, 0x03, 0x00, 0x00, 0x00]));
+    expect(swOf(pubkey)).toBe(SW_INS_NOT_SUPPORTED);
+  });
+
+  it('Mina GET_CONF returns catalog version; GET_ADDR KEEP (secp→Mina field)', async () => {
+    const device = handler();
+    device.setApp('mina');
+    const version = await exchange(device, apdu([0xe0, 0x01, 0x00, 0x00, 0x00]));
+    expect(swOf(version)).toBe(SW_OK);
+    const [maj, min, patch] = catalogVersion('mina', '1.6.10')
+      .split('.')
+      .map((part) => Number.parseInt(part, 10) || 0);
+    expect(Array.from(version.subarray(0, version.length - 2))).toEqual([maj, min, patch]);
+    const addr = await exchange(device, apdu([0xe0, 0x02, 0x00, 0x00, 0x00]));
+    expect(swOf(addr)).toBe(SW_INS_NOT_SUPPORTED);
+  });
+
+  it('MultiversX GET_ADDR returns len||erd bech32 from account||index', async () => {
+    const device = handler();
+    device.setApp('multiversx');
+    const version = await exchange(device, apdu([0xed, 0x01, 0x00, 0x00, 0x00]));
+    expect(swOf(version)).toBe(SW_OK);
+    const data = [0, 0, 0, 0, 0, 0, 0, 0];
+    const addr = await exchange(device, apdu([0xed, 0x03, 0x00, 0x00, data.length, ...data]));
+    expect(swOf(addr)).toBe(SW_OK);
+    const body = addr.subarray(0, addr.length - 2);
+    const len = body[0]!;
+    const text = Array.from(body.subarray(1, 1 + len), (b) => String.fromCharCode(b)).join('');
+    expect(text.startsWith('erd1')).toBe(true);
+  });
+
+  it('utility and ethereum-plugin apps return INS_NOT_SUPPORTED', async () => {
+    const device = handler();
+    device.setApp('exchange');
+    const denied = await exchange(device, apdu([0xe0, 0x02, 0x00, 0x00, 0x00]));
+    expect(swOf(denied)).toBe(SW_INS_NOT_SUPPORTED);
+  });
+
+  it('Tezos GET_VERSION is wallet_tag||maj||min||patch', async () => {
+    const device = handler();
+    device.setApp('tezos-wallet');
+    const payload = await exchange(device, apdu([0x80, 0x00, 0x00, 0x00, 0x00]));
+    expect(swOf(payload)).toBe(SW_OK);
+    const body = payload.subarray(0, payload.length - 2);
+    expect(body[0]).toBe(0x00);
+    const [maj, min, patch] = catalogVersion('tezos-wallet', '3.2.4')
+      .split('.')
+      .map((part) => Number.parseInt(part, 10) || 0);
+    expect(Array.from(body)).toEqual([0x00, maj, min, patch]);
   });
 
   it('Cardano GET_VERSION is major||minor||patch||flags so BLE connect passes the host length check', async () => {
