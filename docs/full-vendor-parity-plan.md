@@ -113,7 +113,7 @@ Sources already cited in [ledger-apdu.md](ledger-apdu.md). Close a row only with
 | Bitcoin | Wallet-policy HMAC and PSBT merkle proofs beyond `family.test.ts` and `handler.test.ts` | [app-bitcoin `doc/bitcoin.md`](https://github.com/LedgerHQ/app-bitcoin/blob/develop/doc/bitcoin.md). Blocker: `walletHmac` uses the CWS key `CWS/ledger-wallet-hmac`, not the app-bitcoin policy key. A zero HMAC stays host-unproven. CLA `F8` INS `01` has an unarmed hold-forward test |
 | Ethereum | INS `22` `32` `36` `38` `3A` (domain, simulation, safe account, gated signing, map entry) | [app-ethereum `doc/apdu.md`](https://github.com/LedgerHQ/app-ethereum/blob/develop/doc/apdu.md). hw-app-eth `Eth.ts` sends only `22` (`provideDomainName`) from this set. Blocker: the TLV is CAL-signed. Empty `9000` would accept an unsigned domain. `32` / `36` / `38` / `3A` are not written by that host package. All five stay `6D00`. `12` / `16` / `1E` acknowledge and store nothing |
 | Tron | sign-by-hash setting word `6A8C` | ECDH `0A` and TIP-712 `0C` are MATCH. [app-tron `ui_globals.c`](https://github.com/LedgerHQ/app-tron/blob/develop/src/ui/ui_globals.c). CWS does not model the off switch, so `E_MISSING_SETTING_SIGN_BY_HASH` is not returned |
-| XRP | ed25519 when P2 is `80` | [hw-app-xrp](https://github.com/LedgerHQ/ledger-live/blob/develop/libs/ledgerjs/packages/hw-app-xrp/src/Xrp.ts). Not exercised |
+| XRP | ed25519 when P2 is `80` | [app-xrp `sign_transaction.c`](https://github.com/LedgerHQ/app-xrp/blob/develop/src/apdu/messages/sign_transaction.c). Blocker: `cx_eddsa_sign` is SHA-512 over `STX\0` ‖ tx and the body is 64 bytes, but `bip32_derive_init_privkey_256(CX_CURVE_Ed25519)` lives in the SDK. CWS will not sign that path with SLIP-10 until that HDW call is copied |
 | Cosmos | length-prefixed GET_ADDR helper | HRP requests are MATCH (`pk` ‖ bech32, no length prefixes) from [hw-app-cosmos](https://github.com/LedgerHQ/ledger-live/blob/develop/libs/ledgerjs/packages/hw-app-cosmos/src/Cosmos.ts) and `crypto_fillAddress`. A length-prefixed BIP32 body is still accepted for older hosts |
 | Polkadot | SCALE / metadata proof; SS58 prefix taken from the payload | [Zondax ledger-polkadot APDUSPEC](https://github.com/Zondax/ledger-polkadot/blob/master/docs/APDUSPEC.md) |
 | TON | BOC / cell hash; proof and sign-data fields | [app-ton COMMANDS](https://github.com/LedgerHQ/app-ton/blob/master/doc/COMMANDS.md). The hash field is sha256 of the uploaded bytes |
@@ -347,19 +347,25 @@ Docs only. No handler change. No USB install. No Proxy rebuild.
 
 One family, or a small set that shares a chunk mode, per PR. Official chunk mode, response length, and a confirm sheet. Algorand Ed25519 stays KEEP if the source is HDW_NORMAL and CWS would sign SLIP-10. XMSS (QRL), RSA (Arweave), Mina field, and Curve25519 (Waves) stay KEEP when the curve is not the one CWS derives. Proxy test in the same PR.
 
-XRP ed25519, Polkadot SCALE, and TON cell hash are still this phase. They already have a core handler. Stellar `maxDataSize` is MATCH (Nano X `4096`, other models `8192`). Tron ECDH and TIP-712 are MATCH. TIP-712 does not return firmware `6A8C` for a disabled sign-by-hash setting. Cosmos HRP GET_ADDR is MATCH. A length-prefixed Cosmos address body is still accepted.
+XRP ed25519, Polkadot SCALE, and TON cell hash stay KEEP. Stellar `maxDataSize` is MATCH (Nano X `4096`, other models `8192`). Tron ECDH and TIP-712 are MATCH. TIP-712 does not return firmware `6A8C` for a disabled sign-by-hash setting. Cosmos HRP GET_ADDR is MATCH. A length-prefixed Cosmos address body is still accepted.
+
+XRP blocker: [app-xrp `sign_transaction.c`](https://github.com/LedgerHQ/app-xrp/blob/develop/src/apdu/messages/sign_transaction.c) returns a 64-byte EdDSA signature over `STX\0` ‖ tx. The private key is `bip32_derive_init_privkey_256(CX_CURVE_Ed25519)` in the Ledger SDK, not in the app tree. Polkadot blocker: SCALE and the metadata proof in the Zondax APDUSPEC are not parsed. TON blocker: the hash field is sha256 of the uploaded bytes, not the cell hash from a parsed BOC (`COMMANDS.md`). Newer-family SIGN stays KEEP on the curves named in section 1b. Those curves are not the ones CWS derives.
 
 ### Phase 6 — Trezor gaps Safe 7 hosts send
 
-QR pairing (1032/1033) and NFC pairing (1040/1041) only if a Safe 7 host selects `ThpPairingMethod` QrCode or NFC. Otherwise they stay KEEP. Solana sign-message 906, Ethereum definitions 471/472, and the Cardano stages Suite sends are the next coin work. Stellar op-by-op and Monero stay KEEP until a trace exists. Proxy `attachTrezor` / trezord test when the message arrives over USB.
+**Status.** KEEP. No Suite trace in this pass selects these messages, so none were implemented.
+
+QR pairing (1032/1033) and NFC pairing (1040/1041) stay KEEP until a Safe 7 host selects `ThpPairingMethod` QrCode or NFC. Solana sign-message 906 and Ethereum definitions 471/472 are names in trezor-firmware `MessageType.py`. CWS does not decode those protobufs. Cardano stages Suite sends beyond the ids already tested stay KEEP. Stellar op-by-op and Monero stay KEEP until a trace exists. Proxy `attachTrezor` does not need a new test until one of those messages is decoded.
 
 ### Phase 7 — OneKey gaps the OneKey app sends
 
-Start from ids the desktop or mobile OneKey app actually writes: Ethereum OneKey tx ack 20106/20107, EIP-7702 20120, Solana unsafe message 10106, Sui tx request/ack, TON proof and sign-data. Algorand, Filecoin, Kaspa, and the long tail stay KEEP until a capture shows the id. V2 multi-chunk adapter test when the frame spans reports.
+**Status.** KEEP. The ids are present in OneKey firmware. This pass did not capture the desktop or mobile app writing them, and CWS does not decode those protobufs.
+
+Ethereum tx ack 20106/20107, EIP-7702 20120, Solana unsafe message 10106, Sui tx request/ack, and TON proof and sign-data stay KEEP until a capture shows the bytes. Algorand, Filecoin, Kaspa, and the long tail stay KEEP for the same reason. A V2 multi-chunk adapter test waits until a frame that spans reports is implemented.
 
 ### Phase 8 — QR registry types hosts scan
 
-Implement a Keystone or Blockchain Commons type only when Rabby, MetaMask, OKX, Sparrow, or the Keystone app scans it and the registry file is cited. Fountain tests cover multipart. Seed QR still confirms. No proxy UR bridge in this phase.
+**Status.** KEEP for every registry type this tree does not already encode. No new type was added. Rabby, MetaMask, OKX, Sparrow, and the Keystone app were not shown scanning an unimplemented type in this pass. The types CWS already encodes stay MATCH in [vendor-protocols.md](vendor-protocols.md). Fountain tests cover multipart. Seed QR still confirms. No proxy UR bridge.
 
 ---
 
