@@ -366,6 +366,14 @@ export async function shelleyAddressBytes(ctx: FamilyContext, address: ShelleyAd
   return concatBytes(...parts);
 }
 
+/** Address bytes `txHashBuilder` writes into an output, after device-owned params are resolved. */
+export async function cardanoOutputAddressBytes(
+  ctx: FamilyContext,
+  address: ShelleyAddress,
+): Promise<Uint8Array> {
+  return address.type === 0x08 ? byronAddressBytes(ctx, address) : shelleyAddressBytes(ctx, address);
+}
+
 export async function handleCardanoDeriveAddress(apdu: Apdu, ctx: FamilyContext): Promise<Uint8Array> {
   if (apdu.p2 !== 0x00 || (apdu.p1 !== 0x01 && apdu.p1 !== 0x02)) {
     return encodeResponse(new Uint8Array(), SW_WRONG_P1P2);
