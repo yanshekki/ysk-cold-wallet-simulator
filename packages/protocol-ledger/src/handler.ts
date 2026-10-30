@@ -83,6 +83,12 @@ import { handleEverscaleApdu } from './apps/everscale';
 import { handleQrlApdu } from './apps/qrl';
 import { handleArdorApdu } from './apps/ardor';
 import { handleFioApdu } from './apps/fio';
+import { handleCantonApdu } from './apps/canton';
+import { handleKaspaApdu } from './apps/kaspa';
+import { handleIotaApdu } from './apps/iota';
+import { handleNervosApdu } from './apps/nervos';
+import { handleNamadaApdu } from './apps/namada';
+import { handleSpacemeshApdu } from './apps/spacemesh';
 import type { FamilySession } from './apps/generic';
 import { replaceSeedCache, wrapSeedPort, type SeedCache } from './crypto';
 
@@ -609,6 +615,42 @@ export class LedgerProtocolHandler implements ProtocolHandler {
       }
       return handleFioApdu(apdu, ctx, this.familySession);
     }
+    if (family === 'canton') {
+      if (apdu.cla !== 0xe0) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleCantonApdu(apdu);
+    }
+    if (family === 'kaspa') {
+      if (apdu.cla !== 0xe0) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleKaspaApdu(apdu);
+    }
+    if (family === 'iota') {
+      if (apdu.cla !== 0x00) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleIotaApdu(apdu);
+    }
+    if (family === 'nervos') {
+      if (apdu.cla !== 0x80) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleNervosApdu(apdu);
+    }
+    if (family === 'namada') {
+      if (apdu.cla !== 0x57) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleNamadaApdu(apdu, targetIdFor(this.model.id));
+    }
+    if (family === 'spacemesh') {
+      if (apdu.cla !== 0x45) {
+        return encodeResponse(new Uint8Array(), SW_CLA_NOT_SUPPORTED);
+      }
+      return handleSpacemeshApdu(apdu);
+    }
 
     // ethereum-plugin / utility: not standalone coin APDU targets.
     if (family === 'ethereum-plugin' || family === 'utility') {
@@ -737,20 +779,24 @@ function inferAppFromApdu(app: LedgerApp, apdu: ReturnType<typeof parseApdu>): L
     family !== 'mina' &&
     family !== 'flare' &&
     family !== 'aleo' &&
-    family !== 'hathor'
+    family !== 'hathor' &&
+    family !== 'canton' &&
+    family !== 'kaspa'
   ) {
     return family === 'ton' ? undefined : 'ton';
   }
   if (apdu.cla === 0xe0 && apdu.ins === 0x04 && empty) {
     // TON GET_APP_NAME is also empty E0 04.
-    if (family === 'solana' || family === 'ton') {
+    // Canton and Kaspa GET_APP_NAME share that header. Leave them on the open app.
+    if (family === 'solana' || family === 'ton' || family === 'canton' || family === 'kaspa') {
       return undefined;
     }
     return 'solana';
   }
   if (apdu.cla === 0xe0 && apdu.ins === 0x05) {
     // TON GET_PUBLIC_KEY is E0 05 (32-byte ed25519), same INS as Solana.
-    if (family === 'solana' || family === 'ton') {
+    // Canton and Kaspa GET_PUBLIC_KEY share that header. Pubkey stays KEEP there.
+    if (family === 'solana' || family === 'ton' || family === 'canton' || family === 'kaspa') {
       return undefined;
     }
     return 'solana';
@@ -761,7 +807,9 @@ function inferAppFromApdu(app: LedgerApp, apdu: ReturnType<typeof parseApdu>): L
       family === 'xrp' ||
       family === 'stellar' ||
       family === 'symbol' ||
-      family === 'aion'
+      family === 'aion' ||
+      family === 'canton' ||
+      family === 'kaspa'
     ) {
       return undefined;
     }
@@ -783,7 +831,10 @@ function inferAppFromApdu(app: LedgerApp, apdu: ReturnType<typeof parseApdu>): L
     apdu.cla === 0x00 &&
     (apdu.ins === 0x00 || apdu.ins === 0x01 || apdu.ins === 0x02 || apdu.ins === 0x03)
   ) {
-    return family === 'sui' ? undefined : 'sui';
+    if (family === 'sui' || family === 'iota') {
+      return undefined;
+    }
+    return 'sui';
   }
   // CLA 80 is shared by Near, Avalanche, Tezos, Algorand, NEO, Waves — only
   // infer Near when the open app is not already one of those families.
@@ -795,7 +846,8 @@ function inferAppFromApdu(app: LedgerApp, apdu: ReturnType<typeof parseApdu>): L
     family !== 'algorand' &&
     family !== 'neo' &&
     family !== 'waves' &&
-    family !== 'alephium'
+    family !== 'alephium' &&
+    family !== 'nervos'
   ) {
     return family === 'near' ? undefined : 'near';
   }

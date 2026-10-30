@@ -64,6 +64,12 @@ export type LedgerAppFamily =
   | 'qrl'
   | 'ardor'
   | 'fio'
+  | 'canton'
+  | 'kaspa'
+  | 'iota'
+  | 'nervos'
+  | 'namada'
+  | 'spacemesh'
   | 'utility'
   | 'unknown';
 
@@ -203,6 +209,12 @@ const FAMILY_BY_OPEN_NAME: Readonly<Record<string, LedgerAppFamily>> = {
   qrl: 'qrl',
   ardor: 'ardor',
   fio: 'fio',
+  canton: 'canton',
+  iota: 'iota',
+  kaspa: 'kaspa',
+  namada: 'namada',
+  nervos: 'nervos',
+  spacemesh: 'spacemesh',
   // ethereum clear-signing plugins — companions, not standalone APDU apps
   '1inch': 'ethereum-plugin',
   alkemi: 'ethereum-plugin',
@@ -294,6 +306,12 @@ const FAMILY_RULES: [RegExp, LedgerAppFamily][] = [
   [/^qrl$/i, 'qrl'],
   [/^ardor$/i, 'ardor'],
   [/^fio$/i, 'fio'],
+  [/^canton$/i, 'canton'],
+  [/^iota$/i, 'iota'],
+  [/^kaspa$/i, 'kaspa'],
+  [/^namada$/i, 'namada'],
+  [/^nervos$/i, 'nervos'],
+  [/^spacemesh$/i, 'spacemesh'],
 ];
 
 export function inferLedgerFamily(name: string): LedgerAppFamily {
@@ -388,6 +406,12 @@ function chipFor(name: string, family: LedgerAppFamily): string {
       qrl: 'QRL',
       ardor: 'ARDO',
       fio: 'FIO',
+      canton: 'CANT',
+      kaspa: 'KASP',
+      iota: 'IOTA',
+      nervos: 'NERV',
+      namada: 'NAMA',
+      spacemesh: 'SPAC',
     };
     if (name.toLowerCase().includes('litecoin')) {
       return 'LTC';

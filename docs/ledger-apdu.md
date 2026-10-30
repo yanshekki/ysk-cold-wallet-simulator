@@ -251,7 +251,7 @@ See also [ledger-apdu-plan.md](./ledger-apdu-plan.md) for the catalog matrix and
 | Bitcoin Private | `bitcoin` | 2.4.13 | bitcoin family — see Bitcoin section; coin params differ | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
 | Brick Towers | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | Callisto | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
-| Canton | `unknown` | 3.5.1 | unknown — needs firmware research | unknown — needs firmware research |
+| Canton | `canton` | 3.5.1 | MATCH GET_VERSION (CLA E0 INS 03) 3-byte; pubkey/sign KEEP — LedgerHQ/app-canton `doc/APDU.md` | CLA E0: 03/04/05/06 |
 | Cardano ADA | `cardano` | 8.0.8 | see Cardano section (MATCH/FIXED/KEEP) | CLA D7: 00/01/04/10/11/12/21/22/23/24 |
 | Casper | `casper` | 3.1.9 | MATCH VERSION/ADDR/SIGN — LedgerHQ/app-casper (#53) | MATCH VERSION/ADDR/SIGN — LedgerHQ/app-casper (#53) |
 | cBridge | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
@@ -309,11 +309,11 @@ See also [ledger-apdu-plan.md](./ledger-apdu-plan.md) for the catalog matrix and
 | ICON | `unknown` | 1.0.9 | unknown — needs firmware research | unknown — needs firmware research |
 | ID4Good | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | InternetComputer | `internetcomputer` | 4.2.17 | MATCH GET_VERSION (CLA 11 INS 00) 5-byte Zondax; ADDR/SIGN KEEP — Zondax/ledger-icp | MATCH GET_VERSION (CLA 11 INS 00) 5-byte Zondax; ADDR/SIGN KEEP — Zondax/ledger-icp |
-| IOTA | `unknown` | 1.0.4 | unknown — needs firmware research | unknown — needs firmware research |
+| IOTA | `iota` | 1.0.4 | MATCH GET_VERSION (CLA 00 INS 00) triple\|\|`iota`; other INS and the block envelope KEEP — LedgerHQ/app-iota `docs/apdu.md` | CLA 00: 00/01/02/03/FF |
 | IOTA Legacy | `unknown` | 0.5.9 | unknown — needs firmware research | unknown — needs firmware research |
 | IoTeX | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | IOV | `cosmos` | 2.16.7 | family-mapped — catalog `cosmos` (reuses cosmos handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA 55: 00/01/02/04 (Zondax pattern) |
-| Kaspa | `unknown` | 1.2.2 | unknown — needs firmware research | unknown — needs firmware research |
+| Kaspa | `kaspa` | 1.2.2 | MATCH GET_VERSION (CLA E0 INS 03) 3-byte; bad P1/P2 is 6A86; pubkey/sign KEEP — LedgerHQ/app-kaspa `src/types.h` | CLA E0: 03/04/05/06/07 |
 | Kelp | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | Kiln | `ethereum-plugin` | 2.2.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | Komodo | `bitcoin` | 2.4.13 | family-mapped — catalog `bitcoin` (reuses bitcoin handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
@@ -333,13 +333,13 @@ See also [ledger-apdu-plan.md](./ledger-apdu-plan.md) for the catalog matrix and
 | Morpho | `ethereum-plugin` | 3.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | MultiversX | `multiversx` | 1.3.1 | MATCH VERSION + GET_ADDR; SIGN KEEP — LedgerHQ/app-multiversx (#52) | MATCH VERSION + GET_ADDR; SIGN KEEP — LedgerHQ/app-multiversx (#52) |
 | Musicoin | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
-| Namada | `unknown` | 3.0.6 | unknown — needs firmware research | unknown — needs firmware research |
+| Namada | `namada` | 3.0.6 | MATCH GET_VERSION (CLA 57 INS 00) test\|\|u16 triple\|\|locked\|\|target id; addr/sign KEEP — LedgerHQ/app-namada `docs/APDUSPEC.md` | CLA 57: 00/01/02/03 |
 | Nano | `unknown` | 1.3.1 | unknown — needs firmware research | unknown — needs firmware research |
 | NEAR | `near` | 2.4.3 | see NEAR section (KEEP) | CLA 80: 00/02/04/05/06/07/08 |
 | NEM | `unknown` | 0.0.13 | unknown — needs firmware research | unknown — needs firmware research |
 | NEO | `neo` | 1.5.1 | MATCH GET_PUBLIC_KEY 65-byte P-256; SIGN KEEP — LedgerHQ/app-neo (#53) | MATCH GET_PUBLIC_KEY 65-byte P-256; SIGN KEEP — LedgerHQ/app-neo (#53) |
 | NEO N3 | `neo` | 0.6.1 | MATCH GET_PUBLIC_KEY; SIGN KEEP — LedgerHQ/app-neo (#53) | MATCH GET_PUBLIC_KEY; SIGN KEEP — LedgerHQ/app-neo (#53) |
-| Nervos | `unknown` | 0.6.3 | unknown — needs firmware research | unknown — needs firmware research |
+| Nervos | `nervos` | 0.6.3 | MATCH GET_VERSION (CLA 80 INS 00) 3-byte; pubkey/sign KEEP — LedgerHQ/app-nervos `src/apdu.c` CLA 0x80 | CLA 80: 00–07/09/0F |
 | Nested | `ethereum-plugin` | 1.2.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | Nimiq | `unknown` | 2.1.1 | unknown — needs firmware research | unknown — needs firmware research |
 | NIX | `bitcoin` | 2.4.13 | family-mapped — catalog `bitcoin` (reuses bitcoin handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E1 00/02/03/04/05/10; F8 01; legacy E0… |
@@ -385,7 +385,7 @@ See also [ledger-apdu-plan.md](./ledger-apdu-plan.md) for the catalog matrix and
 | Solar | `unknown` | 1.3.1 | unknown — needs firmware research | unknown — needs firmware research |
 | Songbird | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | Sonic | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
-| Spacemesh | `unknown` | 0.0.16 | unknown — needs firmware research | unknown — needs firmware research |
+| Spacemesh | `spacemesh` | 0.0.16 | MATCH GET_VERSION (CLA 45 INS 00) test\|\|u16 triple\|\|locked; addr/sign KEEP — LedgerHQ/app-spacemesh `docs/APDUSPEC.md` | CLA 45: 00/01/02 |
 | Spool | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | Squid | `ethereum-plugin` | 1.1.0 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
 | Stacks | `stacks` | 0.26.19 | MATCH VERSION/ADDR/SIGN — LedgerHQ/app-stacks (#52) | MATCH VERSION/ADDR/SIGN — LedgerHQ/app-stacks (#52) |

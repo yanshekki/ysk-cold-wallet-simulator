@@ -6,7 +6,7 @@ import { HDKey } from '@scure/bip32';
 import { describe, expect, it } from 'vitest';
 import { LEDGER_MODELS, catalogVersion, type ConfirmationPort, type LedgerApp, type SigningRequest } from '@cws/contracts';
 import { buildP2wpkhPsbt as buildQrPsbt, parsePsbt } from '@cws/protocol-qr';
-import { SW_DENY, SW_INS_NOT_SUPPORTED, SW_INTERRUPTED, SW_OK } from '../apdu';
+import { SW_DENY, SW_INS_NOT_SUPPORTED, SW_INTERRUPTED, SW_OK, SW_WRONG_P1P2 } from '../apdu';
 import {
   CLA_FRAMEWORK,
   ClientCommandInterpreter,
@@ -1461,5 +1461,95 @@ describe('Phase 2 item 4 — unknown catalog VERSION MATCH (round after #53)', (
       .split('.')
       .map((part) => Number.parseInt(part, 10) || 0);
     expect(Array.from(version.subarray(0, version.length - 2))).toEqual([maj, min, patch, 0x00]);
+  });
+});
+
+describe('Phase 2 version MATCH for previously unknown apps', () => {
+  it('Canton GET_VERSION is 3 bytes and SIGN stays 6D00', async () => {
+    const device = handler();
+    device.setApp('canton');
+    const version = await exchange(device, apdu([0xe0, 0x03, 0x00, 0x00, 0x00]));
+    expect(swOf(version)).toBe(SW_OK);
+    expect(Array.from(version.subarray(0, version.length - 2))).toEqual([0x03, 0x05, 0x01]);
+    const sign = await exchange(device, apdu([0xe0, 0x06, 0x00, 0x00, 0x00]));
+    expect(swOf(sign)).toBe(SW_INS_NOT_SUPPORTED);
+    expect(device.getApp()).toBe('canton');
+  });
+
+  it('an empty E0 03 on the dashboard is still TON', async () => {
+    const device = handler();
+    const version = await exchange(device, apdu([0xe0, 0x03, 0x00, 0x00, 0x00]));
+    expect(swOf(version)).toBe(SW_OK);
+    expect(device.getApp()).toBe('ton');
+  });
+
+  it('Kaspa GET_VERSION is 3 bytes; a bad P1 is 6A86; pubkey stays 6D00', async () => {
+    const device = handler();
+    device.setApp('kaspa');
+    const version = await exchange(device, apdu([0xe0, 0x03, 0x00, 0x00, 0x00]));
+    expect(swOf(version)).toBe(SW_OK);
+    expect(Array.from(version.subarray(0, version.length - 2))).toEqual([0x01, 0x02, 0x02]);
+    const bad = await exchange(device, apdu([0xe0, 0x03, 0x01, 0x00, 0x00]));
+    expect(swOf(bad)).toBe(SW_WRONG_P1P2);
+    const pubkey = await exchange(device, apdu([0xe0, 0x05, 0x00, 0x00, 0x00]));
+    expect(swOf(pubkey)).toBe(SW_INS_NOT_SUPPORTED);
+    const sign = await exchange(device, apdu([0xe0, 0x06, 0x00, 0x00, 0x00]));
+    expect(swOf(sign)).toBe(SW_INS_NOT_SUPPORTED);
+    expect(device.getApp()).toBe('kaspa');
+  });
+
+  it('IOTA GET_VERSION is the catalog triple plus ascii iota; SIGN stays 6D00', async () => {
+    const device = handler();
+    device.setApp('iota');
+    const version = await exchange(device, apdu([0x00, 0x00, 0x00, 0x00, 0x00]));
+    expect(swOf(version)).toBe(SW_OK);
+    expect(Array.from(version.subarray(0, version.length - 2))).toEqual([
+      0x01, 0x00, 0x04, 0x69, 0x6f, 0x74, 0x61,
+    ]);
+    const sign = await exchange(device, apdu([0x00, 0x03, 0x00, 0x00, 0x00]));
+    expect(swOf(sign)).toBe(SW_INS_NOT_SUPPORTED);
+    expect(device.getApp()).toBe('iota');
+  });
+
+  it('an empty CLA 00 INS 00 on the dashboard is still Sui', async () => {
+    const device = handler();
+    const version = await exchange(device, apdu([0x00, 0x00, 0x00, 0x00, 0x00]));
+    expect(swOf(version)).toBe(SW_OK);
+    expect(device.getApp()).toBe('sui');
+  });
+
+  it('Nervos GET_VERSION is 3 bytes on CLA 0x80 and SIGN stays 6D00', async () => {
+    const device = handler();
+    device.setApp('nervos');
+    const version = await exchange(device, apdu([0x80, 0x00, 0x00, 0x00, 0x00]));
+    expect(swOf(version)).toBe(SW_OK);
+    expect(Array.from(version.subarray(0, version.length - 2))).toEqual([0x00, 0x06, 0x03]);
+    const sign = await exchange(device, apdu([0x80, 0x03, 0x00, 0x00, 0x00]));
+    expect(swOf(sign)).toBe(SW_INS_NOT_SUPPORTED);
+    expect(device.getApp()).toBe('nervos');
+  });
+
+  it('Namada GET_VERSION is the Zondax u16 body plus the Nano X target id', async () => {
+    const device = handler();
+    device.setApp('namada');
+    const version = await exchange(device, apdu([0x57, 0x00, 0x00, 0x00, 0x00]));
+    expect(swOf(version)).toBe(SW_OK);
+    expect(Array.from(version.subarray(0, version.length - 2))).toEqual([
+      0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x06, 0x00, 0x33, 0x00, 0x00, 0x04,
+    ]);
+    const sign = await exchange(device, apdu([0x57, 0x02, 0x00, 0x00, 0x00]));
+    expect(swOf(sign)).toBe(SW_INS_NOT_SUPPORTED);
+  });
+
+  it('Spacemesh GET_VERSION is 8 bytes and has no target id', async () => {
+    const device = handler();
+    device.setApp('spacemesh');
+    const version = await exchange(device, apdu([0x45, 0x00, 0x00, 0x00, 0x00]));
+    expect(swOf(version)).toBe(SW_OK);
+    expect(Array.from(version.subarray(0, version.length - 2))).toEqual([
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00,
+    ]);
+    const sign = await exchange(device, apdu([0x45, 0x02, 0x00, 0x00, 0x00]));
+    expect(swOf(sign)).toBe(SW_INS_NOT_SUPPORTED);
   });
 });
