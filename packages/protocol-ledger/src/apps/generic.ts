@@ -51,6 +51,8 @@ export type SuiBlocksSession = {
 export type CardanoTxWire = {
   protocol: 'v7' | 'v8';
   body: Uint8Array;
+  /** v8 `serializeTxInitData`. Absent on the v7 stage wire. */
+  init?: Uint8Array;
   hash?: Uint8Array;
 };
 

@@ -19,6 +19,7 @@ import { deriveIcarus, deriveIcarusFromRoot, signIcarus } from './icarus';
 import { handleCardanoDeriveAddress } from './cardanoAddress';
 import { handleCardanoNativeScript } from './cardanoNativeScript';
 import { handleCardanoSignMsg } from './cardanoSignMsg';
+import { cardanoCanonicalTxHash } from './cardanoTxHash';
 
 export type CardanoSession = FamilySession;
 
@@ -114,9 +115,8 @@ function emptyOk(): Uint8Array {
   return encodeResponse(new Uint8Array(), SW_OK);
 }
 
-function txHash(body: Uint8Array): Uint8Array {
-  return blake2b(body, { dkLen: 32 });
-}
+/** Unparsed SIGN_TX body. Do not hash the raw APDU stream. */
+const SW_TX_BODY = 0x6a80;
 
 function openTx(session: CardanoSession, protocol: 'v7' | 'v8', reset: boolean): CardanoTxWire {
   if (reset || !session.cardanoTx || session.cardanoTx.protocol !== protocol) {
@@ -148,7 +148,7 @@ async function signTransactionV8(
   session: CardanoSession,
 ): Promise<Uint8Array> {
   if (apdu.p1 === V8_INIT) {
-    openTx(session, 'v8', true);
+    session.cardanoTx = { protocol: 'v8', body: new Uint8Array(), init: apdu.data };
     return emptyOk();
   }
   if (apdu.p1 === V8_CHUNK) {
@@ -158,15 +158,19 @@ async function signTransactionV8(
   if (apdu.p1 === V8_CONFIRM) {
     const tx = openTx(session, 'v8', false);
     remember(tx, apdu.data);
-    if (tx.body.length === 0) {
+    if (!tx.init || tx.body.length === 0) {
       return encodeResponse(new Uint8Array(), SW_WRONG_LENGTH);
+    }
+    const hash = await cardanoCanonicalTxHash(tx.init, tx.body, ctx);
+    if (!hash) {
+      return encodeResponse(new Uint8Array(), SW_TX_BODY);
     }
     const ok = await confirmTx(ctx, tx.body);
     if (!ok) {
       return encodeResponse(new Uint8Array(), SW_DENY);
     }
-    tx.hash = txHash(tx.body);
-    return encodeResponse(tx.hash, SW_OK);
+    tx.hash = hash;
+    return encodeResponse(hash, SW_OK);
   }
   if (apdu.p1 === V8_WITNESS) {
     return signWitness(apdu, ctx, session, 'v8');
@@ -197,14 +201,9 @@ async function signTransactionV7(
     return emptyOk();
   }
   if (apdu.p1 === V7_CONFIRM) {
-    const tx = openTx(session, 'v7', false);
-    remember(tx, apdu.data);
-    const ok = await confirmTx(ctx, tx.body);
-    if (!ok) {
-      return encodeResponse(new Uint8Array(), SW_DENY);
-    }
-    tx.hash = txHash(tx.body);
-    return encodeResponse(tx.hash, SW_OK);
+    // The v7 stage wire is not the v8 raw blob. Hashing those stages was the
+    // SIGNATURE_INVALID bug. Refuse it instead of signing the wrong digest.
+    return encodeResponse(new Uint8Array(), SW_TX_BODY);
   }
   if (apdu.p1 === V7_WITNESS) {
     return signWitness(apdu, ctx, session, 'v7');

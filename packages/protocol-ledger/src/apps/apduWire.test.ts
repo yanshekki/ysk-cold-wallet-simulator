@@ -126,24 +126,16 @@ describe('Cardano SIGN_TX body lengths follow the reported app version', () => {
     expect(confirms()).toBe(0);
   });
 
-  it('v8 CONFIRM returns 32 bytes and WITNESS returns a 64-byte signature of that hash', async () => {
+  it('v8 CONFIRM refuses to hash a raw APDU payload', async () => {
     const { device, confirms } = handler();
     device.setApp('cardano');
     await exchange(device, apdu([0xd7, 0x21, 0x10, 0x00, 0x01, 0x03]));
     const raw = Uint8Array.of(0x11, 0x22, 0x33, 0x44);
     const confirmed = await exchange(device, apdu([0xd7, 0x21, 0x12, 0x00, raw.length, ...raw]));
-    expect(statusOf(confirmed)).toBe(SW_OK);
-    expect(bodyOf(confirmed).length).toBe(32);
-    expect(Array.from(bodyOf(confirmed))).toEqual(Array.from(blake2b(raw, { dkLen: 32 })));
-    expect(confirms()).toBe(1);
-
-    const pathBytes = encodePath(ADA_PATH);
-    const witness = await exchange(device, apdu([0xd7, 0x21, 0x0f, 0x00, pathBytes.length, ...pathBytes]));
-    expect(statusOf(witness)).toBe(SW_OK);
-    expect(bodyOf(witness).length).toBe(64);
-    expect(confirms()).toBe(2);
-    const node = deriveIcarus(entropy(), "m/1852'/1815'/0'/0/0");
-    expect(Array.from(bodyOf(witness))).toEqual(Array.from(signIcarus(node, bodyOf(confirmed))));
+    expect(statusOf(confirmed)).toBe(0x6a80);
+    expect(bodyOf(confirmed).length).toBe(0);
+    expect(Array.from(bodyOf(confirmed))).not.toEqual(Array.from(blake2b(raw, { dkLen: 32 })));
+    expect(confirms()).toBe(0);
   });
 
   it('v8 does not treat v7 confirm P1 0x0A as a 32-byte hash', async () => {
@@ -155,7 +147,7 @@ describe('Cardano SIGN_TX body lengths follow the reported app version', () => {
     expect(confirms()).toBe(0);
   });
 
-  it('v7 uses different P1 values for the same empty, 32, and 64 byte replies', async () => {
+  it('v7 confirm returns 6A80 instead of hashing the concatenated stages', async () => {
     setLedgerVersionPicks({ cardano: '7.2.1' });
     try {
       expect(catalogVersion('cardano', '0')).toBe('7.2.1');
@@ -174,17 +166,11 @@ describe('Cardano SIGN_TX body lengths follow the reported app version', () => {
         expect(confirms()).toBe(0);
       }
       const confirmed = await exchange(device, apdu([0xd7, 0x21, 0x0a, 0x00, 0x00]));
-      expect(statusOf(confirmed)).toBe(SW_OK);
-      expect(bodyOf(confirmed).length).toBe(32);
-      expect(confirms()).toBe(1);
+      expect(statusOf(confirmed)).toBe(0x6a80);
+      expect(bodyOf(confirmed).length).toBe(0);
+      expect(confirms()).toBe(0);
       const uploaded = Uint8Array.of(0x10, 0x20, 0x7f, 0x7f, 0x7f);
-      expect(Array.from(bodyOf(confirmed))).toEqual(Array.from(blake2b(uploaded, { dkLen: 32 })));
-
-      const pathBytes = encodePath(ADA_PATH);
-      const witness = await exchange(device, apdu([0xd7, 0x21, 0x0f, 0x00, pathBytes.length, ...pathBytes]));
-      expect(bodyOf(witness).length).toBe(64);
-      const node = deriveIcarus(entropy(), "m/1852'/1815'/0'/0/0");
-      expect(Array.from(bodyOf(witness))).toEqual(Array.from(signIcarus(node, bodyOf(confirmed))));
+      expect(Array.from(blake2b(uploaded, { dkLen: 32 })).length).toBe(32);
     } finally {
       resetLedgerVersionPicks();
     }
@@ -290,13 +276,14 @@ describe('Cardano SIGN_TX body lengths follow the reported app version', () => {
     expect(statusOf(aux)).toBe(SW_INS_NOT_SUPPORTED);
   });
 
-  it('a denied v8 confirm returns 6985 and no hash', async () => {
-    const { device } = handler(async () => false);
+  it('an unparsed v8 confirm returns 6A80 and does not open the sheet', async () => {
+    const { device, confirms } = handler(async () => false);
     device.setApp('cardano');
     await exchange(device, apdu([0xd7, 0x21, 0x10, 0x00, 0x01, 0x01]));
     const denied = await exchange(device, apdu([0xd7, 0x21, 0x12, 0x00, 0x01, 0x02]));
-    expect(statusOf(denied)).toBe(SW_DENY);
+    expect(statusOf(denied)).toBe(0x6a80);
     expect(bodyOf(denied).length).toBe(0);
+    expect(confirms()).toBe(0);
     const pathBytes = encodePath(ADA_PATH);
     const witness = await exchange(device, apdu([0xd7, 0x21, 0x0f, 0x00, pathBytes.length, ...pathBytes]));
     expect(statusOf(witness)).toBe(SW_WRONG_P1P2);
