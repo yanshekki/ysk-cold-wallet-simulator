@@ -1,6 +1,6 @@
 # YSK Cold Wallet Simulator
 
-**版本 1.1.2（組建編號 8）** · YSK Limited
+**版本 1.1.3（組建編號 9）** · YSK Limited
 
 手機套件識別碼 `hk.ysk.cws` · CWS Proxy 套件識別碼 `hk.ysk.cws.proxy`
 
@@ -20,7 +20,7 @@ CWS 是模擬器。它不是安全元件。Ledger、Trezor 及 OneKey 均未認�
 
 ## 下載
 
-版本 1.1.2（組建編號 8），保留 1.1.1 的熱錢包基線，並加入 Cardano 主體雜湊（#73）、Trezor 與 OneKey 傳輸測試（#74），以及 QR 預覽 settle（#75）。種子不是硬體錢包級安全。 [GitHub Release v1.1.0](https://github.com/yanshekki/ysk-cold-wallet-simulator/releases/tag/v1.1.0) 只有說明，沒有附上 APK、IPA 或桌面安裝包。Ubuntu 可以從這份原始碼組建 `.deb`。macOS 與 Windows 在該發行仍然沒有可安裝的套件。
+版本 1.1.3（組建編號 9），保留 1.1.2 的基線，並加入代理程式鎖定使用者所選的電話（#77），以及供應商 BLE 服務 UUID 與每部電話各自的 OneKey 名稱（#78）。種子不是硬體錢包級安全。 [GitHub Release v1.1.0](https://github.com/yanshekki/ysk-cold-wallet-simulator/releases/tag/v1.1.0) 只有說明，沒有附上 APK、IPA 或桌面安裝包。Ubuntu 可以從這份原始碼組建 `.deb`。macOS 與 Windows 在該發行仍然沒有可安裝的套件。
 
 | 產品 | 取得方式 |
 | --- | --- |
@@ -114,7 +114,7 @@ Windows 仍然沒有安裝包。Windows 沒有虛擬 HID。
 yarn workspace @cws/proxy app
 ```
 
-產品版本 **1.1.2** 與組建編號 **8** 來自 `apps/mobile/app.json` 的 `version`、`versionCode` 及 `buildNumber`。Expo prebuild 會寫入 Android 的 `versionName`／`versionCode`，以及 iOS 的 `CFBundleShortVersionString`／`CFBundleVersion`。隨應用程式發行的工作區套件版本同為 `1.1.2`。macOS 代理程式的行銷版本與組建編號相同。
+產品版本 **1.1.3** 與組建編號 **9** 來自 `apps/mobile/app.json` 的 `version`、`versionCode` 及 `buildNumber`。Expo prebuild 會寫入 Android 的 `versionName`／`versionCode`，以及 iOS 的 `CFBundleShortVersionString`／`CFBundleVersion`。隨應用程式發行的工作區套件版本同為 `1.1.3`。macOS 代理程式的行銷版本與組建編號相同。
 
 ## 協議範圍
 
@@ -188,14 +188,14 @@ OneKey Mini 沒有藍牙，本軟件不予模擬。
 
 秘密資料以 `WHEN_UNLOCKED_THIS_DEVICE_ONLY` 儲存。正式組建另設定 `requireAuthentication`。助記詞不會寫入剪貼簿。匯入只在確認貼上之後才讀取剪貼簿。正式組建在顯示、匯入、儲存、簽署及匯出種子之前，會要求作業系統認證。Android 正式組建在秘密畫面設定 `FLAG_SECURE`。這些略過只在 `__DEV__` 為真時存在。
 
-這不是硬體錢包級安全。種子不是硬體錢包級安全。1.1.2 仍保留的相容選擇：
+這不是硬體錢包級安全。種子不是硬體錢包級安全。1.1.3 仍保留的相容選擇：
 
 - WebHID 轉送報告時沒有指令允許清單。
 - 本機 trezord 橋接器聽 `127.0.0.1`，並反映請求的 `Origin`。
 - iOS 在系統報告截圖時顯示警告，不會把即時畫面塗黑。只警告是有意的，因為塗黑亦會塗黑鏡像輸出。
 - iOS 不提供 BLE 連結金鑰。
 
-能夠解鎖手機、除錯行程、拍攝螢幕或連上主機的人，所能取得的資料多於介面所顯示。全文見 [security.md](security.md)。1.1.2 說明見 [releases/1.1.2.md](releases/1.1.2.md)。
+能夠解鎖手機、除錯行程、拍攝螢幕或連上主機的人，所能取得的資料多於介面所顯示。全文見 [security.md](security.md)。1.1.3 說明見 [releases/1.1.3.md](releases/1.1.3.md)。
 
 ## 保安模型
 
@@ -296,6 +296,7 @@ app.rhea.finance（Rhea Finance）經 Ledger 藍牙連接一部運行 CWS 的 iP
 | [../README.md](../README.md) | 英文公開首頁 |
 | [security.md](security.md) | 英文保安說明 |
 | [testing.md](testing.md) | 英文測試紀錄 |
+| [releases/1.1.3.md](releases/1.1.3.md) | 1.1.3（組建編號 9）的雙語發行說明 |
 | [releases/1.1.2.md](releases/1.1.2.md) | 1.1.2（組建編號 8）的雙語發行說明 |
 | [releases/1.1.1.md](releases/1.1.1.md) | 1.1.1（組建編號 7）熱錢包基線的雙語發行說明 |
 | [releases/1.1.0.md](releases/1.1.0.md) | 1.1.0（組建編號 6）雙語發行說明 |
