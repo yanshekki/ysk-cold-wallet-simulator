@@ -12,6 +12,7 @@ import {
   isCwsServiceUuid,
   isPhantomGattError,
   isSystemOnlyServices,
+  nameGuess,
   pickModel,
   probeHit,
   rankModels,
@@ -117,12 +118,23 @@ function probeGuess(hit: ScanHit, holder: HidHolder): DeviceModel | undefined {
   if (picked) {
     return picked.model;
   }
-  // Generic iPhone/Pixel advertisements (Continuity, 180a) must not be guessed
-  // as Classic 1s. Leftover `… [Trezor Safe 7]` names still probe so GATT can
-  // confirm OneKey when the UUID was omitted.
+  const named = nameGuess(hit.name);
+  // Ledger and Trezor each have their own service UUID. When the ADV packet
+  // omits that 128-bit UUID, open that model's GATT. Do not fall through to
+  // the single OneKey service. A stale GAP name is corrected from the write
+  // characteristic after connect.
+  if (named && named.brand !== 'onekey') {
+    return named;
+  }
   if (holder.model?.brand === 'onekey') {
     return holder.model;
   }
+  if (named) {
+    return named;
+  }
+  // Generic iPhone/Pixel advertisements (Continuity, 180a) must not be guessed
+  // as Classic 1s. An unnamed CWS-like advertiser still probes OneKey, whose
+  // models share one service UUID.
   if (!probeHit([hit])) {
     return undefined;
   }

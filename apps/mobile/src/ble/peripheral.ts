@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 import type { GATTCharacteristicPermission } from 'munim-bluetooth';
-import { bleAdvertiseName, type DeviceModel, type ProtocolHandler } from '@cws/contracts';
+import { bleGapLocalName, type DeviceModel, type ProtocolHandler } from '@cws/contracts';
 import { DEFAULT_MTU, splitNotify } from '@cws/sdk';
 import { bleSignHostGate } from './bleSignGate';
 import { bytesToHex, hexToBytes } from './hex';
@@ -139,7 +139,7 @@ export async function startAdvertising(
   model: DeviceModel,
   handler: HandlerSource,
   callbacks: PeripheralCallbacks,
-  options?: { nameSuffix?: string },
+  options?: { nameSuffix?: string; identityToken?: string },
 ): Promise<PeripheralHandle> {
   const ble = await import('munim-bluetooth');
   const allowed = await ble.requestBluetoothPermission(['advertise', 'connect']);
@@ -147,13 +147,14 @@ export async function startAdvertising(
     throw new Error('errors.advertisePermission');
   }
 
-  // Optional 3-char suffix helps humans tell two phones apart. It is not a
-  // connection key: iOS wraps this in `{phone} [{localName}]`, Android often
-  // advertises the CWS name alone, and both phones may use the same OneKey
-  // serial form (`Pro 2 A1B2`). Proxy must confirm the writable GATT char.
-  const suffix = options?.nameSuffix?.replace(/[^A-Za-z0-9]/g, '').slice(0, 3);
-  const baseName = bleAdvertiseName(model);
-  const localName = suffix && model.brand !== 'ledger' ? `${baseName} ${suffix}`.trim() : baseName;
+  // OneKey phones differ by the 4-digit token inside the vendor GAP name.
+  // Ledger keeps the short product name: real devices share that name and
+  // are told apart by the service UUID plus the OS radio address. An optional
+  // suffix is not a connection key. Proxy confirms the writable GATT char.
+  const localName = bleGapLocalName(model, {
+    token: options?.identityToken,
+    suffix: options?.nameSuffix,
+  });
 
   try {
     ble.stopAdvertising();

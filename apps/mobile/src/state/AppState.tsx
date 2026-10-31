@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import * as Crypto from 'expo-crypto';
 import type {
   ConfirmationPort,
   DeviceModel,
@@ -19,6 +20,7 @@ import type {
   SigningRequest,
 } from '@cws/contracts';
 import {
+  formatBleIdentityToken,
   keepVersionPicks,
   ledgerCatalog,
   ledgerCatalogBase,
@@ -308,7 +310,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void (async () => {
       try {
-        const loaded = await loadSettings();
+        let loaded = await loadSettings();
+        if (!/^\d{4}$/.test(loaded.bleIdentityToken)) {
+          const raw = await Crypto.getRandomBytesAsync(2);
+          loaded = { ...loaded, bleIdentityToken: formatBleIdentityToken(raw) };
+          await saveSettings(loaded);
+        }
         settingsRef.current = loaded;
         setSettings(loaded);
         setFaceIdEnabled(loaded.faceIdEnabled);
@@ -433,7 +440,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     await clearCatalogOverlay();
     await clearVersionPicks();
     await clearDisclaimerAcceptance();
-    const next = { ...DEFAULT_SETTINGS, language: detectLanguage() };
+    const next = {
+      ...DEFAULT_SETTINGS,
+      language: detectLanguage(),
+      bleIdentityToken: settingsRef.current.bleIdentityToken,
+    };
     settingsRef.current = next;
     setSettings(next);
     setFaceIdEnabled(next.faceIdEnabled);
@@ -567,7 +578,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           setAdvertising(false);
           appendAppLog('error', message);
         },
-      }, { nameSuffix: settingsRef.current.bleNameSuffix });
+      }, {
+        nameSuffix: settingsRef.current.bleNameSuffix,
+        identityToken: settingsRef.current.bleIdentityToken,
+      });
       peripheralRef.current = handle;
       setAdvertising(true);
       setCurrentApp(handlerRef.current?.getApp?.() ?? currentAppRef.current);

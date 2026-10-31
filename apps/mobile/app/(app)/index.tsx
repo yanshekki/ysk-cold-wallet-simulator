@@ -15,7 +15,7 @@ import {
 import type { Brand, DeviceModel, LedgerApp } from '@cws/contracts';
 import {
   ALL_MODELS,
-  bleAdvertiseName,
+  bleGapLocalName,
   ledgerAppChip,
   ledgerAppLabel,
   ledgerPickerApps,
@@ -58,6 +58,7 @@ export default function DeviceScreen() {
     selectModel,
     startSimulation,
     stopSimulation,
+    settings,
     setApp,
     showToast,
     hydrated,
@@ -109,6 +110,8 @@ export default function DeviceScreen() {
     }
   }, [pending]);
 
+  const gapName = (item: DeviceModel) =>
+    bleGapLocalName(item, { token: settings.bleIdentityToken, suffix: settings.bleNameSuffix });
   const isLedger = model?.protocol === 'ledger-apdu';
   const canStart = !!seed && !!model && isSimulatable(model) && !advertising;
   const pickerApps = ledgerPickerApps();
@@ -381,7 +384,8 @@ export default function DeviceScreen() {
                 enabled={ready}
                 badge={ready ? undefined : t('device.notImplemented')}
                 onSelect={() => onSelect(item)}
-                onCopyName={() => void onCopy('name', bleAdvertiseName(item))}
+                localName={gapName(item)}
+                onCopyName={() => void onCopy('name', gapName(item))}
                 onCopyUuid={() => void onCopy('uuid', item.serviceUUID)}
               >
                 {model?.id === item.id ? (
@@ -399,7 +403,7 @@ export default function DeviceScreen() {
                         <Text style={styles.live}>
                           {connected
                             ? t('device.hostGatt')
-                            : t('device.advertising', { name: bleAdvertiseName(item) })}
+                            : t('device.advertising', { name: gapName(item) })}
                         </Text>
                         <Text style={styles.hint} testID="device-host-derive">
                           {t('device.hostDerive')}

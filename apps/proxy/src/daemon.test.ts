@@ -559,7 +559,56 @@ describe('runProxy', () => {
     );
     expect(created.some((id) => id === 'safe-7')).toBe(false);
     expect(bus.snapshot().brand).toBe('onekey');
-    expect(bus.snapshot().modelId).toBe('classic1s');
+    expect(bus.snapshot().serviceUUID).toBe(ONEKEY_MODELS[0]?.serviceUUID);
+    expect(bus.snapshot().modelId).not.toBe('safe-7');
+  });
+
+  it('opens Flex by its own service UUID when the advertisement omits the UUID', async () => {
+    const flex = LEDGER_MODELS.find((item) => item.id === 'flex')!;
+    const opened: string[] = [];
+    const bus = createStatusBus();
+    const connected: ConnectedBle = {
+      async write() {
+        return;
+      },
+      onNotify() {
+        return () => undefined;
+      },
+      async close() {
+        return;
+      },
+      async isConnected() {
+        return false;
+      },
+      debugInfo() {
+        return `write=${flex.writeCharUUID} flags=swift-cb`;
+      },
+    };
+    await runProxy(
+      {
+        async scan() {
+          return [{ id: 'phone', name: 'Flex', services: [] }];
+        },
+        async openBle(_id, model) {
+          opened.push(model.id);
+          return connected;
+        },
+        createHid() {
+          return memoryHidPair().gadget;
+        },
+        async askPairingCode() {
+          return '000000';
+        },
+      },
+      () => undefined,
+      new AbortController().signal,
+      { once: true, scanMs: 10, status: bus },
+    );
+    expect(opened[0]).toBe('flex');
+    expect(opened).not.toContain('classic1s');
+    expect(bus.snapshot().modelId).toBe('flex');
+    expect(bus.snapshot().serviceUUID).toBe(flex.serviceUUID);
+    expect(bus.snapshot().serviceUUID).not.toBe(LEDGER_MODELS.find((item) => item.id === 'nano-x')!.serviceUUID);
   });
 
   it('drops the session when the phone switches from Ledger to OneKey', async () => {

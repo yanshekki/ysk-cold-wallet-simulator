@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { LEDGER_MODELS, ONEKEY_MODELS } from '@cws/contracts';
 import {
   isPhantomGattError,
   isSystemOnlyServices,
+  nameGuess,
   pickModel,
   probeHit,
   rankModels,
@@ -106,8 +108,42 @@ describe('pickModel', () => {
     expect(picked).toBeNull();
   });
 
-  it('lists every model service UUID once', () => {
-    expect(serviceUuids().length).toBeGreaterThan(3);
+  it('lists every distinct model service UUID and does not collapse Ledger', () => {
+    const listed = serviceUuids();
+    const ledger = new Set(LEDGER_MODELS.map((model) => model.serviceUUID.toLowerCase()));
+    expect(ledger.size).toBe(LEDGER_MODELS.length);
+    for (const uuid of ledger) {
+      expect(listed).toContain(uuid);
+    }
+    const onekey = ONEKEY_MODELS[0]!.serviceUUID.toLowerCase();
+    expect(listed.filter((uuid) => uuid === onekey)).toEqual([onekey]);
+  });
+
+  it('rejects the Nano X service UUID for Flex and accepts the Flex UUID', () => {
+    const nano = LEDGER_MODELS.find((model) => model.id === 'nano-x')!;
+    const flex = LEDGER_MODELS.find((model) => model.id === 'flex')!;
+    const stax = LEDGER_MODELS.find((model) => model.id === 'stax')!;
+    const gen5 = LEDGER_MODELS.find((model) => model.id === 'gen5')!;
+    expect(pickModel([{ id: 'p', name: 'Flex', services: [nano.serviceUUID] }])?.model.id).toBe('nano-x');
+    expect(pickModel([{ id: 'p', name: 'Flex', services: [flex.serviceUUID] }])?.model.id).toBe('flex');
+    expect(pickModel([{ id: 'p', name: 'Nano X', services: [flex.serviceUUID] }])?.model.id).toBe('flex');
+    expect(pickModel([{ id: 'p', name: 'Stax', services: [stax.serviceUUID] }])?.model.id).toBe('stax');
+    expect(pickModel([{ id: 'p', name: 'Nano G5', services: [gen5.serviceUUID] }])?.model.id).toBe('gen5');
+    expect(nameGuess('Flex')?.id).toBe('flex');
+    expect(nameGuess('Nano X')?.id).toBe('nano-x');
+    expect(nameGuess('Nano X')?.serviceUUID).not.toBe(flex.serviceUUID);
+  });
+
+  it('tells OneKey models apart by GAP token while they share one service UUID', () => {
+    const uuid = ONEKEY_MODELS[0]!.serviceUUID;
+    expect(new Set(ONEKEY_MODELS.map((model) => model.serviceUUID)).size).toBe(1);
+    expect(pickModel([{ id: 'a', name: 'Pro 2 4821', services: [uuid] }])?.model.id).toBe('pro2');
+    expect(pickModel([{ id: 'b', name: 'K4821', services: [uuid] }])?.model.id).toBe('classic');
+    expect(pickModel([{ id: 'c', name: 'Pro 4821', services: [uuid] }])?.model.id).toBe('pro');
+    expect(pickModel([{ id: 'd', name: 'Neo 4821', services: [uuid] }])?.model.id).toBe('neo');
+    expect(pickModel([{ id: 'e', name: 'Pro 2 4821', services: [LEDGER_MODELS[0]!.serviceUUID] }])?.model.id).not.toBe(
+      'pro2',
+    );
   });
 
   it('picks Stax from its UUID even if the GAP name is a leftover OneKey', () => {
