@@ -1,8 +1,12 @@
 # YSK Cold Wallet Simulator
 
-**Version 1.1.3 (build 9)** · YSK Limited
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+**Version 1.1.3 (build 9)** · [YSK Limited](https://ysk.hk) · [Product page](https://ysk.hk/products/ysk-cold-wallet-simulator)
 
 Phone bundle `hk.ysk.cws` · CWS Proxy bundle `hk.ysk.cws.proxy`
+
+Repository: [github.com/yanshekki/ysk-cold-wallet-simulator](https://github.com/yanshekki/ysk-cold-wallet-simulator/)
 
 A phone application for developers and wallet teams who need to test interoperability with selected Bluetooth hardware wallets.
 
@@ -10,7 +14,7 @@ The phone holds a BIP39 or SLIP-39 secret in operating-system secure storage and
 
 The phone app and the proxy UI include English, 繁體中文（香港）, Español, العربية, Português, Bahasa Indonesia, Français, 日本語, Русский, and Deutsch.
 
-中文說明（香港書面語）：[docs/zh-HK.md](docs/zh-HK.md)
+中文說明：[docs/zh-HK.md](docs/zh-HK.md)
 
 ## Warning
 
@@ -20,20 +24,22 @@ CWS is a simulator. It is not a secure element. Ledger, Trezor, and OneKey do no
 
 ## Downloads
 
-Version 1.1.3 (build 9). It keeps the 1.1.2 baseline and adds the proxy lock to the phone the user picks (#77) and vendor BLE service UUIDs with a per-phone OneKey name (#78). Seeds are not hardware-wallet safe. [GitHub Release v1.1.0](https://github.com/yanshekki/ysk-cold-wallet-simulator/releases/tag/v1.1.0) is notes only: no APK, IPA, or desktop package is attached. Ubuntu can build a `.deb` from this tree. macOS and Windows still have no installable package on that release.
+Version 1.1.3 (build 9). It keeps the 1.1.2 baseline and adds the proxy lock to the phone the user picks (#77) and vendor BLE service UUIDs with a per-phone OneKey name (#78). Seeds are not hardware-wallet safe.
+
+[GitHub Release v1.1.0](https://github.com/yanshekki/ysk-cold-wallet-simulator/releases/tag/v1.1.0) is the only tag. It is notes only: no APK, IPA, or desktop package is attached. Later notes do not attach binaries either. See [docs/releases/README.md](docs/releases/README.md).
 
 | Product | Where to get it |
 | --- | --- |
 | Android phone | [Google Play](https://play.google.com/store/apps/details?id=hk.ysk.cws) (`hk.ysk.cws`) |
 | iOS phone | App Store: Coming soon |
-| CWS Proxy, macOS | Mac App Store: Coming soon. The HID Virtual Device App Store entitlement is still **Submitted**. |
+| CWS Proxy, macOS | Mac App Store: Coming soon. The HID Virtual Device App Store entitlement is still **Submitted**. Build from source: [docs/proxy-macos.md](docs/proxy-macos.md). |
 | CWS Proxy, Ubuntu | Package `hk.ysk.cws.proxy` (amd64 and arm64). Build it on Ubuntu with `bash apps/proxy/linux/build-deb.sh`, then install the `.deb`. It installs `cws-proxy` and the `uhid` udev rule. The GitHub Release does not attach the `.deb`. See [Ubuntu package](#ubuntu-package). |
 | CWS Proxy, other Linux | No package. From source: `yarn proxy`, after the `uhid` rule in Quick start. |
 | CWS Proxy, Windows | No packaged download. From source: `yarn proxy` after building `@cws/native-proxy`. Virtual HID is not implemented on Windows, so this does not create a USB HID device. The local page is `http://127.0.0.1:8788`. |
 
 Virtual HID exists for Linux (`/dev/uhid`, including the Ubuntu package) and for the macOS CWS Proxy app. It is not implemented for Windows.
 
-Until the Mac App Store build ships, build the macOS app from source with `yarn workspace @cws/proxy app`. That script uses the team already set in the Xcode project. Do not commit provisioning profiles.
+Product version **1.1.3** and build **9** come from `apps/mobile/app.json` (`version`, `versionCode`, `buildNumber`). Expo prebuild writes the Android `versionName` / `versionCode` and the iOS `CFBundleShortVersionString` / `CFBundleVersion`. Workspace packages that ship with the app are version `1.1.3`. The macOS proxy marketing version and build are the same numbers.
 
 ## Quick start
 
@@ -42,9 +48,9 @@ Use a physical Android or iOS phone. A simulator and Expo Go cannot advertise Bl
 1. Install the Android app from Google Play, or build the phone app from source.
 2. Accept the warning, unlock, choose a model, and use a secret that does not control real assets.
 3. Start advertising, then connect the third-party wallet over Bluetooth.
-4. For desktop WebHID, start CWS Proxy (macOS app, Ubuntu `cws-proxy` from the `.deb`, or `yarn proxy` on Linux) and press Start. Pick the phone in the Bluetooth list. Chrome can then open the virtual USB device. The local page is `http://127.0.0.1:8788`.
+4. For desktop WebHID, start CWS Proxy (the macOS app, Ubuntu `cws-proxy` from the `.deb`, or `yarn proxy` on Linux) and press Start. Pick the phone in the Bluetooth list. Chrome can then open the virtual USB device. The local page is `http://127.0.0.1:8788`.
 
-Start lists nearby CWS phones: advertised name, the Bluetooth id, and RSSI when the operating system reports it. Choose one phone. The proxy locks to that id and will not connect to another phone in the same room until you press Unlock / Change device. The lock is a small local file (`~/Library/Application Support/CWS Proxy/ble-lock.json` on macOS, `~/.config/cws-proxy/ble-lock.json` on Linux, or `$XDG_CONFIG_HOME/cws-proxy/ble-lock.json` when that variable is set). It stores the Bluetooth id and the advertised name, not a seed. That id comes from this computer's Bluetooth stack. If the phone changes its address, or macOS issues a new peripheral id, the saved lock no longer matches and you pick the phone again. macOS needs Bluetooth permission for this copy of CWS Proxy under System Settings → Privacy & Security → Bluetooth. Linux needs a Bluetooth adapter the process can open. RSSI is left blank when the stack does not provide it. CoreBluetooth uses 127 for an unknown reading, and the list shows a dash for that. `cws-proxy --no-ui` still connects to the highest-ranked advertiser when no lock file is present. The proxy only forwards bytes. Signing stays on the phone.
+Start lists nearby CWS phones: advertised name, the Bluetooth id, and RSSI when the operating system reports it. Choose one phone. The proxy locks to that id until you press Unlock / Change device. The lock file stores the Bluetooth id and the advertised name, not a seed (`~/Library/Application Support/CWS Proxy/ble-lock.json` on macOS, `~/.config/cws-proxy/ble-lock.json` on Linux, or `$XDG_CONFIG_HOME/cws-proxy/ble-lock.json` when that variable is set). macOS needs Bluetooth permission for that copy of CWS Proxy. The proxy only forwards bytes. Signing stays on the phone. Details are in [docs/security.md](docs/security.md) and [docs/proxy-macos.md](docs/proxy-macos.md).
 
 From source you need Node.js, Yarn 1.22.22, and Xcode or Android Studio for the native phone build. The proxy’s HID library also needs Rust.
 
@@ -64,6 +70,8 @@ yarn proxy                               # http://127.0.0.1:8788
 ```
 
 That path does not install a package. Copy `apps/proxy/udev/99-cws-uhid.rules` to `/etc/udev/rules.d/` and log in again. The rule sets group `plugdev` and mode `0660` on `/dev/uhid`. Ubuntu can install the same rule with the package below.
+
+On macOS, virtual HID is the CWS Proxy app. Build and install steps are in [docs/proxy-macos.md](docs/proxy-macos.md). `yarn proxy` does not create that HID device.
 
 ### Ubuntu package
 
@@ -100,21 +108,11 @@ dpkg-deb -c apps/proxy/dist/linux/hk.ysk.cws.proxy_*.deb
 bash apps/proxy/linux/check-deb.sh apps/proxy/dist/linux/hk.ysk.cws.proxy_*.deb
 ```
 
-After install, `cws-proxy --help` should print usage, and `/usr/lib/udev/rules.d/99-cws-uhid.rules` should match the source rule. Opening `/dev/uhid` still needs membership in `plugdev` and a new login. A full HID session also needs the phone advertising over Bluetooth. Checking the archive does not by itself prove that a desktop login can open `/dev/uhid`.
+After install, `cws-proxy --help` should print usage, and `/usr/lib/udev/rules.d/99-cws-uhid.rules` should match the source rule. Opening `/dev/uhid` still needs membership in `plugdev` and a new login. A full HID session also needs the phone advertising over Bluetooth.
 
 `bash apps/proxy/linux/check-deb.sh` with no arguments builds a layout-check `.deb` whose Node binary and native addon are ELF stubs. Use that only to inspect the archive on a machine that cannot compile the Linux addon. Do not install it.
 
 The package does not contain a seed, a keystore, or a provisioning profile. Seeds are not absolutely safe.
-
-Windows still has no package. Virtual HID is not implemented on Windows.
-
-On macOS, virtual HID is the signed CWS Proxy app, not `yarn proxy`:
-
-```bash
-yarn workspace @cws/proxy app
-```
-
-Product version **1.1.3** and build **9** come from `apps/mobile/app.json` (`version`, `versionCode`, `buildNumber`). Expo prebuild writes the Android `versionName` / `versionCode` and the iOS `CFBundleShortVersionString` / `CFBundleVersion`. Workspace packages that ship with the app are version `1.1.3`. The macOS proxy marketing version and build are the same numbers.
 
 ## What it speaks
 
@@ -188,26 +186,28 @@ A transaction signature, a message signature, and a backup-seed export wait for 
 
 The secret is stored with `WHEN_UNLOCKED_THIS_DEVICE_ONLY`. A release build also sets `requireAuthentication`. The phrase is not written to the clipboard. Import reads the clipboard only after Paste is confirmed. A release build asks the OS authenticator before reveal, import, save, sign, and seed export. Android release builds set `FLAG_SECURE` on secret screens. Those skips exist only when `__DEV__` is true.
 
-That is not hardware-wallet safety. Seeds are not hardware-wallet safe. Compatibility choices that stay open in 1.1.3:
+That is not hardware-wallet safety. The hot-wallet baseline is progress toward Phantom, Rabby, and MetaMask mobile. It is not a secure element. Compatibility choices that stay open in 1.1.3:
 
 - WebHID forwards reports with no command allowlist.
 - The local trezord bridge on `127.0.0.1` reflects the request `Origin`.
 - iOS warns on capture and does not black the live image. That warn-only choice is intentional, because blanking also blanks mirroring.
 - iOS does not expose a BLE link key.
 
-Anyone who can unlock the phone, debug the process, photograph the screen, or connect a host can reach more than the UI shows. Details, platform limits, and known host gaps are in [docs/security.md](docs/security.md). The 1.1.3 notes are [docs/releases/1.1.3.md](docs/releases/1.1.3.md).
+Anyone who can unlock the phone, debug the process, photograph the screen, or connect a host can reach more than the UI shows. Details, platform limits, and known host gaps are in [docs/security.md](docs/security.md).
 
 ## Testing
 
-What was run, and what was not, is in [docs/testing.md](docs/testing.md). In October 2026 a person reported four sessions. An iPhone running 1.1.0 (build 6) advertised as Ledger over Bluetooth, and near.com finished login and one transaction. Core (core.app) used a Ledger identity on CWS through CWS Proxy and finished an Avalanche export/import round-trip: C-Chain → X-Chain → P-Chain → X-Chain → C-Chain. Rabby Wallet (the extension) used that same CWS Proxy path after tip 0fbbf4c (#43) and finished one trade on lfj.gg (Trader Joe / LFJ). app.rhea.finance (Rhea Finance) used Ledger over Bluetooth on a CWS iPhone and finished login and one transaction. Each note is that host on that path. The Core note leaves the separate X/P account-listing gap in place. The Rabby note is that one lfj.gg trade and leaves the Rabby camera-scan gap in place. The Rhea note records login and one transaction on the phone’s Ledger Bluetooth path. CWS Proxy, other Near hosts, and other DEX hosts are outside that note. Seeds are not absolutely safe.
+What was run, and what was not, is in [docs/testing.md](docs/testing.md). In October 2026 a person reported four sessions on 1.1.0 (build 6): near.com over Ledger Bluetooth, Core and one Rabby trade on lfj.gg through CWS Proxy, and app.rhea.finance over Ledger Bluetooth. Each note is that host on that path. Known gaps stay open. Seeds are not absolutely safe.
 
 ## Documentation
 
 | Document | What it is |
 | --- | --- |
-| [docs/zh-HK.md](docs/zh-HK.md) | 香港書面語：同一版本、警告、下載與已知缺口 |
+| [docs/zh-HK.md](docs/zh-HK.md) | 中文產品頁：同一版本、警告、下載與文件索引 |
+| [docs/proxy-macos.md](docs/proxy-macos.md) | Build CWS Proxy on macOS. Not on the Mac App Store yet |
 | [docs/security.md](docs/security.md) | Public security statement |
 | [docs/testing.md](docs/testing.md) | What was tested, and what was not |
+| [docs/releases/README.md](docs/releases/README.md) | Release notes index |
 | [docs/releases/1.1.3.md](docs/releases/1.1.3.md) | Bilingual notes for 1.1.3 (build 9) |
 | [docs/releases/1.1.2.md](docs/releases/1.1.2.md) | Bilingual notes for 1.1.2 (build 8) |
 | [docs/releases/1.1.1.md](docs/releases/1.1.1.md) | Bilingual notes for 1.1.1 (build 7), the hot-wallet baseline |
@@ -216,11 +216,12 @@ What was run, and what was not, is in [docs/testing.md](docs/testing.md). In Oct
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Engineering layout |
 | [docs/ledger-apdu.md](docs/ledger-apdu.md) | Ledger APDU stages, response lengths, and what CWS still does not implement |
 | [docs/vendor-protocols.md](docs/vendor-protocols.md) | Trezor, OneKey, and QR type strings, including what is not implemented |
+| [SECURITY.md](SECURITY.md) | How to report a security issue |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Review, tests, and secrets to keep out of git |
-| [LICENSE](LICENSE) | Copyright YSK Limited. All rights reserved. |
+| [LICENSE](LICENSE) | MIT License. Copyright YSK Limited |
 
 ## Licence
 
-Copyright © 2026 YSK Limited. All rights reserved.
+[MIT](LICENSE). Copyright © 2026 YSK Limited.
 
-The source is published so that behaviour and security limits can be read. No other licence is granted. The software is not fit for holding real digital assets. You may not present it as a product of Ledger, Trezor, OneKey, or any other wallet vendor. See [LICENSE](LICENSE).
+MIT does not make CWS a secure element, and it does not make this software a product of Ledger, Trezor, or OneKey. Seeds are not absolutely safe. Read [docs/security.md](docs/security.md).

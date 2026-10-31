@@ -1,5 +1,7 @@
 # Full vendor parity plan
 
+Engineering backlog, not a product guarantee. Do not read a MATCH row as a claim that a seed is safe.
+
 Research / plan date: 30 Oct 2026 (Asia/Hong_Kong). Tip at write time: `b421f7d` (#49–#55).
 
 This document is the backlog after the Ledger catalog matrix in [ledger-apdu-plan.md](ledger-apdu-plan.md). Wire claims stay in [ledger-apdu.md](ledger-apdu.md). Trezor, OneKey, and QR notes that are already checked stay in [vendor-protocols.md](vendor-protocols.md).

@@ -104,6 +104,9 @@ describe('platform-aware authenticator copy', () => {
     expect(translate('en', 'device.starting')).toMatch(/Bluetooth/);
     expect(translate('zh-HK', 'device.qrDecoding')).toContain('解碼');
     for (const language of LANGUAGES) {
+      const licence = translate(language, 'disclaimer.licenceBody');
+      expect(licence).toMatch(/MIT/);
+      expect(licence).not.toMatch(/All other rights are reserved|所有未明示授予的權利均予保留/);
       expect(translate(language, 'pairing.hint')).not.toBe('pairing.hint');
       expect(translate(language, 'signing.verifying')).not.toBe('signing.verifying');
       expect(translate(language, 'signing.field.path')).not.toBe('signing.field.path');

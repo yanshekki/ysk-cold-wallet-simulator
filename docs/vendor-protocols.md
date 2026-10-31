@@ -1,5 +1,7 @@
 # Trezor, OneKey, and QR wire notes
 
+Maintainer wire notes for the 1.1.3 tree. They are not a product guarantee. Seeds are not absolutely safe.
+
 Research date: 30 Oct 2026. Ledger APDU stages are in [ledger-apdu.md](ledger-apdu.md). The phased backlog for Trezor, OneKey, QR, Proxy, and the remaining Ledger work is [full-vendor-parity-plan.md](full-vendor-parity-plan.md). This note is the diff for the other protocols this tree actually speaks. Seeds are not absolutely safe.
 
 ## Trezor THP
