@@ -4,6 +4,8 @@ export type ScanHit = {
   id: string;
   name: string;
   services: string[];
+  /** dBm from the host stack. Absent when the stack does not report it. */
+  rssi?: number | null;
 };
 
 export type RankedPick = {

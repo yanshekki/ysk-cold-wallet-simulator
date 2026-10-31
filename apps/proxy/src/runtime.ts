@@ -1,3 +1,4 @@
+import { createBleTarget, readBleLock, type BleTarget } from './bleLock';
 import { createHidHolder, runProxy, type HidHolder, type ProxyIo, type ProxyOptions } from './daemon';
 import type { Brand } from '@cws/contracts';
 import { labCatalogFor, type LabCatalog, type LabDraftInput, type LabHandle } from './lab';
@@ -5,8 +6,11 @@ import type { LogFn } from './log';
 import type { PairingGate } from './pairing';
 import type { StatusBus } from './status';
 
-export type RuntimeOptions = Omit<ProxyOptions, 'status'> & {
+export type RuntimeOptions = Omit<ProxyOptions, 'status' | 'bleTarget'> & {
   nativeReady?: boolean;
+  /** Wait for an explicit phone, then keep the connection on that peripheral. */
+  picker?: boolean;
+  bleLockFile?: string;
 };
 
 export type ProxyRuntime = {
@@ -17,6 +21,9 @@ export type ProxyRuntime = {
   labCatalog(requested?: Brand): LabCatalog;
   runLab(actionId: string, draft?: LabDraftInput): Promise<string>;
   setOpenAppName(name: string): void;
+  selectBle(id: string): void;
+  unlockBle(): void;
+  rescanBle(): void;
 };
 
 export function teeLog(log: LogFn, bus: StatusBus): LogFn {
@@ -46,6 +53,29 @@ export function createRuntime(
   const nativeReady = options.nativeReady ?? true;
   const proxyLog = teeLog(log, bus);
   const holder: HidHolder = createHidHolder(options.skipHid);
+  const bleLockFile = options.bleLockFile;
+  const target: BleTarget | undefined = options.picker
+    ? createBleTarget(bleLockFile ? readBleLock(bleLockFile) : null, { file: bleLockFile })
+    : undefined;
+  const publishLock = () => {
+    if (!target) {
+      return;
+    }
+    const lock = target.snapshot().lock;
+    bus.patch({
+      locked: Boolean(lock),
+      targetId: lock?.id ?? null,
+      targetName: lock?.name ?? '',
+    });
+  };
+  target?.subscribe(publishLock);
+  publishLock();
+  const requireTarget = (): BleTarget => {
+    if (!target) {
+      throw new Error('Bluetooth picker is off');
+    }
+    return target;
+  };
   const dropHid = () => {
     holder.ble.detach();
     holder.adapter?.close();
@@ -84,6 +114,7 @@ export function createRuntime(
       proxyLog('start');
       loop = runProxy(io, proxyLog, session.signal, {
         ...options,
+        bleTarget: target,
         persistHid: true,
         holder,
         status: bus,
@@ -109,6 +140,7 @@ export function createRuntime(
           inFlight = false;
           lab = undefined;
           bus.idle();
+          publishLock();
           if (pendingStart) {
             pendingStart = false;
             runtime.start();
@@ -124,6 +156,7 @@ export function createRuntime(
         proxyLog('stopping');
       }
       bus.idle();
+      publishLock();
     },
     wait() {
       return loop;
@@ -147,6 +180,25 @@ export function createRuntime(
         throw new Error('HID adapter is not up');
       }
       adapter.setOpenAppName(name);
+    },
+    selectBle(id) {
+      const trimmed = id.trim();
+      if (!trimmed) {
+        throw new Error('device id required');
+      }
+      const row = bus.snapshot().nearby.find((item) => item.id === trimmed);
+      const current = requireTarget().snapshot().lock;
+      requireTarget().select({
+        id: trimmed,
+        name: row?.name || (current?.id === trimmed ? current.name : trimmed),
+        modelId: row?.modelId ?? (current?.id === trimmed ? current.modelId : null),
+      });
+    },
+    unlockBle() {
+      requireTarget().unlock();
+    },
+    rescanBle() {
+      requireTarget().rescan();
     },
   };
   return runtime;

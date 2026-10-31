@@ -5,6 +5,7 @@ import { attachLedger } from './adapters/ledger';
 import { attachOneKey } from './adapters/onekey';
 import { ThpClient } from './adapters/thp';
 import { attachTrezor } from './adapters/trezor';
+import { nearbyDevices, type BleLockRecord, type BleTarget } from './bleLock';
 import type { LogFn } from './log';
 import {
   gattFingerprint,
@@ -69,6 +70,12 @@ export type ProxyOptions = {
   holder?: HidHolder;
   status?: StatusSink;
   labSlot?: LabSlot;
+  /**
+   * Desktop picker. With a lock, connect and reconnect only that peripheral.
+   * With no lock, keep scanning and wait for select. Omitted: auto-pick, and
+   * a later reconnect may try another same-model advertiser.
+   */
+  bleTarget?: BleTarget;
 };
 
 function sameUsb(left: DeviceModel | undefined, right: DeviceModel): boolean {
@@ -175,6 +182,40 @@ function candidatesFor(
     return [];
   }
   return [{ hit, model, score: 0 }];
+}
+
+function targetLock(options: ProxyOptions): BleLockRecord | null {
+  return options.bleTarget?.snapshot().lock ?? null;
+}
+
+function publishScan(options: ProxyOptions, hits: ScanHit[]): void {
+  const lock = targetLock(options);
+  options.status?.patch({
+    nearby: nearbyDevices(hits, options.modelId),
+    locked: Boolean(lock),
+    targetId: lock?.id ?? null,
+    targetName: lock?.name ?? '',
+  });
+}
+
+async function pause(ms: number, signal: AbortSignal, target?: BleTarget): Promise<void> {
+  if (!target) {
+    await wait(ms, signal);
+    return;
+  }
+  if (signal.aborted) {
+    return;
+  }
+  const local = new AbortController();
+  const onAbort = () => local.abort();
+  signal.addEventListener('abort', onAbort, { once: true });
+  const timer = setTimeout(() => local.abort(), ms);
+  try {
+    await target.wait(local.signal);
+  } finally {
+    clearTimeout(timer);
+    signal.removeEventListener('abort', onAbort);
+  }
 }
 
 function attachAdapter(
@@ -331,56 +372,104 @@ export async function runProxy(
       ? ALL_MODELS.find((item) => item.id === options.modelId)
       : undefined);
   const phantoms = createPhantomBook();
+  let hits: ScanHit[] = [];
+  let scanned = false;
   try {
     if (!options.skipHid && seed) {
       await ensureHid(io, log, signal, options, holder, seed);
     }
     while (!signal.aborted) {
-      log('scanning');
-      status?.patch({
-        running: true,
-        phase: holder.hid ? 'hid' : 'scanning',
-        hid: holder.hidState,
-        pairing: false,
-        trezord: null,
-        error: null,
-      });
-      let hits: ScanHit[] = [];
+      let lock = targetLock(options);
+      const reusable = scanned && Boolean(lock) && hits.some((item) => item.id === lock?.id);
       let scanError: unknown;
-      try {
-        hits = await abortable(signal, io.scan(uuids, scanMs));
-      } catch (error) {
-        if (signal.aborted) {
-          return;
+      if (!reusable) {
+        log('scanning');
+        status?.patch({
+          running: true,
+          phase: holder.hid ? 'hid' : 'scanning',
+          hid: holder.hidState,
+          pairing: false,
+          trezord: null,
+          error: null,
+          phoneName: '',
+          locked: Boolean(lock),
+          targetId: lock?.id ?? null,
+          targetName: lock?.name ?? '',
+        });
+        try {
+          hits = await abortable(signal, io.scan(uuids, scanMs));
+        } catch (error) {
+          if (signal.aborted) {
+            return;
+          }
+          scanError = error;
+          hits = [];
+          log(`scan failed: ${String(error)}`);
         }
-        scanError = error;
-        log(`scan failed: ${String(error)}`);
+        scanned = true;
+        publishScan(options, hits);
+        lock = targetLock(options);
+      } else {
+        publishScan(options, hits);
       }
-      const queue = candidatesFor(hits, options.modelId, holder, phantoms);
-      if (queue.length === 0) {
-        const nearby = hits
-          .slice(0, 3)
-          .map((item) => item.name || item.id)
-          .filter(Boolean)
-          .join(', ');
-        log(`scan nearby=${hits.length}${nearby ? ` ${nearby}` : ''}`);
+      if (options.bleTarget && !lock) {
+        log(`waiting for a Bluetooth selection nearby=${hits.length}`);
+        publishScan(options, hits);
         if (options.once) {
-          throw new Error(options.modelId ? `no BLE device for ${options.modelId}` : 'no CWS device advertising');
+          throw new Error('no Bluetooth device selected');
         }
         const denied = /permission denied|unauthorized|Bluetooth is off/i.test(String(scanError ?? ''));
-        await wait(denied ? 5_000 : 1_000, signal);
+        await pause(denied ? 5_000 : 1_000, signal, options.bleTarget);
+        const picked = targetLock(options);
+        scanned = Boolean(picked && hits.some((item) => item.id === picked.id));
+        continue;
+      }
+      const scoped = lock ? hits.filter((item) => item.id === lock.id) : hits;
+      const queue = candidatesFor(scoped, options.modelId, holder, phantoms);
+      if (queue.length === 0) {
+        if (lock) {
+          const seen = hits.some((item) => item.id === lock.id);
+          log(
+            seen
+              ? `locked ${lock.name || lock.id} (${lock.id}) is not a CWS advertiser`
+              : `locked ${lock.name || lock.id} (${lock.id}) not advertising`,
+          );
+          if (options.once) {
+            throw new Error(`locked Bluetooth device ${lock.id} is not advertising`);
+          }
+        } else {
+          const nearby = hits
+            .slice(0, 3)
+            .map((item) => item.name || item.id)
+            .filter(Boolean)
+            .join(', ');
+          log(`scan nearby=${hits.length}${nearby ? ` ${nearby}` : ''}`);
+          if (options.once) {
+            throw new Error(options.modelId ? `no BLE device for ${options.modelId}` : 'no CWS device advertising');
+          }
+        }
+        const denied = /permission denied|unauthorized|Bluetooth is off/i.test(String(scanError ?? ''));
+        await pause(denied ? 5_000 : 1_000, signal, options.bleTarget);
+        const picked = targetLock(options);
+        scanned = Boolean(picked && hits.some((item) => item.id === picked.id));
         continue;
       }
       try {
+        if (lock) {
+          log(`locked ${lock.name || lock.id} (${lock.id})`);
+        }
         const opened = await openFirstViable(io, log, signal, queue, phantoms);
         if (!opened) {
           if (options.once) {
             throw new Error(options.modelId ? `no BLE device for ${options.modelId}` : 'no CWS device advertising');
           }
-          await wait(400, signal);
+          scanned = false;
+          await pause(400, signal, options.bleTarget);
           continue;
         }
         const { hit, model, ble } = opened;
+        options.bleTarget?.remember({ name: hit.name || hit.id, modelId: model.id });
+        const chosen = targetLock(options);
         status?.patch({
           phoneName: hit.name || hit.id,
           brand: model.brand,
@@ -391,10 +480,17 @@ export async function runProxy(
           vendorId: model.usb.vendorId,
           productId: model.usb.productId,
           mtu: 20,
+          locked: Boolean(chosen),
+          targetId: chosen?.id ?? hit.id,
+          targetName: chosen?.name || hit.name || hit.id,
         });
         await ensureHid(io, log, signal, options, holder, model);
+        scanned = false;
         await session(io, log, signal, model, hit, options, holder, ble, phantoms);
+        const lockAfter = targetLock(options);
+        scanned = Boolean(lockAfter && hits.some((item) => item.id === lockAfter.id));
       } catch (error) {
+        scanned = false;
         if (signal.aborted) {
           return;
         }
@@ -403,12 +499,12 @@ export async function runProxy(
         status?.patch({ phase: 'error', error: message });
         const quick =
           /missing write|connect timed out|unknown peripheral|GATT|disconnected/i.test(message);
-        await wait(quick ? 400 : 8_000, signal);
+        await pause(quick ? 400 : 8_000, signal, options.bleTarget);
       }
       if (options.once) {
         return;
       }
-      await wait(500, signal);
+      await pause(500, signal, options.bleTarget);
     }
   } finally {
     holder.ble.detach();
@@ -578,8 +674,37 @@ async function session(
       }
     }
     while (!signal.aborted) {
-      await waitUntilDropped(ble, signal);
+      const lockAtStart = targetLock(options)?.id ?? null;
+      const watch = new AbortController();
+      const onAbort = () => watch.abort();
+      signal.addEventListener('abort', onAbort);
+      let which: 'drop' | 'switch' | 'rescan' = 'drop';
+      try {
+        const racers: Array<Promise<'drop' | 'switch' | 'rescan'>> = [
+          waitUntilDropped(ble, watch.signal).then(() => 'drop' as const),
+        ];
+        if (options.bleTarget) {
+          racers.push(
+            options.bleTarget.wait(watch.signal).then(() => {
+              const now = targetLock(options)?.id ?? null;
+              return now === lockAtStart ? ('rescan' as const) : ('switch' as const);
+            }),
+          );
+        }
+        which = await Promise.race(racers);
+      } finally {
+        watch.abort();
+        signal.removeEventListener('abort', onAbort);
+      }
       if (signal.aborted || options.once) {
+        break;
+      }
+      if (which === 'rescan') {
+        continue;
+      }
+      if (which === 'switch') {
+        const now = targetLock(options);
+        log(now ? `switching Bluetooth target to ${now.name || now.id}` : 'Bluetooth lock cleared');
         break;
       }
       log('ble dropped; keeping HID');
@@ -587,6 +712,11 @@ async function session(
       holder.ble.detach();
       route.release();
       await settle(ble.close(), 400);
+      // A link that dies as soon as it opens must not spin the reconnect loop.
+      await wait(200, signal);
+      if (signal.aborted) {
+        break;
+      }
       status?.patch({ phase: holder.hid ? 'hid' : 'connecting' });
       const next = await reconnectBle(
         io,
@@ -596,6 +726,7 @@ async function session(
         hit,
         options.scanMs ?? 4_000,
         phantoms,
+        options,
       );
       if (!next) {
         log(`phone left ${model.id}; rescanning`);
@@ -605,7 +736,14 @@ async function session(
       route = routeBle(ble);
       holder.ble.attach(route.port);
       log(`gatt ${model.writeCharUUID} ${ble.debugInfo?.() ?? ''}`.trim());
-      status?.patch({ phase: holder.hid ? 'hid' : 'gatt' });
+      const chosen = targetLock(options);
+      status?.patch({
+        phase: holder.hid ? 'hid' : 'gatt',
+        phoneName: hit.name || hit.id,
+        locked: Boolean(chosen),
+        targetId: chosen?.id ?? hit.id,
+        targetName: chosen?.name || hit.name || hit.id,
+      });
       if (model.brand === 'trezor') {
         thp?.close();
         thp = new ThpClient(route.port, log, () => io.askPairingCode());
@@ -643,6 +781,79 @@ function routeBle(ble: ConnectedBle): {
   };
 }
 
+async function reconnectLocked(
+  io: ProxyIo,
+  log: LogFn,
+  signal: AbortSignal,
+  model: DeviceModel,
+  hit: ScanHit,
+  scanMs: number,
+  book: PhantomBook,
+  options: ProxyOptions,
+  pin: string,
+): Promise<ConnectedBle | undefined> {
+  const still = () => targetLock(options)?.id === pin;
+  hit.id = pin;
+  try {
+    if (!still()) {
+      return undefined;
+    }
+    return await abortable(signal, io.openBle(pin, model));
+  } catch (error) {
+    const message = String(error);
+    log(`reconnect ${pin}: ${message}`);
+    rememberPhantom(book, { id: pin, name: hit.name, services: hit.services }, message);
+  }
+  while (!signal.aborted && still()) {
+    log('scanning');
+    let found: ScanHit[] = [];
+    try {
+      found = await abortable(signal, io.scan(serviceUuids(ALL_MODELS), scanMs));
+    } catch (error) {
+      if (signal.aborted) {
+        return undefined;
+      }
+      log(`scan failed: ${String(error)}`);
+    }
+    publishScan(options, found);
+    if (!still()) {
+      return undefined;
+    }
+    const ranked = rankModels(
+      found.filter((item) => item.id === pin),
+      options.modelId,
+    ).filter((item) => !isRejected(book, item.hit));
+    const same = ranked.find((item) => item.model.id === model.id);
+    const other = ranked.find((item) => item.model.id !== model.id);
+    if (!same) {
+      if (other) {
+        log(`locked phone now ${other.model.brand} ${other.model.name}; dropping ${model.id} session`);
+        return undefined;
+      }
+      const seen = found.some((item) => item.id === pin);
+      log(
+        seen
+          ? `locked ${hit.name || pin} (${pin}) is not a CWS advertiser`
+          : `locked ${hit.name || pin} (${pin}) not advertising`,
+      );
+      await pause(1_000, signal, options.bleTarget);
+      continue;
+    }
+    hit.id = same.hit.id;
+    hit.name = same.hit.name;
+    hit.services = same.hit.services;
+    try {
+      return await abortable(signal, io.openBle(hit.id, model));
+    } catch (error) {
+      const message = String(error);
+      log(`reconnect ${hit.id}: ${message}`);
+      rememberPhantom(book, same.hit, message);
+      await pause(isPhantomGattError(message) ? 400 : 1_000, signal, options.bleTarget);
+    }
+  }
+  return undefined;
+}
+
 async function reconnectBle(
   io: ProxyIo,
   log: LogFn,
@@ -651,7 +862,16 @@ async function reconnectBle(
   hit: ScanHit,
   scanMs: number,
   book: PhantomBook,
+  options: ProxyOptions,
 ): Promise<ConnectedBle | undefined> {
+  // undefined: auto mode. null: picker with no lock. string: that peripheral only.
+  const pin = options.bleTarget ? (targetLock(options)?.id ?? null) : undefined;
+  if (pin === null) {
+    return undefined;
+  }
+  if (typeof pin === 'string') {
+    return reconnectLocked(io, log, signal, model, hit, scanMs, book, options, pin);
+  }
   try {
     return await abortable(signal, io.openBle(hit.id, model));
   } catch (error) {

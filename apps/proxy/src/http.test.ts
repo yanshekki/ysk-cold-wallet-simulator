@@ -53,6 +53,9 @@ describe('proxy ui http', () => {
     });
     let started = 0;
     let stopped = 0;
+    let selected = '';
+    let unlocked = 0;
+    let rescans = 0;
     server = await startUiServer({
       bus,
       pairing,
@@ -81,6 +84,15 @@ describe('proxy ui http', () => {
         },
         setOpenAppName() {
           return;
+        },
+        selectBle(id) {
+          selected = id;
+        },
+        unlockBle() {
+          unlocked += 1;
+        },
+        rescanBle() {
+          rescans += 1;
         },
         async runLab(actionId) {
           if (actionId === 'dash-version') {
@@ -201,6 +213,19 @@ describe('proxy ui http', () => {
     expect(pair.status).toBe(200);
     await pending;
     expect(codes).toEqual(['123456']);
+
+    const missingDevice = await controlPost(`${server.url}/ble/select`, {});
+    expect(missingDevice.status).toBe(400);
+    const picked = await controlPost(`${server.url}/ble/select`, { id: ' phone-a ' });
+    expect(picked.status).toBe(200);
+    expect(await picked.json()).toEqual({ ok: true, id: 'phone-a' });
+    expect(selected).toBe('phone-a');
+    const unlock = await controlPost(`${server.url}/ble/unlock`);
+    expect(unlock.status).toBe(200);
+    expect(unlocked).toBe(1);
+    const rescan = await controlPost(`${server.url}/ble/rescan`);
+    expect(rescan.status).toBe(200);
+    expect(rescans).toBe(1);
   });
 
   it('rejects a rebinding Host before it can read status or start a scan', async () => {
@@ -226,6 +251,15 @@ describe('proxy ui http', () => {
           };
         },
         setOpenAppName() {
+          return;
+        },
+        selectBle() {
+          return;
+        },
+        unlockBle() {
+          return;
+        },
+        rescanBle() {
           return;
         },
         async runLab() {

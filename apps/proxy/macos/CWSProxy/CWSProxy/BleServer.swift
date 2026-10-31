@@ -24,6 +24,7 @@ struct BleFrame: Codable {
   var packet: String?
   var timeoutMs: Int?
   var message: String?
+  var rssi: Int?
 }
 
 final class BleServer {
@@ -205,7 +206,8 @@ final class BleServer {
                 op: .found,
                 id: hit.id,
                 name: hit.name,
-                services: hit.services
+                services: hit.services,
+                rssi: hit.rssi
               )
             )
           }

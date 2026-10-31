@@ -42,7 +42,9 @@ Use a physical Android or iOS phone. A simulator and Expo Go cannot advertise Bl
 1. Install the Android app from Google Play, or build the phone app from source.
 2. Accept the warning, unlock, choose a model, and use a secret that does not control real assets.
 3. Start advertising, then connect the third-party wallet over Bluetooth.
-4. For desktop WebHID, start CWS Proxy (macOS app, Ubuntu `cws-proxy` from the `.deb`, or `yarn proxy` on Linux) and press Start. Chrome can then open the virtual USB device. The local page is `http://127.0.0.1:8788`.
+4. For desktop WebHID, start CWS Proxy (macOS app, Ubuntu `cws-proxy` from the `.deb`, or `yarn proxy` on Linux) and press Start. Pick the phone in the Bluetooth list. Chrome can then open the virtual USB device. The local page is `http://127.0.0.1:8788`.
+
+Start lists nearby CWS phones: advertised name, the Bluetooth id, and RSSI when the operating system reports it. Choose one phone. The proxy locks to that id and will not connect to another phone in the same room until you press Unlock / Change device. The lock is a small local file (`~/Library/Application Support/CWS Proxy/ble-lock.json` on macOS, `~/.config/cws-proxy/ble-lock.json` on Linux, or `$XDG_CONFIG_HOME/cws-proxy/ble-lock.json` when that variable is set). It stores the Bluetooth id and the advertised name, not a seed. That id comes from this computer's Bluetooth stack. If the phone changes its address, or macOS issues a new peripheral id, the saved lock no longer matches and you pick the phone again. macOS needs Bluetooth permission for this copy of CWS Proxy under System Settings → Privacy & Security → Bluetooth. Linux needs a Bluetooth adapter the process can open. RSSI is left blank when the stack does not provide it. CoreBluetooth uses 127 for an unknown reading, and the list shows a dash for that. `cws-proxy --no-ui` still connects to the highest-ranked advertiser when no lock file is present. The proxy only forwards bytes. Signing stays on the phone.
 
 From source you need Node.js, Yarn 1.22.22, and Xcode or Android Studio for the native phone build. The proxy’s HID library also needs Rust.
 

@@ -8,6 +8,8 @@ export interface ScanResult {
   id: string
   name: string
   services: Array<string>
+  /** dBm, or null when the adapter did not report RSSI. */
+  rssi: number | null
 }
 export declare function scanBle(serviceUuids: Array<string>, timeoutMs: number): Promise<Array<ScanResult>>
 export declare function connectBle(id: string, writeUuid: string, notifyUuid: string): Promise<BleDevice>

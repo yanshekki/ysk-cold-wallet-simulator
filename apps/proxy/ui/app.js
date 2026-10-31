@@ -220,6 +220,9 @@ function renderCopy() {
   $('log-export').textContent = t('export');
   $('log-clear').textContent = t('clear');
   $('log-latest').textContent = t('latest');
+  $('devices-title').textContent = t('devicesTitle');
+  $('ble-rescan').textContent = t('rescan');
+  $('ble-unlock').textContent = t('unlockChange');
   $('label-phone').textContent = t('phone');
   $('label-uuid').textContent = t('uuid');
   $('label-vid').textContent = t('vid');
@@ -253,7 +256,7 @@ function renderStatus(status) {
   $('radio').textContent = status.radio;
   $('radio').parentElement.classList.toggle('on', live);
   $('pip').classList.toggle('on', live);
-  $('host').textContent = status.phoneName || t('noPhone');
+  $('host').textContent = status.phoneName || status.targetName || t('noPhone');
   const chip = $('chip');
   if (status.brand) {
     chip.textContent = BRAND_LABEL[status.brand] ?? status.brand;
@@ -293,7 +296,10 @@ function renderStatus(status) {
     trezordRow.classList.add('hidden');
   }
   const phase = $('phase');
-  const phaseKey = PHASE_COPY[status.phase] ?? 'idle';
+  let phaseKey = PHASE_COPY[status.phase] ?? 'idle';
+  if (status.running && !status.locked && (status.phase === 'scanning' || status.phase === 'hid') && !status.phoneName) {
+    phaseKey = 'waitingPick';
+  }
   if (status.phase === 'error' && status.error) {
     phase.className = 'status error';
     phase.innerHTML = `<strong>${t('error')}</strong> ${status.error}`;
@@ -308,11 +314,71 @@ function renderStatus(status) {
   pairing.classList.toggle('hidden', !status.pairing);
   pairing.hidden = !status.pairing;
   renderPower();
+  renderDevices(status);
   maybeRefreshLab(status);
   const badge = $('log-badge');
   badge.textContent = String(status.logs.length);
   badge.classList.toggle('hidden', status.logs.length === 0);
   renderLogs();
+}
+
+function renderDevices(status) {
+  const locked = Boolean(status.locked && status.targetId);
+  const badge = $('devices-lock');
+  badge.textContent = locked ? t('locked') : t('unlocked');
+  badge.classList.toggle('on', locked);
+  const hint = $('devices-hint');
+  if (locked && !status.phoneName) {
+    hint.textContent = status.running ? t('lockedWait') : t('savedLock');
+  } else if (!locked) {
+    hint.textContent = t('pickDevice');
+  } else {
+    hint.textContent = t('lockedWait');
+  }
+  const targetName = status.targetName || status.phoneName;
+  $('devices-target').textContent = targetName
+    ? `${t('targetLabel')}: ${targetName}${status.targetId ? ` · ${status.targetId}` : ''}`
+    : `${t('targetLabel')}: —`;
+  const linked = Boolean(status.running && status.phoneName);
+  $('ble-rescan').disabled = !status.running || linked;
+  $('ble-unlock').disabled = !locked;
+  const list = $('device-list');
+  list.replaceChildren();
+  const nearby = Array.isArray(status.nearby) ? status.nearby : [];
+  if (!nearby.length) {
+    const empty = document.createElement('li');
+    empty.className = 'empty';
+    empty.textContent = status.running ? t('noDevices') : t('waitingPick');
+    list.append(empty);
+    return;
+  }
+  for (const device of nearby) {
+    const item = document.createElement('li');
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'device';
+    button.dataset.bleId = device.id;
+    button.dataset.testid = `ble-pick-${device.id}`;
+    const current = locked && device.id === status.targetId;
+    button.classList.toggle('on', current);
+    button.disabled = current;
+    const name = document.createElement('span');
+    name.className = 'device-name';
+    name.textContent = device.name || device.id;
+    const meta = document.createElement('span');
+    meta.className = 'device-meta';
+    const rssi = typeof device.rssi === 'number' ? `${device.rssi} dBm` : '—';
+    const model = device.modelName || device.modelId || '';
+    meta.textContent = [model, rssi, current ? t('locked') : locked ? t('switchDevice') : t('connectDevice')]
+      .filter(Boolean)
+      .join(' · ');
+    const id = document.createElement('span');
+    id.className = 'device-id';
+    id.textContent = `${t('deviceId')}: ${device.id}`;
+    button.append(name, meta, id);
+    item.append(button);
+    list.append(item);
+  }
 }
 
 function renderLogs() {
@@ -664,6 +730,32 @@ if (new URLSearchParams(location.search).get('native') === '1') {
 }
 
 bindPower();
+$('ble-rescan').addEventListener('click', () => {
+  void post('/ble/rescan').catch((error) => {
+    const message = error instanceof Error ? error.message : String(error);
+    $('devices-hint').textContent = message;
+  });
+});
+$('ble-unlock').addEventListener('click', () => {
+  void post('/ble/unlock').catch((error) => {
+    const message = error instanceof Error ? error.message : String(error);
+    $('devices-hint').textContent = message;
+  });
+});
+$('device-list').addEventListener('click', (event) => {
+  const button = event.target.closest('[data-ble-id]');
+  if (!button || button.disabled) {
+    return;
+  }
+  const id = button.dataset.bleId;
+  if (!id) {
+    return;
+  }
+  void post('/ble/select', { id }).catch((error) => {
+    const message = error instanceof Error ? error.message : String(error);
+    $('devices-hint').textContent = message;
+  });
+});
 $('tab-lab').addEventListener('click', () => setTab('lab'));
 $('lab-run').addEventListener('click', () => {
   if (state.labEditor) {

@@ -24,12 +24,14 @@ export type BleFrame = {
   packet?: string;
   timeoutMs?: number;
   message?: string;
+  rssi?: number | null;
 };
 
 export type BleScanHit = {
   id: string;
   name: string;
   services: string[];
+  rssi?: number | null;
 };
 
 type Rpc = {
@@ -225,11 +227,15 @@ export class BleSocketClient {
     }
     for (const frame of frames) {
       if (frame.op === 'found' && this.scanWait) {
-        this.scanWait.hits.push({
+        const hit: BleScanHit = {
           id: frame.id ?? '',
           name: frame.name ?? '',
           services: frame.services ?? [],
-        });
+        };
+        if (typeof frame.rssi === 'number' && Number.isFinite(frame.rssi)) {
+          hit.rssi = frame.rssi;
+        }
+        this.scanWait.hits.push(hit);
       } else if (frame.op === 'scanDone') {
         const wait = this.scanWait;
         this.scanWait = undefined;

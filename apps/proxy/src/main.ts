@@ -1,5 +1,6 @@
 import readline from 'node:readline';
 import { ALL_MODELS } from '@cws/contracts';
+import { defaultBleLockPath, readBleLock } from './bleLock';
 import { type ProxyIo } from './daemon';
 import { startUiServer } from './http';
 import { createLog } from './log';
@@ -18,7 +19,9 @@ Usage:
   cws-proxy [--model <id>] [--scan-ms 4000] [--pairing-code 123456] [--trezord-port 21325] [--ui-port 8788] [--no-hid] [--no-ui]
   yarn proxy [same flags]
 
-Opens http://127.0.0.1:8788 and waits for Start. --no-ui scans immediately (headless).
+Opens http://127.0.0.1:8788 and waits for Start. The page lists CWS phones.
+Pick one to lock the connection. --no-ui scans immediately (headless) and
+auto-connects only when no lock file is saved.
 
 Ubuntu: package hk.ysk.cws.proxy installs this command and the uhid udev rule.
 From a git checkout on Linux, copy apps/proxy/udev/99-cws-uhid.rules to /etc/udev/rules.d and log in again.
@@ -92,6 +95,8 @@ async function main(): Promise<void> {
       }
     },
   };
+  const bleLockFile = defaultBleLockPath();
+  const picker = !noUi || readBleLock(bleLockFile) !== null;
   const runtime = createRuntime(
     io,
     log,
@@ -103,6 +108,8 @@ async function main(): Promise<void> {
       trezordPort: Number(argValue(argv, '--trezord-port') ?? 21325),
       skipHid: argv.includes('--no-hid'),
       nativeReady: ready || Boolean(process.env.CWS_HID_SOCKET && process.env.CWS_BLE_SOCKET),
+      picker,
+      bleLockFile,
     },
     pairing,
   );
@@ -129,6 +136,9 @@ async function main(): Promise<void> {
       labCatalog: (brand) => runtime.labCatalog(brand),
       runLab: (actionId, draft) => runtime.runLab(actionId, draft),
       setOpenAppName: (name) => runtime.setOpenAppName(name),
+      selectBle: (id) => runtime.selectBle(id),
+      unlockBle: () => runtime.unlockBle(),
+      rescanBle: () => runtime.rescanBle(),
     },
     port: uiPort,
   });

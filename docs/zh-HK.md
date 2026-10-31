@@ -42,7 +42,9 @@ CWS 是模擬器。它不是安全元件。Ledger、Trezor 及 OneKey 均未認�
 1. 從 Google Play 安裝 Android 應用程式，或從原始碼組建手機應用程式。
 2. 接受警告、解鎖、選擇型號，並使用一組不掌管真實資產的秘密資料。
 3. 開始廣播，然後以藍牙連接第三方錢包。
-4. 桌面 WebHID 請啟動 CWS Proxy（macOS 應用程式、Ubuntu 套件的 `cws-proxy`，或在 Linux 執行 `yarn proxy`），再按 Start。Chrome 其後可開啟虛擬 USB 裝置。本機頁面是 `http://127.0.0.1:8788`。
+4. 桌面 WebHID 請啟動 CWS Proxy（macOS 應用程式、Ubuntu 套件的 `cws-proxy`，或在 Linux 執行 `yarn proxy`），再按 Start，並在藍牙清單選擇電話。Chrome 其後可開啟虛擬 USB 裝置。本機頁面是 `http://127.0.0.1:8788`。
+
+按下開始後，代理會列出附近的 CWS 電話：廣播名稱、藍牙識別碼，以及作業系統有提供時的 RSSI。請選擇一部電話。代理會鎖定該識別碼，在你按下「解除鎖定」之前，不會改連同一空間內的另一部電話。鎖定寫在本機小檔（macOS 為 `~/Library/Application Support/CWS Proxy/ble-lock.json`，Linux 為 `~/.config/cws-proxy/ble-lock.json`；若已設定 `$XDG_CONFIG_HOME`，則放在其下的 `cws-proxy/ble-lock.json`）。檔案只記藍牙識別碼與廣播名稱，不含種子。識別碼由這部電腦的藍牙堆疊分配。若電話更換位址，或 macOS 發出新的周邊識別碼，已存的鎖定便對不上，需要再選一次。macOS 須在「系統設定 → 私隱與保安 → 藍牙」允許這一份 CWS Proxy。Linux 須有此程式能開啟的藍牙配接器。堆疊沒有提供 RSSI 時，清單留空；CoreBluetooth 以 127 表示未知讀數，畫面顯示為橫線。沒有鎖定檔時，`cws-proxy --no-ui` 仍會連接排名最高的廣播。代理只轉送位元組。簽署留在電話上。
 
 從原始碼組建需要 Node.js、Yarn 1.22.22，以及 Xcode 或 Android Studio。代理程式的 HID 程式庫另需 Rust。
 

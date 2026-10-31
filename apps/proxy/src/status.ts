@@ -1,4 +1,5 @@
 import type { Brand } from '@cws/contracts';
+import type { NearbyDevice } from './bleLock';
 
 export type ProxyPhase = 'idle' | 'scanning' | 'connecting' | 'gatt' | 'hid' | 'error';
 export type HidState = 'idle' | 'up' | 'skipped' | 'failed';
@@ -30,6 +31,12 @@ export type ProxyStatus = {
   error: string | null;
   pairing: boolean;
   nativeOk: boolean;
+  /** Compatible advertisers from the latest scan. Empty when the proxy is idle. */
+  nearby: NearbyDevice[];
+  /** OS Bluetooth id the user locked, or null when the picker is waiting. */
+  targetId: string | null;
+  targetName: string;
+  locked: boolean;
   logs: LogLine[];
 };
 
@@ -86,6 +93,10 @@ function emptyState(nativeOk = true): Omit<ProxyStatus, 'radio' | 'logs'> {
     error: null,
     pairing: false,
     nativeOk,
+    nearby: [],
+    targetId: null,
+    targetName: '',
+    locked: false,
   };
 }
 

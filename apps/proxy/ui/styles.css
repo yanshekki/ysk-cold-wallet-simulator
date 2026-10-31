@@ -309,6 +309,110 @@ h1 {
   color: var(--danger);
 }
 
+.devices {
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  background: var(--card);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.devices-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.devices h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.lock-badge {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.lock-badge.on {
+  color: var(--ok);
+}
+
+.devices-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.devices-target {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text);
+  word-break: break-all;
+}
+
+.devices-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.devices-actions button {
+  flex: 1;
+  min-height: 40px;
+}
+
+.device-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.device-list .empty {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+button.device {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 8px 10px;
+  text-align: start;
+}
+
+button.device.on {
+  border-color: var(--ok);
+}
+
+.device-name {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.device-meta,
+.device-id {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  word-break: break-all;
+}
+
 .card {
   border: 1px solid var(--border);
   border-radius: 2px;
