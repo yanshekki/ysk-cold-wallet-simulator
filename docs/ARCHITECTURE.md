@@ -3,6 +3,7 @@
 **Project:** `ysk-cold-wallet-simulator`  
 **Product:** YSK Cold Wallet Simulator (CWS), version 1.1.3 (build 9)  
 **Publisher:** YSK Limited  
+**Product page:** https://ysk.hk/products/ysk-cold-wallet-simulator  
 **Layout:** Expo TypeScript monorepo  
 **Scope:** The phone acts as a Bluetooth hardware-wallet peripheral for selected Ledger, Trezor, and OneKey models. USB HID is bridged by `apps/proxy` and `packages/native-proxy`. Air-gap QR lives in `packages/protocol-qr`.  
 **Platforms:** Android and iOS on a physical phone. Simulators and Expo Go cannot advertise BLE. iOS keeps the radio in the foreground.  
@@ -232,16 +233,10 @@ Update Ledger apps loads two public Ledger endpoints for the selected device, pr
 QR air-gap does not speak Ledger `GET_VERSION`. The desktop proxy forwards HID to the phone, so the phone’s pick is what the HID host reads. The proxy fills an empty `GET_APP_AND_VERSION` from its own bundled catalog only when the phone reply has no version.
 
 ### protocol-trezor
-- Implement THP L2 framing
-- Implement Noise XX handshake (use audited Noise implementation, e.g. `@noble/curves` + AES-GCM)
-- After encrypted channel is established, handle Protobuf messages
-- This is the most complex package
+`packages/protocol-trezor` speaks THP for Trezor Safe 7. `framing.ts` handles L2 frames. `noise.ts` runs the Noise XX handshake. `proto.ts` handles protobuf messages after the channel is up. Wire notes and KEEP gaps are in `docs/vendor-protocols.md`. Signing still waits for the phone review.
 
 ### protocol-onekey
-- Detect V1 vs V2 from first packets
-- V1: parse `3F2323` header
-- V2: handle chunked CRC framing
-- Same seed-signing flow as above
+`packages/protocol-onekey` switches on the first packets. V1 (`framing.ts`) parses the `3F2323` header. V2 (`v2.ts`) handles chunked CRC frames. The review-before-sign rule is the same as Ledger. Wire notes are in `docs/vendor-protocols.md`.
 
 **Important:** The phone UI must show the review before any signature is produced. Never auto-sign. A decoded EVM transaction shows the chain, the called address, the native amount, gas, and nonce. Contract calldata that is not an exact ERC-20 transfer or approve stays raw, and amounts inside that calldata are not shown. That review is not Ledger clear signing and does not run an e0/32 simulation.
 
@@ -252,7 +247,7 @@ QR air-gap does not speak Ledger `GET_VERSION`. The desktop proxy forwards HID t
 1. **Unlock** — OS biometric / device passcode (debug skip in development)
 2. **Device** — Pick a BLE model (`DeviceCard`), optional session passphrase, Start advertising
 3. **Seed Vault** — Generate / import BIP39 or SLIP-39, HD inspect
-4. **Host** — `yarn proxy` / CWS Proxy. USB HID gadget plus the **Testnet host** tab (Ledger / OneKey / Trezor catalogs over the phone BLE link). Signing still confirms on the phone.
+4. **Host** — On macOS, virtual HID is the CWS Proxy app (`docs/proxy-macos.md`). On Linux, `uhid` is `yarn proxy` or the Ubuntu package `hk.ysk.cws.proxy`. The **Testnet host** tab speaks Ledger, OneKey, and Trezor catalogs over the phone BLE link. Signing still confirms on the phone.
 5. **Signing Request** — `SigningModal` hold-to-confirm. Decoded EVM fields stay labeled. An exact ERC-20 transfer or approve shows the raw token amount; a PROVIDE_ERC20 ticker is labeled host-provided. Other calldata is not decoded. Long raw hex stays collapsed until it is expanded.
 6. **QR air-gap** — Export account UR / scan sign requests via `@cws/sdk` QR helpers
 7. **Stop** — Stop advertising, `resetLink`, wipe session seed
@@ -280,5 +275,5 @@ The security statement for readers is `docs/security.md`. In short: seeds are no
 
 ---
 
-**Document version:** 1.1.0  
-**Date:** 2026-10-29
+**Document version:** 1.1.3 (build 9)  
+**Date:** 2026-10-31

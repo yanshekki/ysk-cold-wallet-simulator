@@ -1,5 +1,7 @@
 # Ledger APDU wire matrix
 
+Maintainer contract for CWS 1.1.3 (build 9). Status words are MATCH, FIXED, and KEEP. A KEEP is not a silent success, and a MATCH row is not a claim that a seed is safe. Seeds are not absolutely safe. The phase notes below are the research log for how this matrix was built.
+
 **Phase 2 item 2 (KEEP re-diff follow-up):** Tron/XRP/Stellar/Cosmos/Polkadot/TON/Aptos handlers re-diffed against official firmware/hw-app; MATCH/FIXED only with citations + `family.test.ts` KEEP re-diff cases. Cardano operational certificate, CIP-36 vote, native script hash, Shelley and Byron `DERIVE_ADDRESS`, and CIP-8 Shelley address fields are MATCH. Solana `numPaths` must be 1 (`6A80` otherwise) and INS `20` returns a 4-byte challenge. Stellar `GET_CONF` appends `maxDataSize`. CIP-36 auxiliary registration stays KEEP. The canonical transaction hash is FIXED for v8 and for v7 app 2.2 through 7.2.1. Solana trusted-name INS `21`/`22`, Bitcoin policy HMAC, and Ethereum clear-sign stay KEEP.
 
 **Phase 2 family map (follow-up to #49):** catalog/`inferLedgerFamily` remaps ethereum CHAIN, bitcoin-like, cosmos-like, polkadot-like, and `ethereum-plugin` names so Open App is not `unknown`. Remapped rows are **not** new wire MATCH/FIXED — only family routing changed.

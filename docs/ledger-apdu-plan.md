@@ -1,5 +1,7 @@
 # Ledger APDU full-align plan (Phase 1)
 
+Engineering backlog, not a product guarantee. MATCH and KEEP claims that readers should rely on are in [ledger-apdu.md](ledger-apdu.md). Seeds are not absolutely safe.
+
 Research / plan date: 30 Oct 2026 (Asia/Hong_Kong).
 
 **Phase 1 (merged #49):** planning and matrix documentation only. The post-#55 backlog (remaining unknown apps, open KEEP, Proxy HID/BLE races, Trezor, OneKey, and QR) is [full-vendor-parity-plan.md](full-vendor-parity-plan.md). This file stays the catalog matrix. Seeds are not absolutely safe.

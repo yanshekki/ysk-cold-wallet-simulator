@@ -8,7 +8,7 @@ Primary size is `2880×1800`. `1280×800` is the same frame, scaled.
 
 ## zh-HK
 
-Proxy UI language is 繁體中文（香港）. The caption on each frame is 香港書面語 only.
+Proxy UI language is 繁體中文（香港）. The caption on each frame is Traditional Chinese only.
 
 ## en
 
