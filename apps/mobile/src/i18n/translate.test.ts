@@ -25,6 +25,18 @@ describe('platform-aware authenticator copy', () => {
     expect(translate('en', 'vault.authPrompt', { n: 1 }, 'ios')).toBe('Unlock');
   });
 
+  it('names the proxy lock id in every locale', () => {
+    expect(translate('en', 'device.peripheralId')).toBe('Device id');
+    expect(translate('zh-HK', 'device.peripheralId')).toBe('裝置識別');
+    expect(translate('en', 'device.copyPeripheralId')).toBe('Copy device id');
+    expect(translate('zh-HK', 'device.copyPeripheralId')).toBe('複製裝置識別');
+    for (const language of LANGUAGES) {
+      expect(translate(language, 'device.peripheralId')).not.toBe('device.peripheralId');
+      expect(translate(language, 'device.peripheralIdHint')).not.toBe('device.peripheralIdHint');
+      expect(translate(language, 'device.copyPeripheralId')).not.toBe('device.copyPeripheralId');
+    }
+  });
+
   it('labels hold-to-confirm in English and zh-HK', () => {
     expect(translate('en', 'signing.holdSign')).toBe('Hold to sign');
     expect(translate('en', 'settings.holdDuration')).toContain('seconds');

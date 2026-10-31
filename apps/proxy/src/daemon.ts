@@ -36,6 +36,11 @@ export type ConnectedBle = BlePort & {
 export type ProxyIo = {
   scan(uuids: string[], timeoutMs: number): Promise<ScanHit[]>;
   openBle(id: string, model: DeviceModel): Promise<ConnectedBle>;
+  /**
+   * Write this host's peripheral id to the phone and disconnect.
+   * Omitted in tests. A failure must not block the picker.
+   */
+  identify?(id: string): Promise<void>;
   createHid(model: DeviceModel, signal?: AbortSignal): HidPort | Promise<HidPort>;
   askPairingCode(): Promise<string>;
 };
@@ -386,6 +391,7 @@ export async function runProxy(
   const phantoms = createPhantomBook();
   let hits: ScanHit[] = [];
   let scanned = false;
+  const identifyAttempts = new Map<string, number>();
   try {
     if (!options.skipHid && seed) {
       await ensureHid(io, log, signal, options, holder, seed);
@@ -430,6 +436,7 @@ export async function runProxy(
         if (options.once) {
           throw new Error('no Bluetooth device selected');
         }
+        await tellPeripheralIds(io, log, signal, hits, identifyAttempts);
         const denied = /permission denied|unauthorized|Bluetooth is off/i.test(String(scanError ?? ''));
         await pause(denied ? 5_000 : 1_000, signal, options.bleTarget);
         const picked = targetLock(options);
@@ -950,6 +957,41 @@ async function waitUntilDropped(ble: ConnectedBle, signal: AbortSignal): Promise
       return;
     }
     await wait(1_000, signal);
+  }
+}
+
+const IDENTIFY_TRIES = 2;
+
+/** While the picker is open, tell each CWS phone the id this host will lock. */
+async function tellPeripheralIds(
+  io: ProxyIo,
+  log: LogFn,
+  signal: AbortSignal,
+  hits: ScanHit[],
+  attempts: Map<string, number>,
+): Promise<void> {
+  if (!io.identify) {
+    return;
+  }
+  for (const pick of rankModels(hits)) {
+    if (signal.aborted) {
+      return;
+    }
+    const id = pick.hit.id;
+    const tries = attempts.get(id) ?? 0;
+    if (tries >= IDENTIFY_TRIES) {
+      continue;
+    }
+    attempts.set(id, tries + 1);
+    try {
+      await abortable(signal, io.identify(id));
+    } catch (error) {
+      if (signal.aborted) {
+        return;
+      }
+      const message = error instanceof Error ? error.message : String(error);
+      log(`identify ${id}: ${message}`);
+    }
   }
 }
 

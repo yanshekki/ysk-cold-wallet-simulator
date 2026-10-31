@@ -4,7 +4,7 @@ import { defaultBleLockPath, readBleLock } from './bleLock';
 import { type ProxyIo } from './daemon';
 import { startUiServer } from './http';
 import { createLog } from './log';
-import { createVirtualHid, nativeOk, openBle, scanBle } from './native';
+import { createVirtualHid, identifyBle, nativeOk, openBle, scanBle } from './native';
 import { openBrowser } from './open';
 import { createPairingGate } from './pairing';
 import { createRuntime } from './runtime';
@@ -79,6 +79,7 @@ async function main(): Promise<void> {
   const io: ProxyIo = {
     scan: scanBle,
     openBle,
+    identify: identifyBle,
     createHid: createVirtualHid,
     askPairingCode: async () => {
       if (provided) {

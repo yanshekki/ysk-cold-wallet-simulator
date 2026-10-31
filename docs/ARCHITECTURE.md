@@ -125,6 +125,7 @@ ysk-cold-wallet-simulator/
 4. Handle Write / WriteWithoutResponse → feed into protocol handler
 5. Send Notify responses back to the connected host
 6. Negotiate MTU where possible
+7. Publish an unadvertised GATT service so CWS Proxy can write the host peripheral id (`CBPeripheral.identifier` on macOS). The phone shows that string as Device id. It is not invented on the phone: CoreBluetooth and Android do not expose the central's id to the advertiser.
 
 **Android and iOS:** The phone advertises only while the app is on screen. The Android connected-device foreground service is removed, and iOS background modes are not set. Simulators and Expo Go cannot advertise BLE.
 

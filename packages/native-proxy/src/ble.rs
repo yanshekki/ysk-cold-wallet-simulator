@@ -36,6 +36,30 @@ fn parse_uuid(value: &str) -> Result<Uuid> {
   Uuid::parse_str(value).map_err(|error| Error::from_reason(format!("bad UUID {value}: {error}")))
 }
 
+/// Same string as `CWS_PERIPHERAL_ID.writeCharUUID` in `@cws/contracts`.
+const PERIPHERAL_ID_CHAR: &str = "43575300-6964-4000-8000-c057a11e7002";
+
+async fn tell_peripheral_id(peripheral: &Peripheral, id: &str) -> Result<()> {
+  let identity = parse_uuid(PERIPHERAL_ID_CHAR)?;
+  let characteristic = peripheral
+    .characteristics()
+    .into_iter()
+    .find(|item| item.uuid == identity);
+  let Some(characteristic) = characteristic else {
+    return Ok(());
+  };
+  // macOS WriteWithResponse waits for didWriteValue and can stall the central.
+  let write_type = if cfg!(target_os = "macos") {
+    WriteType::WithoutResponse
+  } else {
+    WriteType::WithResponse
+  };
+  peripheral
+    .write(&characteristic, id.as_bytes(), write_type)
+    .await
+    .map_err(|error| Error::from_reason(error.to_string()))
+}
+
 async fn ensure_central() -> Result<Adapter> {
   let mut slot = HUB.lock().await;
   if let Some(hub) = slot.as_ref() {
@@ -86,6 +110,29 @@ async fn disconnect_known() {
   for peripheral in known {
     let _ = peripheral.disconnect().await;
   }
+}
+
+/// Connect, write this host's peripheral id, disconnect. Does not subscribe.
+pub async fn identify(id: String) -> Result<()> {
+  let peripheral = known(&id)
+    .await
+    .ok_or_else(|| Error::from_reason(format!("BLE device {id} not found. Scan first.")))?;
+  peripheral
+    .connect()
+    .await
+    .map_err(|error| Error::from_reason(error.to_string()))?;
+  let told = async {
+    peripheral
+      .discover_services()
+      .await
+      .map_err(|error| Error::from_reason(error.to_string()))?;
+    tell_peripheral_id(&peripheral, &id).await?;
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    Ok(())
+  }
+  .await;
+  let _ = peripheral.disconnect().await;
+  told
 }
 
 pub async fn scan_ble(service_uuids: Vec<String>, timeout_ms: u32) -> Result<Vec<ScanResult>> {
@@ -190,6 +237,7 @@ impl BleDevice {
         .collect::<Vec<_>>()
         .join(",")
     };
+    let _ = tell_peripheral_id(&peripheral, &id).await;
     let write_char = chars
       .iter()
       .find(|item| item.uuid == write)

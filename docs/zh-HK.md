@@ -22,7 +22,7 @@ CWS 是模擬器。它不是安全元件。Ledger、Trezor 及 OneKey 均未認�
 
 ## 下載
 
-版本 1.1.4（組建編號 10），保留 1.1.3 的基線，並移除複製助記詞與複製份額按鈕。那些控制不會把還原資料寫入剪貼簿。種子並非絕對安全。
+版本 1.1.4（組建編號 10），保留 1.1.3 的基線，移除複製助記詞與複製份額按鈕，並顯示代理程式用來鎖定電話的藍牙裝置識別。那些複製控制不會把還原資料寫入剪貼簿。種子並非絕對安全。
 
 [GitHub Release v1.1.0](https://github.com/yanshekki/ysk-cold-wallet-simulator/releases/tag/v1.1.0) 是唯一的標籤。該頁只有說明，沒有附上 APK、IPA 或桌面安裝包。其後的說明同樣沒有附上二進位檔。見 [releases/README.md](releases/README.md)。
 

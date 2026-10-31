@@ -24,7 +24,7 @@ CWS is a simulator. It is not a secure element. Ledger, Trezor, and OneKey do no
 
 ## Downloads
 
-Version 1.1.4 (build 10). It keeps the 1.1.3 baseline and removes the copy-phrase and copy-share buttons. Those controls did not write the recovery material. Seeds are not absolutely safe.
+Version 1.1.4 (build 10). It keeps the 1.1.3 baseline, removes the copy-phrase and copy-share buttons, and shows the Bluetooth device id the proxy uses to lock the phone. Those copy controls did not write the recovery material. Seeds are not absolutely safe.
 
 [GitHub Release v1.1.0](https://github.com/yanshekki/ysk-cold-wallet-simulator/releases/tag/v1.1.0) is the only tag. It is notes only: no APK, IPA, or desktop package is attached. Later notes do not attach binaries either. See [docs/releases/README.md](docs/releases/README.md).
 

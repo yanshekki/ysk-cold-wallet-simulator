@@ -12,6 +12,7 @@ enum BleOp: String, Codable {
   case ok
   case error
   case disconnected
+  case identify
 }
 
 struct BleFrame: Codable {
@@ -254,6 +255,14 @@ final class BleServer {
     case .close:
       central.disconnect()
       send(BleFrame(op: .ok))
+    case .identify:
+      Task { [weak self] in
+        guard let self else {
+          return
+        }
+        await self.central.identify(id: frame.id ?? "")
+        self.send(BleFrame(op: .ok))
+      }
     default:
       break
     }

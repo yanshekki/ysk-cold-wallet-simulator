@@ -103,6 +103,14 @@ impl BleDevice {
 }
 
 #[napi]
+pub async fn identify_ble(id: String) -> Result<()> {
+  ble::runtime()
+    .spawn(ble::identify(id))
+    .await
+    .map_err(|error| Error::from_reason(error.to_string()))?
+}
+
+#[napi]
 pub async fn connect_ble(id: String, write_uuid: String, notify_uuid: String) -> Result<BleDevice> {
   let inner = ble::runtime()
     .spawn(ble::BleDevice::connect(id, write_uuid, notify_uuid))

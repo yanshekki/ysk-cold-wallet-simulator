@@ -12,7 +12,7 @@ Seeds are not absolutely safe. The public statement is [../security.md](../secur
 
 | Version | Note |
 | --- | --- |
-| 1.1.4 (build 10) | [1.1.4.md](1.1.4.md) — remove the copy-phrase and copy-share buttons |
+| 1.1.4 (build 10) | [1.1.4.md](1.1.4.md) — remove the copy-phrase and copy-share buttons; show the proxy lock id on the phone |
 | 1.1.3 (build 9) | [1.1.3.md](1.1.3.md) — proxy Bluetooth lock, vendor BLE service UUIDs |
 | 1.1.2 (build 8) | [1.1.2.md](1.1.2.md) — Cardano canonical signing, transport tests, QR layout, camera preview |
 | 1.1.1 (build 7) | [1.1.1.md](1.1.1.md) — hot-wallet baseline, including the phone confirm on public reads |
@@ -34,7 +34,7 @@ Android 在 [Google Play](https://play.google.com/store/apps/details?id=hk.ysk.c
 
 | 版本 | 說明 |
 | --- | --- |
-| 1.1.4（組建編號 10） | [1.1.4.md](1.1.4.md) — 移除複製助記詞與複製份額按鈕 |
+| 1.1.4（組建編號 10） | [1.1.4.md](1.1.4.md) — 移除複製助記詞與複製份額按鈕；手機顯示代理程式的鎖定識別碼 |
 | 1.1.3（組建編號 9） | [1.1.3.md](1.1.3.md) — 代理程式藍牙鎖定、供應商 BLE 服務 UUID |
 | 1.1.2（組建編號 8） | [1.1.2.md](1.1.2.md) — Cardano 規範簽署、傳輸測試、二維碼版面、相機預覽 |
 | 1.1.1（組建編號 7） | [1.1.1.md](1.1.1.md) — 熱錢包基線，包括手機對公開讀取的確認 |

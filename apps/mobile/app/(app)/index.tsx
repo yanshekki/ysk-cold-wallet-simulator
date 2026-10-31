@@ -385,8 +385,17 @@ export default function DeviceScreen() {
                 badge={ready ? undefined : t('device.notImplemented')}
                 onSelect={() => onSelect(item)}
                 localName={gapName(item)}
+                peripheralId={settings.blePeripheralId}
+                peripheralIdLabel={t('device.peripheralId')}
+                peripheralIdHint={t('device.peripheralIdHint')}
+                copyPeripheralIdLabel={t('device.copyPeripheralId')}
                 onCopyName={() => void onCopy('name', gapName(item))}
                 onCopyUuid={() => void onCopy('uuid', item.serviceUUID)}
+                onCopyPeripheralId={
+                  settings.blePeripheralId
+                    ? () => void onCopy('peripheral', settings.blePeripheralId)
+                    : undefined
+                }
               >
                 {model?.id === item.id ? (
                   <View style={styles.bezelActions}>

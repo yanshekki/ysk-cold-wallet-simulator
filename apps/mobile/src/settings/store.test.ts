@@ -34,6 +34,10 @@ describe('settings hold duration', () => {
     expect(DEFAULT_SETTINGS.signReauth).toBe(true);
     expect(normalizeSettings({ bleIdentityToken: '12' }, 'en').bleIdentityToken).toBe('');
     expect(normalizeSettings({ bleIdentityToken: '4821' }, 'en').bleIdentityToken).toBe('4821');
+    expect(normalizeSettings({ blePeripheralId: 'not-an-id' }, 'en').blePeripheralId).toBe('');
+    expect(
+      normalizeSettings({ blePeripheralId: '09C9EE96-4AB6-F964-B996-9D8D4D48A870' }, 'en').blePeripheralId,
+    ).toBe('09C9EE96-4AB6-F964-B996-9D8D4D48A870');
 
     getItemAsync.mockResolvedValueOnce(JSON.stringify({ language: 'en', autoLockMinutes: 15 }));
     const loaded = await loadSettings();

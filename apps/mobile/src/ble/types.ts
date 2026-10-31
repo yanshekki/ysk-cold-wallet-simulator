@@ -5,6 +5,8 @@ export type PeripheralCallbacks = {
   onDisconnected: () => void;
   onLog: (direction: 'in' | 'out', hex: string, note?: string) => void;
   onError?: (message: string) => void;
+  /** Host lock id written by CWS Proxy. Not a connection. */
+  onPeripheralId?: (id: string) => void;
 };
 
 export type PeripheralHandle = {

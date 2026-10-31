@@ -2,7 +2,7 @@ import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { hidDescriptorFor, USB_HID_REPORT_SIZE, type DeviceModel } from '@cws/contracts';
-import { openBleSocket, scanBleSocket } from './bleSocket';
+import { identifyBleSocket, openBleSocket, scanBleSocket } from './bleSocket';
 import { openHidSocket } from './hidSocket';
 import type { BlePort, HidPort, Unsubscribe } from './ports';
 
@@ -22,6 +22,18 @@ const native = require('@cws/native-proxy') as typeof import('@cws/native-proxy'
 
 export const nativeOk: () => boolean = native.nativeOk;
 export const connectBle: typeof native.connectBle = native.connectBle;
+
+export async function identifyBle(id: string): Promise<void> {
+  const socketPath = process.env.CWS_BLE_SOCKET?.trim();
+  if (socketPath) {
+    await identifyBleSocket(socketPath, id);
+    return;
+  }
+  const tell = (native as { identifyBle?: (peripheralId: string) => Promise<void> }).identifyBle;
+  if (typeof tell === 'function') {
+    await tell(id);
+  }
+}
 
 export async function scanBle(serviceUuids: string[], timeoutMs: number) {
   const socketPath = process.env.CWS_BLE_SOCKET?.trim();

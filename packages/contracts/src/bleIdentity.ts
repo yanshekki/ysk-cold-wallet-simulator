@@ -196,6 +196,71 @@ export function ledgerServicesAreDistinct(models: BleNamed[]): boolean {
   return services.size === ledger.length;
 }
 
+/**
+ * Not advertised. The vendor service UUID stays the only UUID on the air.
+ * CWS Proxy writes the peripheral id it uses to lock the phone
+ * (`CBPeripheral.identifier` on macOS, the btleplug peripheral id elsewhere).
+ * CoreBluetooth does not give that UUID to `CBPeripheralManager`, and Android
+ * does not expose the same value to a normal app.
+ */
+export const CWS_PERIPHERAL_ID = {
+  serviceUUID: '43575300-6964-4000-8000-c057a11e7001',
+  writeCharUUID: '43575300-6964-4000-8000-c057a11e7002',
+} as const;
+
+const PERIPHERAL_ID_MAX = 96;
+
+const UUID_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const MAC_ID = /^(?:[0-9a-f]{2}:){5}[0-9a-f]{2}$/i;
+const BLUEZ_ID = /^hci\d+\/dev_[0-9a-f]{2}(?:_[0-9a-f]{2}){5}$/i;
+
+/** Host lock id. UUID, `AA:BB:CC:DD:EE:FF`, or a BlueZ `hci0/dev_AA_BB_…` path. */
+export function parseBlePeripheralId(value: string): string | null {
+  const text = value.trim();
+  if (!text || text.length > PERIPHERAL_ID_MAX) {
+    return null;
+  }
+  if (UUID_ID.test(text) || MAC_ID.test(text) || BLUEZ_ID.test(text)) {
+    return text;
+  }
+  return null;
+}
+
+export function peripheralIdFromBytes(bytes: Uint8Array): string | null {
+  if (bytes.length === 0 || bytes.length > PERIPHERAL_ID_MAX) {
+    return null;
+  }
+  try {
+    const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    return parseBlePeripheralId(text);
+  } catch {
+    return null;
+  }
+}
+
+/** Reassemble a short ATT write. A parsed id clears the buffer. */
+export function foldBlePeripheralIdWrite(
+  pending: Uint8Array | null,
+  offset: number,
+  chunk: Uint8Array,
+): { pending: Uint8Array | null; id: string | null } {
+  if (!Number.isInteger(offset) || offset < 0 || offset > PERIPHERAL_ID_MAX) {
+    return { pending: null, id: null };
+  }
+  if (chunk.length === 0 || chunk.length > PERIPHERAL_ID_MAX || offset + chunk.length > PERIPHERAL_ID_MAX) {
+    return { pending: null, id: null };
+  }
+  const base = offset === 0 ? new Uint8Array(0) : (pending ?? new Uint8Array(0));
+  if (offset > base.length) {
+    return { pending: null, id: null };
+  }
+  const next = new Uint8Array(offset + chunk.length);
+  next.set(base.subarray(0, offset));
+  next.set(chunk, offset);
+  const id = peripheralIdFromBytes(next);
+  return { pending: id ? null : next, id };
+}
+
 /** Service UUID and characteristics must belong to the same vendor model. A copied Nano X UUID fails. */
 export function bleCharacteristicsMatchService(model: BleNamed): boolean {
   const service = model.serviceUUID.toLowerCase();
