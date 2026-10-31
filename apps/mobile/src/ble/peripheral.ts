@@ -1,6 +1,12 @@
 import { Platform } from 'react-native';
 import type { GATTCharacteristicPermission } from 'munim-bluetooth';
-import { bleGapLocalName, type DeviceModel, type ProtocolHandler } from '@cws/contracts';
+import {
+  CWS_PERIPHERAL_ID,
+  bleGapLocalName,
+  foldBlePeripheralIdWrite,
+  type DeviceModel,
+  type ProtocolHandler,
+} from '@cws/contracts';
 import { DEFAULT_MTU, splitNotify } from '@cws/sdk';
 import { bleSignHostGate } from './bleSignGate';
 import { bytesToHex, hexToBytes } from './hex';
@@ -85,7 +91,20 @@ function configureServices(ble: BleModule, model: DeviceModel): void {
       value: '00',
     });
   }
-  ble.setServices([{ uuid: model.serviceUUID, characteristics: chars }]);
+  ble.setServices([
+    { uuid: model.serviceUUID, characteristics: chars },
+    {
+      uuid: CWS_PERIPHERAL_ID.serviceUUID,
+      characteristics: [
+        {
+          uuid: CWS_PERIPHERAL_ID.writeCharUUID,
+          properties: ['write', 'writeWithoutResponse'],
+          permissions: writePermissions,
+          value: '00',
+        },
+      ],
+    },
+  ]);
 }
 
 function waitForAdvertisingStarted(ble: BleModule): {
@@ -181,6 +200,7 @@ export async function startAdvertising(
   );
 
   let writeEpoch = 0;
+  let idWritePending: Uint8Array | null = null;
   subscriptions.push(
     ble.addEventListener('peripheralSubscribed', (event) => {
       writeEpoch += 1;
@@ -205,6 +225,19 @@ export async function startAdvertising(
     ble.addEventListener('peripheralWriteRequest', (event) => {
       if (event.responseRequired && event.requestId) {
         void ble.respondToPeripheralWriteRequest(event.requestId, true).catch(() => undefined);
+      }
+      if (sameBleUuid(event.characteristicUUID, CWS_PERIPHERAL_ID.writeCharUUID)) {
+        try {
+          const chunk = event.value ? hexToBytes(event.value) : new Uint8Array();
+          const folded = foldBlePeripheralIdWrite(idWritePending, event.offset ?? 0, chunk);
+          idWritePending = folded.pending;
+          if (folded.id) {
+            callbacks.onPeripheralId?.(folded.id);
+          }
+        } catch {
+          idWritePending = null;
+        }
+        return;
       }
       const epoch = writeEpoch;
       writeTail = writeTail

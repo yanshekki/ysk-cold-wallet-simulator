@@ -15,7 +15,8 @@ export type BleFrame = {
     | 'close'
     | 'ok'
     | 'error'
-    | 'disconnected';
+    | 'disconnected'
+    | 'identify';
   id?: string;
   name?: string;
   services?: string[];
@@ -99,6 +100,10 @@ export class BleSocketClient {
         reject(error);
       });
     });
+  }
+
+  identify(id: string): Promise<void> {
+    return this.enqueue(() => this.rpc({ op: 'identify', id }));
   }
 
   scan(timeoutMs: number): Promise<BleScanHit[]> {
@@ -337,6 +342,11 @@ function clientFor(socketPath: string): Promise<BleSocketClient> {
 export async function scanBleSocket(socketPath: string, timeoutMs: number): Promise<BleScanHit[]> {
   const socket = await clientFor(socketPath);
   return socket.scan(timeoutMs);
+}
+
+export async function identifyBleSocket(socketPath: string, id: string): Promise<void> {
+  const socket = await clientFor(socketPath);
+  await socket.identify(id);
 }
 
 export async function openBleSocket(

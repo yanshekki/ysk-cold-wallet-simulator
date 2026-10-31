@@ -444,6 +444,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       ...DEFAULT_SETTINGS,
       language: detectLanguage(),
       bleIdentityToken: settingsRef.current.bleIdentityToken,
+      blePeripheralId: settingsRef.current.blePeripheralId,
     };
     settingsRef.current = next;
     setSettings(next);
@@ -578,6 +579,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           setAdvertising(false);
           appendAppLog('error', message);
         },
+        onPeripheralId: (id) => {
+          if (settingsRef.current.blePeripheralId === id) {
+            return;
+          }
+          appendAppLog('ble', `peripheral ${id}`);
+          void patchSettings({ blePeripheralId: id });
+        },
       }, {
         nameSuffix: settingsRef.current.bleNameSuffix,
         identityToken: settingsRef.current.bleIdentityToken,
@@ -593,7 +601,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       setError(shown);
       appendAppLog('error', shown);
     }
-  }, [appendAppLog, appendLog, confirmation, model, selectSeed]);
+  }, [appendAppLog, appendLog, confirmation, model, patchSettings, selectSeed]);
 
   const exportQrAccount = useCallback(async (profile: QrProfile, format?: QrFormatId | QrUrKind) => {
     const active = seedRef.current;

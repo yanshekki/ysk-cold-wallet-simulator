@@ -13,6 +13,8 @@ export interface ScanResult {
 }
 export declare function scanBle(serviceUuids: Array<string>, timeoutMs: number): Promise<Array<ScanResult>>
 export declare function connectBle(id: string, writeUuid: string, notifyUuid: string): Promise<BleDevice>
+/** Write this host's peripheral id to the phone, then disconnect. Requires a rebuilt native binary. */
+export declare function identifyBle(id: string): Promise<void>
 export declare class VirtualHid {
   constructor(vendorId: number, productId: number, name: string, reportDescriptor: Buffer)
   write(report: Buffer): void

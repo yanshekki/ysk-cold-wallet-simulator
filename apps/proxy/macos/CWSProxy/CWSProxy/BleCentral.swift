@@ -33,6 +33,13 @@ final class BleCentral: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
   private var writeInFlight = false
   private var scanToken = 0
   private var notifyArmed = false
+  private var identifying = false
+  private var identifyWait: CheckedContinuation<Void, Never>?
+  private var identifyPeripheral: CBPeripheral?
+  private var identifyToken = 0
+  private var identityWritePending = false
+  /// Matches `CWS_PERIPHERAL_ID.writeCharUUID` in packages/contracts. Not advertised.
+  private static let identityWriteUuid = CBUUID(string: "43575300-6964-4000-8000-c057a11e7002")
   private var foundChars: [String] = []
   private var discoveredChars: [CBCharacteristic] = []
   private(set) var boundWriteUuid = ""
@@ -103,6 +110,61 @@ final class BleCentral: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
     } catch {
       disconnect()
       throw error
+    }
+  }
+
+  /// Tell the phone the id this Mac uses to lock it, then drop the link.
+  /// Best effort: a missing characteristic still returns.
+  func identify(id: String) async {
+    guard let uuid = UUID(uuidString: id) else {
+      return
+    }
+    do {
+      try await waitReady()
+    } catch {
+      return
+    }
+    await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+      self.queue.async {
+        if self.connected != nil || self.connectWait != nil || self.identifying {
+          cont.resume()
+          return
+        }
+        self.identifyToken += 1
+        let token = self.identifyToken
+        self.identifying = true
+        self.identifyWait = cont
+        self.discoveredChars = []
+        self.foundChars = []
+        self.pendingServices = 0
+        self.identityWritePending = false
+        let peripheral =
+          self.seen[uuid] ?? self.manager.retrievePeripherals(withIdentifiers: [uuid]).first
+        guard let peripheral else {
+          self.finishIdentify()
+          return
+        }
+        self.seen[uuid] = peripheral
+        self.identifyPeripheral = peripheral
+        peripheral.delegate = self
+        self.queue.asyncAfter(deadline: .now() + .seconds(4)) {
+          guard token == self.identifyToken else {
+            return
+          }
+          if let current = self.identifyPeripheral {
+            self.manager.cancelPeripheralConnection(current)
+          } else {
+            self.finishIdentify()
+          }
+        }
+        self.queue.asyncAfter(deadline: .now() + .seconds(5)) {
+          guard token == self.identifyToken else {
+            return
+          }
+          self.finishIdentify()
+        }
+        self.manager.connect(peripheral, options: nil)
+      }
     }
   }
 
@@ -414,6 +476,10 @@ final class BleCentral: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
     didFailToConnect peripheral: CBPeripheral,
     error: Error?
   ) {
+    if identifying || identifyPeripheral?.identifier == peripheral.identifier {
+      finishIdentify()
+      return
+    }
     finishConnect(error ?? HidError.listenFailed("BLE connect failed"))
   }
 
@@ -422,6 +488,12 @@ final class BleCentral: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
     didDisconnectPeripheral peripheral: CBPeripheral,
     error: Error?
   ) {
+    if identifyPeripheral?.identifier == peripheral.identifier {
+      identifyPeripheral = nil
+      identifying = false
+      finishIdentify()
+      return
+    }
     if connected?.identifier == peripheral.identifier {
       connected = nil
       writeChar = nil
@@ -434,12 +506,23 @@ final class BleCentral: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
 
   func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
     if let error {
+      if identifying {
+        finishIdentify()
+        return
+      }
       finishConnect(error)
       return
     }
     guard let services = peripheral.services, !services.isEmpty else {
+      if identifying {
+        finishIdentify()
+        return
+      }
       finishConnect(HidError.listenFailed("no GATT services"))
       return
+    }
+    if identifying {
+      discoveredChars = []
     }
     pendingServices = services.count
     for service in services {
@@ -453,6 +536,10 @@ final class BleCentral: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
     error: Error?
   ) {
     if let error {
+      if identifying {
+        finishIdentify()
+        return
+      }
       finishConnect(error)
       return
     }
@@ -469,6 +556,13 @@ final class BleCentral: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
     pendingServices = max(0, pendingServices - 1)
     guard pendingServices == 0 else {
       return
+    }
+    if identifying {
+      deliverIdentity(peripheral)
+      return
+    }
+    if let identity = discoveredChars.first(where: { Self.sameUuid($0.uuid, Self.identityWriteUuid) }) {
+      sendLockId(peripheral, characteristic: identity, allowResponse: false)
     }
     bindKnownChars()
     if let notifyChar {
@@ -565,7 +659,71 @@ final class BleCentral: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
     didWriteValueFor characteristic: CBCharacteristic,
     error: Error?
   ) {
+    if identityWritePending {
+      identityWritePending = false
+      if identifying {
+        manager.cancelPeripheralConnection(peripheral)
+      }
+      return
+    }
     finishWrite(error)
+  }
+
+  private func finishIdentify() {
+    identifying = false
+    identifyPeripheral = nil
+    identityWritePending = false
+    identifyToken += 1
+    let wait = identifyWait
+    identifyWait = nil
+    wait?.resume()
+  }
+
+  private func deliverIdentity(_ peripheral: CBPeripheral) {
+    guard let characteristic = discoveredChars.first(where: { Self.sameUuid($0.uuid, Self.identityWriteUuid) }) else {
+      manager.cancelPeripheralConnection(peripheral)
+      return
+    }
+    sendLockId(peripheral, characteristic: characteristic, allowResponse: true)
+    if identityWritePending {
+      return
+    }
+    queue.asyncAfter(deadline: .now() + .milliseconds(300)) { [weak self] in
+      guard let self, self.identifying else {
+        return
+      }
+      self.manager.cancelPeripheralConnection(peripheral)
+    }
+  }
+
+  /// `uuidString` is the same value the scan list shows as 裝置識別.
+  private func sendLockId(
+    _ peripheral: CBPeripheral,
+    characteristic: CBCharacteristic,
+    allowResponse: Bool
+  ) {
+    guard let payload = peripheral.identifier.uuidString.data(using: .utf8), !payload.isEmpty else {
+      return
+    }
+    let room = peripheral.maximumWriteValueLength(for: .withoutResponse)
+    if characteristic.properties.contains(.writeWithoutResponse), room >= payload.count {
+      if peripheral.canSendWriteWithoutResponse {
+        peripheral.writeValue(payload, for: characteristic, type: .withoutResponse)
+      } else {
+        queue.asyncAfter(deadline: .now() + .milliseconds(150)) { [weak peripheral] in
+          guard let peripheral, peripheral.state == .connected, peripheral.canSendWriteWithoutResponse else {
+            return
+          }
+          peripheral.writeValue(payload, for: characteristic, type: .withoutResponse)
+        }
+      }
+      return
+    }
+    guard allowResponse, characteristic.properties.contains(.write) else {
+      return
+    }
+    identityWritePending = true
+    peripheral.writeValue(payload, for: characteristic, type: .withResponse)
   }
 
   func peripheralIsReady(toSendWriteWithoutResponse peripheral: CBPeripheral) {

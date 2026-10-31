@@ -6,6 +6,7 @@ import {
   HOLD_CONFIRM_DEFAULT_SECONDS,
   clampHoldDuration,
   ledgerVersionPicks,
+  parseBlePeripheralId,
   parseStoredCatalog,
   parseVersionPicks,
   resetLedgerCatalogOverlay,
@@ -30,6 +31,8 @@ export type AppSettings = {
   bleNameSuffix: string;
   /** Four digits spliced into OneKey GAP names so two phones are not identical. */
   bleIdentityToken: string;
+  /** Host Bluetooth id CWS Proxy uses to lock this phone. Empty until the proxy writes it. */
+  blePeripheralId: string;
   faceIdEnabled: boolean;
   signReauth: boolean;
   autoLockMinutes: number;
@@ -45,6 +48,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   confirmClearLogs: true,
   bleNameSuffix: '',
   bleIdentityToken: '',
+  blePeripheralId: '',
   faceIdEnabled: true,
   signReauth: true,
   autoLockMinutes: 15,
@@ -65,6 +69,7 @@ export function normalizeSettings(
     ...parsed,
     language,
     bleIdentityToken: /^\d{4}$/.test(token) ? token : '',
+    blePeripheralId: parseBlePeripheralId(parsed.blePeripheralId ?? '') ?? '',
     holdDurationSeconds: clampHoldDuration(
       parsed.holdDurationSeconds ?? DEFAULT_SETTINGS.holdDurationSeconds,
     ),

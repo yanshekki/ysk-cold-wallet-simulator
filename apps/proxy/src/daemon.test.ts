@@ -1149,4 +1149,58 @@ describe('runProxy', () => {
       await running;
     }
   });
+
+  it('tells each waiting phone its lock id without opening a session', async () => {
+    const nano = LEDGER_MODELS.find((item) => item.id === 'nano-x')!;
+    const target = createBleTarget(null);
+    const told: string[] = [];
+    const opened: string[] = [];
+    const controller = new AbortController();
+    const running = runProxy(
+      {
+        async scan() {
+          return [
+            { id: 'phone-a', name: 'Nano X', services: [nano.serviceUUID], rssi: -70 },
+            { id: 'phone-b', name: 'Nano X', services: [nano.serviceUUID], rssi: -40 },
+          ];
+        },
+        async identify(id) {
+          told.push(id);
+        },
+        async openBle(id) {
+          opened.push(id);
+          return {
+            async write() {
+              return;
+            },
+            onNotify() {
+              return () => undefined;
+            },
+            async close() {
+              return;
+            },
+            async isConnected() {
+              return true;
+            },
+          };
+        },
+        createHid() {
+          return memoryHidPair().gadget;
+        },
+        async askPairingCode() {
+          return '000000';
+        },
+      },
+      () => undefined,
+      controller.signal,
+      { scanMs: 20, skipHid: true, bleTarget: target },
+    );
+    try {
+      await expect.poll(() => [...told].sort(), { timeout: 1_000 }).toEqual(['phone-a', 'phone-b']);
+      expect(opened).toEqual([]);
+    } finally {
+      controller.abort();
+      await running;
+    }
+  });
 });

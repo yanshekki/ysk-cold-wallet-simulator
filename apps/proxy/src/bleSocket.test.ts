@@ -5,6 +5,7 @@ import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   encodeBleFrame,
+  identifyBleSocket,
   openBleSocket,
   resetBleSocketForTests,
   scanBleSocket,
@@ -80,6 +81,8 @@ describe('ble socket client', () => {
             );
           } else if (frame.op === 'close') {
             socket.write(encodeBleFrame({ op: 'ok' }));
+          } else if (frame.op === 'identify') {
+            socket.write(encodeBleFrame({ op: 'ok' }));
           }
         }
       });
@@ -108,5 +111,7 @@ describe('ble socket client', () => {
     expect(seen.some((frame) => frame.op === 'connect')).toBe(true);
     expect(seen.some((frame) => frame.op === 'write')).toBe(true);
     expect(seen.some((frame) => frame.op === 'close')).toBe(true);
+    await identifyBleSocket(socketPath, 'AAA');
+    expect(seen.some((frame) => frame.op === 'identify' && frame.id === 'AAA')).toBe(true);
   });
 });

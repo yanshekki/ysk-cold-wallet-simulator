@@ -186,14 +186,18 @@ export {
   bleGapNameMatches,
 } from './models';
 export {
+  CWS_PERIPHERAL_ID,
   LEDGER_BLE_SEGMENT,
   ONEKEY_BLE,
   TREZOR_BLE,
   bleCharacteristicsMatchService,
+  foldBlePeripheralIdWrite,
   formatBleIdentityToken,
   ledgerBleUuid,
   ledgerGatt,
   ledgerServicesAreDistinct,
+  parseBlePeripheralId,
+  peripheralIdFromBytes,
 } from './bleIdentity';
 export type { UsbHidIdentity } from './usb';
 export {

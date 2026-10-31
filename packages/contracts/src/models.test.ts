@@ -4,9 +4,11 @@ import {
   ONEKEY_BLE,
   TREZOR_BLE,
   bleCharacteristicsMatchService,
+  foldBlePeripheralIdWrite,
   formatBleIdentityToken,
   ledgerBleUuid,
   ledgerServicesAreDistinct,
+  parseBlePeripheralId,
 } from './bleIdentity';
 import { ALL_MODELS, LEDGER_MODELS, ONEKEY_MODELS, TREZOR_MODELS, bleAdvertiseName, bleGapLocalName, bleGapNameMatches } from './models';
 
@@ -100,5 +102,33 @@ describe('BLE service UUIDs', () => {
   it('formats a 4-digit identity token', () => {
     expect(formatBleIdentityToken(Uint8Array.of(0x12, 0x34))).toMatch(/^\d{4}$/);
     expect(formatBleIdentityToken(Uint8Array.of(0, 0))).toBe('0000');
+  });
+});
+
+describe('peripheral lock id', () => {
+  const sample = '09C9EE96-4AB6-F964-B996-9D8D4D48A870';
+
+  it('accepts the host lock id and rejects nearby text', () => {
+    expect(parseBlePeripheralId(sample)).toBe(sample);
+    expect(parseBlePeripheralId(`  ${sample}  `)).toBe(sample);
+    expect(parseBlePeripheralId('AA:BB:CC:DD:EE:FF')).toBe('AA:BB:CC:DD:EE:FF');
+    expect(parseBlePeripheralId('hci0/dev_AA_BB_CC_DD_EE_FF')).toBe('hci0/dev_AA_BB_CC_DD_EE_FF');
+    expect(parseBlePeripheralId('13d63400-2c97-0004-0000-4c6564676572')).toBe(
+      '13d63400-2c97-0004-0000-4c6564676572',
+    );
+    expect(parseBlePeripheralId('Nano X')).toBeNull();
+    expect(parseBlePeripheralId('')).toBeNull();
+    expect(parseBlePeripheralId(`${sample}\nsecret`)).toBeNull();
+  });
+
+  it('reassembles a split ATT write and keeps the proxy spelling', () => {
+    const bytes = new TextEncoder().encode(sample);
+    const head = foldBlePeripheralIdWrite(null, 0, bytes.subarray(0, 20));
+    expect(head.id).toBeNull();
+    const tail = foldBlePeripheralIdWrite(head.pending, 20, bytes.subarray(20));
+    expect(tail.id).toBe(sample);
+    expect(tail.pending).toBeNull();
+    const whole = foldBlePeripheralIdWrite(null, 0, bytes);
+    expect(whole.id).toBe(sample);
   });
 });

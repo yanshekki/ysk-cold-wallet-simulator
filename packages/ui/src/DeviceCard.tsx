@@ -11,7 +11,12 @@ type Props = {
   onSelect: () => void;
   onCopyUuid?: () => void;
   onCopyName?: () => void;
+  onCopyPeripheralId?: () => void;
   localName?: string;
+  peripheralId?: string;
+  peripheralIdLabel?: string;
+  peripheralIdHint?: string;
+  copyPeripheralIdLabel?: string;
   children?: ReactNode;
 };
 
@@ -23,7 +28,12 @@ export function DeviceCard({
   onSelect,
   onCopyUuid,
   onCopyName,
+  onCopyPeripheralId,
   localName,
+  peripheralId,
+  peripheralIdLabel,
+  peripheralIdHint,
+  copyPeripheralIdLabel,
   children,
 }: Props) {
   const rail = brandColor(model.brand);
@@ -54,6 +64,15 @@ export function DeviceCard({
           <Text style={styles.mono} selectable>
             {model.serviceUUID}
           </Text>
+          <Text style={styles.meta}>{peripheralIdLabel ?? 'Device id'}</Text>
+          <Text style={styles.mono} selectable testID="device-peripheral-id">
+            {peripheralId || '—'}
+          </Text>
+          {!peripheralId && peripheralIdHint ? (
+            <Text style={styles.hint} testID="device-peripheral-id-hint">
+              {peripheralIdHint}
+            </Text>
+          ) : null}
           <View style={styles.copies}>
             {onCopyName ? (
               <Pressable
@@ -73,6 +92,17 @@ export function DeviceCard({
                 hitSlop={6}
               >
                 <Text style={styles.copy}>Copy UUID</Text>
+              </Pressable>
+            ) : null}
+            {peripheralId && onCopyPeripheralId ? (
+              <Pressable
+                testID="device-copy-peripheral-id"
+                accessibilityRole="button"
+                accessibilityLabel={copyPeripheralIdLabel ?? 'Copy device id'}
+                onPress={onCopyPeripheralId}
+                hitSlop={6}
+              >
+                <Text style={styles.copy}>{copyPeripheralIdLabel ?? 'Copy device id'}</Text>
               </Pressable>
             ) : null}
           </View>
@@ -145,6 +175,11 @@ const styles = StyleSheet.create({
   mono: {
     color: colors.text,
     fontFamily: fonts.mono,
+    fontSize: 12,
+  },
+  hint: {
+    color: colors.muted,
+    fontFamily: fonts.sans,
     fontSize: 12,
   },
   copies: {
