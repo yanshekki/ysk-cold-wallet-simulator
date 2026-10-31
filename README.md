@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**Version 1.1.3 (build 9)** · [YSK Limited](https://ysk.hk) · [Product page](https://ysk.hk/products/ysk-cold-wallet-simulator)
+**Version 1.1.4 (build 10)** · [YSK Limited](https://ysk.hk) · [Product page](https://ysk.hk/products/ysk-cold-wallet-simulator)
 
 Phone bundle `hk.ysk.cws` · CWS Proxy bundle `hk.ysk.cws.proxy`
 
@@ -24,7 +24,7 @@ CWS is a simulator. It is not a secure element. Ledger, Trezor, and OneKey do no
 
 ## Downloads
 
-Version 1.1.3 (build 9). It keeps the 1.1.2 baseline and adds the proxy lock to the phone the user picks (#77) and vendor BLE service UUIDs with a per-phone OneKey name (#78). Seeds are not hardware-wallet safe.
+Version 1.1.4 (build 10). It keeps the 1.1.3 baseline and removes the copy-phrase and copy-share buttons. Those controls did not write the recovery material. Seeds are not absolutely safe.
 
 [GitHub Release v1.1.0](https://github.com/yanshekki/ysk-cold-wallet-simulator/releases/tag/v1.1.0) is the only tag. It is notes only: no APK, IPA, or desktop package is attached. Later notes do not attach binaries either. See [docs/releases/README.md](docs/releases/README.md).
 
@@ -39,7 +39,7 @@ Version 1.1.3 (build 9). It keeps the 1.1.2 baseline and adds the proxy lock to 
 
 Virtual HID exists for Linux (`/dev/uhid`, including the Ubuntu package) and for the macOS CWS Proxy app. It is not implemented for Windows.
 
-Product version **1.1.3** and build **9** come from `apps/mobile/app.json` (`version`, `versionCode`, `buildNumber`). Expo prebuild writes the Android `versionName` / `versionCode` and the iOS `CFBundleShortVersionString` / `CFBundleVersion`. Workspace packages that ship with the app are version `1.1.3`. The macOS proxy marketing version and build are the same numbers.
+Product version **1.1.4** and build **10** come from `apps/mobile/app.json` (`version`, `versionCode`, `buildNumber`). Expo prebuild writes the Android `versionName` / `versionCode` and the iOS `CFBundleShortVersionString` / `CFBundleVersion`. Workspace packages that ship with the app are version `1.1.4`. The macOS proxy marketing version and build are the same numbers.
 
 ## Quick start
 
@@ -184,9 +184,9 @@ A transaction signature, a message signature, and a backup-seed export wait for 
 
 ## Security
 
-The secret is stored with `WHEN_UNLOCKED_THIS_DEVICE_ONLY`. A release build also sets `requireAuthentication`. The phrase is not written to the clipboard. Import reads the clipboard only after Paste is confirmed. A release build asks the OS authenticator before reveal, import, save, sign, and seed export. Android release builds set `FLAG_SECURE` on secret screens. Those skips exist only when `__DEV__` is true.
+The secret is stored with `WHEN_UNLOCKED_THIS_DEVICE_ONLY`. A release build also sets `requireAuthentication`. The phrase is not written to the clipboard. The phrase and share screens do not offer a copy button. Import reads the clipboard only after Paste is confirmed. A release build asks the OS authenticator before reveal, import, save, sign, and seed export. Android release builds set `FLAG_SECURE` on secret screens. Those skips exist only when `__DEV__` is true.
 
-That is not hardware-wallet safety. The hot-wallet baseline is progress toward Phantom, Rabby, and MetaMask mobile. It is not a secure element. Compatibility choices that stay open in 1.1.3:
+That is not hardware-wallet safety. The hot-wallet baseline is progress toward Phantom, Rabby, and MetaMask mobile. It is not a secure element. Compatibility choices that stay open in 1.1.4:
 
 - WebHID forwards reports with no command allowlist.
 - The local trezord bridge on `127.0.0.1` reflects the request `Origin`.
@@ -208,6 +208,7 @@ What was run, and what was not, is in [docs/testing.md](docs/testing.md). In Oct
 | [docs/security.md](docs/security.md) | Public security statement |
 | [docs/testing.md](docs/testing.md) | What was tested, and what was not |
 | [docs/releases/README.md](docs/releases/README.md) | Release notes index |
+| [docs/releases/1.1.4.md](docs/releases/1.1.4.md) | Bilingual notes for 1.1.4 (build 10) |
 | [docs/releases/1.1.3.md](docs/releases/1.1.3.md) | Bilingual notes for 1.1.3 (build 9) |
 | [docs/releases/1.1.2.md](docs/releases/1.1.2.md) | Bilingual notes for 1.1.2 (build 8) |
 | [docs/releases/1.1.1.md](docs/releases/1.1.1.md) | Bilingual notes for 1.1.1 (build 7), the hot-wallet baseline |

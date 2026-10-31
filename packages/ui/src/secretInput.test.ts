@@ -18,4 +18,12 @@ describe('secretInputProps', () => {
     expect(source).not.toContain('accessibilityLabel={word}');
     expect(source).not.toContain('accessibilityHint');
   });
+
+  it('does not offer a copy control for the recovery words', () => {
+    const source = readFileSync(path.join(import.meta.dirname, 'MnemonicGrid.tsx'), 'utf8');
+    expect(source).not.toContain('setRefused');
+    expect(source).not.toContain('<Button');
+    expect(source).not.toContain('Clipboard');
+    expect(source).not.toContain('copyText');
+  });
 });

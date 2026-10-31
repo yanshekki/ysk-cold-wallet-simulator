@@ -1,7 +1,7 @@
 # YSK Cold Wallet Simulator — Architecture Document
 
 **Project:** `ysk-cold-wallet-simulator`  
-**Product:** YSK Cold Wallet Simulator (CWS), version 1.1.3 (build 9)  
+**Product:** YSK Cold Wallet Simulator (CWS), version 1.1.4 (build 10)  
 **Publisher:** YSK Limited  
 **Product page:** https://ysk.hk/products/ysk-cold-wallet-simulator  
 **Layout:** Expo TypeScript monorepo  
@@ -152,7 +152,7 @@ const mnemonic = entropyToMnemonic(entropy, wordlist);
 - Do not use `Math.random`, a `crypto.getRandomValues` polyfill that falls back to an insecure source, or a WASM RNG that has been observed to return zeros on Android after the first call.
 - Validate with `@scure/bip39`.
 
-The vault stores entropy, or the SLIP-39 secret. It does not write the mnemonic to the clipboard.
+The vault stores entropy, or the SLIP-39 secret. It does not write the mnemonic to the clipboard. The word grid does not offer a copy button.
 
 ### Storage
 
@@ -275,5 +275,5 @@ The security statement for readers is `docs/security.md`. In short: seeds are no
 
 ---
 
-**Document version:** 1.1.3 (build 9)  
+**Document version:** 1.1.4 (build 10)  
 **Date:** 2026-10-31

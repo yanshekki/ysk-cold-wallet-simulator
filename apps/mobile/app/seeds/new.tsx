@@ -323,16 +323,7 @@ export default function NewSeedScreen() {
               ) : null}
             </View>
           ) : null}
-          <MnemonicGrid
-            phrase={mnemonic}
-            labels={{
-              copy: t('generate.copy'),
-              copyTitle: t('generate.copyTitle'),
-              copyBody: t('generate.copyBody'),
-              confirm: t('common.close'),
-              cancel: t('common.cancel'),
-            }}
-          />
+          <MnemonicGrid phrase={mnemonic} />
           {verify.length > 0 ? (
             <>
               <Text style={styles.warn} testID="generate-verify">
