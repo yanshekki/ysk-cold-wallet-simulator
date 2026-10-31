@@ -29,4 +29,4 @@ Put paths, identities, and passwords in your environment. Do not commit them, an
 
 ## Scope that is intentionally open
 
-WebHID command filtering, a trezord origin lockdown, and a confirmation on every extended public key break the hosts this project already speaks. Do not send those as drive-by hardening. [docs/security.md](docs/security.md) records them as residual risk for 1.1.3.
+WebHID command filtering, a trezord origin lockdown, and a confirmation on every extended public key break the hosts this project already speaks. Do not send those as drive-by hardening. [docs/security.md](docs/security.md) records them as residual risk for 1.1.4.

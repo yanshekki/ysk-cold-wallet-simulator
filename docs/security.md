@@ -1,6 +1,6 @@
 # Security
 
-**Version 1.1.3 (build 9).** [YSK Limited](https://ysk.hk) · [ysk.hk/products/ysk-cold-wallet-simulator](https://ysk.hk/products/ysk-cold-wallet-simulator)
+**Version 1.1.4 (build 10).** [YSK Limited](https://ysk.hk) · [ysk.hk/products/ysk-cold-wallet-simulator](https://ysk.hk/products/ysk-cold-wallet-simulator)
 
 This is the public statement of what CWS protects and what it leaves open. Seeds are not hardware-wallet safe.
 
@@ -15,7 +15,7 @@ This is progress toward Phantom, Rabby, and MetaMask mobile. It is not a secure 
 | Item | Result | Residual |
 | --- | --- | --- |
 | Keychain `requireAuthentication` on entropy and shares in a release build | Pass | The skip exists only when `__DEV__` is true. Release always sets the flag. The first successful read is cached in memory until lock. Reveal and backup force a fresh authenticator read. An item saved before this flag is rewritten on the next read |
-| No mnemonic or private key on the clipboard. System copy is off. Seed QR and backup wait for a confirm sheet | Pass | Import does not read the clipboard until Paste is confirmed. A successful import clears the clipboard when it still holds that pasted text. CWS does not write a phrase. Console export is log text, not a seed |
+| No mnemonic or private key on the clipboard. System copy is off. Seed QR and backup wait for a confirm sheet | Pass | Import does not read the clipboard until Paste is confirmed. A successful import clears the clipboard when it still holds that pasted text. CWS does not write a phrase. The phrase and share screens do not offer a copy button. Console export is log text, not a seed |
 | Android `FLAG_SECURE` on secret screens in release. iOS app-switcher blur and a capture warning | Pass. The iOS warn-only choice is intentional | `preventScreenCapture` blacks the live window whenever iOS reports a capture, including mirroring and Control Center. CWS does not do that. It warns and blurs the app switcher. Another camera can photograph the screen. Debug Android skips `FLAG_SECURE` only while `__DEV__` is true |
 | Release manifest blocks `SYSTEM_ALERT_WINDOW` | Pass | Debug still allows cleartext traffic for Metro. Release does not merge that manifest |
 | Public account and xpub reads confirm on the phone | Pass for the phone policy | Firmware P1=0 stays silent in protocol tests. The phone sets `confirmSilentPublic`. One confirm covers that read plus the next 15 public reads for 60 seconds. It does not cover a signature. Disconnect and lock clear the batch. This is not a Ledger wire MATCH |
@@ -25,7 +25,7 @@ This is progress toward Phantom, Rabby, and MetaMask mobile. It is not a secure 
 
 ## What the software does
 
-- A new BIP39 or SLIP-39 secret comes from the operating-system CSPRNG. The mnemonic and the SLIP-39 shares are shown so they can be written down. They are not written to the clipboard. The system copy menu is disabled on fields that hold a phrase, a share, entropy, a verify word, or a passphrase. Import reads the clipboard only after the Paste confirm. A successful import then clears the clipboard when it still holds that text.
+- A new BIP39 or SLIP-39 secret comes from the operating-system CSPRNG. The mnemonic and the SLIP-39 shares are shown so they can be written down. They are not written to the clipboard. The screens that show a phrase or a share do not offer a copy button. The system copy menu is disabled on fields that hold a phrase, a share, entropy, a verify word, or a passphrase. Import reads the clipboard only after the Paste confirm. A successful import then clears the clipboard when it still holds that text.
 - The stored value is entropy, or the SLIP-39 secret, in `expo-secure-store`, with `WHEN_UNLOCKED_THIS_DEVICE_ONLY`. A release build also sets `requireAuthentication`. The web build refuses to store it. A passphrase stays in memory for the session and is wiped on lock. `lockVaultMemory` drops the cached secret.
 - A release build asks the OS authenticator before a secret is revealed, imported, saved, or applied as a passphrase, and again before a signature or a backup-seed QR is produced. Debug builds skip the reveal prompt so a lab session can run. Sign and seed export on a debug build follow the Settings toggle. A release build asks even when that toggle is off.
 - Vault, import, generate, the passphrase sheet, a backup-seed QR, and the seed-export confirmation are secret screens. Android release sets `FLAG_SECURE` on those screens. The debug skip is `__DEV__` only. iOS blurs the app switcher and shows a warning when the OS reports a capture. Leaving the live image visible is intentional: blanking it also blanks mirroring and Control Center.
@@ -33,7 +33,7 @@ This is progress toward Phantom, Rabby, and MetaMask mobile. It is not a secure 
 
 ## What stays open, on purpose
 
-Closing the items below would stop real wallets from connecting. They are residual risk. 1.1.3 does not claim to have removed them.
+Closing the items below would stop real wallets from connecting. They are residual risk. 1.1.4 does not claim to have removed them.
 
 ### WebHID
 
@@ -61,7 +61,7 @@ Release writes set `requireAuthentication`. The decision is `keychainRequiresAut
 
 ## Known host gaps
 
-These gaps remain open in 1.1.3. They were already open in 1.1.0. They are usability gaps. They are not a reason to drop the public-read confirm.
+These gaps remain open in 1.1.4. They were already open in 1.1.0. They are usability gaps. They are not a reason to drop the public-read confirm.
 
 - Phantom may not complete unlock after connect.
 - Rabby’s camera may still fail to scan the phone QR. The static account PNG is ECC M, a four-module quiet zone, 8 px modules, and black-on-white (`qrPng.ts`). On 2026-10-31, host `ki-mac-mini` encoded that PNG for the OneKey and Keystone account profiles. Local `zbarimg` 0.23.95 decoded both files. That is not a wallet scan. Rabby was not opened: Chrome’s extension directory returned `Operation not permitted`, and an unpacked Rabby 0.94.13 tree was not loaded. OneKey.app 6.6.3 was not given a scan session. No Keystone wallet app is installed. Continuity Camera is enumerated as the lab iPhone, and ffmpeg timed out without a frame while Preview showed the PNG. The attempt is host-only KEEP in [testing.md](testing.md). Unimplemented Keystone UR types stay out of the export.
@@ -76,7 +76,7 @@ Anyone who can unlock the phone, debug the process, photograph the screen, or co
 
 ## 繁體中文（香港）
 
-**版本 1.1.3（組建編號 9）。** [YSK Limited](https://ysk.hk) · [ysk.hk/products/ysk-cold-wallet-simulator](https://ysk.hk/products/ysk-cold-wallet-simulator)
+**版本 1.1.4（組建編號 10）。** [YSK Limited](https://ysk.hk) · [ysk.hk/products/ysk-cold-wallet-simulator](https://ysk.hk/products/ysk-cold-wallet-simulator)
 
 這是 CWS 保護甚麼、留下甚麼的公開說明。種子不是硬體錢包級安全。
 
@@ -91,7 +91,7 @@ Anyone who can unlock the phone, debug the process, photograph the screen, or co
 | 項目 | 結果 | 殘餘 |
 | --- | --- | --- |
 | 正式組建對熵與份額設定鑰匙圈 `requireAuthentication` | 通過 | 略過只在 `__DEV__` 為真時存在。正式組建必定設定該旗標。第一次成功讀取會留在記憶體，直到鎖定。顯示與備份會強制再讀一次認證。此旗標出現之前已儲存的項目，會在下一次讀取時重寫 |
-| 剪貼簿沒有助記詞或私鑰。系統複製已關閉。種子二維碼與備份須等確認表 | 通過 | 匯入在確認貼上之前不會讀剪貼簿。匯入成功後，若剪貼簿仍是剛貼上的文字，會把它清掉。CWS 不會寫入助記詞。主控台匯出的是紀錄文字，不是種子 |
+| 剪貼簿沒有助記詞或私鑰。系統複製已關閉。種子二維碼與備份須等確認表 | 通過 | 匯入在確認貼上之前不會讀剪貼簿。匯入成功後，若剪貼簿仍是剛貼上的文字，會把它清掉。CWS 不會寫入助記詞。助記詞與份額畫面沒有複製按鈕。主控台匯出的是紀錄文字，不是種子 |
 | Android 正式組建在秘密畫面設定 `FLAG_SECURE`。iOS 模糊應用程式切換器，並在擷取時警告 | 通過。iOS 只警告是有意的 | `preventScreenCapture` 會在 iOS 報告擷取時把即時視窗塗黑，包括鏡像與控制中心。CWS 不這樣做。它只警告，並模糊應用程式切換器。另一部相機仍可拍下螢幕。Android 除錯組建只在 `__DEV__` 為真時略過 `FLAG_SECURE` |
 | 正式清單阻擋 `SYSTEM_ALERT_WINDOW` | 通過 | 除錯組建仍允許明文流量，以便 Metro。正式組建不會合併該清單 |
 | 手機確認公開帳戶與擴展公鑰讀取 | 就手機政策而言通過 | 韌體 P1=0 在協議測試中仍保持靜默。手機設定 `confirmSilentPublic`。一次確認涵蓋該次讀取，以及其後 60 秒內的 15 次公開讀取。它不包括簽署。斷線與鎖定會清掉這一批。這不是 Ledger 傳輸位元組上的 MATCH |
@@ -101,7 +101,7 @@ Anyone who can unlock the phone, debug the process, photograph the screen, or co
 
 ### 軟件實際做的事
 
-- 新的 BIP39 或 SLIP-39 秘密資料來自作業系統的密碼學安全隨機數。助記詞與 SLIP-39 份額會顯示出來，以便抄寫。它們不會寫入剪貼簿。持有助記詞、份額、熵、核對詞或密語的欄位已關閉系統複製選單。匯入只在確認貼上之後才讀剪貼簿。匯入成功後，若剪貼簿仍是該段文字，會把它清掉。
+- 新的 BIP39 或 SLIP-39 秘密資料來自作業系統的密碼學安全隨機數。助記詞與 SLIP-39 份額會顯示出來，以便抄寫。它們不會寫入剪貼簿。顯示助記詞或份額的畫面沒有複製按鈕。持有助記詞、份額、熵、核對詞或密語的欄位已關閉系統複製選單。匯入只在確認貼上之後才讀剪貼簿。匯入成功後，若剪貼簿仍是該段文字，會把它清掉。
 - 儲存的是熵，或 SLIP-39 秘密，放在 `expo-secure-store`，使用 `WHEN_UNLOCKED_THIS_DEVICE_ONLY`。正式組建另設定 `requireAuthentication`。網頁組建拒絕寫入。密語只存在於該工作階段的記憶體，鎖定時清除。`lockVaultMemory` 會丟掉快取的秘密。
 - 正式組建在顯示、匯入、儲存或套用密語之前，以及在產生簽署或備份種子二維碼之前，會要求作業系統認證。除錯組建略過顯示時的提示，以便實驗室操作。除錯組建的簽署與種子匯出依設定開關。正式組建即使關閉該開關仍會詢問。
 - 種子庫、匯入、產生、密語表、備份種子二維碼及種子匯出確認均為秘密畫面。Android 正式組建在這些畫面設定 `FLAG_SECURE`。除錯略過只在 `__DEV__`。iOS 會模糊應用程式切換器，並在系統報告擷取時顯示警告。保留即時畫面是有意的：塗黑它亦會塗黑鏡像與控制中心。
@@ -109,7 +109,7 @@ Anyone who can unlock the phone, debug the process, photograph the screen, or co
 
 ### 為相容而保留的風險
 
-關閉下列項目會令真實錢包無法連線。它們是殘餘風險。1.1.3 並不宣稱已消除它們。
+關閉下列項目會令真實錢包無法連線。它們是殘餘風險。1.1.4 並不宣稱已消除它們。
 
 **WebHID。** 代理程式把 HID 報告轉成 APDU 送到手機。沒有指令允許清單。你在 Chrome 連接的網站可以發送手機已實現的任何指令，包括韌體上屬靜默的地址或擴展公鑰讀取。簽署與種子匯出仍須等手機。
 
@@ -129,7 +129,7 @@ Anyone who can unlock the phone, debug the process, photograph the screen, or co
 
 ### 已知的主機缺口
 
-這些缺口在 1.1.3 仍然開放。它們在 1.1.0 已經開放。它們是可用性缺口，不是取消公開讀取確認的理由。
+這些缺口在 1.1.4 仍然開放。它們在 1.1.0 已經開放。它們是可用性缺口，不是取消公開讀取確認的理由。
 
 - Phantom 連線後可能無法完成解鎖。
 - Rabby 的相機仍可能掃不到手機二維碼。靜態帳戶 PNG 是 ECC M、四模組安靜區、8 像素模組、黑白（`qrPng.ts`）。2026-10-31，主機 `ki-mac-mini` 為 OneKey 與 Keystone 帳戶設定編碼了該 PNG。本機 `zbarimg` 0.23.95 解出了兩個檔案。那不是錢包掃描。Rabby 沒有開啟：Chrome 的擴充功能目錄回傳 `Operation not permitted`，未載入解包的 Rabby 0.94.13。OneKey.app 6.6.3 沒有得到掃描工作階段。沒有安裝 Keystone 錢包應用程式。Continuity Camera 列為實驗室的 iPhone，Preview 顯示了 PNG，ffmpeg 卻逾時而沒有影格。該次嘗試在 [testing.md](testing.md) 是只限主機的 KEEP。未實現的 Keystone UR 類型不在匯出之內。

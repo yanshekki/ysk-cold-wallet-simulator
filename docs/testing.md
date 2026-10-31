@@ -1,8 +1,8 @@
 # Testing record
 
-**Through 1.1.3 (build 9).** [YSK Limited](https://ysk.hk) · [ysk.hk/products/ysk-cold-wallet-simulator](https://ysk.hk/products/ysk-cold-wallet-simulator)
+**Through 1.1.4 (build 10).** [YSK Limited](https://ysk.hk) · [ysk.hk/products/ysk-cold-wallet-simulator](https://ysk.hk/products/ysk-cold-wallet-simulator)
 
-This page records the 1.1.0 (build 6) handset pass and what later notes added through the 1.1.3 tree. A green suite is not a certificate that every third-party wallet screen works, and it is not a statement that a seed is safe.
+This page records the 1.1.0 (build 6) handset pass and what later notes added through the 1.1.4 tree. A green suite is not a certificate that every third-party wallet screen works, and it is not a statement that a seed is safe.
 
 **Seeds are not absolutely safe.** See [security.md](security.md). The same record in 繁體中文（香港） is below.
 
@@ -94,9 +94,9 @@ Classification: host-only KEEP.
 
 ## 繁體中文（香港）
 
-**截至 1.1.3（組建編號 9）。** [YSK Limited](https://ysk.hk) · [ysk.hk/products/ysk-cold-wallet-simulator](https://ysk.hk/products/ysk-cold-wallet-simulator)
+**截至 1.1.4（組建編號 10）。** [YSK Limited](https://ysk.hk) · [ysk.hk/products/ysk-cold-wallet-simulator](https://ysk.hk/products/ysk-cold-wallet-simulator)
 
-本頁記錄 1.1.0（組建編號 6）的實機檢查，以及其後直到 1.1.3 原始碼樹的補充。綠色測試套件不是每家第三方錢包畫面都已通過的證明，亦不是種子安全的聲明。
+本頁記錄 1.1.0（組建編號 6）的實機檢查，以及其後直到 1.1.4 原始碼樹的補充。綠色測試套件不是每家第三方錢包畫面都已通過的證明，亦不是種子安全的聲明。
 
 **種子並非絕對安全。** 見上文與英文 [security.md](security.md) 的同一頁。
 

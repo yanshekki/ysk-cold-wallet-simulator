@@ -2,7 +2,7 @@
 
 **YSK Limited** · [ysk.hk/products/ysk-cold-wallet-simulator](https://ysk.hk/products/ysk-cold-wallet-simulator)
 
-Version **1.1.0 (build 6)**. These images are for App Store Connect. They are not a download of the app. The current source tree is 1.1.3 (build 9). These frames were not regenerated for that build.
+Version **1.1.0 (build 6)**. These images are for App Store Connect. They are not a download of the app. The current source tree is 1.1.4 (build 10). These frames were not regenerated for that build.
 
 Upload **one folder per localization**. Do not mix frames from two locales into the same localization.
 

@@ -267,16 +267,7 @@ export default function VaultScreen() {
         testID="vault-phrase-sheet"
       >
         {backupWords ? (
-          <MnemonicGrid
-            phrase={backupWords}
-            labels={{
-              copy: t('vault.copyPhrase'),
-              copyTitle: t('vault.copyPhraseTitle'),
-              copyBody: t('vault.copyPhraseBody'),
-              confirm: t('common.close'),
-              cancel: t('common.cancel'),
-            }}
-          />
+          <MnemonicGrid phrase={backupWords} />
         ) : null}
       </Sheet>
 
@@ -291,16 +282,7 @@ export default function VaultScreen() {
         {backupShares?.map((share, index) => (
           <View key={`${index}-${share.slice(0, 12)}`} style={styles.shareBlock}>
             <Text style={styles.shareTitle}>{t('import.shareN', { n: index + 1 })}</Text>
-            <MnemonicGrid
-              phrase={share}
-              labels={{
-                copy: t('vault.copyShare'),
-                copyTitle: t('vault.copyShareTitle'),
-                copyBody: t('vault.copyShareBody'),
-                confirm: t('common.close'),
-                cancel: t('common.cancel'),
-              }}
-            />
+            <MnemonicGrid phrase={share} />
           </View>
         ))}
       </Sheet>

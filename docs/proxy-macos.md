@@ -2,7 +2,7 @@
 
 **YSK Limited** · [ysk.hk/products/ysk-cold-wallet-simulator](https://ysk.hk/products/ysk-cold-wallet-simulator)
 
-CWS Proxy bundle `hk.ysk.cws.proxy` · version **1.1.3 (build 9)**
+CWS Proxy bundle `hk.ysk.cws.proxy` · version **1.1.4 (build 10)**
 
 Seeds are not absolutely safe. The proxy forwards bytes. Signing stays on the phone. Read [security.md](security.md) before you use a secret.
 
@@ -71,7 +71,7 @@ apps/proxy/macos/CWSProxy/DerivedData/Build/Products/Debug/CWS Proxy.app
 
 `apps/proxy/macos/CWSProxy/DerivedData/` is gitignored. Cleaning Derived Data deletes this build.
 
-Bundle id `hk.ysk.cws.proxy`. Display name CWS Proxy. `Info.plist` is `apps/proxy/macos/CWSProxy/CWSProxy/Info.plist`. Marketing version 1.1.3 and build 9 come from the Xcode project, matching `apps/mobile/app.json`.
+Bundle id `hk.ysk.cws.proxy`. Display name CWS Proxy. `Info.plist` is `apps/proxy/macos/CWSProxy/CWSProxy/Info.plist`. Marketing version 1.1.4 and build 10 come from the Xcode project, matching `apps/mobile/app.json`.
 
 ## Applications
 
@@ -114,14 +114,14 @@ The proxy only forwards bytes. Signing stays on the phone. Seeds are not absolut
 
 - [security.md](security.md)
 - [store/README.md](store/README.md)
-- [releases/1.1.3.md](releases/1.1.3.md)
+- [releases/1.1.4.md](releases/1.1.4.md)
 - [../README.md](../README.md)
 
 ## 繁體中文（香港）
 
 **YSK Limited** · [ysk.hk/products/ysk-cold-wallet-simulator](https://ysk.hk/products/ysk-cold-wallet-simulator)
 
-CWS Proxy 套件識別碼 `hk.ysk.cws.proxy` · 版本 **1.1.3（組建編號 9）**
+CWS Proxy 套件識別碼 `hk.ysk.cws.proxy` · 版本 **1.1.4（組建編號 10）**
 
 種子並非絕對安全。代理程式只轉送位元組。簽署留在手機上。使用秘密資料之前，請先閱讀 [security.md](security.md)。
 
@@ -190,7 +190,7 @@ apps/proxy/macos/CWSProxy/DerivedData/Build/Products/Debug/CWS Proxy.app
 
 `apps/proxy/macos/CWSProxy/DerivedData/` 已列入 gitignore。清除 Derived Data 會刪除這個組建。
 
-套件識別碼 `hk.ysk.cws.proxy`。顯示名稱 CWS Proxy。`Info.plist` 是 `apps/proxy/macos/CWSProxy/CWSProxy/Info.plist`。行銷版本 1.1.3 與組建編號 9 來自 Xcode 專案，與 `apps/mobile/app.json` 相同。
+套件識別碼 `hk.ysk.cws.proxy`。顯示名稱 CWS Proxy。`Info.plist` 是 `apps/proxy/macos/CWSProxy/CWSProxy/Info.plist`。行銷版本 1.1.4 與組建編號 10 來自 Xcode 專案，與 `apps/mobile/app.json` 相同。
 
 ### 「應用程式」資料夾
 
@@ -233,5 +233,5 @@ open "/Applications/CWS Proxy.app"
 
 - [security.md](security.md)
 - [store/README.md](store/README.md)
-- [releases/1.1.3.md](releases/1.1.3.md)
+- [releases/1.1.4.md](releases/1.1.4.md)
 - [../README.md](../README.md)

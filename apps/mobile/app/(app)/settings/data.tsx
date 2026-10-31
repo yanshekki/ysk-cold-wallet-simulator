@@ -114,7 +114,7 @@ export default function DataSettingsScreen() {
       <View style={styles.card} testID="data-about">
         <Text style={styles.cardTitle}>{t('settings.about')}</Text>
         <Text style={styles.meta}>
-          {t('settings.version')} {Constants.expoConfig?.version ?? '1.1.3'}
+          {t('settings.version')} {Constants.expoConfig?.version ?? '1.1.4'}
         </Text>
         <Text style={styles.meta}>
           Ledger SE {os.se} / MCU {os.mcu}
