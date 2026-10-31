@@ -369,7 +369,13 @@ function renderDevices(status) {
     meta.className = 'device-meta';
     const rssi = typeof device.rssi === 'number' ? `${device.rssi} dBm` : '—';
     const model = device.modelName || device.modelId || '';
-    meta.textContent = [model, rssi, current ? t('locked') : locked ? t('switchDevice') : t('connectDevice')]
+    const services = Array.isArray(device.services) ? device.services.filter(Boolean) : [];
+    meta.textContent = [
+      model,
+      services.join(', '),
+      rssi,
+      current ? t('locked') : locked ? t('switchDevice') : t('connectDevice'),
+    ]
       .filter(Boolean)
       .join(' · ');
     const id = document.createElement('span');

@@ -34,7 +34,9 @@ Only products that officially support BLE are included.
 - Initial MTU negotiation via `0x08` query (default 20, negotiate up to ~153)
 - APDU is standard ISO 7816-4 style (CLA INS P1 P2 Lc Data Le)
 
-Source: Ledger Developer Portal identifiers + historical Nano X BLE spec (btchip gist).
+Source: [Ledger device identifiers](https://developers.ledger.com/docs/device-interaction/references/identifiers) and [`@ledgerhq/devices`](https://github.com/LedgerHQ/ledger-live/blob/develop/libs/ledgerjs/packages/devices/src/index.ts). Nano Gen5 normal mode is `8004`. The rare early-bootloader set `9004` is not advertised; this build simulates the app, not the bootloader.
+
+Ledger models do not share a service UUID. Two phones simulating the same Ledger model do: that is how the hardware works. The phone OS assigns the radio address.
 
 ### Trezor
 
@@ -54,6 +56,8 @@ Source: Ledger Developer Portal identifiers + historical Nano X BLE spec (btchip
 
 Only Safe 7 has BLE. Older models are USB-only.
 
+Source: [`trezorlib/transport/ble.py`](https://github.com/trezor/trezor-firmware/blob/main/python/src/trezorlib/transport/ble.py) (`8c000001` service, `8c000002` RX/write, `8c000003` TX/notify). The host transport does not require a separate push characteristic.
+
 ### OneKey
 
 | Model              | Protocol | BLE Support | Notes |
@@ -65,10 +69,13 @@ Only Safe 7 has BLE. Older models are USB-only.
 | Neo                | V2       | Yes | No camera |
 | Mini               | V1       | **No** | Excluded |
 
-**Common BLE UUIDs (all BLE models):**
+**Common BLE UUIDs (all BLE models):** OneKey hosts scan one communication service and tell models apart by the GAP name (`K`/`T` + 4 digits, `Pro XXXX`, `Pro 2 XXXX`, `Neo XXXX`). Sharing this service UUID across OneKey models matches the hardware. CWS puts a per-phone 4-digit token in that name so two phones are not the same advertiser. The default placeholders (`K1234`, `Pro 2 A1B2`) are only the no-token form.
+
 - Service: `00000001-0000-1000-8000-00805f9b34fb`
 - Write: `00000002-0000-1000-8000-00805f9b34fb`
 - Notify: `00000003-0000-1000-8000-00805f9b34fb`
+
+Source: [OneKey low-level transport](https://developer.onekey.so/en/hardware-sdk/concepts/low-level-plugin/) and [`packages/shared/src/constants.ts`](https://github.com/OneKeyHQ/hardware-js-sdk/blob/onekey/packages/shared/src/constants.ts).
 
 **Protocol V1 header:** Magic `3F 23 23` + 2-byte message type (BE) + 4-byte payload length (BE) + protobuf.  
 **Protocol V2:** Raw chunks with CRC + sequence; no 3F2323 header. SDK assembles.
@@ -112,7 +119,7 @@ ysk-cold-wallet-simulator/
 
 **Responsibilities:**
 1. Advertise the exact Service UUID of the selected model
-2. Advertise the local name from `bleAdvertiseName` (short names such as `Nano X`, `Trezor Safe 7`, `K1234`)
+2. Advertise the local name from `bleGapLocalName` (Ledger short names such as `Nano X`; OneKey names with the phone's 4-digit token, such as `K4821` or `Pro 2 4821`)
 3. Implement GATT server with the correct characteristics
 4. Handle Write / WriteWithoutResponse → feed into protocol handler
 5. Send Notify responses back to the connected host

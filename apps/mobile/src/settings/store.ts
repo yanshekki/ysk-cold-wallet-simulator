@@ -28,6 +28,8 @@ export type AppSettings = {
   logCap: number;
   confirmClearLogs: boolean;
   bleNameSuffix: string;
+  /** Four digits spliced into OneKey GAP names so two phones are not identical. */
+  bleIdentityToken: string;
   faceIdEnabled: boolean;
   signReauth: boolean;
   autoLockMinutes: number;
@@ -42,6 +44,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   logCap: 1000,
   confirmClearLogs: true,
   bleNameSuffix: '',
+  bleIdentityToken: '',
   faceIdEnabled: true,
   signReauth: true,
   autoLockMinutes: 15,
@@ -56,10 +59,12 @@ export function normalizeSettings(
 ): AppSettings {
   const storedLang = parsed.language ?? '';
   const language = isAppLanguage(storedLang) ? storedLang : fallbackLanguage;
+  const token = parsed.bleIdentityToken ?? '';
   return {
     ...DEFAULT_SETTINGS,
     ...parsed,
     language,
+    bleIdentityToken: /^\d{4}$/.test(token) ? token : '',
     holdDurationSeconds: clampHoldDuration(
       parsed.holdDurationSeconds ?? DEFAULT_SETTINGS.holdDurationSeconds,
     ),

@@ -182,7 +182,19 @@ export {
   TREZOR_MODELS,
   ONEKEY_MODELS,
   bleAdvertiseName,
+  bleGapLocalName,
+  bleGapNameMatches,
 } from './models';
+export {
+  LEDGER_BLE_SEGMENT,
+  ONEKEY_BLE,
+  TREZOR_BLE,
+  bleCharacteristicsMatchService,
+  formatBleIdentityToken,
+  ledgerBleUuid,
+  ledgerGatt,
+  ledgerServicesAreDistinct,
+} from './bleIdentity';
 export type { UsbHidIdentity } from './usb';
 export {
   USB_HID_PREFIX,

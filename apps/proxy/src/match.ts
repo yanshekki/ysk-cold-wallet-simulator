@@ -1,4 +1,4 @@
-import { ALL_MODELS, bleAdvertiseName, type DeviceModel } from '@cws/contracts';
+import { ALL_MODELS, bleAdvertiseName, bleGapNameMatches, type DeviceModel } from '@cws/contracts';
 
 export type ScanHit = {
   id: string;
@@ -134,7 +134,8 @@ function nameScore(advertised: string, model: DeviceModel): number {
   const labelHits =
     label === expected ||
     label === modelName ||
-    (expected.length > 0 && (label.startsWith(`${expected} `) || label.startsWith(`${modelName} `)));
+    (expected.length > 0 && (label.startsWith(`${expected} `) || label.startsWith(`${modelName} `))) ||
+    bleGapNameMatches(model, advertised);
   let score = 0;
   if (labelHits) {
     score = 5;
@@ -161,6 +162,24 @@ function uniqueService(model: DeviceModel): boolean {
 
 export function looksLikeCwsName(name: string, models: DeviceModel[] = ALL_MODELS): boolean {
   return models.some((model) => nameScore(name, model) >= 2);
+}
+
+/**
+ * Best model for a GAP name when the advertisement omitted the service UUID.
+ * Score 4 is a real vendor name (including a per-phone OneKey token).
+ */
+export function nameGuess(name: string, models: DeviceModel[] = ALL_MODELS): DeviceModel | undefined {
+  let best: { model: DeviceModel; score: number } | undefined;
+  for (const model of models) {
+    const score = nameScore(name, model);
+    if (score < 4) {
+      continue;
+    }
+    if (!best || score > best.score) {
+      best = { model, score };
+    }
+  }
+  return best?.model;
 }
 
 export function serviceUuids(models: DeviceModel[] = ALL_MODELS): string[] {

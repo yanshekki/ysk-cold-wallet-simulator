@@ -11,6 +11,7 @@ type Props = {
   onSelect: () => void;
   onCopyUuid?: () => void;
   onCopyName?: () => void;
+  localName?: string;
   children?: ReactNode;
 };
 
@@ -22,6 +23,7 @@ export function DeviceCard({
   onSelect,
   onCopyUuid,
   onCopyName,
+  localName,
   children,
 }: Props) {
   const rail = brandColor(model.brand);
@@ -47,7 +49,7 @@ export function DeviceCard({
       {selected && enabled ? (
         <View style={styles.bezel}>
           <Text style={styles.meta}>Local name</Text>
-          <Text style={styles.mono}>{bleAdvertiseName(model)}</Text>
+          <Text style={styles.mono}>{localName ?? bleAdvertiseName(model)}</Text>
           <Text style={styles.meta}>Service UUID</Text>
           <Text style={styles.mono} selectable>
             {model.serviceUUID}

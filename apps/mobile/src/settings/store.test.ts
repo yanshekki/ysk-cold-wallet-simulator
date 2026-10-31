@@ -32,6 +32,8 @@ describe('settings hold duration', () => {
     expect(normalizeSettings({ holdDurationSeconds: 0 }, 'en').holdDurationSeconds).toBe(3);
     expect(normalizeSettings({ holdDurationSeconds: 1 }, 'en').holdDurationSeconds).toBe(3);
     expect(DEFAULT_SETTINGS.signReauth).toBe(true);
+    expect(normalizeSettings({ bleIdentityToken: '12' }, 'en').bleIdentityToken).toBe('');
+    expect(normalizeSettings({ bleIdentityToken: '4821' }, 'en').bleIdentityToken).toBe('4821');
 
     getItemAsync.mockResolvedValueOnce(JSON.stringify({ language: 'en', autoLockMinutes: 15 }));
     const loaded = await loadSettings();

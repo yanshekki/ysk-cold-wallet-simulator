@@ -1,7 +1,7 @@
 import Constants from 'expo-constants';
 import { useState } from 'react';
 import { Alert, Pressable, Switch, Text, TextInput, View } from 'react-native';
-import { bleAdvertiseName, ledgerOsFor } from '@cws/contracts';
+import { bleGapLocalName, ledgerOsFor } from '@cws/contracts';
 import { Button, colors } from '@cws/ui';
 import { useT } from '../../../src/i18n';
 import { wipeAllSlots } from '../../../src/seeds/vault';
@@ -12,24 +12,14 @@ import { settingsStyles as styles } from '../../../src/settings/styles';
 
 const LOG_CAPS = [200, 500, 1000, 2000];
 
-function advertisedName(modelName: string, brand: string | undefined, suffix: string): string {
-  const clean = suffix.replace(/[^A-Za-z0-9]/g, '').slice(0, 3);
-  if (!clean || brand === 'ledger') {
-    return modelName;
-  }
-  return `${modelName} ${clean}`.trim();
-}
-
 export default function DataSettingsScreen() {
   const t = useT();
   const { model, settings, patchSettings, selectSeed, showToast, clearLogs } = useAppState();
   const [wipe, setWipe] = useState('');
   const os = ledgerOsFor(model?.id ?? 'nano-x');
-  const preview = advertisedName(
-    model ? bleAdvertiseName(model) : 'Nano X',
-    model?.brand,
-    settings.bleNameSuffix,
-  );
+  const preview = model
+    ? bleGapLocalName(model, { token: settings.bleIdentityToken, suffix: settings.bleNameSuffix })
+    : 'Nano X';
 
   const onWipe = async () => {
     if (wipe !== 'WIPE') {
@@ -49,7 +39,11 @@ export default function DataSettingsScreen() {
         text: t('common.confirm'),
         style: 'destructive',
         onPress: () => {
-          void patchSettings({ ...DEFAULT_SETTINGS, language: detectLanguage() }).then(() =>
+          void patchSettings({
+            ...DEFAULT_SETTINGS,
+            language: detectLanguage(),
+            bleIdentityToken: settings.bleIdentityToken,
+          }).then(() =>
             showToast(t('settings.reset')),
           );
         },
