@@ -64,6 +64,7 @@ describe('ble socket client', () => {
                 id: 'AAA',
                 name: 'Sample的iPhone [Nano X]',
                 services: [],
+                rssi: -55,
               }),
             );
             socket.write(encodeBleFrame({ op: 'scanDone' }));
@@ -90,7 +91,7 @@ describe('ble socket client', () => {
 
     const hits = await scanBleSocket(socketPath, 400);
     expect(hits).toEqual([
-      { id: 'AAA', name: 'Sample的iPhone [Nano X]', services: [] },
+      { id: 'AAA', name: 'Sample的iPhone [Nano X]', services: [], rssi: -55 },
     ]);
 
     const ble = await openBleSocket(socketPath, 'AAA', 'write', 'notify');

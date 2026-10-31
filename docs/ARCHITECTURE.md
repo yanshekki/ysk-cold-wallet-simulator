@@ -262,6 +262,7 @@ Declared versions live in each workspace `package.json`. The phone app uses Expo
 
 The security statement for readers is `docs/security.md`. In short: seeds are not absolutely safe. This build has no secure element.
 
+- **Proxy Bluetooth lock.** The desktop page lists compatible advertisers and connects only to the phone you pick. The choice is a peripheral id on this computer, not a seed. macOS needs Bluetooth permission for that copy of CWS Proxy. A rotated address or a new OS peripheral id will not match the saved lock. `cws-proxy --no-ui` without a lock file still auto-connects to the highest-ranked advertiser. RSSI is omitted when the stack does not report it.
 - **BLE peripheral requires a physical phone.** Simulators and Expo Go cannot advertise GATT.
 - **USB** is not emulated inside the phone. Desktop wallets that only speak HID use Linux `uhid` (`cws-proxy` from the Ubuntu package `hk.ysk.cws.proxy`, or `yarn proxy`) or the macOS CWS Proxy app. Virtual HID is not implemented on Windows. The gadget forwards to the phone over BLE.
 - **Advertising stays in the foreground.** The Android connected-device foreground service is removed. iOS background modes are not set. Notify MTU stays 20 on iOS.

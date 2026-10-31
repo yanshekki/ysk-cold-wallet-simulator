@@ -61,6 +61,56 @@ test.describe('CWS Proxy testnet host', () => {
     await expect(page.getByTestId('lab-result')).toContainText('0x33010400');
   });
 
+  test('given two nearby phones, when one is picked, then the proxy locks that id', async ({ page }) => {
+    await page.goto(mock.server.url);
+    await page.getByTestId('lang-select').selectOption('en');
+    mock.bus.patch({
+      running: true,
+      phase: 'scanning',
+      phoneName: '',
+      locked: false,
+      targetId: null,
+      targetName: '',
+      nearby: [
+        {
+          id: 'AAA-111',
+          name: 'Nano X A',
+          rssi: -61,
+          services: [],
+          brand: 'ledger',
+          modelId: 'nano-x',
+          modelName: 'Nano X',
+        },
+        {
+          id: 'BBB-222',
+          name: 'Pro 2 B',
+          rssi: -88,
+          services: [],
+          brand: 'onekey',
+          modelId: 'pro2',
+          modelName: 'Pro 2',
+        },
+      ],
+    });
+    await expect(page.getByTestId('ble-pick-AAA-111')).toBeVisible();
+    await expect(page.getByTestId('ble-pick-BBB-222')).toBeVisible();
+    await expect(page.getByTestId('ble-pick-AAA-111')).toContainText('Nano X A');
+    await expect(page.getByTestId('ble-pick-AAA-111')).toContainText('AAA-111');
+    await expect(page.getByTestId('ble-pick-AAA-111')).toContainText('-61 dBm');
+    await expect(page.getByTestId('proxy-lock')).toHaveText('Unlocked');
+    await page.getByTestId('ble-rescan').click();
+    await expect.poll(() => mock.rescans).toBe(1);
+    await page.getByTestId('ble-pick-AAA-111').click();
+    await expect.poll(() => mock.selectedId).toBe('AAA-111');
+    await expect(page.getByTestId('proxy-lock')).toHaveText('Locked');
+    await expect(page.getByTestId('proxy-target')).toContainText('Nano X A');
+    await expect(page.getByTestId('proxy-target')).toContainText('AAA-111');
+    await expect(page.getByTestId('ble-pick-AAA-111')).toBeDisabled();
+    await page.getByTestId('ble-unlock').click();
+    await expect.poll(() => mock.selectedId).toBeNull();
+    await expect(page.getByTestId('proxy-lock')).toHaveText('Unlocked');
+  });
+
   test('given a GATT-ready mock, when personal_sign is tapped, then the editor opens', async ({ page }) => {
     await page.goto(mock.server.url);
     await page.getByTestId('proxy-power').click();

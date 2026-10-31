@@ -59,6 +59,19 @@
           </div>
           <p class="subtitle" id="subtitle"></p>
           <p id="phase" class="status" data-testid="proxy-phase"></p>
+          <section id="devices" class="devices" data-testid="proxy-devices">
+            <div class="devices-head">
+              <h2 id="devices-title">Bluetooth</h2>
+              <span id="devices-lock" class="lock-badge" data-testid="proxy-lock"></span>
+            </div>
+            <p id="devices-hint" class="devices-hint" data-testid="proxy-devices-hint"></p>
+            <p id="devices-target" class="devices-target" data-testid="proxy-target"></p>
+            <div class="devices-actions">
+              <button type="button" id="ble-rescan" class="ghost" data-testid="ble-rescan"></button>
+              <button type="button" id="ble-unlock" class="ghost" data-testid="ble-unlock"></button>
+            </div>
+            <ul id="device-list" class="device-list" data-testid="ble-device-list"></ul>
+          </section>
           <section id="card" class="card" data-testid="proxy-card">
             <div class="card-head">
               <span id="brand" class="brand">—</span>

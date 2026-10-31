@@ -1,6 +1,7 @@
 import { mnemonicToEntropy } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
 import { describe, expect, it } from 'vitest';
+import { createBleTarget } from './bleLock';
 import { LEDGER_MODELS, ONEKEY_MODELS, TREZOR_MODELS, type ConfirmationPort } from '@cws/contracts';
 import { DEFAULT_MTU, LedgerProtocolHandler, splitFramedPackets } from '@cws/protocol-ledger';
 import {
@@ -903,5 +904,200 @@ describe('runProxy', () => {
     ).rejects.toThrow(/no CWS device advertising/);
     expect(opened).toEqual([]);
     expect(bus.snapshot().modelId).toBeNull();
+  });
+
+  it('waits for an explicit pick and does not hop to a louder phone', async () => {
+    const nano = LEDGER_MODELS.find((item) => item.id === 'nano-x')!;
+    const target = createBleTarget(null);
+    const opened: string[] = [];
+    let live = true;
+    const bus = createStatusBus();
+    const controller = new AbortController();
+    const running = runProxy(
+      {
+        async scan() {
+          return [
+            { id: 'phone-a', name: 'Nano X A', services: [nano.serviceUUID], rssi: -80 },
+            { id: 'phone-b', name: 'Nano X B', services: [nano.serviceUUID], rssi: -40 },
+          ];
+        },
+        async openBle(id) {
+          opened.push(id);
+          if (!live) {
+            throw new Error('disconnected');
+          }
+          return {
+            async write() {
+              return;
+            },
+            onNotify() {
+              return () => undefined;
+            },
+            async close() {
+              return;
+            },
+            async isConnected() {
+              return live;
+            },
+          };
+        },
+        createHid() {
+          return memoryHidPair().gadget;
+        },
+        async askPairingCode() {
+          return '000000';
+        },
+      },
+      () => undefined,
+      controller.signal,
+      { scanMs: 20, skipHid: true, status: bus, bleTarget: target },
+    );
+    try {
+      await expect
+        .poll(() => bus.snapshot().nearby.map((item) => item.id), { timeout: 1_000 })
+        .toEqual(['phone-b', 'phone-a']);
+      expect(opened).toEqual([]);
+      expect(bus.snapshot().locked).toBe(false);
+      target.select({ id: 'phone-a', name: 'Nano X A', modelId: 'nano-x' });
+      await expect.poll(() => opened[0], { timeout: 1_000 }).toBe('phone-a');
+      expect(opened.every((id) => id === 'phone-a')).toBe(true);
+      expect(bus.snapshot().locked).toBe(true);
+      expect(bus.snapshot().targetId).toBe('phone-a');
+      live = false;
+      await expect.poll(() => opened.length, { timeout: 4_000 }).toBeGreaterThan(1);
+      expect(opened.includes('phone-b')).toBe(false);
+      const beforeSwitch = opened.length;
+      target.unlock();
+      await expect.poll(() => bus.snapshot().locked, { timeout: 1_000 }).toBe(false);
+      await new Promise((resolve) => setTimeout(resolve, 80));
+      expect(opened.includes('phone-b')).toBe(false);
+      target.select({ id: 'phone-b', name: 'Nano X B', modelId: 'nano-x' });
+      await expect.poll(() => opened.includes('phone-b'), { timeout: 1_000 }).toBe(true);
+      expect(opened.slice(0, beforeSwitch).includes('phone-b')).toBe(false);
+      expect(bus.snapshot().targetId).toBe('phone-b');
+    } finally {
+      controller.abort();
+      await running;
+    }
+  });
+
+  it('keeps a saved lock on the quieter phone', async () => {
+    const nano = LEDGER_MODELS.find((item) => item.id === 'nano-x')!;
+    const target = createBleTarget({ id: 'phone-a', name: 'Nano X A', modelId: 'nano-x' });
+    const opened: string[] = [];
+    let live = true;
+    const bus = createStatusBus();
+    const controller = new AbortController();
+    const running = runProxy(
+      {
+        async scan() {
+          return [
+            { id: 'phone-a', name: 'Nano X A', services: [nano.serviceUUID], rssi: -75 },
+            { id: 'phone-b', name: 'Nano X B', services: [nano.serviceUUID], rssi: -30 },
+          ];
+        },
+        async openBle(id) {
+          opened.push(id);
+          if (!live) {
+            throw new Error('disconnected');
+          }
+          return {
+            async write() {
+              return;
+            },
+            onNotify() {
+              return () => undefined;
+            },
+            async close() {
+              return;
+            },
+            async isConnected() {
+              return live;
+            },
+          };
+        },
+        createHid() {
+          return memoryHidPair().gadget;
+        },
+        async askPairingCode() {
+          return '000000';
+        },
+      },
+      () => undefined,
+      controller.signal,
+      { scanMs: 20, skipHid: true, status: bus, bleTarget: target },
+    );
+    try {
+      await expect.poll(() => opened[0], { timeout: 1_000 }).toBe('phone-a');
+      expect(bus.snapshot().locked).toBe(true);
+      expect(bus.snapshot().targetName).toBe('Nano X A');
+      live = false;
+      await expect.poll(() => opened.length, { timeout: 4_000 }).toBeGreaterThan(1);
+      expect(new Set(opened)).toEqual(new Set(['phone-a']));
+    } finally {
+      controller.abort();
+      await running;
+    }
+  });
+
+  it('rescan keeps the lock and connects when that phone appears', async () => {
+    const nano = LEDGER_MODELS.find((item) => item.id === 'nano-x')!;
+    const target = createBleTarget({ id: 'phone-a', name: 'Nano X A', modelId: 'nano-x' });
+    let visible = false;
+    const opened: string[] = [];
+    const logs: string[] = [];
+    const controller = new AbortController();
+    const running = runProxy(
+      {
+        async scan() {
+          if (!visible) {
+            return [{ id: 'phone-b', name: 'Nano X B', services: [nano.serviceUUID], rssi: -40 }];
+          }
+          return [{ id: 'phone-a', name: 'Nano X A', services: [nano.serviceUUID], rssi: -70 }];
+        },
+        async openBle(id) {
+          opened.push(id);
+          return {
+            async write() {
+              return;
+            },
+            onNotify() {
+              return () => undefined;
+            },
+            async close() {
+              return;
+            },
+            async isConnected() {
+              return true;
+            },
+          };
+        },
+        createHid() {
+          return memoryHidPair().gadget;
+        },
+        async askPairingCode() {
+          return '000000';
+        },
+      },
+      (line) => logs.push(line),
+      controller.signal,
+      { scanMs: 20, skipHid: true, bleTarget: target },
+    );
+    try {
+      await expect
+        .poll(() => logs.some((line) => line.includes('locked Nano X A (phone-a) not advertising')), {
+          timeout: 1_000,
+        })
+        .toBe(true);
+      expect(opened).toEqual([]);
+      expect(target.snapshot().lock?.id).toBe('phone-a');
+      visible = true;
+      target.rescan();
+      await expect.poll(() => opened[0], { timeout: 1_000 }).toBe('phone-a');
+      expect(opened.includes('phone-b')).toBe(false);
+    } finally {
+      controller.abort();
+      await running;
+    }
   });
 });

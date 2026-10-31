@@ -30,6 +30,9 @@ export type UiCommands = {
   labCatalog(requested?: Brand): LabCatalog;
   runLab(actionId: string, draft?: LabDraftInput): Promise<string>;
   setOpenAppName(name: string): void;
+  selectBle(id: string): void;
+  unlockBle(): void;
+  rescanBle(): void;
 };
 
 export type UiServer = {
@@ -140,6 +143,50 @@ export function startUiServer(opts: {
           json(res, 409, { ok: false, error: message });
         }
       });
+      return;
+    }
+    if (method === 'POST' && url.pathname === '/ble/select') {
+      void readBody(req).then((body) => {
+        let id = '';
+        try {
+          const parsed = body ? (JSON.parse(body) as { id?: unknown }) : {};
+          id = typeof parsed.id === 'string' ? parsed.id.trim() : '';
+        } catch {
+          json(res, 400, { ok: false, error: 'invalid json' });
+          return;
+        }
+        if (!id) {
+          json(res, 400, { ok: false, error: 'device id required' });
+          return;
+        }
+        try {
+          opts.commands.selectBle(id);
+          json(res, 200, { ok: true, id });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          json(res, 409, { ok: false, error: message });
+        }
+      });
+      return;
+    }
+    if (method === 'POST' && url.pathname === '/ble/unlock') {
+      try {
+        opts.commands.unlockBle();
+        json(res, 200, { ok: true, locked: false });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        json(res, 409, { ok: false, error: message });
+      }
+      return;
+    }
+    if (method === 'POST' && url.pathname === '/ble/rescan') {
+      try {
+        opts.commands.rescanBle();
+        json(res, 200, { ok: true });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        json(res, 409, { ok: false, error: message });
+      }
       return;
     }
     if (method === 'POST' && url.pathname === '/start') {

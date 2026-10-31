@@ -47,6 +47,7 @@ pub struct ScanResult {
   pub id: String,
   pub name: String,
   pub services: Vec<String>,
+  pub rssi: Option<i16>,
 }
 
 #[napi]
@@ -62,6 +63,7 @@ pub async fn scan_ble(service_uuids: Vec<String>, timeout_ms: u32) -> Result<Vec
         id: row.id,
         name: row.name,
         services: row.services,
+        rssi: row.rssi,
       })
       .collect(),
   )

@@ -29,6 +29,7 @@ pub struct ScanResult {
   pub id: String,
   pub name: String,
   pub services: Vec<String>,
+  pub rssi: Option<i16>,
 }
 
 fn parse_uuid(value: &str) -> Result<Uuid> {
@@ -129,6 +130,7 @@ pub async fn scan_ble(service_uuids: Vec<String>, timeout_ms: u32) -> Result<Vec
       id: peripheral.id().to_string(),
       name: props.local_name.unwrap_or_default(),
       services: services.into_iter().collect(),
+      rssi: props.rssi,
     });
   }
   Ok(out)

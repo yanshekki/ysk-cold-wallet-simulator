@@ -8,6 +8,8 @@ export type MockProxy = {
   bus: StatusBus;
   pairing: PairingGate;
   lastLab: { actionId: string; draft?: LabDraftInput } | null;
+  selectedId: string | null;
+  rescans: number;
 };
 
 export function resetMock(mock: MockProxy): void {
@@ -32,7 +34,13 @@ export function resetMock(mock: MockProxy): void {
     trezord: null,
     error: null,
     pairing: false,
+    nearby: [],
+    targetId: null,
+    targetName: '',
+    locked: false,
   });
+  mock.selectedId = null;
+  mock.rescans = 0;
 }
 
 export async function startMockProxy(nativeOk = true): Promise<MockProxy> {
@@ -43,6 +51,8 @@ export async function startMockProxy(nativeOk = true): Promise<MockProxy> {
     bus,
     pairing,
     lastLab: null,
+    selectedId: null,
+    rescans: 0,
   };
   mock.server = await startUiServer({
     bus,
@@ -72,6 +82,22 @@ export async function startMockProxy(nativeOk = true): Promise<MockProxy> {
       labCatalog(requested) {
         const snap = bus.snapshot();
         return labCatalogFor(snap.brand ?? requested ?? 'ledger', snap.labReady, snap.brand);
+      },
+      selectBle(id) {
+        mock.selectedId = id;
+        const row = bus.snapshot().nearby.find((item) => item.id === id);
+        bus.patch({
+          locked: true,
+          targetId: id,
+          targetName: row?.name || id,
+        });
+      },
+      unlockBle() {
+        mock.selectedId = null;
+        bus.patch({ locked: false, targetId: null, targetName: '' });
+      },
+      rescanBle() {
+        mock.rescans += 1;
       },
       async runLab(actionId, draft) {
         if (!bus.snapshot().labReady) {

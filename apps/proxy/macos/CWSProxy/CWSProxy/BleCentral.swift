@@ -6,6 +6,8 @@ struct BleScanHit {
   var id: String
   var name: String
   var services: [String]
+  /// dBm. Nil when CoreBluetooth reports an unknown reading (127).
+  var rssi: Int?
 }
 
 private struct PendingWrite {
@@ -392,10 +394,14 @@ final class BleCentral: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
     } else if localChanged {
       uuids = []
     }
+    let reading = RSSI.intValue
+    // 127 means CoreBluetooth could not read RSSI. Keep the last real sample.
+    let rssi: Int? = reading > 20 ? previous?.rssi : reading
     scanHits[peripheral.identifier] = BleScanHit(
       id: peripheral.identifier.uuidString,
       name: name,
-      services: uuids
+      services: uuids,
+      rssi: rssi
     )
   }
 
