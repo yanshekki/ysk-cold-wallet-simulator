@@ -507,7 +507,7 @@ describe('Cardano canonical transaction body', () => {
     expect(bytes.includes(0x3b)).toBe(false);
   });
 
-  it('fails closed on CIP-36 registration, a pool certificate, and voting procedures', async () => {
+  it('fails closed on incomplete CIP-36, pool, and voting wires', async () => {
     const { raw } = paymentWire();
     const cip36 = paymentWire().init;
     const marker = cip36.indexOf(0xab);
@@ -596,5 +596,358 @@ describe('Cardano canonical transaction body', () => {
     const rejected = await send(raw, 0x12);
     expect((rejected[rejected.length - 2]! << 8) | rejected[rejected.length - 1]!).toBe(0x6a80);
     expect(rejected.length).toBe(2);
+  });
+
+  it('hashes CIP-36 aux type 1 as field 7, not the concatenated APDU', async () => {
+    const { init, raw, body } = paymentWire();
+    const marker = init.indexOf(0xab);
+    const cip36Init = concatBytes(init.slice(0, marker - 1), Uint8Array.of(1), init.slice(marker + 32));
+    const auxHash = new Uint8Array(32).fill(0xcd);
+    const originalAux = new Uint8Array(32).fill(0xab);
+    const start = body.findIndex((_, index) => originalAux.every((byte, offset) => body[index + offset] === byte));
+    const expected = concatBytes(body.slice(0, start), auxHash, body.slice(start + 32));
+    const built = await cardanoCanonicalBody(cip36Init, raw, ctx(), auxHash);
+    expect(Array.from(built ?? new Uint8Array())).toEqual(Array.from(expected));
+    const hash = await cardanoCanonicalTxHash(cip36Init, raw, ctx(), auxHash);
+    expect(Array.from(hash ?? new Uint8Array())).toEqual(Array.from(blake2b(expected, { dkLen: 32 })));
+    expect(Array.from(hash ?? new Uint8Array())).not.toEqual(Array.from(blake2b(raw, { dkLen: 32 })));
+    expect(await cardanoCanonicalTxHash(cip36Init, raw, ctx())).toBeNull();
+  });
+
+  it('encodes a pool-registration certificate as Conway Array(10) type 3', async () => {
+    const txHash = new Uint8Array(32).fill(0x11);
+    const address = concatBytes(Uint8Array.of(0x61), new Uint8Array(28).fill(0x22));
+    const output = concatBytes(
+      Uint8Array.of(1),
+      u16(address.length),
+      address,
+      u64(1_000_000n),
+      Uint8Array.of(1, 0x01, 0x01),
+      u16(0),
+    );
+    const poolId = new Uint8Array(28).fill(0xaa);
+    const vrf = new Uint8Array(32).fill(0xbb);
+    const reward = concatBytes(Uint8Array.of(0xe1), new Uint8Array(28).fill(0xcc));
+    const owner = new Uint8Array(28).fill(0xdd);
+    const url = new TextEncoder().encode('https://pool.example');
+    const metaHash = new Uint8Array(32).fill(0xee);
+    const payload = concatBytes(
+      Uint8Array.of(0),
+      poolId,
+      vrf,
+      u64(1_000_000n),
+      u64(340_000_000n),
+      u64(1n),
+      u64(10n),
+      Uint8Array.of(0),
+      reward,
+      u16(1),
+      u16(1),
+      Uint8Array.of(0x02),
+      Uint8Array.of(0),
+      owner,
+      Uint8Array.of(0),
+      Uint8Array.of(0x02),
+      u16(3001),
+      Uint8Array.of(0x02),
+      Uint8Array.of(1, 2, 3, 4),
+      Uint8Array.of(0x01),
+      u16(url.length),
+      url,
+      metaHash,
+    );
+    const cert = concatBytes(Uint8Array.of(3), u16(payload.length), payload);
+    const raw = concatBytes(txHash, u32(0), u16(output.length), output, u64(170_000n), u64(1_000n), cert);
+    const init = concatBytes(
+      u64(1n),
+      Uint8Array.of(1),
+      u32(1),
+      Uint8Array.of(3),
+      u16(1),
+      u16(1),
+      Uint8Array.of(0x02),
+      u16(1),
+      u16(0),
+      Uint8Array.of(0x01),
+      Uint8Array.of(0x01),
+      u16(0),
+      Uint8Array.of(0x01),
+      u16(0),
+      u16(0),
+      Uint8Array.of(0x02, 0x01, 0x01),
+      u16(0),
+      u16(0),
+      Uint8Array.of(0x01, 0x01),
+      u16(1),
+      u16(raw.length),
+    );
+    const input = concatBytes(cborMajor(4, 2n), cborBytes(txHash), cborUnsigned(0n));
+    const outputCbor = concatBytes(
+      cborMajor(5, 2n),
+      cborUnsigned(0n),
+      cborBytes(address),
+      cborUnsigned(1n),
+      cborUnsigned(1_000_000n),
+    );
+    const relay = concatBytes(
+      cborMajor(4, 4n),
+      cborUnsigned(0n),
+      cborUnsigned(3001n),
+      cborBytes(Uint8Array.of(1, 2, 3, 4)),
+      Uint8Array.of(0xf6),
+    );
+    const metadata = concatBytes(
+      cborMajor(4, 2n),
+      concatBytes(cborMajor(3, BigInt(url.length)), url),
+      cborBytes(metaHash),
+    );
+    const poolCbor = concatBytes(
+      cborMajor(4, 10n),
+      cborUnsigned(3n),
+      cborBytes(poolId),
+      cborBytes(vrf),
+      cborUnsigned(1_000_000n),
+      cborUnsigned(340_000_000n),
+      concatBytes(cborMajor(6, 30n), cborMajor(4, 2n), cborUnsigned(1n), cborUnsigned(10n)),
+      cborBytes(reward),
+      concatBytes(cborMajor(6, 258n), cborMajor(4, 1n), cborBytes(owner)),
+      concatBytes(cborMajor(4, 1n), relay),
+      metadata,
+    );
+    const body = concatBytes(
+      cborMajor(5, 6n),
+      cborUnsigned(0n),
+      cborMajor(6, 258n),
+      cborMajor(4, 1n),
+      input,
+      cborUnsigned(1n),
+      cborMajor(4, 1n),
+      outputCbor,
+      cborUnsigned(2n),
+      cborUnsigned(170_000n),
+      cborUnsigned(3n),
+      cborUnsigned(1_000n),
+      cborUnsigned(4n),
+      cborMajor(6, 258n),
+      cborMajor(4, 1n),
+      poolCbor,
+      cborUnsigned(15n),
+      cborUnsigned(1n),
+    );
+    const built = await cardanoCanonicalBody(init, raw, ctx());
+    expect(Array.from(built ?? new Uint8Array())).toEqual(Array.from(body));
+    const hash = await cardanoCanonicalTxHash(init, raw, ctx());
+    expect(Array.from(hash ?? new Uint8Array())).toEqual(Array.from(blake2b(body, { dkLen: 32 })));
+    expect(Array.from(hash ?? new Uint8Array())).not.toEqual(Array.from(blake2b(raw, { dkLen: 32 })));
+  });
+
+  it('encodes voting procedures as body field 19', async () => {
+    const { raw: paymentRaw } = paymentWire();
+    const voter = new Uint8Array(28).fill(0xa1);
+    const govTx = new Uint8Array(32).fill(0xa2);
+    const voting = concatBytes(
+      Uint8Array.of(0),
+      voter,
+      u16(1),
+      govTx,
+      u32(3),
+      Uint8Array.of(1),
+      Uint8Array.of(0x01),
+    );
+    const raw = concatBytes(paymentRaw, voting);
+    const init = concatBytes(
+      u64(1n),
+      Uint8Array.of(1),
+      u32(1),
+      Uint8Array.of(3),
+      u16(1),
+      u16(1),
+      Uint8Array.of(0x02),
+      u16(0),
+      u16(0),
+      Uint8Array.of(0x01),
+      Uint8Array.of(0x01),
+      u16(0),
+      Uint8Array.of(0x01),
+      u16(0),
+      u16(0),
+      Uint8Array.of(0x02, 0x01, 0x01),
+      u16(0),
+      u16(1),
+      Uint8Array.of(0x01, 0x01),
+      u16(1),
+      u16(raw.length),
+    );
+    const address = concatBytes(Uint8Array.of(0x61), new Uint8Array(28).fill(0x22));
+    const txHash = new Uint8Array(32).fill(0x11);
+    const input = concatBytes(cborMajor(4, 2n), cborBytes(txHash), cborUnsigned(0n));
+    const outputCbor = concatBytes(
+      cborMajor(5, 2n),
+      cborUnsigned(0n),
+      cborBytes(address),
+      cborUnsigned(1n),
+      cborUnsigned(1_000_000n),
+    );
+    const body = concatBytes(
+      cborMajor(5, 6n),
+      cborUnsigned(0n),
+      cborMajor(6, 258n),
+      cborMajor(4, 1n),
+      input,
+      cborUnsigned(1n),
+      cborMajor(4, 1n),
+      outputCbor,
+      cborUnsigned(2n),
+      cborUnsigned(170_000n),
+      cborUnsigned(3n),
+      cborUnsigned(1_000n),
+      cborUnsigned(15n),
+      cborUnsigned(1n),
+      cborUnsigned(19n),
+      cborMajor(5, 1n),
+      cborMajor(4, 2n),
+      cborUnsigned(0n),
+      cborBytes(voter),
+      cborMajor(5, 1n),
+      cborMajor(4, 2n),
+      cborBytes(govTx),
+      cborUnsigned(3n),
+      cborMajor(4, 2n),
+      cborUnsigned(1n),
+      Uint8Array.of(0xf6),
+    );
+    const built = await cardanoCanonicalBody(init, raw, ctx());
+    expect(Array.from(built ?? new Uint8Array())).toEqual(Array.from(body));
+    expect(Array.from((await cardanoCanonicalTxHash(init, raw, ctx())) ?? new Uint8Array())).not.toEqual(
+      Array.from(blake2b(raw, { dkLen: 32 })),
+    );
+  });
+
+  it('signs a CIP-36 registration then the canonical body including that aux hash', async () => {
+    const { init, raw, body } = paymentWire();
+    const marker = init.indexOf(0xab);
+    const cip36Init = concatBytes(init.slice(0, marker - 1), Uint8Array.of(1), init.slice(marker + 32));
+    const voteKey = new Uint8Array(32).fill(0x42);
+    const payment = concatBytes(Uint8Array.of(0x61), new Uint8Array(28).fill(0x22));
+    const stake = Uint8Array.of(
+      0x05,
+      0x80, 0x00, 0x07, 0x3c,
+      0x80, 0x00, 0x07, 0x17,
+      0x80, 0x00, 0x00, 0x00,
+      0x00, 0x00, 0x00, 0x02,
+      0x00, 0x00, 0x00, 0x00,
+    );
+    const auxData = concatBytes(
+      Uint8Array.of(2),
+      u16(0),
+      Uint8Array.of(2),
+      stake,
+      Uint8Array.of(1),
+      u16(payment.length),
+      payment,
+      u64(123n),
+      u64(0n),
+      Uint8Array.of(0),
+      voteKey,
+    );
+    const nanoX = LEDGER_MODELS.find((model) => model.id === 'nano-x')!;
+    const device = new LedgerProtocolHandler({
+      model: nanoX,
+      confirmation: ctx().confirmation,
+      slotId: 'slot',
+      entropy: ctx().entropy,
+    });
+    device.setApp('cardano');
+    const send = (data: Uint8Array, p1: number, p2 = 0) =>
+      roundTrip(device, Uint8Array.from([0xd7, 0x21, p1, p2, data.length, ...data]));
+    expect((await send(cip36Init, 0x10)).slice(-2)).toEqual(Uint8Array.of(0x90, 0x00));
+    const auxReply = await send(auxData, 0x13, 0x36);
+    expect((auxReply[auxReply.length - 2]! << 8) | auxReply[auxReply.length - 1]!).toBe(SW_OK);
+    expect(auxReply.length).toBe(98);
+    const auxHash = auxReply.slice(0, 32);
+    const auxSig = auxReply.slice(32, 96);
+    const staking = deriveIcarus(ctx().entropy, "m/1852'/1815'/0'/2/0");
+    const payload = concatBytes(
+      cborMajor(5, 5n),
+      cborUnsigned(1n),
+      cborBytes(voteKey),
+      cborUnsigned(2n),
+      cborBytes(staking.publicKey),
+      cborUnsigned(3n),
+      cborBytes(payment),
+      cborUnsigned(4n),
+      cborUnsigned(123n),
+      cborUnsigned(5n),
+      cborUnsigned(0n),
+    );
+    const wrapped = blake2b(concatBytes(cborMajor(5, 1n), cborUnsigned(61284n), payload), { dkLen: 32 });
+    expect(Array.from(auxSig)).toEqual(Array.from(signIcarus(staking, wrapped)));
+    expect(ed25519.verify(auxSig, wrapped, staking.publicKey)).toBe(true);
+    expect(ed25519.verify(auxSig, blake2b(payload, { dkLen: 32 }), staking.publicKey)).toBe(false);
+    const confirmed = await send(raw, 0x12);
+    expect(confirmed.slice(-2)).toEqual(Uint8Array.of(0x90, 0x00));
+    const originalAux = new Uint8Array(32).fill(0xab);
+    const start = body.findIndex((_, index) => originalAux.every((byte, offset) => body[index + offset] === byte));
+    const expectedBody = concatBytes(body.slice(0, start), auxHash, body.slice(start + 32));
+    const hash = confirmed.slice(0, 32);
+    expect(Array.from(hash)).toEqual(Array.from(blake2b(expectedBody, { dkLen: 32 })));
+    expect(Array.from(hash)).not.toEqual(Array.from(blake2b(raw, { dkLen: 32 })));
+    const witnessPath = Uint8Array.of(
+      0x05,
+      0x80, 0x00, 0x07, 0x3c,
+      0x80, 0x00, 0x07, 0x17,
+      0x80, 0x00, 0x00, 0x00,
+      0x00, 0x00, 0x00, 0x00,
+      0x00, 0x00, 0x00, 0x00,
+    );
+    const witness = await send(witnessPath, 0x0f);
+    const node = deriveIcarus(ctx().entropy, "m/1852'/1815'/0'/0/0");
+    expect(ed25519.verify(witness.slice(0, 64), hash, node.publicKey)).toBe(true);
+    expect(ed25519.verify(witness.slice(0, 64), blake2b(raw, { dkLen: 32 }), node.publicKey)).toBe(false);
+  });
+
+  it('returns 9000 until the last CIP-36 delegation, then 96 bytes', async () => {
+    const { init } = paymentWire();
+    const marker = init.indexOf(0xab);
+    const cip36Init = concatBytes(init.slice(0, marker - 1), Uint8Array.of(1), init.slice(marker + 32));
+    const voteKey = new Uint8Array(32).fill(0x43);
+    const payment = concatBytes(Uint8Array.of(0x61), new Uint8Array(28).fill(0x22));
+    const stake = Uint8Array.of(
+      0x05,
+      0x80, 0x00, 0x07, 0x3c,
+      0x80, 0x00, 0x07, 0x17,
+      0x80, 0x00, 0x00, 0x00,
+      0x00, 0x00, 0x00, 0x02,
+      0x00, 0x00, 0x00, 0x00,
+    );
+    const auxInit = concatBytes(
+      Uint8Array.of(2),
+      u16(1),
+      Uint8Array.of(2),
+      stake,
+      Uint8Array.of(1),
+      u16(payment.length),
+      payment,
+      u64(123n),
+      u64(0n),
+    );
+    const nanoX = LEDGER_MODELS.find((model) => model.id === 'nano-x')!;
+    const device = new LedgerProtocolHandler({
+      model: nanoX,
+      confirmation: ctx().confirmation,
+      slotId: 'slot',
+      entropy: ctx().entropy,
+    });
+    device.setApp('cardano');
+    const send = (data: Uint8Array, p1: number, p2 = 0) =>
+      roundTrip(device, Uint8Array.from([0xd7, 0x21, p1, p2, data.length, ...data]));
+    expect((await send(cip36Init, 0x10)).slice(-2)).toEqual(Uint8Array.of(0x90, 0x00));
+    const held = await send(auxInit, 0x13, 0x36);
+    expect(held).toEqual(Uint8Array.of(0x90, 0x00));
+    const last = await send(concatBytes(Uint8Array.of(0), voteKey, u32(4)), 0x13, 0x37);
+    expect((last[last.length - 2]! << 8) | last[last.length - 1]!).toBe(SW_OK);
+    expect(last.length).toBe(98);
+    const empty = await send(new Uint8Array(), 0x13, 0x36);
+    expect((empty[empty.length - 2]! << 8) | empty[empty.length - 1]!).toBe(0x6980);
   });
 });

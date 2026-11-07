@@ -357,7 +357,7 @@ describe('Cardano 7.2.1 stage hash', () => {
     }
   });
 
-  it('fails closed on CIP-36 auxiliary data and on voting procedures', async () => {
+  it('fails closed on incomplete CIP-36 auxiliary data and on voting procedures', async () => {
     const { stages } = swap721();
     const cip = new CardanoV7Tx('7.2.1');
     await cip.stage(stages[0]!.p1, stages[0]!.p2, stages[0]!.data, ctx());
@@ -371,5 +371,297 @@ describe('Cardano 7.2.1 stage hash', () => {
     const machine = new CardanoV7Tx('7.2.1');
     await machine.stage(0x01, 0, voters, ctx());
     expect(machine.body()).toBeNull();
+  });
+
+  it('hashes a CIP-36 registration as body field 7', async () => {
+    const txHash = new Uint8Array(32).fill(0x11);
+    const address = concatBytes(Uint8Array.of(0x61), new Uint8Array(28).fill(0x22));
+    const voteKey = new Uint8Array(32).fill(0x42);
+    const stake = [0x8000073c, 0x80000717, 0x80000000, 2, 0];
+    const init = concatBytes(
+      u64(1n),
+      Uint8Array.of(1),
+      u32(764824073),
+      Uint8Array.of(0x02, 0x02, 0x01, 0x01, 0x01, 0x02, 0x01, 0x01, 0x01, 0x01),
+      Uint8Array.of(7),
+      u32(1),
+      u32(1),
+      u32(0),
+      u32(0),
+      u32(0),
+      u32(0),
+      u32(0),
+      u32(0),
+      u32(1),
+    );
+    const basic = concatBytes(
+      Uint8Array.of(0, 1),
+      u32(address.length),
+      address,
+      u64(1_000_000n),
+      u32(0),
+      Uint8Array.of(0x01, 0x01),
+    );
+    const machine = new CardanoV7Tx('7.2.1');
+    await machine.stage(0x01, 0, init, ctx());
+    await machine.stage(0x08, 0, Uint8Array.of(1), ctx());
+    await machine.stage(0x08, 0x36, concatBytes(Uint8Array.of(2), u32(0)), ctx());
+    await machine.stage(0x08, 0x30, concatBytes(Uint8Array.of(1), voteKey), ctx());
+    await machine.stage(0x08, 0x31, path(stake), ctx());
+    await machine.stage(0x08, 0x32, concatBytes(Uint8Array.of(1), u32(address.length), address), ctx());
+    await machine.stage(0x08, 0x33, u64(123n), ctx());
+    await machine.stage(0x08, 0x35, concatBytes(Uint8Array.of(0x02), u64(0n)), ctx());
+    await machine.stage(0x08, 0x34, new Uint8Array(), ctx());
+    const result = await machine.finalizeCip36(ctx());
+    expect(result).not.toBeNull();
+    await machine.stage(0x02, 0, concatBytes(txHash, u32(0)), ctx());
+    await machine.stage(0x03, 0x30, basic, ctx());
+    await machine.stage(0x03, 0x33, new Uint8Array(), ctx());
+    await machine.stage(0x04, 0, u64(170_000n), ctx());
+    await machine.stage(0x05, 0, u64(1_000n), ctx());
+    const built = machine.body();
+    expect(built).not.toBeNull();
+    const staking = deriveIcarus(ctx().entropy, "m/1852'/1815'/0'/2/0");
+    const payload = concatBytes(
+      cborMajor(5, 5n),
+      cborUnsigned(1n),
+      cborBytes(voteKey),
+      cborUnsigned(2n),
+      cborBytes(staking.publicKey),
+      cborUnsigned(3n),
+      cborBytes(address),
+      cborUnsigned(4n),
+      cborUnsigned(123n),
+      cborUnsigned(5n),
+      cborUnsigned(0n),
+    );
+    const wrapped = blake2b(concatBytes(cborMajor(5, 1n), cborUnsigned(61284n), payload), { dkLen: 32 });
+    expect(Array.from(result!.signature)).toEqual(Array.from(signIcarus(staking, wrapped)));
+    expect(ed25519.verify(result!.signature, wrapped, staking.publicKey)).toBe(true);
+    expect(ed25519.verify(result!.signature, blake2b(payload, { dkLen: 32 }), staking.publicKey)).toBe(false);
+    const input = concatBytes(cborMajor(4, 2n), cborBytes(txHash), cborUnsigned(0n));
+    const output = concatBytes(cborMajor(4, 2n), cborBytes(address), cborUnsigned(1_000_000n));
+    const body = concatBytes(
+      cborMajor(5, 6n),
+      cborUnsigned(0n),
+      cborMajor(6, 258n),
+      cborMajor(4, 1n),
+      input,
+      cborUnsigned(1n),
+      cborMajor(4, 1n),
+      output,
+      cborUnsigned(2n),
+      cborUnsigned(170_000n),
+      cborUnsigned(3n),
+      cborUnsigned(1_000n),
+      cborUnsigned(7n),
+      cborBytes(result!.hash),
+      cborUnsigned(15n),
+      cborUnsigned(1n),
+    );
+    expect(Array.from(built!)).toEqual(Array.from(body));
+  });
+
+  it('hashes a pool-registration certificate and a voting procedure', async () => {
+    const txHash = new Uint8Array(32).fill(0x11);
+    const address = concatBytes(Uint8Array.of(0x61), new Uint8Array(28).fill(0x22));
+    const poolId = new Uint8Array(28).fill(0xaa);
+    const vrf = new Uint8Array(32).fill(0xbb);
+    const reward = concatBytes(Uint8Array.of(0xe1), new Uint8Array(28).fill(0xcc));
+    const owner = new Uint8Array(28).fill(0xdd);
+    const url = new TextEncoder().encode('https://pool.example');
+    const metaHash = new Uint8Array(32).fill(0xee);
+    const voter = new Uint8Array(28).fill(0xa1);
+    const govTx = new Uint8Array(32).fill(0xa2);
+    const init = concatBytes(
+      u64(1n),
+      Uint8Array.of(1),
+      u32(764824073),
+      Uint8Array.of(0x02, 0x01, 0x01, 0x01, 0x01, 0x02, 0x01, 0x01, 0x01, 0x01),
+      Uint8Array.of(7),
+      u32(1),
+      u32(1),
+      u32(1),
+      u32(0),
+      u32(0),
+      u32(0),
+      u32(0),
+      u32(1),
+      u32(1),
+    );
+    const basic = concatBytes(
+      Uint8Array.of(0, 1),
+      u32(address.length),
+      address,
+      u64(1_000_000n),
+      u32(0),
+      Uint8Array.of(0x01, 0x01),
+    );
+    const machine = new CardanoV7Tx('7.2.1');
+    await machine.stage(0x01, 0, init, ctx());
+    await machine.stage(0x02, 0, concatBytes(txHash, u32(0)), ctx());
+    await machine.stage(0x03, 0x30, basic, ctx());
+    await machine.stage(0x03, 0x33, new Uint8Array(), ctx());
+    await machine.stage(0x04, 0, u64(170_000n), ctx());
+    await machine.stage(0x05, 0, u64(1_000n), ctx());
+    await machine.stage(0x06, 0, Uint8Array.of(3), ctx());
+    await machine.stage(0x06, 0x30, concatBytes(u32(1), u32(1)), ctx());
+    await machine.stage(0x06, 0x31, concatBytes(Uint8Array.of(2), poolId), ctx());
+    await machine.stage(0x06, 0x32, vrf, ctx());
+    await machine.stage(0x06, 0x33, concatBytes(u64(1_000_000n), u64(340_000_000n), u64(1n), u64(10n)), ctx());
+    await machine.stage(0x06, 0x34, concatBytes(Uint8Array.of(2), reward), ctx());
+    await machine.stage(0x06, 0x35, concatBytes(Uint8Array.of(2), owner), ctx());
+    await machine.stage(
+      0x06,
+      0x36,
+      concatBytes(Uint8Array.of(0), Uint8Array.of(0x02), Uint8Array.of(0x0b, 0xb9), Uint8Array.of(0x02), Uint8Array.of(1, 2, 3, 4), Uint8Array.of(0x01)),
+      ctx(),
+    );
+    await machine.stage(0x06, 0x37, concatBytes(Uint8Array.of(0x02), metaHash, url), ctx());
+    await machine.stage(0x06, 0x38, new Uint8Array(), ctx());
+    await machine.stage(
+      0x13,
+      0,
+      concatBytes(Uint8Array.of(0), voter, govTx, u32(3), Uint8Array.of(1), Uint8Array.of(0x01)),
+      ctx(),
+    );
+    const built = machine.body();
+    expect(built).not.toBeNull();
+    const input = concatBytes(cborMajor(4, 2n), cborBytes(txHash), cborUnsigned(0n));
+    const output = concatBytes(cborMajor(4, 2n), cborBytes(address), cborUnsigned(1_000_000n));
+    const relay = concatBytes(
+      cborMajor(4, 4n),
+      cborUnsigned(0n),
+      cborUnsigned(3001n),
+      cborBytes(Uint8Array.of(1, 2, 3, 4)),
+      Uint8Array.of(0xf6),
+    );
+    const metadata = concatBytes(
+      cborMajor(4, 2n),
+      concatBytes(cborMajor(3, BigInt(url.length)), url),
+      cborBytes(metaHash),
+    );
+    const poolCbor = concatBytes(
+      cborMajor(4, 10n),
+      cborUnsigned(3n),
+      cborBytes(poolId),
+      cborBytes(vrf),
+      cborUnsigned(1_000_000n),
+      cborUnsigned(340_000_000n),
+      concatBytes(cborMajor(6, 30n), cborMajor(4, 2n), cborUnsigned(1n), cborUnsigned(10n)),
+      cborBytes(reward),
+      concatBytes(cborMajor(6, 258n), cborMajor(4, 1n), cborBytes(owner)),
+      concatBytes(cborMajor(4, 1n), relay),
+      metadata,
+    );
+    const body = concatBytes(
+      cborMajor(5, 7n),
+      cborUnsigned(0n),
+      cborMajor(6, 258n),
+      cborMajor(4, 1n),
+      input,
+      cborUnsigned(1n),
+      cborMajor(4, 1n),
+      output,
+      cborUnsigned(2n),
+      cborUnsigned(170_000n),
+      cborUnsigned(3n),
+      cborUnsigned(1_000n),
+      cborUnsigned(4n),
+      cborMajor(6, 258n),
+      cborMajor(4, 1n),
+      poolCbor,
+      cborUnsigned(15n),
+      cborUnsigned(1n),
+      cborUnsigned(19n),
+      cborMajor(5, 1n),
+      cborMajor(4, 2n),
+      cborUnsigned(0n),
+      cborBytes(voter),
+      cborMajor(5, 1n),
+      cborMajor(4, 2n),
+      cborBytes(govTx),
+      cborUnsigned(3n),
+      cborMajor(4, 2n),
+      cborUnsigned(1n),
+      Uint8Array.of(0xf6),
+    );
+    expect(Array.from(built ?? new Uint8Array())).toEqual(Array.from(body));
+    expect(Array.from(blake2b(built!, { dkLen: 32 }))).not.toEqual(
+      Array.from(blake2b(concatBytes(init, txHash), { dkLen: 32 })),
+    );
+  });
+
+  it('returns 96 bytes on v7 CIP-36 confirm and signs the canonical body', async () => {
+    const txHash = new Uint8Array(32).fill(0x11);
+    const address = concatBytes(Uint8Array.of(0x61), new Uint8Array(28).fill(0x22));
+    const voteKey = new Uint8Array(32).fill(0x42);
+    const stake = [0x8000073c, 0x80000717, 0x80000000, 2, 0];
+    const init = concatBytes(
+      u64(1n),
+      Uint8Array.of(1),
+      u32(764824073),
+      Uint8Array.of(0x02, 0x02, 0x01, 0x01, 0x01, 0x02, 0x01, 0x01, 0x01, 0x01),
+      Uint8Array.of(7),
+      u32(1),
+      u32(1),
+      u32(0),
+      u32(0),
+      u32(0),
+      u32(0),
+      u32(0),
+      u32(0),
+      u32(1),
+    );
+    const basic = concatBytes(
+      Uint8Array.of(0, 1),
+      u32(address.length),
+      address,
+      u64(1_000_000n),
+      u32(0),
+      Uint8Array.of(0x01, 0x01),
+    );
+    setLedgerVersionPicks({ cardano: '7.2.1' });
+    try {
+      const nanoX = LEDGER_MODELS.find((model) => model.id === 'nano-x')!;
+      const device = new LedgerProtocolHandler({
+        model: nanoX,
+        confirmation: ctx().confirmation,
+        slotId: 'slot',
+        entropy: ctx().entropy,
+      });
+      device.setApp('cardano');
+      const send = (data: Uint8Array, p1: number, p2 = 0) =>
+        roundTrip(device, Uint8Array.from([0xd7, 0x21, p1, p2, data.length, ...data]));
+      expect((await send(init, 0x01)).slice(-2)).toEqual(Uint8Array.of(0x90, 0x00));
+      expect((await send(Uint8Array.of(1), 0x08, 0x00)).slice(-2)).toEqual(Uint8Array.of(0x90, 0x00));
+      expect((await send(concatBytes(Uint8Array.of(2), u32(0)), 0x08, 0x36)).slice(-2)).toEqual(Uint8Array.of(0x90, 0x00));
+      expect((await send(concatBytes(Uint8Array.of(1), voteKey), 0x08, 0x30)).slice(-2)).toEqual(Uint8Array.of(0x90, 0x00));
+      expect((await send(path(stake), 0x08, 0x31)).slice(-2)).toEqual(Uint8Array.of(0x90, 0x00));
+      expect((await send(concatBytes(Uint8Array.of(1), u32(address.length), address), 0x08, 0x32)).slice(-2)).toEqual(
+        Uint8Array.of(0x90, 0x00),
+      );
+      expect((await send(u64(123n), 0x08, 0x33)).slice(-2)).toEqual(Uint8Array.of(0x90, 0x00));
+      expect((await send(concatBytes(Uint8Array.of(0x02), u64(0n)), 0x08, 0x35)).slice(-2)).toEqual(
+        Uint8Array.of(0x90, 0x00),
+      );
+      const aux = await send(new Uint8Array(), 0x08, 0x34);
+      expect((aux[aux.length - 2]! << 8) | aux[aux.length - 1]!).toBe(SW_OK);
+      expect(aux.length).toBe(98);
+      expect((await send(concatBytes(txHash, u32(0)), 0x02)).slice(-2)).toEqual(Uint8Array.of(0x90, 0x00));
+      expect((await send(basic, 0x03, 0x30)).slice(-2)).toEqual(Uint8Array.of(0x90, 0x00));
+      expect((await send(new Uint8Array(), 0x03, 0x33)).slice(-2)).toEqual(Uint8Array.of(0x90, 0x00));
+      expect((await send(u64(170_000n), 0x04)).slice(-2)).toEqual(Uint8Array.of(0x90, 0x00));
+      expect((await send(u64(1_000n), 0x05)).slice(-2)).toEqual(Uint8Array.of(0x90, 0x00));
+      const confirmed = await send(new Uint8Array(), 0x0a);
+      expect((confirmed[confirmed.length - 2]! << 8) | confirmed[confirmed.length - 1]!).toBe(SW_OK);
+      const hash = confirmed.slice(0, 32);
+      const witness = await send(path([0x8000073c, 0x80000717, 0x80000000, 0, 0]), 0x0f);
+      const node = deriveIcarus(ctx().entropy, "m/1852'/1815'/0'/0/0");
+      expect(ed25519.verify(witness.slice(0, 64), hash, node.publicKey)).toBe(true);
+      expect(ed25519.verify(witness.slice(0, 64), blake2b(aux.slice(0, 32), { dkLen: 32 }), node.publicKey)).toBe(false);
+    } finally {
+      resetLedgerVersionPicks();
+    }
   });
 });

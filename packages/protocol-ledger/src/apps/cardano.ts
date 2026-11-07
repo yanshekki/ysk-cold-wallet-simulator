@@ -19,8 +19,9 @@ import { deriveIcarus, deriveIcarusFromRoot, signIcarus } from './icarus';
 import { handleCardanoDeriveAddress } from './cardanoAddress';
 import { handleCardanoNativeScript } from './cardanoNativeScript';
 import { handleCardanoSignMsg } from './cardanoSignMsg';
-import { cardanoCanonicalTxHash } from './cardanoTxHash';
+import { cardanoCanonicalTxHash, parseCardanoTxInit } from './cardanoTxHash';
 import { CardanoV7Tx } from './cardanoTxV7';
+import { finalizeCip36, parseV8Cip36Delegation, parseV8Cip36Init } from './cardanoAux';
 
 export type CardanoSession = FamilySession;
 
@@ -111,6 +112,10 @@ const V8_WITNESS = 0x0f;
 const V8_INIT = 0x10;
 const V8_CHUNK = 0x11;
 const V8_CONFIRM = 0x12;
+const V8_AUX = 0x13;
+const V8_AUX_INIT = 0x36;
+const V8_AUX_DELEGATION = 0x37;
+const SW_CVOTE_AUX_PARSE = 0x6b50;
 
 const V7_INIT = 0x01;
 const V7_CONFIRM = 0x0a;
@@ -208,7 +213,7 @@ async function signTransactionV8(
     if (!tx.init || tx.body.length === 0) {
       return encodeResponse(new Uint8Array(), SW_WRONG_LENGTH);
     }
-    const hash = await cardanoCanonicalTxHash(tx.init, tx.body, ctx);
+    const hash = await cardanoCanonicalTxHash(tx.init, tx.body, ctx, tx.auxHash);
     if (!hash) {
       return encodeResponse(new Uint8Array(), SW_TX_BODY);
     }
@@ -222,12 +227,84 @@ async function signTransactionV8(
   if (apdu.p1 === V8_WITNESS) {
     return signWitness(apdu, ctx, session, 'v8');
   }
-  // P1 0x13 is the CIP-36 auxiliary sub-flow. The last APDU is 96 bytes.
-  // That parser is not implemented; do not answer it with a witness signature.
-  if (apdu.p1 === 0x13) {
-    return encodeResponse(new Uint8Array(), SW_INS_NOT_SUPPORTED);
+  if (apdu.p1 === V8_AUX) {
+    return signTxAuxV8(apdu, ctx, session);
   }
   return encodeResponse(new Uint8Array(), SW_WRONG_P1P2);
+}
+
+async function signTxAuxV8(
+  apdu: Apdu,
+  ctx: FamilyContext,
+  session: CardanoSession,
+): Promise<Uint8Array> {
+  const tx = session.cardanoTx;
+  if (!tx || tx.protocol !== 'v8' || !tx.init || tx.hash || tx.body.length > 0) {
+    return encodeResponse(new Uint8Array(), SW_NOT_ALLOWED);
+  }
+  const header = parseCardanoTxInit(tx.init);
+  if (!header || header.aux?.type !== 1) {
+    return encodeResponse(new Uint8Array(), SW_NOT_ALLOWED);
+  }
+  if (tx.auxHash) {
+    return encodeResponse(new Uint8Array(), SW_NOT_ALLOWED);
+  }
+  if (apdu.p2 === V8_AUX_INIT) {
+    if (tx.cip36) {
+      return encodeResponse(new Uint8Array(), SW_NOT_ALLOWED);
+    }
+    const parsed = await parseV8Cip36Init(apdu.data, ctx);
+    if (!parsed) {
+      return encodeResponse(new Uint8Array(), SW_CVOTE_AUX_PARSE);
+    }
+    tx.cip36 = parsed;
+    if (parsed.remaining > 0) {
+      return emptyOk();
+    }
+    return finishCip36(ctx, tx);
+  }
+  if (apdu.p2 === V8_AUX_DELEGATION) {
+    const open = tx.cip36;
+    if (!open || open.remaining < 1) {
+      return encodeResponse(new Uint8Array(), SW_NOT_ALLOWED);
+    }
+    const delegation = await parseV8Cip36Delegation(apdu.data, ctx);
+    if (!delegation) {
+      return encodeResponse(new Uint8Array(), SW_CVOTE_AUX_PARSE);
+    }
+    open.delegations.push(delegation);
+    open.remaining -= 1;
+    if (open.remaining > 0) {
+      return emptyOk();
+    }
+    return finishCip36(ctx, tx);
+  }
+  return encodeResponse(new Uint8Array(), SW_WRONG_P1P2);
+}
+
+async function finishCip36(ctx: FamilyContext, tx: CardanoTxWire): Promise<Uint8Array> {
+  const open = tx.cip36;
+  if (!open) {
+    return encodeResponse(new Uint8Array(), SW_CVOTE_AUX_PARSE);
+  }
+  const ok = await confirm(ctx, {
+    kind: 'sign',
+    title: 'Sign Cardano CIP-36',
+    path: open.stakingPath,
+    message: `Sign Cardano CIP-36 registration\n${open.stakingPath}`,
+    rawPayload: open.payment,
+  });
+  if (!ok) {
+    tx.cip36 = undefined;
+    return encodeResponse(new Uint8Array(), SW_DENY);
+  }
+  const result = await finalizeCip36(open, ctx);
+  tx.cip36 = undefined;
+  if (!result) {
+    return encodeResponse(new Uint8Array(), SW_CVOTE_AUX_PARSE);
+  }
+  tx.auxHash = result.hash;
+  return encodeResponse(concatBytes(result.hash, result.signature), SW_OK);
 }
 
 async function signTransactionV7(
@@ -235,9 +312,6 @@ async function signTransactionV7(
   ctx: FamilyContext,
   session: CardanoSession,
 ): Promise<Uint8Array> {
-  if (apdu.p1 === P1_AUX_STAGE && apdu.p2 === V7_AUX_CONFIRM_P2) {
-    return encodeResponse(new Uint8Array(), SW_INS_NOT_SUPPORTED);
-  }
   if (apdu.p1 === V7_INIT) {
     const tx: CardanoTxWire = { protocol: 'v7', body: new Uint8Array(), v7Open: true };
     const machine = new CardanoV7Tx(catalogVersion('cardano', '7.2.1'));
@@ -265,6 +339,22 @@ async function signTransactionV7(
   }
   if (apdu.p1 === V7_WITNESS) {
     return signWitness(apdu, ctx, session, 'v7');
+  }
+  if (apdu.p1 === P1_AUX_STAGE && apdu.p2 === V7_AUX_CONFIRM_P2) {
+    await machine.stage(apdu.p1, apdu.p2, apdu.data, ctx);
+    const pending = machine.cip36Pending();
+    if (!pending) return encodeResponse(new Uint8Array(), SW_TX_BODY);
+    const ok = await confirm(ctx, {
+      kind: 'sign',
+      title: 'Sign Cardano CIP-36',
+      path: pending.stakingPath,
+      message: `Sign Cardano CIP-36 registration\n${pending.stakingPath}`,
+      rawPayload: pending.payment,
+    });
+    if (!ok) return encodeResponse(new Uint8Array(), SW_DENY);
+    const result = await machine.finalizeCip36(ctx);
+    if (!result) return encodeResponse(new Uint8Array(), SW_TX_BODY);
+    return encodeResponse(concatBytes(result.hash, result.signature), SW_OK);
   }
   await machine.stage(apdu.p1, apdu.p2, apdu.data, ctx);
   return emptyOk();

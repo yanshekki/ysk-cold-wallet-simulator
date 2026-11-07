@@ -293,8 +293,12 @@ async function icarusNode(ctx: FamilyContext, path: string) {
     : deriveIcarus(ctx.entropy, resolved, undefined, ctx.backup);
 }
 
+export async function icarusPublicKey(ctx: FamilyContext, path: string): Promise<Uint8Array> {
+  return (await icarusNode(ctx, path)).publicKey;
+}
+
 async function hashPath(ctx: FamilyContext, path: string): Promise<Uint8Array> {
-  return blake2b((await icarusNode(ctx, path)).publicKey, { dkLen: 28 });
+  return blake2b(await icarusPublicKey(ctx, path), { dkLen: 28 });
 }
 
 function cborHead(major: number, value: number): Uint8Array {

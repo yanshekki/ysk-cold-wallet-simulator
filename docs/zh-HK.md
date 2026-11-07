@@ -1,6 +1,6 @@
 # YSK Cold Wallet Simulator
 
-**版本 1.1.4（組建編號 10）** · [YSK Limited](https://ysk.hk) · [產品頁](https://ysk.hk/products/ysk-cold-wallet-simulator)
+**版本 1.1.5（組建編號 11）** · [YSK Limited](https://ysk.hk) · [產品頁](https://ysk.hk/products/ysk-cold-wallet-simulator)
 
 手機套件識別碼 `hk.ysk.cws` · CWS Proxy 套件識別碼 `hk.ysk.cws.proxy`
 
@@ -22,7 +22,7 @@ CWS 是模擬器。它不是安全元件。Ledger、Trezor 及 OneKey 均未認�
 
 ## 下載
 
-版本 1.1.4（組建編號 10），保留 1.1.3 的基線，移除複製助記詞與複製份額按鈕，並顯示代理程式用來鎖定電話的藍牙裝置識別。那些複製控制不會把還原資料寫入剪貼簿。種子並非絕對安全。
+版本 1.1.5（組建編號 11），保留 1.1.4 的基線，並補上 Cardano CIP-36 輔助登記、權益池登記憑證與投票程序，使 `SIGN_TX` 對那些主機送出的規範主體做雜湊。種子並非絕對安全。
 
 [GitHub Release v1.1.0](https://github.com/yanshekki/ysk-cold-wallet-simulator/releases/tag/v1.1.0) 是唯一的標籤。該頁只有說明，沒有附上 APK、IPA 或桌面安裝包。其後的說明同樣沒有附上二進位檔。見 [releases/README.md](releases/README.md)。
 
@@ -37,7 +37,7 @@ CWS 是模擬器。它不是安全元件。Ledger、Trezor 及 OneKey 均未認�
 
 虛擬 HID 在 Linux（`/dev/uhid`，包括 Ubuntu 安裝包）及 macOS 的 CWS Proxy 應用程式實現。Windows 沒有虛擬 HID。
 
-產品版本 **1.1.4** 與組建編號 **10** 來自 `apps/mobile/app.json` 的 `version`、`versionCode` 及 `buildNumber`。Expo prebuild 會寫入 Android 的 `versionName`／`versionCode`，以及 iOS 的 `CFBundleShortVersionString`／`CFBundleVersion`。隨應用程式發行的工作區套件版本同為 `1.1.4`。macOS 代理程式的行銷版本與組建編號相同。
+產品版本 **1.1.5** 與組建編號 **11** 來自 `apps/mobile/app.json` 的 `version`、`versionCode` 及 `buildNumber`。Expo prebuild 會寫入 Android 的 `versionName`／`versionCode`，以及 iOS 的 `CFBundleShortVersionString`／`CFBundleVersion`。隨應用程式發行的工作區套件版本同為 `1.1.5`。macOS 代理程式的行銷版本與組建編號相同。
 
 ## 快速開始
 
@@ -184,7 +184,7 @@ OneKey Mini 沒有藍牙，本軟件不予模擬。
 
 秘密資料以 `WHEN_UNLOCKED_THIS_DEVICE_ONLY` 儲存。正式組建另設定 `requireAuthentication`。助記詞不會寫入剪貼簿。助記詞與份額畫面沒有複製按鈕。匯入只在確認貼上之後才讀取剪貼簿。正式組建在顯示、匯入、儲存、簽署及匯出種子之前，會要求作業系統認證。Android 正式組建在秘密畫面設定 `FLAG_SECURE`。這些略過只在 `__DEV__` 為真時存在。
 
-這不是硬體錢包級安全。熱錢包基線是朝向 Phantom、Rabby 及 MetaMask 手機版的進度。它不是安全元件。1.1.4 仍保留的相容選擇：
+這不是硬體錢包級安全。熱錢包基線是朝向 Phantom、Rabby 及 MetaMask 手機版的進度。它不是安全元件。1.1.5 仍保留的相容選擇：
 
 - WebHID 轉送報告時沒有指令允許清單。
 - 本機 trezord 橋接器聽 `127.0.0.1`，並反映請求的 `Origin`。
@@ -206,6 +206,7 @@ OneKey Mini 沒有藍牙，本軟件不予模擬。
 | [security.md](security.md) | 公開保安說明 |
 | [testing.md](testing.md) | 測過甚麼、沒有測過甚麼 |
 | [releases/README.md](releases/README.md) | 發行說明索引 |
+| [releases/1.1.5.md](releases/1.1.5.md) | 1.1.5（組建編號 11）的雙語發行說明 |
 | [releases/1.1.4.md](releases/1.1.4.md) | 1.1.4（組建編號 10）的雙語發行說明 |
 | [releases/1.1.3.md](releases/1.1.3.md) | 1.1.3（組建編號 9）的雙語發行說明 |
 | [releases/1.1.2.md](releases/1.1.2.md) | 1.1.2（組建編號 8）的雙語發行說明 |

@@ -1,7 +1,7 @@
 # YSK Cold Wallet Simulator — Architecture Document
 
 **Project:** `ysk-cold-wallet-simulator`  
-**Product:** YSK Cold Wallet Simulator (CWS), version 1.1.4 (build 10)  
+**Product:** YSK Cold Wallet Simulator (CWS), version 1.1.5 (build 11)  
 **Publisher:** YSK Limited  
 **Product page:** https://ysk.hk/products/ysk-cold-wallet-simulator  
 **Layout:** Expo TypeScript monorepo  
@@ -276,5 +276,5 @@ The security statement for readers is `docs/security.md`. In short: seeds are no
 
 ---
 
-**Document version:** 1.1.4 (build 10)  
+**Document version:** 1.1.5 (build 11)  
 **Date:** 2026-10-31
