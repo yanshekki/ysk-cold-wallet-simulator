@@ -49,6 +49,17 @@ export type SuiBlocksSession = {
  * upload. It is not the canonical CBOR transaction. v7 keeps its stage machine
  * outside this type and stores only the resulting hash.
  */
+export type CardanoCip36Wire = {
+  remaining: number;
+  format: 1 | 2;
+  stakingPath: string;
+  payment: Uint8Array;
+  nonce: bigint;
+  votingPurpose?: bigint;
+  voteKey?: Uint8Array;
+  delegations: { voteKey: Uint8Array; weight: number }[];
+};
+
 export type CardanoTxWire = {
   protocol: 'v7' | 'v8';
   body: Uint8Array;
@@ -56,6 +67,9 @@ export type CardanoTxWire = {
   init?: Uint8Array;
   /** True after v7 INIT until CONFIRM. Later 0x10 is a new v8 INIT. */
   v7Open?: boolean;
+  /** CIP-36 auxiliary hash, body field 7. Set after the last P1 `13` APDU. */
+  auxHash?: Uint8Array;
+  cip36?: CardanoCip36Wire;
   hash?: Uint8Array;
 };
 

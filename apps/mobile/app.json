@@ -2,7 +2,7 @@
   "expo": {
     "name": "CWS",
     "slug": "ysk-cold-wallet-simulator",
-    "version": "1.1.4",
+    "version": "1.1.5",
     "orientation": "portrait",
     "scheme": "cws",
     "userInterfaceStyle": "dark",
@@ -57,7 +57,7 @@
     ],
     "android": {
       "package": "hk.ysk.cws",
-      "versionCode": 10,
+      "versionCode": 11,
       "label": "CWS",
       "allowBackup": false,
       "softwareKeyboardLayoutMode": "resize",
@@ -99,7 +99,7 @@
     },
     "ios": {
       "bundleIdentifier": "hk.ysk.cws",
-      "buildNumber": "10",
+      "buildNumber": "11",
       "appleTeamId": "K897VVZW77",
       "infoPlist": {
         "CFBundleDisplayName": "CWS",

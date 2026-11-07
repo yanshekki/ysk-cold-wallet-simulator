@@ -1,8 +1,10 @@
 # Ledger APDU wire matrix
 
-Maintainer contract for CWS 1.1.4 (build 10). Status words are MATCH, FIXED, and KEEP. A KEEP is not a silent success, and a MATCH row is not a claim that a seed is safe. Seeds are not absolutely safe. The phase notes below are the research log for how this matrix was built.
+Maintainer contract for CWS 1.1.5 (build 11). Status words are MATCH, FIXED, and KEEP. A KEEP is not a silent success, and a MATCH row is not a claim that a seed is safe. Seeds are not absolutely safe. The phase notes below are the research log for how this matrix was built.
 
-**Phase 2 item 2 (KEEP re-diff follow-up):** Tron/XRP/Stellar/Cosmos/Polkadot/TON/Aptos handlers re-diffed against official firmware/hw-app; MATCH/FIXED only with citations + `family.test.ts` KEEP re-diff cases. Cardano operational certificate, CIP-36 vote, native script hash, Shelley and Byron `DERIVE_ADDRESS`, and CIP-8 Shelley address fields are MATCH. Solana `numPaths` must be 1 (`6A80` otherwise) and INS `20` returns a 4-byte challenge. Stellar `GET_CONF` appends `maxDataSize`. CIP-36 auxiliary registration stays KEEP. The canonical transaction hash is FIXED for v8 and for v7 app 2.2 through 7.2.1. Solana trusted-name INS `21`/`22`, Bitcoin policy HMAC, and Ethereum clear-sign stay KEEP.
+**Weekly parity 1.1.5 (build 11):** Cardano CIP-36 auxiliary registration, pool-registration certificates (type 3), and voting procedures (field 19) are FIXED. Sources: LedgerHQ/app-cardano `src/cvote/aux_data_hash_builder.c`, `src/transaction/tx_hash_builder.c`, `src/cvote/cvote_parser.c`, `src/transaction/tx_parse.c` (develop), and `@cardano-foundation/ledgerjs-hw-app-cardano` v7/v8 serializers. Incomplete wires still fail closed. App versions before 2.2 stay `6A80`. TON cell-hash, Solana INS `21`/`22`, Bitcoin policy HMAC, and Ethereum clear-sign stay KEEP.
+
+**Phase 2 item 2 (KEEP re-diff follow-up):** Tron/XRP/Stellar/Cosmos/Polkadot/TON/Aptos handlers re-diffed against official firmware/hw-app; MATCH/FIXED only with citations + `family.test.ts` KEEP re-diff cases. Cardano operational certificate, CIP-36 vote, native script hash, Shelley and Byron `DERIVE_ADDRESS`, and CIP-8 Shelley address fields are MATCH. Solana `numPaths` must be 1 (`6A80` otherwise) and INS `20` returns a 4-byte challenge. Stellar `GET_CONF` appends `maxDataSize`. The canonical transaction hash is FIXED for v8 and for v7 app 2.2 through 7.2.1, including CIP-36 auxiliary, pool registration, and voting. Solana trusted-name INS `21`/`22`, Bitcoin policy HMAC, and Ethereum clear-sign stay KEEP.
 
 **Phase 2 family map (follow-up to #49):** catalog/`inferLedgerFamily` remaps ethereum CHAIN, bitcoin-like, cosmos-like, polkadot-like, and `ethereum-plugin` names so Open App is not `unknown`. Remapped rows are **not** new wire MATCH/FIXED — only family routing changed.
 
@@ -79,11 +81,11 @@ Source: app-cardano APDU reference and `V8TxP1` in the v8 command builder.
 | `11` | CHUNK (non-final raw body) | 0 | no | FIXED |
 | `12` | CONFIRM (final raw body) | 32 | yes, transaction review | FIXED |
 | `0F` | SIGN_WITNESS (one BIP32 path) | 64 | yes, that witness | FIXED |
-| `13` | CIP-36 auxiliary | host wants 0, or 96 on the last delegation | — | KEEP. `aux_data_hash_builder` is not built. Hashing the uploaded bytes would not match the auxiliary hash |
+| `13` | CIP-36 auxiliary | host wants 0, or 96 on the last delegation | last APDU opens the CIP-36 sheet | FIXED. P2 `36` init / `37` delegation. Zero remaining returns `auxHash ‖ sig`. Remaining > 0 is empty `9000`. No INIT or a second init is `6980`. A parse fail is `6B50` |
 
 `0A` is not a v8 stage. It returns `6A86` and an empty body.
 
-FIXED. v8 `SIGN_TX` confirm returns blake2b-256 of the canonical transaction body, and the witness signs that digest. The encoding follows Ledger `src/transaction/tx_hash_builder.c`: a definite CBOR map, tag 258 on sets when the host sets the option, body fields only. The concatenated APDU payload is not the hash. An arbitrary auxiliary hash is body field 7. CIP-36 registration (aux type 1), pool-registration certificates, and voting procedures still return `6A80` instead of a digest. Tests: `cardanoTxHash.test.ts`.
+FIXED. v8 `SIGN_TX` confirm returns blake2b-256 of the canonical transaction body, and the witness signs that digest. The encoding follows Ledger `src/transaction/tx_hash_builder.c`: a definite CBOR map, tag 258 on sets when the host sets the option, body fields only. The concatenated APDU payload is not the hash. An arbitrary auxiliary hash is body field 7. CIP-36 registration (aux type 1) uses `aux_data_hash_builder.c` (signed digest is blake2b-256 of `Map(1){61284: payload}`). Pool-registration certificates are Conway `Array(10)` type 3. Voting procedures are field 19. Incomplete CIP-36, pool, or voting still returns `6A80`. Tests: `cardanoTxHash.test.ts`, `cardanoAux.test.ts`.
 
 ### 7.x (including a pick of 7.2.1; major ≤ 7)
 
@@ -99,9 +101,9 @@ Source: `src/interactions/v7/signTx.ts`. Every stage below returns an empty body
 | `13`, `15`, `16` | voting procedures, treasury, donation | 0 | no | FIXED |
 | `0A` | CONFIRM | 32 | yes, transaction review | FIXED for 2.2 through 7.2.1 |
 | `0F` | WITNESS | 64 | yes, that witness | FIXED |
-| `08` with P2 `34` | CIP-36 registration confirm | host wants 96 | — | KEEP, `6D00`. Same auxiliary-hash blocker as v8 P1 `13` |
+| `08` with P2 `34` | CIP-36 registration confirm | host wants 96 | yes, CIP-36 registration | FIXED. Same `aux_data_hash_builder.c` CBOR as v8 P1 `13`. P2 `36` init / `37` delegation / `30`–`35` staged fields |
 
-FIXED for app 2.2 through 7.2.1. Each stage is parsed with the layout from `@cardano-foundation/ledgerjs-hw-app-cardano` `src/interactions/v7/signTx.ts` and `src/validation/deviceCapabilities.ts` (2.2 Mary, 3.0 mint, 4.0 Alonzo, 5.0 Babbage, 7.0 Conway). Confirm returns blake2b-256 of that canonical body. Minswap speaks 7.2.1, including when the catalog still says 8.x and the first APDU is P1 `01`. A concatenated stage payload is not the hash. CIP-36 registration, pool registration, and voting procedures still return `6A80` or `6D00`. Tests: `cardanoTxV7.test.ts`. Versions before 2.2 stay `6A80`.
+FIXED for app 2.2 through 7.2.1. Each stage is parsed with the layout from `@cardano-foundation/ledgerjs-hw-app-cardano` `src/interactions/v7/signTx.ts` and `src/validation/deviceCapabilities.ts` (2.2 Mary, 3.0 mint, 4.0 Alonzo, 5.0 Babbage, 7.0 Conway). Confirm returns blake2b-256 of that canonical body. Minswap speaks 7.2.1, including when the catalog still says 8.x and the first APDU is P1 `01`. A concatenated stage payload is not the hash. CIP-36 registration, pool registration, and voting procedures are FIXED. Tests: `cardanoTxV7.test.ts`. Versions before 2.2 stay `6A80`.
 
 ### Cardano commands that are not the Minswap send path
 
@@ -233,7 +235,7 @@ See also [ledger-apdu-plan.md](./ledger-apdu-plan.md) for the catalog matrix and
 
 Ledger rows that stay KEEP, and why:
 
-- Cardano CIP-36 auxiliary registration. `aux_data_hash_builder` is not built. The transaction-body hash is FIXED.
+- Cardano app versions before 2.2. They stay `6A80`. CIP-36 auxiliary, pool registration, and voting on 2.2 through 8.x are FIXED.
 - Solana INS `21` / `22`. The trusted-name check is PKI. INS `20` and a path count of 1 are MATCH.
 - Bitcoin wallet HMAC. The sheet says a zero HMAC was not checked. That label is host-unproven. The key is `CWS/ledger-wallet-hmac`, not the app-bitcoin policy key. CLA `F8` INS `01` has an unarmed hold-forward test.
 - Ethereum INS `22` / `32` / `36` / `38` / `3A`. They stay `6D00`. The domain TLV is CAL-signed.

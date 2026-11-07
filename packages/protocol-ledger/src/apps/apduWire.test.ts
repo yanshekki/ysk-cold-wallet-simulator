@@ -192,13 +192,13 @@ describe('Cardano SIGN_TX body lengths follow the reported app version', () => {
     }
   });
 
-  it('v7 CIP-36 aux confirm is not a 64-byte witness', async () => {
+  it('v7 CIP-36 aux confirm without INIT is not a 64-byte witness', async () => {
     setLedgerVersionPicks({ cardano: '7.2.1' });
     try {
       const { device } = handler();
       device.setApp('cardano');
       const reply = await exchange(device, apdu([0xd7, 0x21, 0x08, 0x34, 0x00]));
-      expect(statusOf(reply)).toBe(SW_INS_NOT_SUPPORTED);
+      expect(statusOf(reply)).toBe(SW_WRONG_P1P2);
       expect(bodyOf(reply).length).toBe(0);
     } finally {
       resetLedgerVersionPicks();
@@ -289,7 +289,9 @@ describe('Cardano SIGN_TX body lengths follow the reported app version', () => {
     expect(bodyOf(denied).length).toBe(0);
     expect(confirms()).toBe(1);
     const aux = await exchange(device, apdu([0xd7, 0x21, 0x13, 0x36, 0x00]));
-    expect(statusOf(aux)).toBe(SW_INS_NOT_SUPPORTED);
+    expect(statusOf(aux)).toBe(0x6980);
+    const unknown = await exchange(device, apdu([0xd7, 0x15, 0x00, 0x00, 0x00]));
+    expect(statusOf(unknown)).toBe(SW_INS_NOT_SUPPORTED);
   });
 
   it('an unparsed v8 confirm returns 6A80 and does not open the sheet', async () => {

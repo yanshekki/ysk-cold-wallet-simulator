@@ -16,9 +16,10 @@ import {
  * `serializeTxInitData` + `serializeTransactionRaw`. The witness signs this
  * digest, not the concatenated APDU payload.
  *
- * CIP-36 registration (aux type 1) is not hashed here. An arbitrary auxiliary
- * hash (type 0) is field 7 of the body. Pool-registration certificates and
- * voting procedures fail closed instead of producing a digest.
+ * An arbitrary auxiliary hash (type 0) is field 7. CIP-36 registration (type 1)
+ * uses the hash from `aux_data_hash_builder.c`, passed in as `auxHash`. Pool
+ * registration (certificate type 3) and voting procedures (field 19) follow
+ * the same hash builder. Unknown certificate types still fail closed.
  */
 
 const INCLUDED_NO = 0x01;
@@ -41,6 +42,20 @@ const HASH32 = 32;
 const POLICY = 28;
 const TAG_SET = 258;
 const TAG_EMBEDDED = 24;
+const TAG_UNIT_INTERVAL = 30;
+const LOVELACE_MAX_SUPPLY = 45_000_000_000_000_000n;
+const MARGIN_DENOMINATOR_MAX = 1_000_000_000_000_000n;
+const RELAY_IP = 0;
+const RELAY_NAME = 1;
+const RELAY_MULTI = 2;
+const VOTER_COMMITTEE_KEY = 0;
+const VOTER_COMMITTEE_SCRIPT = 1;
+const VOTER_DREP_KEY = 2;
+const VOTER_DREP_SCRIPT = 3;
+const VOTER_POOL_KEY = 4;
+const VOTER_COMMITTEE_PATH = 100;
+const VOTER_DREP_PATH = 102;
+const VOTER_POOL_PATH = 104;
 
 export type CardanoTxInit = {
   tagCborSets: boolean;
@@ -187,6 +202,15 @@ export function cborType(major: number, value: bigint): Uint8Array {
 
 export function cborBytes(data: Uint8Array): Uint8Array {
   return concatBytes(cborType(2, BigInt(data.length)), data);
+}
+
+export function cborText(text: string | Uint8Array): Uint8Array {
+  const bytes = typeof text === 'string' ? new TextEncoder().encode(text) : text;
+  return concatBytes(cborType(3, BigInt(bytes.length)), bytes);
+}
+
+export function cborNull(): Uint8Array {
+  return Uint8Array.of(0xf6);
 }
 
 /**
@@ -439,7 +463,7 @@ async function finishOutput(inner: Cursor, address: Uint8Array): Promise<Uint8Ar
     groups === 0
       ? cborUnsigned(amount)
       : concatBytes(cborType(4, 2n), cborUnsigned(amount), cborType(5, BigInt(groups)), tokens);
-  let datum = new Uint8Array();
+  let datum: Uint8Array = new Uint8Array();
   if (includeDatum) {
     const datumType = inner.u8();
     if (datumType === DATUM_HASH) {
@@ -471,7 +495,7 @@ async function finishOutput(inner: Cursor, address: Uint8Array): Promise<Uint8Ar
       return null;
     }
   }
-  let script = new Uint8Array();
+  let script: Uint8Array = new Uint8Array();
   if (includeScript) {
     if (format !== FORMAT_MAP) {
       return null;
@@ -511,7 +535,12 @@ function setPrefix(tagSets: boolean, count: number): Uint8Array {
     : cborType(4, BigInt(count));
 }
 
-async function readCertificate(cursor: Cursor, ctx: FamilyContext): Promise<Uint8Array | null> {
+async function readCertificate(
+  cursor: Cursor,
+  ctx: FamilyContext,
+  networkId: number,
+  tagSets: boolean,
+): Promise<Uint8Array | null> {
   const type = cursor.u8();
   if (type == null) {
     return null;
@@ -536,6 +565,9 @@ async function readCertificate(cursor: Cursor, ctx: FamilyContext): Promise<Uint
       cborBytes(pool),
     );
   }
+  if (type === 3) {
+    return readPoolRegistration(cursor, ctx, networkId, tagSets);
+  }
   if (type === 7 || type === 8) {
     const credential = await readCredential(cursor, ctx);
     const deposit = cursor.u64();
@@ -552,6 +584,290 @@ async function readCertificate(cursor: Cursor, ctx: FamilyContext): Promise<Uint
   return null;
 }
 
+function ipv6Cbor(stored: Uint8Array): Uint8Array {
+  const out = new Uint8Array(16);
+  for (let word = 0; word < 4; word += 1) {
+    const base = word * 4;
+    out[base] = stored[base + 3] ?? 0;
+    out[base + 1] = stored[base + 2] ?? 0;
+    out[base + 2] = stored[base + 1] ?? 0;
+    out[base + 3] = stored[base] ?? 0;
+  }
+  return out;
+}
+
+function optionalFlag(cursor: Cursor): { included: boolean } | null {
+  const value = cursor.flag();
+  if (value == null) {
+    return null;
+  }
+  return { included: value };
+}
+
+async function poolRewardAccount(
+  cursor: Cursor,
+  ctx: FamilyContext,
+  networkId: number,
+): Promise<Uint8Array | null> {
+  const kind = cursor.u8();
+  if (kind === CRED_KEY_HASH) {
+    return cursor.bytes(1 + HASH28);
+  }
+  if (kind === CRED_PATH) {
+    const path = readPath(cursor);
+    if (!path) {
+      return null;
+    }
+    const hash = await shelleyAddressBytes(ctx, {
+      type: 0x0e,
+      networkId,
+      stake: { kind: 'path', path, components: [] },
+    });
+    return hash;
+  }
+  return null;
+}
+
+async function readPoolRegistration(
+  cursor: Cursor,
+  ctx: FamilyContext,
+  networkId: number,
+  tagSets: boolean,
+): Promise<Uint8Array | null> {
+  const payloadLength = cursor.u16();
+  const payload = payloadLength == null ? null : cursor.bytes(payloadLength);
+  if (!payload) {
+    return null;
+  }
+  const inner = new Cursor(payload);
+  const poolId = await readCredential(inner, ctx);
+  const vrf = inner.bytes(HASH32);
+  const pledge = inner.u64();
+  const cost = inner.u64();
+  const marginN = inner.u64();
+  const marginD = inner.u64();
+  const reward = await poolRewardAccount(inner, ctx, networkId);
+  const ownersExpected = inner.u16();
+  const relaysExpected = inner.u16();
+  const hasMetadata = inner.flag();
+  if (
+    !poolId ||
+    poolId.type !== 0 ||
+    !vrf ||
+    pledge == null ||
+    cost == null ||
+    marginN == null ||
+    marginD == null ||
+    !reward ||
+    ownersExpected == null ||
+    relaysExpected == null ||
+    hasMetadata == null ||
+    pledge >= LOVELACE_MAX_SUPPLY ||
+    cost >= LOVELACE_MAX_SUPPLY ||
+    marginD === 0n ||
+    marginD > MARGIN_DENOMINATOR_MAX ||
+    marginN > MARGIN_DENOMINATOR_MAX ||
+    marginN > marginD
+  ) {
+    return null;
+  }
+  const owners: Uint8Array[] = [];
+  for (let index = 0; index < ownersExpected; index += 1) {
+    const owner = await readCredential(inner, ctx);
+    if (!owner || owner.type !== 0) {
+      return null;
+    }
+    owners.push(cborBytes(owner.hash));
+  }
+  const relays: Uint8Array[] = [];
+  for (let index = 0; index < relaysExpected; index += 1) {
+    const relay = readPoolRelay(inner);
+    if (!relay) {
+      return null;
+    }
+    relays.push(relay);
+  }
+  let metadata: Uint8Array;
+  if (hasMetadata) {
+    const urlLen = inner.u16();
+    const url = urlLen == null ? null : inner.bytes(urlLen);
+    const hash = inner.bytes(HASH32);
+    if (!url || !hash) {
+      return null;
+    }
+    metadata = concatBytes(cborType(4, 2n), cborText(url), cborBytes(hash));
+  } else {
+    metadata = cborNull();
+  }
+  if (inner.remaining() !== 0) {
+    return null;
+  }
+  return concatBytes(
+    cborType(4, 10n),
+    cborUnsigned(3n),
+    cborBytes(poolId.hash),
+    cborBytes(vrf),
+    cborUnsigned(pledge),
+    cborUnsigned(cost),
+    cborType(6, BigInt(TAG_UNIT_INTERVAL)),
+    cborType(4, 2n),
+    cborUnsigned(marginN),
+    cborUnsigned(marginD),
+    cborBytes(reward),
+    setPrefix(tagSets, ownersExpected),
+    ...owners,
+    cborType(4, BigInt(relaysExpected)),
+    ...relays,
+    metadata,
+  );
+}
+
+function readPoolRelay(cursor: Cursor): Uint8Array | null {
+  const type = cursor.u8();
+  if (type === RELAY_IP) {
+    const portFlag = optionalFlag(cursor);
+    const port = portFlag?.included ? cursor.u16() : null;
+    if (!portFlag || (portFlag.included && port == null) || !portFlag.included) {
+      return null;
+    }
+    const ipv4Flag = optionalFlag(cursor);
+    const ipv4 = ipv4Flag?.included ? cursor.bytes(4) : null;
+    if (!ipv4Flag || (ipv4Flag.included && !ipv4)) {
+      return null;
+    }
+    const ipv6Flag = optionalFlag(cursor);
+    const ipv6 = ipv6Flag?.included ? cursor.bytes(16) : null;
+    if (!ipv6Flag || (ipv6Flag.included && !ipv6) || (!ipv4Flag.included && !ipv6Flag.included)) {
+      return null;
+    }
+    return concatBytes(
+      cborType(4, 4n),
+      cborUnsigned(0n),
+      cborUnsigned(BigInt(port ?? 0)),
+      ipv4Flag.included && ipv4 ? cborBytes(ipv4) : cborNull(),
+      ipv6Flag.included && ipv6 ? cborBytes(ipv6Cbor(ipv6)) : cborNull(),
+    );
+  }
+  if (type === RELAY_NAME) {
+    const portFlag = optionalFlag(cursor);
+    const port = portFlag?.included ? cursor.u16() : null;
+    if (!portFlag || (portFlag.included && port == null) || !portFlag.included) {
+      return null;
+    }
+    const dns = readDnsName(cursor);
+    if (!dns) {
+      return null;
+    }
+    return concatBytes(cborType(4, 3n), cborUnsigned(1n), cborUnsigned(BigInt(port ?? 0)), cborText(dns));
+  }
+  if (type === RELAY_MULTI) {
+    const dns = readDnsName(cursor);
+    if (!dns) {
+      return null;
+    }
+    return concatBytes(cborType(4, 2n), cborUnsigned(2n), cborText(dns));
+  }
+  return null;
+}
+
+function readDnsName(cursor: Cursor): Uint8Array | null {
+  const included = cursor.flag();
+  const length = included ? cursor.u8() : null;
+  if (!included || length == null || length < 1) {
+    return null;
+  }
+  return cursor.bytes(length);
+}
+
+function readAnchor(cursor: Cursor): Uint8Array | null {
+  const included = cursor.flag();
+  if (included === false) {
+    return cborNull();
+  }
+  if (included !== true) {
+    return null;
+  }
+  const urlLen = cursor.u16();
+  const url = urlLen == null ? null : cursor.bytes(urlLen);
+  const hash = cursor.bytes(HASH32);
+  if (!url || !hash) {
+    return null;
+  }
+  return concatBytes(cborType(4, 2n), cborText(url), cborBytes(hash));
+}
+
+function voterCborType(wire: number): number | null {
+  if (wire === VOTER_COMMITTEE_KEY || wire === VOTER_COMMITTEE_PATH) return VOTER_COMMITTEE_KEY;
+  if (wire === VOTER_COMMITTEE_SCRIPT) return VOTER_COMMITTEE_SCRIPT;
+  if (wire === VOTER_DREP_KEY || wire === VOTER_DREP_PATH) return VOTER_DREP_KEY;
+  if (wire === VOTER_DREP_SCRIPT) return VOTER_DREP_SCRIPT;
+  if (wire === VOTER_POOL_KEY || wire === VOTER_POOL_PATH) return VOTER_POOL_KEY;
+  return null;
+}
+
+async function readVotingProcedures(
+  cursor: Cursor,
+  ctx: FamilyContext,
+  voters: number,
+): Promise<Uint8Array | null> {
+  if (voters < 1) {
+    return null;
+  }
+  const parts: Uint8Array[] = [cborUnsigned(19n), cborType(5, BigInt(voters))];
+  for (let index = 0; index < voters; index += 1) {
+    const wire = cursor.u8();
+    if (wire == null) {
+      return null;
+    }
+    const cborTypeValue = voterCborType(wire);
+    let hash: Uint8Array | null = null;
+    if (wire === VOTER_COMMITTEE_PATH || wire === VOTER_DREP_PATH || wire === VOTER_POOL_PATH) {
+      const path = readPath(cursor);
+      hash = path
+        ? (
+            await shelleyAddressBytes(ctx, {
+              type: 0x06,
+              networkId: 0,
+              paymentPath: path,
+              stake: { kind: 'none' },
+            })
+          ).slice(1)
+        : null;
+    } else if (
+      wire === VOTER_COMMITTEE_KEY ||
+      wire === VOTER_COMMITTEE_SCRIPT ||
+      wire === VOTER_DREP_KEY ||
+      wire === VOTER_DREP_SCRIPT ||
+      wire === VOTER_POOL_KEY
+    ) {
+      hash = cursor.bytes(HASH28);
+    }
+    const votes = cursor.u16();
+    if (cborTypeValue == null || !hash || votes == null || votes < 1) {
+      return null;
+    }
+    parts.push(cborType(4, 2n), cborUnsigned(BigInt(cborTypeValue)), cborBytes(hash), cborType(5, BigInt(votes)));
+    for (let voteIndex = 0; voteIndex < votes; voteIndex += 1) {
+      const txHash = cursor.bytes(HASH32);
+      const actionIndex = cursor.u32();
+      const vote = cursor.u8();
+      const anchor = readAnchor(cursor);
+      if (!txHash || actionIndex == null || vote == null || vote > 2 || !anchor) {
+        return null;
+      }
+      parts.push(
+        cborType(4, 2n),
+        cborBytes(txHash),
+        cborUnsigned(BigInt(actionIndex)),
+        cborType(4, 2n),
+        cborUnsigned(BigInt(vote)),
+        anchor,
+      );
+    }
+  }
+  return concatBytes(...parts);
+}
+
 /**
  * Rebuild the body Ledger hashes. Returns null when the stream is not the v8
  * raw layout or when a field this builder does not encode is present.
@@ -560,20 +876,23 @@ export async function cardanoCanonicalBody(
   init: Uint8Array,
   raw: Uint8Array,
   ctx: FamilyContext,
+  auxHash?: Uint8Array,
 ): Promise<Uint8Array | null> {
   const header = parseCardanoTxInit(init);
-  if (!header || header.rawLength !== raw.length || header.voters > 0) {
+  if (!header || header.rawLength !== raw.length) {
     return null;
   }
+  let field7: Uint8Array | null = null;
   if (header.aux?.type === AUX_CIP36) {
-    return null;
-  }
-  if (header.certificates > 0) {
-    // Pool registration and the long Conway certificate list are not encoded.
-    // A payment, delegation, or Conway stake cert is. Unknown types fail closed.
+    if (!auxHash || auxHash.length !== HASH32) {
+      return null;
+    }
+    field7 = auxHash;
+  } else if (header.aux?.hash) {
+    field7 = header.aux.hash;
   }
   const cursor = new Cursor(raw);
-  const items = bodyItems(header);
+  const items = bodyItems(header, field7 != null);
   const parts: Uint8Array[] = [cborType(5, BigInt(items))];
 
   const inputs = await readMany(cursor, header.inputs, readInput);
@@ -609,7 +928,7 @@ export async function cardanoCanonicalBody(
   if (header.certificates > 0) {
     const certs: Uint8Array[] = [];
     for (let index = 0; index < header.certificates; index += 1) {
-      const certificate = await readCertificate(cursor, ctx);
+      const certificate = await readCertificate(cursor, ctx, header.networkId, header.tagCborSets);
       if (!certificate) {
         return null;
       }
@@ -637,8 +956,8 @@ export async function cardanoCanonicalBody(
     parts.push(cborUnsigned(5n), cborType(5, BigInt(header.withdrawals)), ...entries);
   }
 
-  if (header.aux?.hash) {
-    parts.push(cborUnsigned(7n), cborBytes(header.aux.hash));
+  if (field7) {
+    parts.push(cborUnsigned(7n), cborBytes(field7));
   }
 
   if (header.includeValidityStart) {
@@ -729,6 +1048,14 @@ export async function cardanoCanonicalBody(
     parts.push(cborUnsigned(18n), setPrefix(header.tagCborSets, header.referenceInputs), ...inputs);
   }
 
+  if (header.voters > 0) {
+    const voting = await readVotingProcedures(cursor, ctx, header.voters);
+    if (!voting) {
+      return null;
+    }
+    parts.push(voting);
+  }
+
   if (header.includeTreasury) {
     const treasury = cursor.u64();
     if (treasury == null) {
@@ -749,12 +1076,12 @@ export async function cardanoCanonicalBody(
   return concatBytes(...parts);
 }
 
-function bodyItems(header: CardanoTxInit): number {
+function bodyItems(header: CardanoTxInit, includeAux: boolean): number {
   let items = 3;
   if (header.includeTtl) items += 1;
   if (header.certificates > 0) items += 1;
   if (header.withdrawals > 0) items += 1;
-  if (header.aux?.hash) items += 1;
+  if (includeAux) items += 1;
   if (header.includeValidityStart) items += 1;
   if (header.mintGroups > 0) items += 1;
   if (header.includeScriptDataHash) items += 1;
@@ -764,6 +1091,7 @@ function bodyItems(header: CardanoTxInit): number {
   if (header.includeCollateralOutput) items += 1;
   if (header.includeTotalCollateral) items += 1;
   if (header.referenceInputs > 0) items += 1;
+  if (header.voters > 0) items += 1;
   if (header.includeTreasury) items += 1;
   if (header.includeDonation) items += 1;
   return items;
@@ -789,7 +1117,8 @@ export async function cardanoCanonicalTxHash(
   init: Uint8Array,
   raw: Uint8Array,
   ctx: FamilyContext,
+  auxHash?: Uint8Array,
 ): Promise<Uint8Array | null> {
-  const body = await cardanoCanonicalBody(init, raw, ctx);
+  const body = await cardanoCanonicalBody(init, raw, ctx, auxHash);
   return body ? blake2b(body, { dkLen: 32 }) : null;
 }
