@@ -117,7 +117,7 @@ Sources already cited in [ledger-apdu.md](ledger-apdu.md). Close a row only with
 | XRP | ed25519 when P2 is `80` | [app-xrp `sign_transaction.c`](https://github.com/LedgerHQ/app-xrp/blob/develop/src/apdu/messages/sign_transaction.c). Blocker: `cx_eddsa_sign` is SHA-512 over `STX\0` ‖ tx and the body is 64 bytes, but `bip32_derive_init_privkey_256(CX_CURVE_Ed25519)` lives in the SDK. CWS will not sign that path with SLIP-10 until that HDW call is copied |
 | Cosmos | length-prefixed GET_ADDR helper | HRP requests are MATCH (`pk` ‖ bech32, no length prefixes) from [hw-app-cosmos](https://github.com/LedgerHQ/ledger-live/blob/develop/libs/ledgerjs/packages/hw-app-cosmos/src/Cosmos.ts) and `crypto_fillAddress`. A length-prefixed BIP32 body is still accepted for older hosts |
 | Polkadot | SCALE / metadata proof; SS58 prefix taken from the payload | Blocker: the Zondax [APDUSPEC](https://github.com/Zondax/ledger-polkadot/blob/master/docs/APDUSPEC.md) metadata proof is not parsed |
-| TON | BOC / cell hash; proof and sign-data fields | Blocker: [app-ton COMMANDS](https://github.com/LedgerHQ/app-ton/blob/master/doc/COMMANDS.md). The hash field is sha256 of the uploaded bytes, not a parsed cell hash |
+| TON | Payload without a matching hint | FIXED in 1.1.6: Wallet V4R2 cell hash, SIGN_DATA plaintext, GET_ADDRESS_PROOF TON Connect (`hash.c`, `cell.c`, `sign_data_deserialize.c`, `proof_deserialize.c`, `tonCell.test.ts`). A payload without a matching hint is `BD00` because settings are `00` |
 | NEAR | Fresh firmware diff | The handler matches the near.com path already in the tree. This pass did not re-read app-near |
 | Sui | A second block-tag version | The OKX / Mysten exchange already tested is MATCH. A different tag is not branched |
 | Newer families (#52–#55) | Pubkey and SIGN | VERSION or CONFIG is MATCH. SIGN is KEEP: Aion, Aleo, Alephium, Algorand (HDW_NORMAL Ed25519 is not SLIP-10), Ardor, Arweave (RSA), Concordium, Conflux, Eos (WIF and stream), Ergo, Everscale, FIO, Filecoin raw and personal, Flare address and sign, Flow, Hathor, Hedera, Hive, Internet Computer address and sign, Mina (secp field), MultiversX sign, NEO sign and GET_SIGNED_PUBLIC_KEY, QRL (XMSS), Sia, Stacks auth / JWT / fingerprint, Starknet pubkey and tx, Symbol, Tezos Micheline, Waves (Curve25519), Binance SHOW_ADDR, VeChain SIGN_CERTIFICATE `09` |
@@ -335,7 +335,7 @@ Docs only. No handler change. No USB install. No Proxy rebuild.
 
 ### Phase 4 — High-host KEEP
 
-**Status.** `SIGN_OPCERT`, `SIGN_CVOTE`, native script hash, CIP-8 Shelley messages, and Shelley and Byron `DERIVE_ADDRESS` are MATCH. A valid Byron address inside CIP-8 is `6982`. Solana `numPaths` other than 1 is `6A80`. Solana INS `20` is a 4-byte challenge. CIP-36 auxiliary registration, pool registration, and voting procedures are FIXED in 1.1.5. Solana INS `21`/`22`, the Bitcoin policy HMAC, and Ethereum clear-sign stay KEEP with the blockers in section 1b. The v8 and v7 2.2–7.2.1 canonical transaction hashes are FIXED. Snapshot unknown stays 27.
+**Status.** `SIGN_OPCERT`, `SIGN_CVOTE`, native script hash, CIP-8 Shelley messages, and Shelley and Byron `DERIVE_ADDRESS` are MATCH. A valid Byron address inside CIP-8 is `6982`. Solana `numPaths` other than 1 is `6A80`. Solana INS `20` is a 4-byte challenge. CIP-36 auxiliary registration, pool registration, and voting procedures are FIXED in 1.1.5. TON cell hash, SIGN_DATA plaintext, and GET_ADDRESS_PROOF are FIXED in 1.1.6. Solana INS `21`/`22`, the Bitcoin policy HMAC, and Ethereum clear-sign stay KEEP with the blockers in section 1b. The v8 and v7 2.2–7.2.1 canonical transaction hashes are FIXED. Snapshot unknown stays 27.
 
 1. Cardano CIP-36 auxiliary registration, pool registration, and voting procedures are FIXED in 1.1.5. Operational certificate, CIP-36 vote, native script hash, CIP-8 Shelley messages, Shelley and Byron `DERIVE_ADDRESS`, and the v8/v7 canonical transaction hash are MATCH or FIXED. App versions before 2.2 stay `6A80`.
 2. Solana `numPaths` other than 1 is `6A80`. INS `20` is MATCH. INS `21` / `22` stay KEEP (PKI TLV).
@@ -348,9 +348,9 @@ Docs only. No handler change. No USB install. No Proxy rebuild.
 
 One family, or a small set that shares a chunk mode, per PR. Official chunk mode, response length, and a confirm sheet. Algorand Ed25519 stays KEEP if the source is HDW_NORMAL and CWS would sign SLIP-10. XMSS (QRL), RSA (Arweave), Mina field, and Curve25519 (Waves) stay KEEP when the curve is not the one CWS derives. Proxy test in the same PR.
 
-XRP ed25519, Polkadot SCALE, and TON cell hash stay KEEP. Stellar `maxDataSize` is MATCH (Nano X `4096`, other models `8192`). Tron ECDH and TIP-712 are MATCH. TIP-712 does not return firmware `6A8C` for a disabled sign-by-hash setting. Cosmos HRP GET_ADDR is MATCH. A length-prefixed Cosmos address body is still accepted.
+XRP ed25519 and Polkadot SCALE stay KEEP. TON cell hash, SIGN_DATA plaintext, and GET_ADDRESS_PROOF are FIXED in 1.1.6. Stellar `maxDataSize` is MATCH (Nano X `4096`, other models `8192`). Tron ECDH and TIP-712 are MATCH. TIP-712 does not return firmware `6A8C` for a disabled sign-by-hash setting. Cosmos HRP GET_ADDR is MATCH. A length-prefixed Cosmos address body is still accepted.
 
-XRP blocker: [app-xrp `sign_transaction.c`](https://github.com/LedgerHQ/app-xrp/blob/develop/src/apdu/messages/sign_transaction.c) returns a 64-byte EdDSA signature over `STX\0` ‖ tx. The private key is `bip32_derive_init_privkey_256(CX_CURVE_Ed25519)` in the Ledger SDK, not in the app tree. Polkadot blocker: SCALE and the metadata proof in the Zondax APDUSPEC are not parsed. TON blocker: the hash field is sha256 of the uploaded bytes, not the cell hash from a parsed BOC (`COMMANDS.md`). Newer-family SIGN stays KEEP on the curves named in section 1b. Those curves are not the ones CWS derives.
+XRP blocker: [app-xrp `sign_transaction.c`](https://github.com/LedgerHQ/app-xrp/blob/develop/src/apdu/messages/sign_transaction.c) returns a 64-byte EdDSA signature over `STX\0` ‖ tx. The private key is `bip32_derive_init_privkey_256(CX_CURVE_Ed25519)` in the Ledger SDK, not in the app tree. Polkadot blocker: SCALE and the metadata proof in the Zondax APDUSPEC are not parsed. TON cell hash, SIGN_DATA plaintext, and GET_ADDRESS_PROOF are FIXED in 1.1.6 (`hash.c`, `cell.c`, `sign_data_deserialize.c`, `proof_deserialize.c`). Newer-family SIGN stays KEEP on the curves named in section 1b. Those curves are not the ones CWS derives.
 
 ### Phase 6 — Trezor gaps Safe 7 hosts send
 
@@ -402,7 +402,7 @@ Checked on tip `dfb1f6d`. Nothing below is MATCH. Seeds are not absolutely safe.
 | Tron sign-by-hash word `6A8C` | ECDH and TIP-712 are MATCH. CWS has no off switch, so `E_MISSING_SETTING_SIGN_BY_HASH` is not returned |
 | XRP ed25519 P2 `80` | `sign_transaction.c` signs SHA-512 of `STX\0` ‖ tx (64 bytes). The key is SDK `bip32_derive_init_privkey_256`. CWS will not guess SLIP-10 |
 | Polkadot SCALE / metadata | The Zondax metadata proof is not parsed |
-| TON cell hash | The hash field is sha256 of the uploaded bytes, not a parsed BOC cell hash |
+| TON payload without a matching hint | FIXED cell hash / SIGN_DATA / GET_ADDRESS_PROOF in 1.1.6. Remaining: a payload without a matching hint is `BD00` because `GET_APP_SETTINGS` is `00` |
 | Newer-family SIGN | The firmware curve is not the one CWS derives. See the section 1b list (HDW_NORMAL, XMSS, RSA, Mina field, Curve25519, and the rest) |
 | Trezor `1032`/`1033`, `1040`/`1041`, `906`, `471`/`472`, extra Cardano stages | No Suite trace selects them. Protobuf layouts are not decoded |
 | OneKey `20106`/`20107`, `20120`, `10106`, Sui tx, TON proof | Ids exist in firmware. No desktop or mobile capture of the bytes |
