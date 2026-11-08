@@ -1,6 +1,6 @@
 # Security
 
-**Version 1.1.5 (build 11).** [YSK Limited](https://ysk.hk) · [ysk.hk/products/ysk-cold-wallet-simulator](https://ysk.hk/products/ysk-cold-wallet-simulator)
+**Version 1.1.6 (build 12).** [YSK Limited](https://ysk.hk) · [ysk.hk/products/ysk-cold-wallet-simulator](https://ysk.hk/products/ysk-cold-wallet-simulator)
 
 This is the public statement of what CWS protects and what it leaves open. Seeds are not hardware-wallet safe.
 
@@ -33,7 +33,7 @@ This is progress toward Phantom, Rabby, and MetaMask mobile. It is not a secure 
 
 ## What stays open, on purpose
 
-Closing the items below would stop real wallets from connecting. They are residual risk. 1.1.5 does not claim to have removed them.
+Closing the items below would stop real wallets from connecting. They are residual risk. 1.1.6 does not claim to have removed them.
 
 ### WebHID
 
@@ -61,7 +61,7 @@ Release writes set `requireAuthentication`. The decision is `keychainRequiresAut
 
 ## Known host gaps
 
-These gaps remain open in 1.1.5. They were already open in 1.1.0. They are usability gaps. They are not a reason to drop the public-read confirm.
+These gaps remain open in 1.1.6. They were already open in 1.1.0. They are usability gaps. They are not a reason to drop the public-read confirm.
 
 - Phantom may not complete unlock after connect.
 - Rabby’s camera may still fail to scan the phone QR. The static account PNG is ECC M, a four-module quiet zone, 8 px modules, and black-on-white (`qrPng.ts`). On 2026-10-31, host `ki-mac-mini` encoded that PNG for the OneKey and Keystone account profiles. Local `zbarimg` 0.23.95 decoded both files. That is not a wallet scan. Rabby was not opened: Chrome’s extension directory returned `Operation not permitted`, and an unpacked Rabby 0.94.13 tree was not loaded. OneKey.app 6.6.3 was not given a scan session. No Keystone wallet app is installed. Continuity Camera is enumerated as the lab iPhone, and ffmpeg timed out without a frame while Preview showed the PNG. The attempt is host-only KEEP in [testing.md](testing.md). Unimplemented Keystone UR types stay out of the export.
@@ -76,7 +76,7 @@ Anyone who can unlock the phone, debug the process, photograph the screen, or co
 
 ## 繁體中文（香港）
 
-**版本 1.1.5（組建編號 11）。** [YSK Limited](https://ysk.hk) · [ysk.hk/products/ysk-cold-wallet-simulator](https://ysk.hk/products/ysk-cold-wallet-simulator)
+**版本 1.1.6（組建編號 12）。** [YSK Limited](https://ysk.hk) · [ysk.hk/products/ysk-cold-wallet-simulator](https://ysk.hk/products/ysk-cold-wallet-simulator)
 
 這是 CWS 保護甚麼、留下甚麼的公開說明。種子不是硬體錢包級安全。
 
@@ -109,7 +109,7 @@ Anyone who can unlock the phone, debug the process, photograph the screen, or co
 
 ### 為相容而保留的風險
 
-關閉下列項目會令真實錢包無法連線。它們是殘餘風險。1.1.5 並不宣稱已消除它們。
+關閉下列項目會令真實錢包無法連線。它們是殘餘風險。1.1.6 並不宣稱已消除它們。
 
 **WebHID。** 代理程式把 HID 報告轉成 APDU 送到手機。沒有指令允許清單。你在 Chrome 連接的網站可以發送手機已實現的任何指令，包括韌體上屬靜默的地址或擴展公鑰讀取。簽署與種子匯出仍須等手機。
 
@@ -129,7 +129,7 @@ Anyone who can unlock the phone, debug the process, photograph the screen, or co
 
 ### 已知的主機缺口
 
-這些缺口在 1.1.5 仍然開放。它們在 1.1.0 已經開放。它們是可用性缺口，不是取消公開讀取確認的理由。
+這些缺口在 1.1.6 仍然開放。它們在 1.1.0 已經開放。它們是可用性缺口，不是取消公開讀取確認的理由。
 
 - Phantom 連線後可能無法完成解鎖。
 - Rabby 的相機仍可能掃不到手機二維碼。靜態帳戶 PNG 是 ECC M、四模組安靜區、8 像素模組、黑白（`qrPng.ts`）。2026-10-31，主機 `ki-mac-mini` 為 OneKey 與 Keystone 帳戶設定編碼了該 PNG。本機 `zbarimg` 0.23.95 解出了兩個檔案。那不是錢包掃描。Rabby 沒有開啟：Chrome 的擴充功能目錄回傳 `Operation not permitted`，未載入解包的 Rabby 0.94.13。OneKey.app 6.6.3 沒有得到掃描工作階段。沒有安裝 Keystone 錢包應用程式。Continuity Camera 列為實驗室的 iPhone，Preview 顯示了 PNG，ffmpeg 卻逾時而沒有影格。該次嘗試在 [testing.md](testing.md) 是只限主機的 KEEP。未實現的 Keystone UR 類型不在匯出之內。

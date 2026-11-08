@@ -114,6 +114,11 @@ export type FamilySession = {
    * `uint32` and does not roll it. The value is device RNG, not a seed derivative.
    */
   solanaChallenge?: Uint8Array;
+  /**
+   * TON SIGN_TX / SIGN_DATA. First APDU is path only (`src/handler/sign_tx.c`).
+   * The payload is hashed as a Wallet V4R2 cell, not as sha256 of the APDU.
+   */
+  tonPending?: { ins: number; path: string; payload: Uint8Array };
 };
 
 /**

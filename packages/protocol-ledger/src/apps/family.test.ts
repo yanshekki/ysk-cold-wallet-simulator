@@ -1377,14 +1377,27 @@ describe('KEEP re-diff official chunk / version bodies', () => {
     expect(last[0]).toBe(0x00);
   });
 
-  it('TON SIGN uses P2 0x03 first then 0x00 last; response is sig||hash length-prefixed', async () => {
+  it('TON SIGN uses P2 0x03 first then 0x00 last; response is sig||cell-hash length-prefixed', async () => {
     const device = handler();
     device.setApp('ton');
     const pathBytes = encodePath([0x8000002c, 0x8000025f, 0x80000000]);
     const first = await exchange(device, apdu([0xe0, 0x06, 0x00, 0x03, pathBytes.length, ...pathBytes]));
     expect(swOf(first)).toBe(SW_OK);
     expect(first.length).toBe(2);
-    const payload = [0x01, 0x02, 0x03, 0x04];
+    // TRANSACTION.md tag 0 simple transfer (Wallet V4R2). Not raw APDU bytes.
+    const dest = new Array(32).fill(0x11);
+    const payload = [
+      0x00,
+      0x00, 0x00, 0x00, 0x01,
+      0xff, 0xff, 0xff, 0xff,
+      0x00,
+      0x00, ...dest,
+      0x01,
+      0x03,
+      0x00,
+      0x00,
+      0x00,
+    ];
     const done = await exchange(device, apdu([0xe0, 0x06, 0x00, 0x00, payload.length, ...payload]));
     expect(swOf(done)).toBe(SW_OK);
     const body = done.subarray(0, done.length - 2);

@@ -1,10 +1,10 @@
 # Ledger APDU wire matrix
 
-Maintainer contract for CWS 1.1.5 (build 11). Status words are MATCH, FIXED, and KEEP. A KEEP is not a silent success, and a MATCH row is not a claim that a seed is safe. Seeds are not absolutely safe. The phase notes below are the research log for how this matrix was built.
+Maintainer contract for CWS 1.1.6 (build 12). Status words are MATCH, FIXED, and KEEP. A KEEP is not a silent success, and a MATCH row is not a claim that a seed is safe. Seeds are not absolutely safe. The phase notes below are the research log for how this matrix was built.
 
-**Weekly parity 1.1.5 (build 11):** Cardano CIP-36 auxiliary registration, pool-registration certificates (type 3), and voting procedures (field 19) are FIXED. Sources: LedgerHQ/app-cardano `src/cvote/aux_data_hash_builder.c`, `src/transaction/tx_hash_builder.c`, `src/cvote/cvote_parser.c`, `src/transaction/tx_parse.c` (develop), and `@cardano-foundation/ledgerjs-hw-app-cardano` v7/v8 serializers. Incomplete wires still fail closed. App versions before 2.2 stay `6A80`. TON cell-hash, Solana INS `21`/`22`, Bitcoin policy HMAC, and Ethereum clear-sign stay KEEP.
+**Weekly parity 1.1.6 (build 12):** TON `SIGN_TX` Wallet V4R2 cell hash, `SIGN_DATA` plaintext, and `GET_ADDRESS_PROOF` TON Connect are FIXED. Sources: LedgerHQ/app-ton `src/transaction/hash.c`, `src/common/cell.c`, `src/sign_data/sign_data_deserialize.c`, `src/proof/proof_deserialize.c`, `src/address.c` `pubkey_to_hash`, `src/crypto.c`, and `doc/TRANSACTION.md` / `doc/COMMANDS.md` (2.9.1 / 849962d). A payload without a matching hint is `BD00`. Parse failures are `B010` / `B011`. Solana INS `21`/`22`, Bitcoin policy HMAC, and Ethereum clear-sign stay KEEP.
 
-**Phase 2 item 2 (KEEP re-diff follow-up):** Tron/XRP/Stellar/Cosmos/Polkadot/TON/Aptos handlers re-diffed against official firmware/hw-app; MATCH/FIXED only with citations + `family.test.ts` KEEP re-diff cases. Cardano operational certificate, CIP-36 vote, native script hash, Shelley and Byron `DERIVE_ADDRESS`, and CIP-8 Shelley address fields are MATCH. Solana `numPaths` must be 1 (`6A80` otherwise) and INS `20` returns a 4-byte challenge. Stellar `GET_CONF` appends `maxDataSize`. The canonical transaction hash is FIXED for v8 and for v7 app 2.2 through 7.2.1, including CIP-36 auxiliary, pool registration, and voting. Solana trusted-name INS `21`/`22`, Bitcoin policy HMAC, and Ethereum clear-sign stay KEEP.
+**Phase 2 item 2 (KEEP re-diff follow-up):** Tron/XRP/Stellar/Cosmos/Polkadot/TON/Aptos handlers re-diffed against official firmware/hw-app; MATCH/FIXED only with citations + `family.test.ts` KEEP re-diff cases. Cardano operational certificate, CIP-36 vote, native script hash, Shelley and Byron `DERIVE_ADDRESS`, and CIP-8 Shelley address fields are MATCH. Solana `numPaths` must be 1 (`6A80` otherwise) and INS `20` returns a 4-byte challenge. Stellar `GET_CONF` appends `maxDataSize`. The canonical transaction hash is FIXED for v8 and for v7 app 2.2 through 7.2.1, including CIP-36 auxiliary, pool registration, and voting. TON cell hash, SIGN_DATA plaintext, and GET_ADDRESS_PROOF are FIXED in 1.1.6. Solana trusted-name INS `21`/`22`, Bitcoin policy HMAC, and Ethereum clear-sign stay KEEP.
 
 **Phase 2 family map (follow-up to #49):** catalog/`inferLedgerFamily` remaps ethereum CHAIN, bitcoin-like, cosmos-like, polkadot-like, and `ethereum-plugin` names so Open App is not `unknown`. Remapped rows are **not** new wire MATCH/FIXED — only family routing changed.
 
@@ -205,12 +205,12 @@ Family SIGN chunking is no longer one shared P2-bit-`02` rule for every app belo
 | Stellar | `E0` | `06` (hash-sign flag, major, minor, patch, then `maxDataSize` u16). Empty body still selects this app from Tron. Nano X is `4096` (`0x1000`); Stax and Flex are `8192` (`0x2000`) | `04`, `08`, `0A`, `0C` | 64 | FIXED chunking to hw-app-str P1 `00`/`80` + P2 `00`/`80`. Confirm-on-address is P2 on the real app; export here stays silent. `maxDataSize` matches `get_configuration.rs` / `context.rs` `MAX_RAW_DATA_LEN` |
 | Cosmos | `55` | `00` → 9 bytes (`test|maj|min|patch|locked|target_id`) | `02` | 65, sha256 | FIXED version layout + Zondax P1 `0/1/2` chunk with fixed-5 path (no length byte) per `process_chunk`. GET_ADDR with `serializeHRP` plus five little-endian components returns the 33-byte compressed key and the bech32 text with no length prefixes (`crypto_fillAddress`). A length-prefixed BIP32 body still uses the older helper |
 | Polkadot | `F9` or `90` | `00` → 12 bytes (u16 maj/min/patch layout) | `02`, `03` (raw) | 65 (`00`|ed25519 sig) | FIXED version + Zondax P1 chunk + 65-byte sig envelope per APDUSPEC. KEEP: SCALE/metadata proof parsing; SS58 prefix from path payload |
-| TON | `E0` | `03` (and legacy `01`) | `06`, `08`, `09` | 98 = `len|sig64|len|hash32` | FIXED P2 first/more (`03`/`02`/`00`) + length-prefixed sig|hash per COMMANDS.md; `0A` GET_APP_SETTINGS returns `00`. KEEP: BOC/cell hash (hash field is sha256 of uploaded bytes, not parsed cell hash); proof/sign-data field parse |
+| TON | `E0` | `03` (and legacy `01`) | `06`, `08`, `09` | 98 = `len|sig64|len|hash32` | FIXED P2 first/more (`03`/`02`/`00`) + Wallet V4R2 cell hash (`hash.c` / `cell.c`), SIGN_DATA `schema_crc‖timestamp‖cell_hash` (`sign_data_deserialize.c`), GET_ADDRESS_PROOF TON Connect (`proof_deserialize.c`). `0A` GET_APP_SETTINGS returns `00`. Payload without a matching hint is `BD00`. Tests in `tonCell.test.ts` |
 | Aptos | `5B` | `03` (legacy `00` alias) | `06` (legacy `0A`/`02` aliases) | `len|sig` | FIXED INS table + P2 `0x80` more + path-only first chunk + pubkey `len|pk|len|chain` per COMMANDS.md / types.h. KEEP: none on core INS — chain_code is 32 zero bytes |
 | Sui | `00` | `00` | `03`, plus the Mysten block protocol | block replies, not a raw 64-byte APDU | MATCH for the OKX/Mysten block exchange already tested. A second Sui version with a different block tag is not branched |
 
 load |
-| TON | `E0` | `03` (and legacy `01`) | `06`, `08`, `09` | 98 = `len|sig64|len|hash32` | FIXED P2 first/more (`03`/`02`/`00`) + length-prefixed sig|hash per COMMANDS.md; `0A` GET_APP_SETTINGS returns `00`. KEEP: BOC/cell hash (hash field is sha256 of uploaded bytes, not parsed cell hash); proof/sign-data field parse |
+| TON | `E0` | `03` (and legacy `01`) | `06`, `08`, `09` | 98 = `len|sig64|len|hash32` | FIXED P2 first/more (`03`/`02`/`00`) + Wallet V4R2 cell hash (`hash.c` / `cell.c`), SIGN_DATA `schema_crc‖timestamp‖cell_hash` (`sign_data_deserialize.c`), GET_ADDRESS_PROOF TON Connect (`proof_deserialize.c`). `0A` GET_APP_SETTINGS returns `00`. Payload without a matching hint is `BD00`. Tests in `tonCell.test.ts` |
 | Aptos | `5B` | `03` (legacy `00` alias) | `06` (legacy `0A`/`02` aliases) | `len|sig` | FIXED INS table + P2 `0x80` more + path-only first chunk + pubkey `len|pk|len|chain` per COMMANDS.md / types.h. KEEP: none on core INS — chain_code is 32 zero bytes |
 | Sui | `00` | `00` | `03`, plus the Mysten block protocol | block replies, not a raw 64-byte APDU | MATCH for the OKX/Mysten block exchange already tested. A second Sui version with a different block tag is not branched |
 
@@ -243,7 +243,7 @@ Ledger rows that stay KEEP, and why:
 - XRP P2 `80`. The signature would be 64-byte EdDSA over `STX\0` ‖ tx. The SDK derivation call is not copied.
 - Stellar `maxDataSize` is MATCH (Nano X `4096`, other models `8192`).
 - Polkadot SCALE and the metadata proof are not parsed.
-- TON cell hash is still sha256 of the uploaded bytes.
+- TON `SIGN_TX` / `SIGN_DATA` / `GET_ADDRESS_PROOF` hashes are FIXED in 1.1.6 (`tonCell.test.ts`). A payload without a matching hint stays `BD00`.
 - Newer-family SIGN stays KEEP when the firmware curve is not the one CWS derives.
 
 | App | Catalog family | Default version | Wire / plan status | Official INS summary |
@@ -432,7 +432,7 @@ Ledger rows that stay KEEP, and why:
 | THORChain | `cosmos` | 2.5.2 | family-mapped — catalog `cosmos` (reuses cosmos handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA 55: 00/01/02/04 (Zondax pattern) |
 | ThunderCore | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | TomoChain | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
-| TON | `ton` | 2.9.1 | see Other open apps (FIXED chunk/response; KEEP cell hash) | CLA E0: 03/04/05/06/08/09/0A (+ legacy 01) |
+| TON | `ton` | 2.9.1 | see Other open apps (FIXED cell hash / SIGN_DATA / GET_ADDRESS_PROOF) | CLA E0: 03/04/05/06/08/09/0A (+ legacy 01) |
 | Tron | `tron` | 0.7.10 | see Other open apps (FIXED chunk; KEEP ECDH/TIP-712) | CLA E0: 02/04/05/06/08/0A |
 | Ubiq | `ethereum` | 1.22.5 | family-mapped — catalog `ethereum` (reuses ethereum handler); not re-diffed this PR — no new MATCH/FIXED claim | CLA E0: 02/04/06/08/0A/0C/… (app-ethereum) |
 | Uniswap | `ethereum-plugin` | 1.5.1 | blocked — Ethereum plugin; catalog family `ethereum-plugin` (not a standalone signer; hosts open Ethereum) | none — plugin |
