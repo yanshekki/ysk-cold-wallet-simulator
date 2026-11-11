@@ -2,6 +2,10 @@
 
 **版本 1.1.6（組建編號 12）** · [YSK Limited](https://ysk.hk) · [產品頁](https://ysk.hk/products/ysk-cold-wallet-simulator)
 
+[Google Play](https://play.google.com/store/apps/details?id=hk.ysk.cws) · [App Store](https://apps.apple.com/us/app/cws-cold-wallet-simulator/id6826850492) · [APK](https://ysk.hk/downloads/CWS-1.1.6-12.apk)
+
+請優先使用 Google Play。APK 屬旁載，可能需要允許未知來源。App Store 上架為免費，須 iOS 16.4 或更新，並以 iPhone 為主。本版本庫不附上 IPA。
+
 手機套件識別碼 `hk.ysk.cws` · CWS Proxy 套件識別碼 `hk.ysk.cws.proxy`
 
 版本庫：[github.com/yanshekki/ysk-cold-wallet-simulator](https://github.com/yanshekki/ysk-cold-wallet-simulator/)
@@ -28,8 +32,8 @@ CWS 是模擬器。它不是安全元件。Ledger、Trezor 及 OneKey 均未認�
 
 | 產品 | 取得方式 |
 | --- | --- |
-| Android 手機 | [Google Play](https://play.google.com/store/apps/details?id=hk.ysk.cws)（`hk.ysk.cws`） |
-| iOS 手機 | App Store：即將推出 |
+| Android 手機 | 請優先使用 [Google Play](https://play.google.com/store/apps/details?id=hk.ysk.cws)（`hk.ysk.cws`）· [APK](https://ysk.hk/downloads/CWS-1.1.6-12.apk) |
+| iOS 手機 | [App Store](https://apps.apple.com/us/app/cws-cold-wallet-simulator/id6826850492) |
 | CWS Proxy（macOS） | Mac App Store：即將推出。HID Virtual Device 的 App Store entitlement 仍是 **Submitted**，尚未獲批。從原始碼組建：[proxy-macos.md](proxy-macos.md)。 |
 | CWS Proxy（Ubuntu） | 套件 `hk.ysk.cws.proxy`（amd64 與 arm64）。在 Ubuntu 執行 `bash apps/proxy/linux/build-deb.sh`，再安裝該 `.deb`。套件會安裝 `cws-proxy` 及 `uhid` 的 udev 規則。GitHub Release 沒有附上這個 `.deb`。見 [Ubuntu 安裝包](#ubuntu-安裝包)。 |
 | CWS Proxy（其他 Linux） | 沒有安裝包。請從原始碼執行 `yarn proxy`，並先套用快速開始所述的 `uhid` 規則。 |
@@ -43,7 +47,7 @@ CWS 是模擬器。它不是安全元件。Ledger、Trezor 及 OneKey 均未認�
 
 請使用一部實體 Android 或 iOS 手機。模擬器與 Expo Go 不能作藍牙廣播。
 
-1. 從 Google Play 安裝 Android 應用程式，或從原始碼組建手機應用程式。
+1. 可從 [Google Play](https://play.google.com/store/apps/details?id=hk.ysk.cws)、[App Store](https://apps.apple.com/us/app/cws-cold-wallet-simulator/id6826850492) 或 [APK](https://ysk.hk/downloads/CWS-1.1.6-12.apk) 安裝，或從原始碼組建手機應用程式。
 2. 接受警告、解鎖、選擇型號，並使用不掌管真實資產的秘密資料。
 3. 開始廣播，然後讓第三方錢包經藍牙連接。
 4. 桌面 WebHID 請啟動 CWS Proxy（macOS 應用程式、Ubuntu 套件的 `cws-proxy`，或在 Linux 執行 `yarn proxy`），再按 Start，並在藍牙清單選擇電話。Chrome 其後可開啟虛擬 USB 裝置。本機頁面是 `http://127.0.0.1:8788`。
