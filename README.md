@@ -4,6 +4,10 @@
 
 **Version 1.1.6 (build 12)** · [YSK Limited](https://ysk.hk) · [Product page](https://ysk.hk/products/ysk-cold-wallet-simulator)
 
+[Google Play](https://play.google.com/store/apps/details?id=hk.ysk.cws) · [App Store](https://apps.apple.com/us/app/cws-cold-wallet-simulator/id6826850492) · [APK](https://ysk.hk/downloads/CWS-1.1.6-12.apk)
+
+Prefer Google Play. The APK is a sideload and may require allowing unknown sources. The App Store listing is free, requires iOS 16.4 or later, and is iPhone-focused. This repository does not attach an IPA.
+
 Phone bundle `hk.ysk.cws` · CWS Proxy bundle `hk.ysk.cws.proxy`
 
 Repository: [github.com/yanshekki/ysk-cold-wallet-simulator](https://github.com/yanshekki/ysk-cold-wallet-simulator/)
@@ -30,8 +34,8 @@ Version 1.1.6 (build 12). It keeps the 1.1.5 baseline and closes TON `SIGN_TX` c
 
 | Product | Where to get it |
 | --- | --- |
-| Android phone | [Google Play](https://play.google.com/store/apps/details?id=hk.ysk.cws) (`hk.ysk.cws`) |
-| iOS phone | App Store: Coming soon |
+| Android phone | Preferred: [Google Play](https://play.google.com/store/apps/details?id=hk.ysk.cws) (`hk.ysk.cws`) · [APK](https://ysk.hk/downloads/CWS-1.1.6-12.apk) |
+| iOS phone | [App Store](https://apps.apple.com/us/app/cws-cold-wallet-simulator/id6826850492) |
 | CWS Proxy, macOS | Mac App Store: Coming soon. The HID Virtual Device App Store entitlement is still **Submitted**. Build from source: [docs/proxy-macos.md](docs/proxy-macos.md). |
 | CWS Proxy, Ubuntu | Package `hk.ysk.cws.proxy` (amd64 and arm64). Build it on Ubuntu with `bash apps/proxy/linux/build-deb.sh`, then install the `.deb`. It installs `cws-proxy` and the `uhid` udev rule. The GitHub Release does not attach the `.deb`. See [Ubuntu package](#ubuntu-package). |
 | CWS Proxy, other Linux | No package. From source: `yarn proxy`, after the `uhid` rule in Quick start. |
@@ -45,7 +49,7 @@ Product version **1.1.6** and build **12** come from `apps/mobile/app.json` (`ve
 
 Use a physical Android or iOS phone. A simulator and Expo Go cannot advertise Bluetooth.
 
-1. Install the Android app from Google Play, or build the phone app from source.
+1. Install from [Google Play](https://play.google.com/store/apps/details?id=hk.ysk.cws), the [App Store](https://apps.apple.com/us/app/cws-cold-wallet-simulator/id6826850492), or the [APK](https://ysk.hk/downloads/CWS-1.1.6-12.apk), or build the phone app from source.
 2. Accept the warning, unlock, choose a model, and use a secret that does not control real assets.
 3. Start advertising, then connect the third-party wallet over Bluetooth.
 4. For desktop WebHID, start CWS Proxy (the macOS app, Ubuntu `cws-proxy` from the `.deb`, or `yarn proxy` on Linux) and press Start. Pick the phone in the Bluetooth list. Chrome can then open the virtual USB device. The local page is `http://127.0.0.1:8788`.
