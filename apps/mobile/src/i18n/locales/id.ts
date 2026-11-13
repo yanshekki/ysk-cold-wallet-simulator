@@ -279,6 +279,8 @@ export const id: MessageTree = {
     search: 'Cari',
     loading: 'Memuat',
     unlocking: 'Membuka kunci…',
+    preparingWallet: 'Menyiapkan dompet…',
+    preparingWalletTimeout: 'Terlalu lama. Coba lagi.',
     back: 'Kembali',
     close: 'Tutup',
   },

@@ -26,6 +26,7 @@ import {
 import { useSecretScreenshotWarning } from '../../src/seeds/secretScreenshot';
 import { saveSlot } from '../../src/seeds/vault';
 import { useAppState } from '../../src/state/AppState';
+import { isWalletPrepTimeout, yieldOverlayPaint } from '../../src/state/walletPrep';
 
 export default function ImportSeedScreen() {
   const t = useT();
@@ -38,6 +39,7 @@ export default function ImportSeedScreen() {
   const [error, setError] = useState<string | null>(null);
   const [known, setKnown] = useState(false);
   const [consumedClipboard, setConsumedClipboard] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   useSecretScreenshotWarning();
 
   const analysis = useMemo(() => analyzeImport([draft, ...extraShares]), [draft, extraShares]);
@@ -100,7 +102,11 @@ export default function ImportSeedScreen() {
   };
 
   const onImport = async () => {
+    if (busy) {
+      return;
+    }
     setError(null);
+    setBusy(true);
     try {
       if (!model) {
         throw new Error(t('errors.selectSeed'));
@@ -120,11 +126,20 @@ export default function ImportSeedScreen() {
           setError(t('generate.knownVector'));
           return;
         }
-        if (!(await reauthBeforeReveal(t('unlock.prompt')))) {
-          return;
-        }
-        const entropy = entropyFromMnemonic(first);
-        await runWithLoading(t('common.loading'), async () => {
+        let cancelled = false;
+        await runWithLoading(t('common.preparingWallet'), async (signal) => {
+          if (!(await reauthBeforeReveal(t('unlock.prompt')))) {
+            cancelled = true;
+            return;
+          }
+          if (signal.aborted) {
+            return;
+          }
+          await yieldOverlayPaint();
+          if (signal.aborted) {
+            return;
+          }
+          const entropy = entropyFromMnemonic(first);
           const saved = await saveSlot(
             {
               id: newSlotId(),
@@ -140,6 +155,9 @@ export default function ImportSeedScreen() {
           );
           selectSeed(saved);
         });
+        if (cancelled) {
+          return;
+        }
         await clearConsumedClipboard();
         if (router.canDismiss()) {
           router.dismiss();
@@ -148,11 +166,20 @@ export default function ImportSeedScreen() {
         }
         return;
       }
-      if (!(await reauthBeforeReveal(t('unlock.prompt')))) {
-        return;
-      }
-      const secret = combineSlip39(filled, slipPass);
-      await runWithLoading(t('common.loading'), async () => {
+      let cancelled = false;
+      await runWithLoading(t('common.preparingWallet'), async (signal) => {
+        if (!(await reauthBeforeReveal(t('unlock.prompt')))) {
+          cancelled = true;
+          return;
+        }
+        if (signal.aborted) {
+          return;
+        }
+        await yieldOverlayPaint();
+        if (signal.aborted) {
+          return;
+        }
+        const secret = combineSlip39(filled, slipPass);
         const saved = await saveSlot(
           {
             id: newSlotId(),
@@ -170,6 +197,9 @@ export default function ImportSeedScreen() {
         );
         selectSeed(saved);
       });
+      if (cancelled) {
+        return;
+      }
       await clearConsumedClipboard();
       if (router.canDismiss()) {
         router.dismiss();
@@ -177,7 +207,12 @@ export default function ImportSeedScreen() {
         router.back();
       }
     } catch (err) {
+      if (isWalletPrepTimeout(err)) {
+        return;
+      }
       setError(err instanceof Error ? err.message : t('import.invalid'));
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -302,6 +337,7 @@ export default function ImportSeedScreen() {
             testID="import-submit"
             label={t('vault.import')}
             disabled={!analysis.ready}
+            busy={busy}
             onPress={() => void onImport()}
           />
     </Screen>

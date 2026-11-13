@@ -277,6 +277,8 @@ export const en = {
     search: 'Search',
     loading: 'Loading',
     unlocking: 'Unlocking…',
+    preparingWallet: 'Preparing wallet…',
+    preparingWalletTimeout: 'That took too long. Try again.',
     back: 'Back',
     close: 'Close',
   },

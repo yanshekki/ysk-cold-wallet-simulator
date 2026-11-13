@@ -279,6 +279,8 @@ export const ja: MessageTree = {
     search: '検索',
     loading: '読み込み中',
     unlocking: 'ロック解除中…',
+    preparingWallet: 'ウォレットを準備しています…',
+    preparingWalletTimeout: '準備に時間がかかりすぎました。もう一度試してください。',
     back: '戻る',
     close: '閉じる',
   },

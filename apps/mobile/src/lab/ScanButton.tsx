@@ -48,6 +48,7 @@ export function ScanButton({
     <Pressable
       testID={testID}
       accessibilityRole="button"
+      accessibilityState={{ disabled: !!(disabled || busy), busy: !!busy }}
       disabled={disabled || busy}
       onPress={onPress}
       style={({ pressed }) => [

@@ -279,6 +279,8 @@ export const ru: MessageTree = {
     search: 'Поиск',
     loading: 'Загрузка',
     unlocking: 'Разблокировка…',
+    preparingWallet: 'Подготовка кошелька…',
+    preparingWalletTimeout: 'Это заняло слишком много времени. Попробуйте снова.',
     back: 'Назад',
     close: 'Закрыть',
   },

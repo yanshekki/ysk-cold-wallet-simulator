@@ -279,6 +279,8 @@ export const zhHK: MessageTree = {
     search: '搜尋',
     loading: '載入中',
     unlocking: '解鎖中…',
+    preparingWallet: '正在準備錢包…',
+    preparingWalletTimeout: '準備時間過長。請再試一次。',
     back: '返回',
     close: '關閉',
   },

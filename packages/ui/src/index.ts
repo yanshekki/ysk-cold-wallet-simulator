@@ -33,6 +33,7 @@ export { DeviceCard } from './DeviceCard';
 export { PairingTakeover } from './PairingTakeover';
 export { Toast } from './Toast';
 export { LoadingOverlay } from './LoadingOverlay';
+export { loadingOverlayA11y, overlayShowsAnimatedSpinner } from './loadingOverlayA11y';
 export { MnemonicGrid } from './MnemonicGrid';
 export { secretInputProps } from './secretInput';
 export {
