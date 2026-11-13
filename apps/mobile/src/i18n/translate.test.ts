@@ -115,6 +115,18 @@ describe('platform-aware authenticator copy', () => {
     expect(translate('zh-HK', 'signing.notice7702')).toContain('帳戶');
     expect(translate('en', 'device.starting')).toMatch(/Bluetooth/);
     expect(translate('zh-HK', 'device.qrDecoding')).toContain('解碼');
+    expect(translate('en', 'common.preparingWallet')).toBe('Preparing wallet…');
+    expect(translate('zh-HK', 'common.preparingWallet')).toBe('正在準備錢包…');
+    expect(translate('en', 'common.preparingWalletTimeout')).toBe('That took too long. Try again.');
+    expect(translate('zh-HK', 'common.preparingWalletTimeout')).toBe('準備時間過長。請再試一次。');
+    for (const language of LANGUAGES) {
+      const preparing = translate(language, 'common.preparingWallet');
+      const timeout = translate(language, 'common.preparingWalletTimeout');
+      expect(preparing).not.toBe('common.preparingWallet');
+      expect(timeout).not.toBe('common.preparingWalletTimeout');
+      expect(preparing).not.toMatch(/encrypt|decrypt|PBKDF|derive seed|fingerprint|mnemonic/i);
+      expect(timeout).not.toMatch(/encrypt|decrypt|PBKDF|derive seed|fingerprint|mnemonic/i);
+    }
     for (const language of LANGUAGES) {
       const licence = translate(language, 'disclaimer.licenceBody');
       expect(licence).toMatch(/MIT/);

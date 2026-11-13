@@ -1,6 +1,6 @@
 # YSK Cold Wallet Simulator
 
-**版本 1.1.6（組建編號 12）** · [YSK Limited](https://ysk.hk) · [產品頁](https://ysk.hk/products/ysk-cold-wallet-simulator)
+**版本 1.1.7（組建編號 13）** · [YSK Limited](https://ysk.hk) · [產品頁](https://ysk.hk/products/ysk-cold-wallet-simulator)
 
 [Google Play](https://play.google.com/store/apps/details?id=hk.ysk.cws) · [App Store](https://apps.apple.com/us/app/cws-cold-wallet-simulator/id6826850492) · [APK](https://ysk.hk/downloads/CWS-1.1.6-12.apk)
 
@@ -26,7 +26,7 @@ CWS 是模擬器。它不是安全元件。Ledger、Trezor 及 OneKey 均未認�
 
 ## 下載
 
-版本 1.1.6（組建編號 12），保留 1.1.5 的基線，並補上 TON `SIGN_TX` 的 cell 雜湊、`SIGN_DATA` 明文，以及 `GET_ADDRESS_PROOF` 的 TON Connect，使那些 APDU 簽署 LedgerHQ/app-ton 所用的同一組 32 位元組值。種子並非絕對安全。
+版本 1.1.7（組建編號 13），保留 1.1.6 的基線，並在 Face ID／指紋／裝置密碼之後顯示「正在準備錢包…」載入層，避免密語表在錢包準備期間像死機。種子並非絕對安全。
 
 [GitHub Release v1.1.0](https://github.com/yanshekki/ysk-cold-wallet-simulator/releases/tag/v1.1.0) 是唯一的標籤。該頁只有說明，沒有附上 APK、IPA 或桌面安裝包。其後的說明同樣沒有附上二進位檔。見 [releases/README.md](releases/README.md)。
 
@@ -41,7 +41,7 @@ CWS 是模擬器。它不是安全元件。Ledger、Trezor 及 OneKey 均未認�
 
 虛擬 HID 在 Linux（`/dev/uhid`，包括 Ubuntu 安裝包）及 macOS 的 CWS Proxy 應用程式實現。Windows 沒有虛擬 HID。
 
-產品版本 **1.1.6** 與組建編號 **12** 來自 `apps/mobile/app.json` 的 `version`、`versionCode` 及 `buildNumber`。Expo prebuild 會寫入 Android 的 `versionName`／`versionCode`，以及 iOS 的 `CFBundleShortVersionString`／`CFBundleVersion`。隨應用程式發行的工作區套件版本同為 `1.1.6`。macOS 代理程式的行銷版本與組建編號相同。
+產品版本 **1.1.7** 與組建編號 **13** 來自 `apps/mobile/app.json` 的 `version`、`versionCode` 及 `buildNumber`。Expo prebuild 會寫入 Android 的 `versionName`／`versionCode`，以及 iOS 的 `CFBundleShortVersionString`／`CFBundleVersion`。隨應用程式發行的工作區套件版本同為 `1.1.7`。macOS 代理程式的行銷版本與組建編號仍為 **1.1.6（組建編號 12）**；此次改動只限手機。
 
 ## 快速開始
 
@@ -188,7 +188,7 @@ OneKey Mini 沒有藍牙，本軟件不予模擬。
 
 秘密資料以 `WHEN_UNLOCKED_THIS_DEVICE_ONLY` 儲存。正式組建另設定 `requireAuthentication`。助記詞不會寫入剪貼簿。助記詞與份額畫面沒有複製按鈕。匯入只在確認貼上之後才讀取剪貼簿。正式組建在顯示、匯入、儲存、簽署及匯出種子之前，會要求作業系統認證。Android 正式組建在秘密畫面設定 `FLAG_SECURE`。這些略過只在 `__DEV__` 為真時存在。
 
-這不是硬體錢包級安全。熱錢包基線是朝向 Phantom、Rabby 及 MetaMask 手機版的進度。它不是安全元件。1.1.6 仍保留的相容選擇：
+這不是硬體錢包級安全。熱錢包基線是朝向 Phantom、Rabby 及 MetaMask 手機版的進度。它不是安全元件。1.1.7 仍保留的相容選擇：
 
 - WebHID 轉送報告時沒有指令允許清單。
 - 本機 trezord 橋接器聽 `127.0.0.1`，並反映請求的 `Origin`。
@@ -210,6 +210,7 @@ OneKey Mini 沒有藍牙，本軟件不予模擬。
 | [security.md](security.md) | 公開保安說明 |
 | [testing.md](testing.md) | 測過甚麼、沒有測過甚麼 |
 | [releases/README.md](releases/README.md) | 發行說明索引 |
+| [releases/1.1.7.md](releases/1.1.7.md) | 1.1.7（組建編號 13）的雙語發行說明 |
 | [releases/1.1.6.md](releases/1.1.6.md) | 1.1.6（組建編號 12）的雙語發行說明 |
 | [releases/1.1.5.md](releases/1.1.5.md) | 1.1.5（組建編號 11）的雙語發行說明 |
 | [releases/1.1.4.md](releases/1.1.4.md) | 1.1.4（組建編號 10）的雙語發行說明 |

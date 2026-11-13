@@ -55,6 +55,7 @@ import { reauthBeforeReveal } from '../passkeys/secretReauth';
 import { needsSignReauth } from '../passkeys/signGate';
 import { setFaceIdEnabled, unlock as requestUnlock } from '../passkeys';
 import { SecretSession } from '../seeds/secretSession';
+import { WalletPrepTimeoutError, runWalletPrep, yieldOverlayPaint } from './walletPrep';
 import { listSlots, loadEntropy, lockVaultMemory, setVaultAuthPrompt, updateSlotMeta, wipeAllSlots } from '../seeds/vault';
 import {
   DEFAULT_SETTINGS,
@@ -105,7 +106,7 @@ type AppStateValue = {
   startSimulation: () => Promise<void>;
   stopSimulation: () => Promise<void>;
   setApp: (app: LedgerApp) => void;
-  applySessionPassphrase: (value: string) => Promise<boolean>;
+  applySessionPassphrase: (value: string, options?: { signal?: AbortSignal }) => Promise<boolean>;
   clearSessionPassphrase: () => void;
   resolveSigning: (ok: boolean) => void;
   /** True while a screen modal is already up and hosts the signing sheet itself. */
@@ -126,7 +127,7 @@ type AppStateValue = {
   disclaimerAccepted: boolean;
   acceptDisclaimer: () => Promise<void>;
   clearAllData: () => Promise<void>;
-  runWithLoading: <T>(label: string, work: () => Promise<T>) => Promise<T>;
+  runWithLoading: <T>(label: string, work: (signal: AbortSignal) => Promise<T>) => Promise<T>;
 };
 
 const AppStateContext = createContext<AppStateValue | null>(null);
@@ -204,16 +205,17 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setTimeout(() => setToast(null), 1600);
   }, []);
 
-  const runWithLoading = useCallback(async <T,>(label: string, work: () => Promise<T>): Promise<T> => {
-    setLoading(label);
-    await new Promise<void>((resolve) => {
-      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  const runWithLoading = useCallback(async <T,>(label: string, work: (signal: AbortSignal) => Promise<T>): Promise<T> => {
+    const result = await runWalletPrep({
+      show: () => setLoading(label),
+      hide: () => setLoading(null),
+      work,
     });
-    try {
-      return await work();
-    } finally {
-      setLoading(null);
+    if (result.status === 'timeout') {
+      setError(translate(settingsRef.current.language, 'common.preparingWalletTimeout'));
+      throw new WalletPrepTimeoutError();
     }
+    return result.value;
   }, []);
 
   const clearLogs = useCallback(() => {
@@ -545,6 +547,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       const entropy = await loadEntropy(active.id);
       entropyRef.current = entropy;
       secretSession.current.load(entropy, active.backup ?? 'bip39');
+      setLoading(translate(settingsRef.current.language, 'device.starting'));
+      await yieldOverlayPaint();
       handlerRef.current = spawnHandlerRef.current();
       currentAppRef.current = 'dashboard';
       setCurrentApp('dashboard');
@@ -664,13 +668,24 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     appendAppLog('app', `OPEN_APP ${app}`);
   }, [appendAppLog]);
 
-  const applySessionPassphrase = useCallback(async (value: string) => {
+  const applySessionPassphrase = useCallback(async (value: string, options?: { signal?: AbortSignal }) => {
+    const signal = options?.signal;
+    if (signal?.aborted) {
+      return false;
+    }
     try {
       if (!(await reauthBeforeReveal(translate(settingsRef.current.language, 'unlock.prompt')))) {
         return false;
       }
     } catch (err) {
       setError(translate(settingsRef.current.language, err instanceof Error ? err.message : 'unlock.failed'));
+      return false;
+    }
+    if (signal?.aborted) {
+      return false;
+    }
+    await yieldOverlayPaint();
+    if (signal?.aborted) {
       return false;
     }
     try {

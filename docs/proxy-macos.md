@@ -71,7 +71,7 @@ apps/proxy/macos/CWSProxy/DerivedData/Build/Products/Debug/CWS Proxy.app
 
 `apps/proxy/macos/CWSProxy/DerivedData/` is gitignored. Cleaning Derived Data deletes this build.
 
-Bundle id `hk.ysk.cws.proxy`. Display name CWS Proxy. `Info.plist` is `apps/proxy/macos/CWSProxy/CWSProxy/Info.plist`. Marketing version 1.1.6 and build 12 come from the Xcode project, matching `apps/mobile/app.json`.
+Bundle id `hk.ysk.cws.proxy`. Display name CWS Proxy. `Info.plist` is `apps/proxy/macos/CWSProxy/CWSProxy/Info.plist`. Marketing version 1.1.6 and build 12 come from the Xcode project. The phone app is 1.1.7 (build 13); Proxy was not bumped for that mobile-only change.
 
 ## Applications
 
@@ -114,6 +114,7 @@ The proxy only forwards bytes. Signing stays on the phone. Seeds are not absolut
 
 - [security.md](security.md)
 - [store/README.md](store/README.md)
+- [releases/1.1.7.md](releases/1.1.7.md)
 - [releases/1.1.6.md](releases/1.1.6.md)
 - [releases/1.1.4.md](releases/1.1.4.md)
 - [../README.md](../README.md)
@@ -191,7 +192,7 @@ apps/proxy/macos/CWSProxy/DerivedData/Build/Products/Debug/CWS Proxy.app
 
 `apps/proxy/macos/CWSProxy/DerivedData/` 已列入 gitignore。清除 Derived Data 會刪除這個組建。
 
-套件識別碼 `hk.ysk.cws.proxy`。顯示名稱 CWS Proxy。`Info.plist` 是 `apps/proxy/macos/CWSProxy/CWSProxy/Info.plist`。行銷版本 1.1.6 與組建編號 12 來自 Xcode 專案，與 `apps/mobile/app.json` 相同。
+套件識別碼 `hk.ysk.cws.proxy`。顯示名稱 CWS Proxy。`Info.plist` 是 `apps/proxy/macos/CWSProxy/CWSProxy/Info.plist`。行銷版本 1.1.6 與組建編號 12 來自 Xcode 專案。手機應用程式是 1.1.7（組建編號 13）；代理程式沒有因該次只限手機的改動而升版。
 
 ### 「應用程式」資料夾
 
@@ -234,6 +235,7 @@ open "/Applications/CWS Proxy.app"
 
 - [security.md](security.md)
 - [store/README.md](store/README.md)
+- [releases/1.1.7.md](releases/1.1.7.md)
 - [releases/1.1.6.md](releases/1.1.6.md)
 - [releases/1.1.4.md](releases/1.1.4.md)
 - [../README.md](../README.md)

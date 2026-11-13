@@ -1,6 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  AccessibilityInfo,
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  findNodeHandle,
+} from 'react-native';
 import {
   QR_PROFILES,
   defaultQrFormat,
@@ -26,6 +36,7 @@ import {
   Button,
   DeviceCard,
   GroupedSelectSheet,
+  LoadingOverlay,
   Screen,
   SelectSheet,
   Sheet,
@@ -43,6 +54,7 @@ import { QrScanner } from '../../src/qr/QrScanner';
 import { useT } from '../../src/i18n';
 import { SecretScreenshotBoundary } from '../../src/seeds/secretScreenshot';
 import { useAppState } from '../../src/state/AppState';
+import { isWalletPrepTimeout, runWalletPrep } from '../../src/state/walletPrep';
 
 const BRANDS: Brand[] = ['ledger', 'trezor', 'onekey'];
 
@@ -79,6 +91,8 @@ export default function DeviceScreen() {
   const [appPicked, setAppPicked] = useState(false);
   const [passSheet, setPassSheet] = useState(false);
   const [passDraft, setPassDraft] = useState('');
+  const [passPreparing, setPassPreparing] = useState(false);
+  const passActionRef = useRef<View>(null);
   const [qrSheet, setQrSheet] = useState(false);
   const [qr, setQr] = useState<EthAirgapQr | null>(null);
   const [qrProfile, setQrProfile] = useState<QrProfile | null>(null);
@@ -99,6 +113,7 @@ export default function DeviceScreen() {
     if (!advertising) {
       setPassSheet(false);
       setPassDraft('');
+      setPassPreparing(false);
       setAppSheet(false);
       setAppPicked(false);
     }
@@ -141,8 +156,11 @@ export default function DeviceScreen() {
     setBusy(true);
     setLocalError(null);
     try {
-      await runWithLoading(t('device.starting'), () => startSimulation());
+      await runWithLoading(t('common.preparingWallet'), () => startSimulation());
     } catch (err) {
+      if (isWalletPrepTimeout(err)) {
+        return;
+      }
       setLocalError(err instanceof Error ? t(err.message) : t('errors.advertiseFailed'));
     } finally {
       setBusy(false);
@@ -345,15 +363,40 @@ export default function DeviceScreen() {
   }
 
   const closePassSheet = () => {
+    if (passPreparing) {
+      return;
+    }
     setPassDraft('');
     setPassSheet(false);
   };
 
+  const focusPassAction = () => {
+    requestAnimationFrame(() => {
+      const node = findNodeHandle(passActionRef.current);
+      if (node != null) {
+        AccessibilityInfo.setAccessibilityFocus(node);
+      }
+    });
+  };
+
   const onApplyPassphrase = async () => {
-    const ok = await applySessionPassphrase(passDraft);
-    if (ok) {
+    if (passPreparing) {
+      return;
+    }
+    setLocalError(null);
+    const result = await runWalletPrep({
+      show: () => setPassPreparing(true),
+      hide: () => setPassPreparing(false),
+      work: (signal) => applySessionPassphrase(passDraft, { signal }),
+    });
+    if (result.status === 'timeout') {
+      setLocalError(t('common.preparingWalletTimeout'));
+      return;
+    }
+    if (result.value) {
       setPassDraft('');
       setPassSheet(false);
+      focusPassAction();
     }
   };
 
@@ -363,7 +406,20 @@ export default function DeviceScreen() {
       {
         text: t('device.passphraseClear'),
         style: 'destructive',
-        onPress: clearSessionPassphrase,
+        onPress: () => {
+          void (async () => {
+            try {
+              await runWithLoading(t('common.preparingWallet'), async () => {
+                clearSessionPassphrase();
+              });
+              focusPassAction();
+            } catch (err) {
+              if (!isWalletPrepTimeout(err)) {
+                setLocalError(err instanceof Error ? err.message : t('errors.passphraseFailed'));
+              }
+            }
+          })();
+        },
       },
     ]);
   };
@@ -453,6 +509,7 @@ export default function DeviceScreen() {
                         {seed?.backup !== 'slip39' ? (
                           sessionPassphraseApplied ? (
                             <Button
+                              ref={passActionRef}
                               testID="device-passphrase-applied"
                               label={
                                 passphraseFingerprint
@@ -464,6 +521,7 @@ export default function DeviceScreen() {
                             />
                           ) : (
                             <Button
+                              ref={passActionRef}
                               testID="device-passphrase"
                               label={t('device.passphrase')}
                               variant="ghost"
@@ -541,11 +599,23 @@ export default function DeviceScreen() {
       closeLabel={t('common.close')}
       closeIcon={<Ionicons name="close" size={22} color={colors.text} />}
       testID="device-passphrase-sheet"
+      overlay={
+        passPreparing ? <LoadingOverlay visible label={t('common.preparingWallet')} /> : null
+      }
       footer={
-        <Button testID="device-passphrase-apply" label={t('device.passphraseApply')} onPress={onApplyPassphrase} />
+        <Button
+          testID="device-passphrase-apply"
+          label={t('device.passphraseApply')}
+          busy={passPreparing}
+          disabled={passPreparing}
+          onPress={() => void onApplyPassphrase()}
+        />
       }
     >
       <Text style={styles.hint}>{t('device.passphraseHint')}</Text>
+      {localError || error ? (
+        <Text style={styles.error}>{localError ?? error}</Text>
+      ) : null}
       <TextInput
         {...secretInputProps}
         testID="device-passphrase-input"

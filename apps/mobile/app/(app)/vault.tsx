@@ -14,6 +14,7 @@ import {
 import {
   AddressInspector,
   Button,
+  LoadingOverlay,
   MnemonicGrid,
   Screen,
   SeedCard,
@@ -28,6 +29,7 @@ import { reauthBeforeReveal } from '../../src/passkeys/secretReauth';
 import { useSecretScreenshotWarning } from '../../src/seeds/secretScreenshot';
 import { deleteSlot, listSlots, loadEntropy, loadShares } from '../../src/seeds/vault';
 import { useAppState } from '../../src/state/AppState';
+import { isWalletPrepTimeout, runWalletPrep, yieldOverlayPaint } from '../../src/state/walletPrep';
 
 function inspectKey(slot: SeedSlot): string {
   return `${slot.id}:${JSON.stringify(slot.paths ?? {})}`;
@@ -43,6 +45,7 @@ export default function VaultScreen() {
   const [backupWords, setBackupWords] = useState<string | null>(null);
   const [backupShares, setBackupShares] = useState<string[] | null>(null);
   const [accountsSlot, setAccountsSlot] = useState<SeedSlot | null>(null);
+  const [accountsPreparing, setAccountsPreparing] = useState(false);
   const [slotsReady, setSlotsReady] = useState(false);
   const cache = useRef(new Map<string, InspectRow[]>());
   const inspectSeq = useRef(0);
@@ -59,60 +62,54 @@ export default function VaultScreen() {
   }, []);
 
   const loadInspector = useCallback(
-    async (slot: SeedSlot | null) => {
+    async (slot: SeedSlot) => {
       const ticket = ++inspectSeq.current;
-      if (!slot) {
-        setRows([]);
-        setDeriveError(null);
-        return;
-      }
       const key = inspectKey(slot);
       const hit = cache.current.get(key);
       if (hit) {
         setRows(hit);
         setDeriveError(null);
-        return;
+        return true;
       }
       try {
-        let fast: InspectRow[] = [];
-        const secret = await runWithLoading(t('common.loading'), async () => {
+        const merged = await runWithLoading(t('common.preparingWallet'), async (signal) => {
           const entropy = await loadEntropy(slot.id);
-          fast = await inspectAddressesChunked(
+          if (signal.aborted || ticket !== inspectSeq.current) {
+            return null;
+          }
+          const fast = await inspectAddressesChunked(
             entropy,
             slot.backup ?? 'bip39',
             '',
             slot.paths,
             FAST_INSPECT_IDS,
             {
-              shouldAbort: () => ticket !== inspectSeq.current,
-              onChunk: (next) => {
-                if (ticket === inspectSeq.current) {
-                  setRows(next);
-                }
-              },
+              shouldAbort: () => signal.aborted || ticket !== inspectSeq.current,
             },
           );
-          return entropy;
-        });
-        if (ticket !== inspectSeq.current) {
-          return;
-        }
-        setDeriveError(null);
-        setTimeout(() => {
-          if (ticket !== inspectSeq.current) {
-            return;
+          if (signal.aborted || ticket !== inspectSeq.current) {
+            return null;
           }
-          const slow = inspectAddresses(secret, slot.backup ?? 'bip39', '', slot.paths, SLOW_INSPECT_IDS);
-          const merged = [...fast.filter((row) => row.id !== 'ada'), ...slow];
-          cache.current.set(key, merged);
-          setRows(merged);
-        }, 0);
+          const slow = inspectAddresses(entropy, slot.backup ?? 'bip39', '', slot.paths, SLOW_INSPECT_IDS);
+          return [...fast.filter((row) => row.id !== 'ada'), ...slow];
+        });
+        if (ticket !== inspectSeq.current || !merged) {
+          return false;
+        }
+        cache.current.set(key, merged);
+        setRows(merged);
+        setDeriveError(null);
+        return true;
       } catch (err) {
         if (ticket !== inspectSeq.current) {
-          return;
+          return false;
+        }
+        if (isWalletPrepTimeout(err)) {
+          return false;
         }
         setRows([]);
         setDeriveError(err instanceof Error ? err.message : 'could not derive addresses');
+        return false;
       }
     },
     [runWithLoading, t],
@@ -125,8 +122,15 @@ export default function VaultScreen() {
   );
 
   useEffect(() => {
-    void loadInspector(accountsSlot);
-  }, [accountsSlot, loadInspector]);
+    if (!accountsSlot) {
+      return;
+    }
+    const key = inspectKey(accountsSlot);
+    const hit = cache.current.get(key);
+    if (hit) {
+      setRows(hit);
+    }
+  }, [accountsSlot]);
 
   const closePhrase = () => {
     setBackupWords(null);
@@ -167,41 +171,70 @@ export default function VaultScreen() {
 
   const onBackup = async (slot: SeedSlot) => {
     selectSeed(slot);
-    const ok = await reauthBeforeReveal(t('unlock.prompt'));
-    if (!ok) {
-      return;
-    }
     try {
-      if (slot.backup === 'slip39') {
-        const stored = await runWithLoading(t('common.loading'), () => loadShares(slot.id, true));
-        if (!stored || stored.length === 0) {
-          Alert.alert(t('vault.backupShares'), t('vault.backupSlip39'));
+      let cancelled = false;
+      await runWithLoading(t('common.preparingWallet'), async (signal) => {
+        if (!(await reauthBeforeReveal(t('unlock.prompt')))) {
+          cancelled = true;
           return;
         }
-        setBackupShares(stored);
-        return;
-      }
-      await runWithLoading(t('common.loading'), async () => {
+        if (signal.aborted) {
+          return;
+        }
+        await yieldOverlayPaint();
+        if (signal.aborted) {
+          return;
+        }
+        if (slot.backup === 'slip39') {
+          const stored = await loadShares(slot.id, true);
+          if (!stored || stored.length === 0) {
+            Alert.alert(t('vault.backupShares'), t('vault.backupSlip39'));
+            return;
+          }
+          setBackupShares(stored);
+          return;
+        }
         const entropy = await loadEntropy(slot.id, true);
         setBackupWords(mnemonicFromEntropy(entropy));
       });
+      if (cancelled) {
+        return;
+      }
     } catch (err) {
+      if (isWalletPrepTimeout(err)) {
+        return;
+      }
       setDeriveError(err instanceof Error ? err.message : 'backup failed');
     }
   };
 
-  const onOpenAccounts = (slot: SeedSlot) => {
+  const onOpenAccounts = async (slot: SeedSlot) => {
     selectSeed(slot);
-    setAccountsSlot(slot);
+    const ready = await loadInspector(slot);
+    if (ready) {
+      setAccountsSlot(slot);
+    }
   };
 
   const onCreateNear = (slot: SeedSlot) => {
-    void runWithLoading(t('common.loading'), () => refreshNear(slot))
-      .then(async (updated) => {
-        setAccountsSlot(updated);
+    void (async () => {
+      try {
+        const result = await runWalletPrep({
+          show: () => setAccountsPreparing(true),
+          hide: () => setAccountsPreparing(false),
+          work: () => refreshNear(slot),
+        });
+        if (result.status === 'timeout') {
+          Alert.alert(t('common.error'), t('common.preparingWalletTimeout'));
+          return;
+        }
+        cache.current.delete(inspectKey(result.value));
+        setAccountsSlot(result.value);
         await refresh();
-      })
-      .catch((err) => Alert.alert(t('common.error'), err instanceof Error ? err.message : 'NEAR'));
+      } catch (err) {
+        Alert.alert(t('common.error'), err instanceof Error ? err.message : 'NEAR');
+      }
+    })();
   };
 
   const ledgerSlip39 = accountsSlot?.backup === 'slip39' && model?.brand === 'ledger';
@@ -250,7 +283,7 @@ export default function VaultScreen() {
               testID={seed?.id === slot.id ? 'vault-accounts-selected' : `vault-accounts-${slot.id}`}
               label={t('vault.inspectTitle')}
               variant="ghost"
-              onPress={() => onOpenAccounts(slot)}
+              onPress={() => void onOpenAccounts(slot)}
             />
           </View>
         </SeedCard>
@@ -290,10 +323,13 @@ export default function VaultScreen() {
       <Sheet
         visible={!!accountsSlot}
         title={t('vault.inspectTitle')}
-        onClose={closeAccounts}
+        onClose={accountsPreparing ? () => undefined : closeAccounts}
         closeLabel={t('common.close')}
         closeIcon={closeIcon}
         testID="vault-accounts-sheet"
+        overlay={
+          accountsPreparing ? <LoadingOverlay visible label={t('common.preparingWallet')} /> : null
+        }
       >
         {deriveError ? <Text style={styles.error}>{deriveError}</Text> : null}
         {accountsSlot ? (

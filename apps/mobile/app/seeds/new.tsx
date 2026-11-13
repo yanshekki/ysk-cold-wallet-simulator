@@ -26,6 +26,7 @@ import { pickVerify, type VerifyPick } from '../../src/seeds/pickVerify';
 import { useSecretScreenshotWarning } from '../../src/seeds/secretScreenshot';
 import { saveSlot } from '../../src/seeds/vault';
 import { useAppState } from '../../src/state/AppState';
+import { isWalletPrepTimeout, yieldOverlayPaint } from '../../src/state/walletPrep';
 
 const BIP39_COUNTS: Bip39WordCount[] = [12, 15, 18, 21, 24];
 
@@ -133,12 +134,21 @@ export default function NewSeedScreen() {
       setError(t('generate.needSeedAndModel'));
       return;
     }
-    const ok = await reauthBeforeReveal(t('unlock.prompt'));
-    if (!ok) {
-      return;
-    }
+    setBusy(true);
     try {
-      await runWithLoading(t('common.loading'), async () => {
+      let cancelled = false;
+      await runWithLoading(t('common.preparingWallet'), async (signal) => {
+        if (!(await reauthBeforeReveal(t('unlock.prompt')))) {
+          cancelled = true;
+          return;
+        }
+        if (signal.aborted) {
+          return;
+        }
+        await yieldOverlayPaint();
+        if (signal.aborted) {
+          return;
+        }
         const saved = await saveSlot(
           {
             id: newSlotId(),
@@ -156,13 +166,21 @@ export default function NewSeedScreen() {
         );
         selectSeed(saved);
       });
+      if (cancelled) {
+        return;
+      }
       if (router.canDismiss()) {
         router.dismiss();
       } else {
         router.back();
       }
     } catch (err) {
+      if (isWalletPrepTimeout(err)) {
+        return;
+      }
       setError(err instanceof Error ? t(err.message) : t('generate.saveFailed'));
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -344,7 +362,13 @@ export default function NewSeedScreen() {
               ))}
             </>
           ) : null}
-          <Button testID="generate-confirm" label={t('generate.confirm')} disabled={!verified} onPress={() => void confirm()} />
+          <Button
+            testID="generate-confirm"
+            label={t('generate.confirm')}
+            disabled={!verified}
+            busy={busy}
+            onPress={() => void confirm()}
+          />
         </View>
       ) : null}
       {shares.length > 0 ? (
@@ -361,7 +385,12 @@ export default function NewSeedScreen() {
               {index + 1}. {share}
             </Text>
           ))}
-          <Button testID="generate-confirm-shares" label={t('generate.confirm')} onPress={() => void confirm()} />
+          <Button
+            testID="generate-confirm-shares"
+            label={t('generate.confirm')}
+            busy={busy}
+            onPress={() => void confirm()}
+          />
         </View>
       ) : null}
       {error ? (

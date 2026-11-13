@@ -279,6 +279,8 @@ export const ar: MessageTree = {
     search: 'بحث',
     loading: 'جارٍ التحميل',
     unlocking: 'جارٍ فتح القفل…',
+    preparingWallet: 'جارٍ تجهيز المحفظة…',
+    preparingWalletTimeout: 'استغرق ذلك وقتاً أطول مما ينبغي. حاول مرة أخرى.',
     back: 'رجوع',
     close: 'إغلاق',
   },

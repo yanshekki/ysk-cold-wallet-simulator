@@ -279,6 +279,8 @@ export const de: MessageTree = {
     search: 'Suchen',
     loading: 'Laden',
     unlocking: 'Entsperren…',
+    preparingWallet: 'Wallet wird vorbereitet…',
+    preparingWalletTimeout: 'Das hat zu lange gedauert. Bitte erneut versuchen.',
     back: 'Zurück',
     close: 'Schließen',
   },

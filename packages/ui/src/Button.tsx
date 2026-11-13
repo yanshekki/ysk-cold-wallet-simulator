@@ -1,4 +1,5 @@
-import { Platform, Pressable, StyleSheet, Text } from 'react-native';
+import { forwardRef } from 'react';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors, fonts, hairline, radius, space } from './theme';
 
 type Props = {
@@ -6,26 +7,32 @@ type Props = {
   onPress: () => void;
   variant?: 'primary' | 'ghost' | 'danger';
   disabled?: boolean;
+  busy?: boolean;
   testID?: string;
 };
 
-export function Button({ label, onPress, variant = 'primary', disabled, testID }: Props) {
+export const Button = forwardRef<View, Props>(function Button(
+  { label, onPress, variant = 'primary', disabled, busy, testID },
+  ref,
+) {
+  const inactive = !!disabled || !!busy;
   return (
     <Pressable
+      ref={ref}
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={label}
-      accessibilityState={{ disabled: !!disabled }}
+      accessibilityState={{ disabled: inactive, busy: !!busy }}
       collapsable={false}
-      disabled={disabled}
+      disabled={inactive}
       onPress={onPress}
       style={({ pressed }) => [
         styles.base,
         variant === 'primary' && styles.primary,
         variant === 'ghost' && styles.ghost,
         variant === 'danger' && styles.danger,
-        disabled && styles.disabled,
-        pressed && !disabled && styles.pressed,
+        inactive && styles.disabled,
+        pressed && !inactive && styles.pressed,
       ]}
     >
       <Text
@@ -41,7 +48,7 @@ export function Button({ label, onPress, variant = 'primary', disabled, testID }
       </Text>
     </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   base: {
