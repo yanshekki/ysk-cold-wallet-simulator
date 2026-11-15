@@ -1,6 +1,7 @@
 import type { BackupKind, ChainPathId, ConfirmationPort, SigningDetail, SigningRequest } from '@cws/contracts';
 import { base58 } from '@scure/base';
 import { concatBytes, bytesToHex } from '../bytes';
+import { parseSolanaTransaction, solanaSystemTransfers } from './solanaTx';
 import {
   encodeResponse,
   parseBip32Path,
@@ -185,29 +186,7 @@ function familyPath(ctx: FamilyContext, spec: FamilySpec, path: string): string 
   return ctx.confirmation.resolvePath?.(path, chains) ?? path;
 }
 
-function compactU16(bytes: Uint8Array, offset: number): { value: number; next: number } | null {
-  if (offset >= bytes.length) {
-    return null;
-  }
-  const b0 = bytes[offset]!;
-  if (b0 < 0x80) {
-    return { value: b0, next: offset + 1 };
-  }
-  if (offset + 1 >= bytes.length) {
-    return null;
-  }
-  const b1 = bytes[offset + 1]!;
-  if (b1 < 0x80) {
-    return { value: (b0 & 0x7f) | (b1 << 7), next: offset + 2 };
-  }
-  if (offset + 2 >= bytes.length) {
-    return null;
-  }
-  return { value: (b0 & 0x7f) | ((b1 & 0x7f) << 7) | (bytes[offset + 2]! << 14), next: offset + 3 };
-}
-
 const SOL_LAMPORTS = 1_000_000_000n;
-const SYSTEM_TRANSFER = 2;
 
 type SolanaTransfer = {
   to: string;
@@ -215,7 +194,7 @@ type SolanaTransfer = {
 };
 
 type SolanaPreview = {
-  versioned: boolean;
+  version: number | null;
   feePayer: string;
   instructionCount: number;
   lookupCount: number;
@@ -232,103 +211,17 @@ export function formatLamports(lamports: bigint): string {
   return `${sol} (${lamports} lamports)`;
 }
 
-function readU32LE(bytes: Uint8Array, offset: number): number {
-  return (
-    bytes[offset]! |
-    (bytes[offset + 1]! << 8) |
-    (bytes[offset + 2]! << 16) |
-    (bytes[offset + 3]! << 24)
-  ) >>> 0;
-}
-
-function readU64LE(bytes: Uint8Array, offset: number): bigint {
-  let value = 0n;
-  for (let index = 0; index < 8; index += 1) {
-    value |= BigInt(bytes[offset + index]!) << BigInt(index * 8);
-  }
-  return value;
-}
-
-function isSystemProgram(key: Uint8Array): boolean {
-  return key.length === 32 && key.every((byte) => byte === 0);
-}
-
 function parseSolanaMessage(message: Uint8Array): SolanaPreview | null {
-  if (message.length < 4) {
+  const parsed = parseSolanaTransaction(message);
+  if (!parsed || parsed.addresses.length < 1) {
     return null;
   }
-  const versioned = (message[0]! & 0x80) !== 0;
-  let offset = versioned ? 1 : 0;
-  if (offset + 3 > message.length) {
-    return null;
-  }
-  offset += 3;
-  const accounts = compactU16(message, offset);
-  if (!accounts || accounts.value < 1 || accounts.next + accounts.value * 32 > message.length) {
-    return null;
-  }
-  const keys: Uint8Array[] = [];
-  for (let index = 0; index < accounts.value; index += 1) {
-    const start = accounts.next + index * 32;
-    keys.push(message.subarray(start, start + 32));
-  }
-  const feePayer = base58.encode(keys[0]!);
-  const afterBlockhash = accounts.next + accounts.value * 32 + 32;
-  if (afterBlockhash > message.length) {
-    return null;
-  }
-  const instructions = compactU16(message, afterBlockhash);
-  if (!instructions) {
-    return null;
-  }
-  const transfers: SolanaTransfer[] = [];
-  let cursor = instructions.next;
-  let intact = true;
-  for (let index = 0; index < instructions.value; index += 1) {
-    if (cursor >= message.length) {
-      intact = false;
-      break;
-    }
-    const programIndex = message[cursor]!;
-    cursor += 1;
-    const accountIndexes = compactU16(message, cursor);
-    if (!accountIndexes || accountIndexes.next + accountIndexes.value > message.length) {
-      intact = false;
-      break;
-    }
-    const indexes = message.subarray(accountIndexes.next, accountIndexes.next + accountIndexes.value);
-    cursor = accountIndexes.next + accountIndexes.value;
-    const dataLen = compactU16(message, cursor);
-    if (!dataLen || dataLen.next + dataLen.value > message.length) {
-      intact = false;
-      break;
-    }
-    const data = message.subarray(dataLen.next, dataLen.next + dataLen.value);
-    cursor = dataLen.next + dataLen.value;
-    const program = keys[programIndex];
-    if (
-      program &&
-      isSystemProgram(program) &&
-      data.length === 12 &&
-      readU32LE(data, 0) === SYSTEM_TRANSFER &&
-      indexes.length >= 2
-    ) {
-      const recipient = keys[indexes[1]!];
-      if (recipient) {
-        transfers.push({ to: base58.encode(recipient), lamports: readU64LE(data, 4) });
-      }
-    }
-  }
-  if (!intact) {
-    return null;
-  }
-  const lookups = versioned ? compactU16(message, cursor) : null;
   return {
-    versioned,
-    feePayer,
-    instructionCount: instructions.value,
-    lookupCount: lookups?.value ?? 0,
-    transfers,
+    version: parsed.version,
+    feePayer: base58.encode(parsed.addresses[0]!),
+    instructionCount: parsed.instructions.length,
+    lookupCount: parsed.lookupTableCount,
+    transfers: solanaSystemTransfers(parsed),
   };
 }
 
@@ -340,7 +233,8 @@ function formatSolanaPreview(parsed: SolanaPreview): string {
     .map((transfer) => ` · to ${transfer.to} · ${formatLamports(transfer.lamports)}`)
     .join('');
   const count = parsed.instructionCount;
-  return `${parsed.versioned ? 'v0 · ' : ''}fee payer ${parsed.feePayer} · ${count} instruction${count === 1 ? '' : 's'}${lookupText}${transferText}`;
+  const versionText = parsed.version == null ? '' : `v${parsed.version} · `;
+  return `${versionText}fee payer ${parsed.feePayer} · ${count} instruction${count === 1 ? '' : 's'}${lookupText}${transferText}`;
 }
 
 export function previewSolanaMessage(message: Uint8Array): string {

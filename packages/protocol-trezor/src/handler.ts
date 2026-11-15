@@ -40,6 +40,7 @@ import {
   signIcarus,
   signSecp256k1Recoverable,
   u32le,
+  validateTrezorSolanaTransaction,
   wrapSeedPort,
   type SeedCache,
 } from '@cws/protocol-ledger';
@@ -592,6 +593,16 @@ export class TrezorThpProtocolHandler implements ProtocolHandler {
     }
     const coin = COIN_BY_REQUEST.get(type);
     if (coin) {
+      if (type === MessageType.SolanaSignTx) {
+        const decoded = decodePathBytes(payload, 2);
+        if (!validateTrezorSolanaTransaction(decoded.payload)) {
+          return encodeL4(
+            sessionId,
+            MessageType.Failure,
+            encodeFailure(FailureType.DataError, 'Invalid transaction'),
+          );
+        }
+      }
       return this.handleCoin(sessionId, coin, payload);
     }
     return encodeL4(

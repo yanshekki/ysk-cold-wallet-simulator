@@ -41,6 +41,7 @@ import {
   previewTezosOperation,
   previewTronTransfer,
 } from './generic';
+import { encodeV1SystemTransfer } from './solanaTx';
 
 const FOUNDATION = 'test test test test test test test test test test test junk';
 
@@ -842,6 +843,17 @@ describe('Ledger family APDU bodies', () => {
     expect(preview).toContain(`to ${base58.encode(recipient)}`);
     expect(preview).toContain('1 SOL (1000000000 lamports)');
     expect(preview).toContain('1 instruction');
+
+    const v1 = encodeV1SystemTransfer({
+      payer: from,
+      recipient,
+      lamports: 1_000_000_000n,
+      priorityFee: 123456789n,
+      blockhash: new Uint8Array(32),
+    });
+    expect(previewSolanaMessage(v1)).toMatch(/v1 · fee payer /);
+    expect(previewSolanaMessage(v1)).toContain(`to ${base58.encode(recipient)}`);
+    expect(previewSolanaMessage(v1)).toContain('1 SOL (1000000000 lamports)');
 
     const cosmos = Uint8Array.from([0x1a, 11, ...new TextEncoder().encode('cosmoshub-4'), 0x20, 0x01]);
     expect(previewCosmosSignDoc(cosmos)).toBe('chain cosmoshub-4 · account 1');

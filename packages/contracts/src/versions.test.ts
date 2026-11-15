@@ -22,7 +22,7 @@ const EXPECTED = {
     pro2: { firmware: '1.0.3', ble: '1.0.22' },
     neo: { firmware: '1.0.3', ble: '1.0.22' },
   },
-  trezor: { major: 2, minor: 13, patch: 0 },
+  trezor: { major: 2, minor: 13, patch: 1 },
 };
 
 describe('firmware catalog', () => {
@@ -56,7 +56,7 @@ describe('firmware catalog', () => {
     }
   });
 
-  it('reports Trezor Safe 7 2.13.0', () => {
+  it('reports Trezor Safe 7 2.13.1', () => {
     expect(TREZOR_FIRMWARE).toEqual(EXPECTED.trezor);
   });
 });

@@ -5,7 +5,7 @@
  * Ledger ETH: https://github.com/LedgerHQ/app-ethereum/releases/tag/1.23.0
  * Ledger BTC: https://github.com/LedgerHQ/app-bitcoin-new/releases/tag/2.4.2
  * OneKey: https://data.onekey.so/config.json (firmware-v8 / firmware-v1, required:false)
- * Trezor Safe 7: https://data.trezor.io/firmware/t3w1/releases.json (2.13.0, required:false)
+ * Trezor Safe 7: https://data.trezor.io/firmware/t3w1/releases.json (2.13.1, required:false, revision 4289e23)
  *
  * Re-fetch those URLs before bumping. USB-only SKUs are not listed.
  */
@@ -28,7 +28,7 @@ export const LEDGER_OS: Record<string, LedgerOsVersion> = {
 export const TREZOR_FIRMWARE = {
   major: 2,
   minor: 13,
-  patch: 0,
+  patch: 1,
 } as const;
 
 export type OneKeyFirmware = {

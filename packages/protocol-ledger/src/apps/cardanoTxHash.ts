@@ -3,6 +3,7 @@ import { concatBytes } from '../bytes';
 import type { FamilyContext } from './generic';
 import {
   cardanoOutputAddressBytes,
+  isThirdPartyOutputAddressAllowed,
   readShelleyAddress,
   shelleyAddressBytes,
 } from './cardanoAddress';
@@ -429,7 +430,7 @@ async function readOutput(cursor: Cursor, ctx: FamilyContext): Promise<Uint8Arra
     }
     const addressLen = inner.u16();
     const address = addressLen == null ? null : inner.bytes(addressLen);
-    if (!address) {
+    if (!address || !isThirdPartyOutputAddressAllowed(address)) {
       return null;
     }
     return finishOutput(inner, address);

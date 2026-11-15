@@ -8,6 +8,7 @@ import {
   INS_CONTINUE,
   SW_INTERRUPTED,
   buildP2wpkhPsbt,
+  encodeLegacySystemTransfer,
   encodeSignPsbtCommand,
   ledgerFlowFromPsbt,
   prepareSignPsbtInterpreter,
@@ -1611,6 +1612,12 @@ function tzCall(
   };
 }
 
+const SOL_LEGACY_TRANSFER = encodeLegacySystemTransfer({
+  payer: Uint8Array.from({ length: 32 }, (_, index) => (index === 0 ? 1 : 0)),
+  recipient: Uint8Array.from({ length: 32 }, (_, index) => (index === 0 ? 2 : 0)),
+  lamports: 1_000_000_000n,
+});
+
 function tzSign(
   type: number,
   path: number[],
@@ -1892,8 +1899,8 @@ const TREZOR: LabAction[] = [
     section: 'solana',
     en: 'SOL SignTx',
     zh: 'SOL 簽署交易',
-    editor: { path: pathString(PATH_SOL), hex: 'cafebabe' },
-    run: tzSign(TrezorMessageType.SolanaSignTx, PATH_SOL, hexToBytes('0xcafebabe')),
+    editor: { path: pathString(PATH_SOL), hex: bytesToHex(SOL_LEGACY_TRANSFER) },
+    run: tzSign(TrezorMessageType.SolanaSignTx, PATH_SOL, SOL_LEGACY_TRANSFER),
   },
   {
     id: 'tz-ada-addr',
