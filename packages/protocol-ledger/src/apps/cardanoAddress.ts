@@ -16,6 +16,10 @@ import { deriveIcarus, deriveIcarusFromRoot } from './icarus';
 /**
  * LedgerHQ/app-cardano `addressUtilsShelley.c` and `derive_address.c`.
  * Byron (`08`) stays `6D00`. Shelley bytes are header ‖ credentials.
+ *
+ * 8.0.11 (`cbb0bb0bdd738705a7e0f01bbffd161c538cb0bf`) rejects third-party
+ * output and CIP-36 payment addresses whose length does not match the type
+ * (`isValidShelleyAddressLength`, Byron ≤ 108).
  */
 const SW_ADDRESS_PARAMS = 0x6b06;
 const SW_WRONG_DATA = 0x6a87;
@@ -48,6 +52,23 @@ export type ShelleyAddress = {
 type Read = { address: ShelleyAddress; next: number } | null;
 
 const MAINNET_MAGIC = 764824073;
+const ADDRESS_HEADER_LENGTH = 1;
+const ADDRESS_KEY_HASH_LENGTH = 28;
+const BLOCKCHAIN_POINTER_UINT_COUNT = 3;
+const VARIABLE_LENGTH_UINT_MIN_SIZE = 1;
+const SLOT_NO_VARIABLE_LENGTH_MAX_SIZE = 5;
+const TX_INDEX_VARIABLE_LENGTH_MAX_SIZE = 3;
+const CERT_INDEX_VARIABLE_LENGTH_MAX_SIZE = 3;
+/** `securityPolicy.c` `BYRON_ADDRESS_MAX_DISPLAYABLE_SIZE`. */
+export const BYRON_ADDRESS_MAX_DISPLAYABLE_SIZE = 108;
+
+const POINTER_MIN = ADDRESS_HEADER_LENGTH + ADDRESS_KEY_HASH_LENGTH + BLOCKCHAIN_POINTER_UINT_COUNT * VARIABLE_LENGTH_UINT_MIN_SIZE;
+const POINTER_MAX =
+  ADDRESS_HEADER_LENGTH +
+  ADDRESS_KEY_HASH_LENGTH +
+  SLOT_NO_VARIABLE_LENGTH_MAX_SIZE +
+  TX_INDEX_VARIABLE_LENGTH_MAX_SIZE +
+  CERT_INDEX_VARIABLE_LENGTH_MAX_SIZE;
 
 function hard(index: number): number {
   return (index | HARD) >>> 0;
@@ -376,6 +397,70 @@ export async function cardanoOutputAddressBytes(
   address: ShelleyAddress,
 ): Promise<Uint8Array> {
   return address.type === 0x08 ? byronAddressBytes(ctx, address) : shelleyAddressBytes(ctx, address);
+}
+
+export function cardanoHostAddressType(address: Uint8Array): number | null {
+  if (address.length === 0) {
+    return null;
+  }
+  return (address[0]! & 0xf0) >> 4;
+}
+
+export function isSupportedCardanoHostAddressType(type: number): boolean {
+  return (type >= 0 && type <= 8) || type === 0x0e || type === 0x0f;
+}
+
+export function isShelleyHostAddressType(type: number): boolean {
+  return (type >= 0 && type <= 7) || type === 0x0e || type === 0x0f;
+}
+
+function isValidPointerAddressLength(size: number): boolean {
+  return size >= POINTER_MIN && size <= POINTER_MAX;
+}
+
+/** LedgerHQ/app-cardano `isValidShelleyAddressLength`. */
+export function isValidShelleyAddressLength(type: number, size: number): boolean {
+  switch (type) {
+    case 0:
+    case 1:
+    case 2:
+    case 3:
+      return size === ADDRESS_HEADER_LENGTH + ADDRESS_KEY_HASH_LENGTH + ADDRESS_KEY_HASH_LENGTH;
+    case 4:
+    case 5:
+      return isValidPointerAddressLength(size);
+    case 6:
+    case 7:
+    case 0x0e:
+    case 0x0f:
+      return size === ADDRESS_HEADER_LENGTH + ADDRESS_KEY_HASH_LENGTH;
+    default:
+      return false;
+  }
+}
+
+/**
+ * `securityPolicy.c` `is_addressBytes_suitable_for_tx_output` length rules.
+ * Unsupported types and empty buffers are rejected.
+ */
+export function isThirdPartyOutputAddressAllowed(address: Uint8Array): boolean {
+  const type = cardanoHostAddressType(address);
+  if (type == null || !isSupportedCardanoHostAddressType(type)) {
+    return false;
+  }
+  if (type === 8) {
+    return address.length <= BYRON_ADDRESS_MAX_DISPLAYABLE_SIZE;
+  }
+  return isValidShelleyAddressLength(type, address.length);
+}
+
+/** CIP-36 payment destination: Shelley types only, exact length. Byron is denied. */
+export function isCip36PaymentAddressAllowed(address: Uint8Array): boolean {
+  const type = cardanoHostAddressType(address);
+  if (type == null || !isShelleyHostAddressType(type)) {
+    return false;
+  }
+  return isValidShelleyAddressLength(type, address.length);
 }
 
 export async function handleCardanoDeriveAddress(apdu: Apdu, ctx: FamilyContext): Promise<Uint8Array> {

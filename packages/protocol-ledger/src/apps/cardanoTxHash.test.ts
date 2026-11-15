@@ -57,9 +57,10 @@ function cborBytes(data: Uint8Array): Uint8Array {
   return concatBytes(cborMajor(2, BigInt(data.length)), data);
 }
 
-function paymentWire(): { init: Uint8Array; raw: Uint8Array; body: Uint8Array } {
+function paymentWire(
+  address = concatBytes(Uint8Array.of(0x61), new Uint8Array(28).fill(0x22)),
+): { init: Uint8Array; raw: Uint8Array; body: Uint8Array } {
   const txHash = new Uint8Array(32).fill(0x11);
-  const address = concatBytes(Uint8Array.of(0x61), new Uint8Array(28).fill(0x22));
   const output = concatBytes(
     Uint8Array.of(1),
     u16(address.length),
@@ -160,6 +161,28 @@ describe('Cardano canonical transaction body', () => {
     expect(built).not.toBeNull();
     expect(Array.from(built!)).toEqual(Array.from(body));
     expect(Array.from(blake2b(built!, { dkLen: 32 }))).not.toEqual(Array.from(blake2b(raw, { dkLen: 32 })));
+  });
+
+  it('rejects a wrong-length Shelley output the way app-cardano 8.0.11 does', async () => {
+    const longAddress = concatBytes(Uint8Array.of(0x61), new Uint8Array(29).fill(0x22));
+    const { init, raw: badRaw, body } = paymentWire(longAddress);
+    expect(body.length).toBeGreaterThan(0);
+    expect(await cardanoCanonicalBody(init, badRaw, ctx())).toBeNull();
+    expect(await cardanoCanonicalTxHash(init, badRaw, ctx())).toBeNull();
+
+    const nanoX = LEDGER_MODELS.find((model) => model.id === 'nano-x')!;
+    const device = new LedgerProtocolHandler({
+      model: nanoX,
+      confirmation: ctx().confirmation,
+      slotId: 'slot',
+      entropy: ctx().entropy,
+    });
+    device.setApp('cardano');
+    const send = (data: Uint8Array, p1: number) =>
+      roundTrip(device, Uint8Array.from([0xd7, 0x21, p1, 0x00, data.length, ...data]));
+    await send(init, 0x10);
+    const rejected = await send(badRaw, 0x12);
+    expect((rejected[rejected.length - 2]! << 8) | rejected[rejected.length - 1]!).toBe(0x6a80);
   });
 
   it('includes collateral, a script-data hash, a datum, and a token the way a swap does', async () => {

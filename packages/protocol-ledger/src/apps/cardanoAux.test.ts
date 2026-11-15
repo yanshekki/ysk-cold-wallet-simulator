@@ -216,4 +216,38 @@ describe('CIP-36 auxiliary CBOR (aux_data_hash_builder.c)', () => {
     const delegation = await parseV8Cip36Delegation(concatBytes(Uint8Array.of(0), VOTE_KEY, u32(9)), ctx());
     expect(delegation).toEqual({ voteKey: VOTE_KEY, weight: 9 });
   });
+
+  it('rejects a CIP-36 payment address that is not a valid-length Shelley address', async () => {
+    const longPayment = concatBytes(Uint8Array.of(0x61), new Uint8Array(29).fill(0x22));
+    const init = concatBytes(
+      Uint8Array.of(2),
+      u16(0),
+      Uint8Array.of(2),
+      path(STAKE_COMPONENTS),
+      Uint8Array.of(1),
+      u16(longPayment.length),
+      longPayment,
+      u64(NONCE),
+      u64(PURPOSE),
+      Uint8Array.of(0),
+      VOTE_KEY,
+    );
+    expect(await parseV8Cip36Init(init, ctx())).toBeNull();
+
+    const byron = concatBytes(Uint8Array.of(0x82), new Uint8Array(50).fill(0x11));
+    const byronInit = concatBytes(
+      Uint8Array.of(2),
+      u16(0),
+      Uint8Array.of(2),
+      path(STAKE_COMPONENTS),
+      Uint8Array.of(1),
+      u16(byron.length),
+      byron,
+      u64(NONCE),
+      u64(PURPOSE),
+      Uint8Array.of(0),
+      VOTE_KEY,
+    );
+    expect(await parseV8Cip36Init(byronInit, ctx())).toBeNull();
+  });
 });

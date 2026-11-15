@@ -3,7 +3,12 @@ import { concatBytes } from '../bytes';
 import { parseBip32Path } from '../apdu';
 import { icarusRootFor } from '../crypto';
 import type { FamilyContext } from './generic';
-import { cardanoOutputAddressBytes, icarusPublicKey, readShelleyAddress } from './cardanoAddress';
+import {
+  cardanoOutputAddressBytes,
+  icarusPublicKey,
+  isCip36PaymentAddressAllowed,
+  readShelleyAddress,
+} from './cardanoAddress';
 import { cborBytes, cborType, cborUnsigned } from './cardanoTxHash';
 import { deriveIcarus, deriveIcarusFromRoot, signIcarus } from './icarus';
 
@@ -216,7 +221,11 @@ async function readDestination(cursor: Cursor, ctx: FamilyContext): Promise<Uint
   const type = cursor.u8();
   if (type === DEST_THIRD_PARTY) {
     const length = cursor.u16();
-    return length == null ? null : cursor.bytes(length);
+    const address = length == null ? null : cursor.bytes(length);
+    if (!address || !isCip36PaymentAddressAllowed(address)) {
+      return null;
+    }
+    return address;
   }
   if (type === DEST_DEVICE) {
     const read = readShelleyAddress(cursor.rest());

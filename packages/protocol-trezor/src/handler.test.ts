@@ -1,7 +1,17 @@
+import { ed25519 } from '@noble/curves/ed25519';
 import { mnemonicToEntropy, mnemonicToSeedSync } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
 import { describe, expect, it } from 'vitest';
 import { TREZOR_MODELS, type ConfirmationPort, type SigningRequest } from '@cws/contracts';
+import {
+  deriveEd25519PrivateKeyFromSeed,
+  ed25519PublicKey,
+  encodeLegacyStakeInitialize,
+  encodeLegacySystemTransfer,
+  encodeV1SystemTransfer,
+  SOLANA_CLOCK_SYSVAR_ID,
+} from '@cws/protocol-ledger';
+import { base58 } from '@scure/base';
 import { asBytes, concatBytes, encodeUtf8, equalBytes, randomBytes } from './bytes';
 import { derivePrivateKey, ethereumAddressFromPrivateKey, signPersonalMessage } from './crypto';
 import {
@@ -231,7 +241,7 @@ describe('TrezorThpProtocolHandler', () => {
     expect(decoded.initialized).toBe(true);
     expect(decoded.major).toBe(2);
     expect(decoded.minor).toBe(13);
-    expect(decoded.patch).toBe(0);
+    expect(decoded.patch).toBe(1);
   });
 
   it('exports the foundation Ethereum address after confirm', async () => {
@@ -495,6 +505,77 @@ describe('TrezorThpProtocolHandler', () => {
     expect(supplement.type).toBe(MessageType.Failure);
     const finished = await host.app(MessageType.CardanoTxHostAck, new Uint8Array());
     expect(finished.type).toBe(MessageType.CardanoSignTxFinished);
+  });
+
+  it('signs a Solana v1 transfer over the serialized v1 bytes', async () => {
+    const host = new ThpHost();
+    await host.allocate();
+    await host.handshake();
+    await host.pair();
+    await host.app(MessageType.ThpEndRequest, new Uint8Array());
+    const payer = new Uint8Array(32);
+    payer[0] = 1;
+    const recipient = new Uint8Array(32);
+    recipient[0] = 2;
+    const serialized = encodeV1SystemTransfer({
+      payer,
+      recipient,
+      lamports: 1_000_000_000n,
+      priorityFee: 123456789n,
+    });
+    const path = [0x8000002c, 0x800001f5, 0x80000000];
+    const start = await host.app(
+      MessageType.SolanaSignTx,
+      concatBytes(encodeRepeatedUint32(1, path), encodeBytes(2, serialized)),
+    );
+    expect(start.type).toBe(MessageType.ButtonRequest);
+    const done = await host.app(MessageType.ButtonAck, new Uint8Array());
+    expect(done.type).toBe(MessageType.SolanaTxSignature);
+    const signature = decodeFields(done.payload).find((field) => field.field === 1)?.bytes;
+    expect(signature?.length).toBe(64);
+    const seed = mnemonicToSeedSync(FOUNDATION);
+    const privateKey = deriveEd25519PrivateKeyFromSeed(seed, "m/44'/501'/0'");
+    expect(ed25519.verify(signature!, serialized, ed25519PublicKey(privateKey))).toBe(true);
+    const legacy = encodeLegacySystemTransfer({ payer, recipient, lamports: 1_000_000_000n });
+    expect(ed25519.verify(signature!, legacy, ed25519PublicKey(privateKey))).toBe(false);
+  });
+
+  it('rejects a Solana sysvar-slot mismatch as DataError Invalid transaction', async () => {
+    const host = new ThpHost();
+    await host.allocate();
+    await host.handshake();
+    await host.pair();
+    await host.app(MessageType.ThpEndRequest, new Uint8Array());
+    const serialized = encodeLegacyStakeInitialize({
+      stakeAccount: Uint8Array.from({ length: 32 }, (_, index) => (index === 0 ? 1 : 0)),
+      sysvar: base58.decode(SOLANA_CLOCK_SYSVAR_ID),
+    });
+    const reply = await host.app(
+      MessageType.SolanaSignTx,
+      concatBytes(
+        encodeRepeatedUint32(1, [0x8000002c, 0x800001f5, 0x80000000]),
+        encodeBytes(2, serialized),
+      ),
+    );
+    expect(reply.type).toBe(MessageType.Failure);
+    expect(decodeFailure(reply.payload)).toEqual({ code: FailureType.DataError, message: 'Invalid transaction' });
+  });
+
+  it('rejects garbage Solana bytes before ButtonRequest', async () => {
+    const host = new ThpHost();
+    await host.allocate();
+    await host.handshake();
+    await host.pair();
+    await host.app(MessageType.ThpEndRequest, new Uint8Array());
+    const reply = await host.app(
+      MessageType.SolanaSignTx,
+      concatBytes(
+        encodeRepeatedUint32(1, [0x8000002c, 0x800001f5, 0x80000000]),
+        encodeBytes(2, Uint8Array.of(0xca, 0xfe, 0xba, 0xbe)),
+      ),
+    );
+    expect(reply.type).toBe(MessageType.Failure);
+    expect(decodeFailure(reply.payload).message).toBe('Invalid transaction');
   });
 
   it('issues an HMAC credential when the host asks', async () => {

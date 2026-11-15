@@ -1,6 +1,6 @@
 # Trezor, OneKey, and QR wire notes
 
-Maintainer wire notes for the 1.1.7 tree. They are not a product guarantee. Seeds are not absolutely safe.
+Maintainer wire notes for the 1.1.8 tree. They are not a product guarantee. Seeds are not absolutely safe.
 
 Research date: 30 Oct 2026. Ledger APDU stages are in [ledger-apdu.md](ledger-apdu.md). The phased backlog for Trezor, OneKey, QR, Proxy, and the remaining Ledger work is [full-vendor-parity-plan.md](full-vendor-parity-plan.md). This note is the diff for the other protocols this tree actually speaks. Seeds are not absolutely safe.
 
@@ -17,6 +17,8 @@ Every Trezor id in `packages/protocol-trezor/src/messages.ts` matched those file
 | `CardanoTxBodyHash` | absent | 318 | device → host |
 
 Suite sends **317** after the witness. 314 is the auxiliary-data supplement the device would send. Treating 314 as the finish ack completes the sign on the wrong message and ignores the real ack. The constant is now 317. A test sends 314 and expects `Failure`, then 317 and expects `CardanoSignTxFinished` (319).
+
+Trezor Safe 7 Features report **2.13.1**. Solana `SolanaSignTx` (904) parses SIMD-0385 v1 (`0x81`) and rejects a sysvar slot that is not the named sysvar or is an ALT reference (`core/v2.13.1` `4289e23`). Garbage bytes and version 2 fail as `DataError` / `Invalid transaction` before ButtonRequest. KEEP: CIP-0129 DRep display (CWS Cardano sign still rejects certificates), SLIP-24 Cardano change outputs, Omni (CWS never advertised it), and post-tag coin removals on unreleased main.
 
 THP pairing and code-entry ids 1008–1010 and 1018–1028 match `ThpMessageType`. `ThpCreateNewSession` is 1000. KEEP: QR-code pairing (1032/1033) and NFC pairing (1040/1041) are not implemented.
 

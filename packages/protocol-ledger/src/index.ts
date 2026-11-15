@@ -150,3 +150,13 @@ export {
   icarusRootFromEntropy,
   signIcarus,
 } from './apps/icarus';
+export {
+  checkSolanaSysvarAccounts,
+  encodeLegacyStakeInitialize,
+  encodeLegacySystemTransfer,
+  encodeV1SystemTransfer,
+  parseSolanaTransaction,
+  SOLANA_CLOCK_SYSVAR_ID,
+  SOLANA_RENT_SYSVAR_ID,
+  validateTrezorSolanaTransaction,
+} from './apps/solanaTx';

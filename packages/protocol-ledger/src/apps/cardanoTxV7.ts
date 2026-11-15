@@ -3,6 +3,8 @@ import type { FamilyContext } from './generic';
 import {
   cardanoOutputAddressBytes,
   icarusPublicKey,
+  isCip36PaymentAddressAllowed,
+  isThirdPartyOutputAddressAllowed,
   readShelleyAddress,
   shelleyAddressBytes,
 } from './cardanoAddress';
@@ -784,6 +786,9 @@ export class CardanoV7Tx {
     if (destination === DEST_THIRD_PARTY) {
       const length = cursor.u32();
       address = length == null ? null : cursor.bytes(length);
+      if (address && !isThirdPartyOutputAddressAllowed(address)) {
+        return null;
+      }
     } else if (destination === DEST_DEVICE) {
       const tail = data.slice(cursor.offset);
       const read = readShelleyAddress(tail);
@@ -1158,7 +1163,11 @@ export class CardanoV7Tx {
     const type = cursor.u8();
     if (type === DEST_THIRD_PARTY) {
       const length = cursor.u32();
-      return length == null ? null : cursor.bytes(length);
+      const address = length == null ? null : cursor.bytes(length);
+      if (!address || !isCip36PaymentAddressAllowed(address)) {
+        return null;
+      }
+      return address;
     }
     if (type === DEST_DEVICE) {
       const read = readShelleyAddress(cursor.rest());
