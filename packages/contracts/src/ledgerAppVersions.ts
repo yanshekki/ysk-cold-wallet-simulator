@@ -6,6 +6,8 @@ import type { LedgerInstalledApp } from './ledgerApps';
  * Snapshot 29 Oct 2026 of
  * https://manager.api.live.ledger.com/api/applications?provider=1
  * Device version ids: Nano X 9, Stax 17, Flex 135, Nano G5 (Apex P) 136.
+ * 1.24.0 appended 22 Nov 2026 for apps Manager lists on those devices; by-target
+ * defaults are unchanged.
  * Only MAJOR.MINOR.PATCH with each component in 0..255. Cardano 7.0.0 is
  * Ledger's club provider (3) and is not in this default catalog.
  */

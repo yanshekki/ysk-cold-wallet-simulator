@@ -2,6 +2,8 @@
 
 Maintainer contract for CWS 1.1.6 (build 12). Status words are MATCH, FIXED, and KEEP. A KEEP is not a silent success, and a MATCH row is not a claim that a seed is safe. Seeds are not absolutely safe. The phase notes below are the research log for how this matrix was built.
 
+**Weekly parity 1.1.9 (build 15):** Ledger Ethereum app **1.24.0** wire. Sources: [app-ethereum 1.24.0](https://github.com/LedgerHQ/app-ethereum/releases/tag/1.24.0), [`doc/apdu.md`](https://github.com/LedgerHQ/app-ethereum/blob/1.24.0/doc/apdu.md), [`doc/tlv_structs.md`](https://github.com/LedgerHQ/app-ethereum/blob/1.24.0/doc/tlv_structs.md), `src/features/sign_tx/rlp_utils.c`, `eth_ustream.c` (`USTREAM_FAULT` → `SWO_INCORRECT_DATA` `0x6A80`), `src/features/sign_message/cmd_sign_message.c` (V-030), and Manager `applications?provider=1` (Nano X 9 / Stax 17 / Flex 135 / Gen5 136 list 1.24.0; by-target stays 1.22.5). Trezor is still 2.13.1 (`required: false`). Full ERC-7730 clear-sign stays KEEP.
+
 **Weekly parity 1.1.6 (build 12):** TON `SIGN_TX` Wallet V4R2 cell hash, `SIGN_DATA` plaintext, and `GET_ADDRESS_PROOF` TON Connect are FIXED. Sources: LedgerHQ/app-ton `src/transaction/hash.c`, `src/common/cell.c`, `src/sign_data/sign_data_deserialize.c`, `src/proof/proof_deserialize.c`, `src/address.c` `pubkey_to_hash`, `src/crypto.c`, and `doc/TRANSACTION.md` / `doc/COMMANDS.md` (2.9.1 / 849962d). A payload without a matching hint is `BD00`. Parse failures are `B010` / `B011`. Solana INS `21`/`22`, Bitcoin policy HMAC, and Ethereum clear-sign stay KEEP.
 
 **Phase 2 item 2 (KEEP re-diff follow-up):** Tron/XRP/Stellar/Cosmos/Polkadot/TON/Aptos handlers re-diffed against official firmware/hw-app; MATCH/FIXED only with citations + `family.test.ts` KEEP re-diff cases. Cardano operational certificate, CIP-36 vote, native script hash, Shelley and Byron `DERIVE_ADDRESS`, and CIP-8 Shelley address fields are MATCH. Solana `numPaths` must be 1 (`6A80` otherwise) and INS `20` returns a 4-byte challenge. Stellar `GET_CONF` appends `maxDataSize`. The canonical transaction hash is FIXED for v8 and for v7 app 2.2 through 7.2.1, including CIP-36 auxiliary, pool registration, and voting. TON cell hash, SIGN_DATA plaintext, and GET_ADDRESS_PROOF are FIXED in 1.1.6. Solana trusted-name INS `21`/`22`, Bitcoin policy HMAC, and Ethereum clear-sign stay KEEP.
@@ -146,17 +148,17 @@ First-chunk data is `[numPaths][path…][message]`. Each path is a BIP32 depth a
 
 ## Ethereum and Avalanche C-Chain
 
-CLA `E0` for Ethereum and for Avalanche C-Chain (the Avalanche app's own X/P commands use CLA `80`). Current `@ledgerhq/hw-app-eth` `signTransaction` always sends P2 `00` and splits with P1 `00` then `80`. It keeps the last response. The firmware also defines P2 `01` as "store only, return no data". CWS finishes when the RLP is complete, which is what that host sends. An incomplete chunk is an empty `9000` so the next chunk is sent. That is the behavior fixed in #43.
+CLA `E0` for Ethereum and for Avalanche C-Chain (the Avalanche app's own X/P commands use CLA `80`). Current `@ledgerhq/hw-app-eth` `signTransaction` always sends P2 `00` and splits with P1 `00` then `80`. It keeps the last response. The firmware also defines P2 `01` as "store only, return no data". CWS finishes when the RLP is complete, which is what that host sends. An incomplete chunk is an empty `9000` so the next chunk is sent. That is the behavior fixed in #43. App version **1.24.0** is in the Manager index for Nano X / Stax / Flex / Gen5; GET_APP_CONFIGURATION still reports the catalog by-target (**1.22.5**) until the picker selects 1.24.0.
 
 | INS | Role | Intermediate body | Final body | Sheet | Status |
 | --- | --- | --- | --- | --- | --- |
 | `06` | GET_APP_CONFIGURATION | — | 4 (flags, major, minor, patch) | no | MATCH |
 | `02` | address | — | pubkey and address, chain code only if P2 is `01` | when P1 is `01` | MATCH |
-| `04` | sign transaction | 0 until the RLP is complete | 65 (`v`, `r`, `s`) | when the RLP completes | MATCH |
-| `08` | personal_sign | 0 until the declared length arrives | 65 | on the last byte of the message | MATCH |
-| `0C` / `1A` / `1C` | EIP-712 | depends on the clear-sign stream | 65 on the sign | on the sign | MATCH for the hashed and JSON paths already tested |
-| `34` | EIP-7702 | — | 65 | yes | MATCH |
-| `22`, `32`, `36`, `38`, `3A` | domain name, simulation, safe account, gated signing, map entry | — | — | — | KEEP, `6D00`. hw-app-eth `Eth.ts` sends `provideDomainName` as INS `22` (chunked TLV). INS `32` / `36` / `38` / `3A` are in app-ethereum `doc/apdu.md` and are not written by that host package. An empty `9000` would accept an unsigned domain or CAL entry. `12` / `16` / `1E` acknowledge and store nothing |
+| `04` | sign transaction | 0 until the RLP is complete | 65 (`v`, `r`, `s`) | when the RLP completes | MATCH for a canonical payload. FIXED in 1.1.9 when the reported app is ≥ 1.24.0: trailing bytes after a complete RLP item, and non-canonical long-form / single-byte encodings, are `6A80` (`SWO_INCORRECT_DATA`, V-363, `eth_ustream.c` / `rlp_utils.c`). Pre-1.24.0 still slices the prefix |
+| `08` | personal_sign | 0 until the declared length arrives | 65 | on the last byte of the message | MATCH. The length is a full u32; a value with the high 16 bits set is rejected, not truncated (V-030). Cap stays 16384 (official 1.24.0 `MAX_MSG_LENGTH` is 32766). ≥ 1.24.0 uses `6A80` |
+| `0C` / `1A` / `1C` | EIP-712 | depends on the clear-sign stream | 65 on the sign | on the sign | MATCH for hashed V0 (`P2=00`) and JSON/stream V1 (`P2=01`). FIXED in 1.1.9: V2 `P2=02` is not parsed as V1. Mixed V1/V2 is `6980`. Bad V2 `P1` is `6A86`. Malformed TLV is `6A80`. Other `0C` P2 is `6B00`. Schema + values hash-and-sign (raw review) MATCH for the Ether Mail digest in `ethereum.v124.test.ts`. Full ERC-7730 / `PROVIDE OPERATION *` `P2=02` KEEP |
+| `34` | EIP-7702 | — | 65 | yes | MATCH. 1.24.0 Makefile `EIP7702_SUPPORT=1` is opt-in on official; CWS still answers INS `34` |
+| `22`, `32`, `36`, `38`, `3A` | trusted name (1.24.0 rename of domain name), simulation, safe account, gated signing, map entry | — | — | — | KEEP, `6D00`. 1.24.0 `doc/apdu.md` names INS `22` PROVIDE TRUSTED NAME (same INS as PROVIDE DOMAIN NAME). hw-app-eth `Eth.ts` still sends that INS as chunked TLV. An empty `9000` would accept an unsigned domain or CAL entry. `12` / `16` acknowledge and store nothing. `1E` during a V2 flow is `6980`; otherwise it still ACKs |
 
 Avalanche CLA `80` follows `docs/APDUSPEC.md`:
 
@@ -238,7 +240,7 @@ Ledger rows that stay KEEP, and why:
 - Cardano app versions before 2.2. They stay `6A80`. CIP-36 auxiliary, pool registration, and voting on 2.2 through 8.x are FIXED.
 - Solana INS `21` / `22`. The trusted-name check is PKI. INS `20` and a path count of 1 are MATCH.
 - Bitcoin wallet HMAC. The sheet says a zero HMAC was not checked. That label is host-unproven. The key is `CWS/ledger-wallet-hmac`, not the app-bitcoin policy key. CLA `F8` INS `01` has an unarmed hold-forward test.
-- Ethereum INS `22` / `32` / `36` / `38` / `3A`. They stay `6D00`. The domain TLV is CAL-signed.
+- Ethereum INS `22` / `32` / `36` / `38` / `3A`. They stay `6D00`. 1.24.0 renames PROVIDE DOMAIN NAME → PROVIDE TRUSTED NAME (same INS `22`). The TLV is CAL-signed. Generic clear-sign / ERC-7730 stays KEEP.
 - Tron `6A8C`. ECDH and TIP-712 are MATCH. The disabled sign-by-hash setting is not modeled.
 - XRP P2 `80`. The signature would be 64-byte EdDSA over `STX\0` ‖ tx. The SDK derivation call is not copied.
 - Stellar `maxDataSize` is MATCH (Nano X `4096`, other models `8192`).

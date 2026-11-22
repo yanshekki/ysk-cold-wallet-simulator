@@ -88,6 +88,16 @@ describe('ledger app version picks', () => {
     expect(catalogVersion('ethereum', '0')).toBe('1.22.5');
   });
 
+  it('offers Ethereum 1.24.0 from the Manager index without changing the by-target default', () => {
+    const ethereum = ledgerCatalogBase().find((app) => app.id === 'ethereum')!;
+    expect(ethereum.version).toBe('1.22.5');
+    expect(versionsForApp(ethereum, 'nano-x', null)).toContain('1.24.0');
+    expect(versionsForApp(ethereum, 'stax', null)).toContain('1.24.0');
+    expect(versionsForApp(ethereum, 'flex', null)).toContain('1.24.0');
+    expect(versionsForApp(ethereum, 'gen5', null)).toContain('1.24.0');
+    expect(catalogVersion('ethereum', '0')).toBe('1.22.5');
+  });
+
   it('sync keeps the by-target version as the default and drops picks the new list removed', () => {
     const fresh = applyVersionCatalog([cardano], {
       cardano: ['7.2.1', '8.0.10', '8.0.8-rc1', '25.10100.0', '8.0.8'],
