@@ -4,7 +4,7 @@
 
 Phone `hk.ysk.cws` · CWS Proxy `hk.ysk.cws.proxy`
 
-The source tree is **1.1.8 (build 14)**. The only git tag before this note is [v1.1.0](https://github.com/yanshekki/ysk-cold-wallet-simulator/releases/tag/v1.1.0). That GitHub Release attaches no APK, IPA, or desktop package. The notes below attach no binaries either.
+The source tree is **1.1.9 (build 15)**. The only git tag before this note is [v1.1.0](https://github.com/yanshekki/ysk-cold-wallet-simulator/releases/tag/v1.1.0). That GitHub Release attaches no APK, IPA, or desktop package. The notes below attach no binaries either.
 
 Android is on [Google Play](https://play.google.com/store/apps/details?id=hk.ysk.cws). The iOS App Store listing and the CWS Proxy Mac App Store listing are coming soon. A local macOS build is [../proxy-macos.md](../proxy-macos.md).
 
@@ -12,6 +12,7 @@ Seeds are not absolutely safe. The public statement is [../security.md](../secur
 
 | Version | Note |
 | --- | --- |
+| 1.1.9 (build 15) | [1.1.9.md](1.1.9.md) — Ledger Ethereum 1.24.0 SIGN_TX RLP, personal-sign u32, EIP-712 V2 |
 | 1.1.8 (build 14) | [1.1.8.md](1.1.8.md) — Trezor 2.13.1 Solana v1 / sysvar; Ledger Cardano 8.0.11 address length |
 | 1.1.7 (build 13) | [1.1.7.md](1.1.7.md) — preparing-wallet overlay after OS authenticator |
 | 1.1.6 (build 12) | [1.1.6.md](1.1.6.md) — TON SIGN_TX cell hash, SIGN_DATA plaintext, GET_ADDRESS_PROOF TON Connect |
@@ -30,7 +31,7 @@ Each note is historical. A later note does not rewrite an earlier one.
 
 手機套件 `hk.ysk.cws` · CWS Proxy 套件 `hk.ysk.cws.proxy`
 
-原始碼樹是 **1.1.8（組建編號 14）**。此說明之前唯一的 git 標籤是 [v1.1.0](https://github.com/yanshekki/ysk-cold-wallet-simulator/releases/tag/v1.1.0)。該 GitHub Release 沒有附上 APK、IPA 或桌面安裝包。下列說明同樣沒有附上二進位檔。
+原始碼樹是 **1.1.9（組建編號 15）**。此說明之前唯一的 git 標籤是 [v1.1.0](https://github.com/yanshekki/ysk-cold-wallet-simulator/releases/tag/v1.1.0)。該 GitHub Release 沒有附上 APK、IPA 或桌面安裝包。下列說明同樣沒有附上二進位檔。
 
 Android 在 [Google Play](https://play.google.com/store/apps/details?id=hk.ysk.cws)。iOS App Store 與 CWS Proxy 的 Mac App Store 均即將推出。macOS 本機組建見 [../proxy-macos.md](../proxy-macos.md)。
 
@@ -38,6 +39,7 @@ Android 在 [Google Play](https://play.google.com/store/apps/details?id=hk.ysk.c
 
 | 版本 | 說明 |
 | --- | --- |
+| 1.1.9（組建編號 15） | [1.1.9.md](1.1.9.md) — Ledger Ethereum 1.24.0 SIGN_TX RLP、personal-sign u32、EIP-712 V2 |
 | 1.1.8（組建編號 14） | [1.1.8.md](1.1.8.md) — Trezor 2.13.1 Solana v1／sysvar；Ledger Cardano 8.0.11 地址長度 |
 | 1.1.7（組建編號 13） | [1.1.7.md](1.1.7.md) — 系統認證後的「正在準備錢包…」載入層 |
 | 1.1.6（組建編號 12） | [1.1.6.md](1.1.6.md) — TON SIGN_TX cell 雜湊、SIGN_DATA 明文、GET_ADDRESS_PROOF TON Connect |

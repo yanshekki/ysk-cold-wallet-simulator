@@ -2,7 +2,8 @@
  * Host-visible firmware / OS strings. Snapshot 24 Oct 2026.
  *
  * Ledger OS: https://support.ledger.com/article/7103926130845-zd
- * Ledger ETH: https://github.com/LedgerHQ/app-ethereum/releases/tag/1.23.0
+ * Ledger ETH: https://github.com/LedgerHQ/app-ethereum/releases/tag/1.24.0
+ * Manager by-target Ethereum stays 1.22.5; 1.24.0 is in ledgerVersionIndex.json.
  * Ledger BTC: https://github.com/LedgerHQ/app-bitcoin-new/releases/tag/2.4.2
  * OneKey: https://data.onekey.so/config.json (firmware-v8 / firmware-v1, required:false)
  * Trezor Safe 7: https://data.trezor.io/firmware/t3w1/releases.json (2.13.1, required:false, revision 4289e23)

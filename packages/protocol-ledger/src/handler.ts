@@ -167,6 +167,8 @@ export class LedgerProtocolHandler implements ProtocolHandler {
     this.ethSession.pendingTx = undefined;
     this.ethSession.pending712 = undefined;
     this.ethSession.typed712 = undefined;
+    this.ethSession.eip712Flow = undefined;
+    this.ethSession.v2 = undefined;
     this.ethSession.token = undefined;
     this.ethSession.nft = undefined;
     this.ethSession.network = undefined;
