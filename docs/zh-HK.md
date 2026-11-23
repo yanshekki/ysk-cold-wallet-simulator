@@ -41,7 +41,7 @@ CWS 是模擬器。它不是安全元件。Ledger、Trezor 及 OneKey 均未認�
 
 虛擬 HID 在 Linux（`/dev/uhid`，包括 Ubuntu 安裝包）及 macOS 的 CWS Proxy 應用程式實現。Windows 沒有虛擬 HID。
 
-產品版本 **1.1.9** 與組建編號 **15** 來自 `apps/mobile/app.json` 的 `version`、`versionCode` 及 `buildNumber`。Expo prebuild 會寫入 Android 的 `versionName`／`versionCode`，以及 iOS 的 `CFBundleShortVersionString`／`CFBundleVersion`。隨應用程式發行的工作區套件版本同為 `1.1.9`。macOS 代理程式的行銷版本與組建編號仍為 **1.1.6（組建編號 12）**；此次改動只限手機。
+產品版本 **1.1.9** 與組建編號 **15** 來自 `apps/mobile/app.json` 的 `version`、`versionCode` 及 `buildNumber`。Expo prebuild 會寫入 Android 的 `versionName`／`versionCode`，以及 iOS 的 `CFBundleShortVersionString`／`CFBundleVersion`。隨應用程式發行的工作區套件版本同為 `1.1.9`。macOS 代理程式的行銷版本與組建編號為 **1.1.9（組建編號 15）**（Xcode 專案的 `MARKETING_VERSION`／`CURRENT_PROJECT_VERSION`）。
 
 ## 快速開始
 
