@@ -320,8 +320,10 @@ async function handleSignTx(apdu: Apdu, ctx: EthContext): Promise<Uint8Array | n
   if (ethereumAppAtLeast(ETH_APP_1_24_0)) {
     // app-ethereum 1.24.0 V-363: trailing bytes after a complete RLP item and
     // non-canonical length/single-byte encodings are USTREAM_FAULT → 0x6A80.
+    // check_integer in eth_ustream.c also rejects a leading zero on
+    // nonce / gas / value / chainId / v (zero is the empty string 0x80).
     const trailing = needed != null && pending.payload.length > needed;
-    if (trailing || !rlpEncodingCanonical(raw)) {
+    if (trailing || !rlpEncodingCanonical(raw) || !rlpTxIntegersCanonical(raw)) {
       ctx.session.pendingTx = undefined;
       return encodeResponse(new Uint8Array(), SW_INCORRECT_DATA);
     }
@@ -910,6 +912,111 @@ function rlpEncodingCanonical(bytes: Uint8Array): boolean {
   const offset = rlpTypeOffset(bytes);
   const inspected = inspectRlpItem(bytes, offset);
   return inspected != null && inspected.canonical && inspected.end === bytes.length;
+}
+
+/**
+ * Integer fields have no leading zero byte; zero is the empty string.
+ * Official 1.24.0 `check_integer` in `src/features/sign_tx/eth_ustream.c`
+ * (nonce, gas price / fees / limit, value, chainId, v).
+ */
+function rlpTxIntegersCanonical(bytes: Uint8Array): boolean {
+  const offset = rlpTypeOffset(bytes);
+  const outer = rlpItemAt(bytes, offset);
+  if (!outer?.isList) {
+    return false;
+  }
+  const fields: RlpItemView[] = [];
+  let pos = outer.payloadStart;
+  const end = outer.payloadStart + outer.payloadLength;
+  while (pos < end) {
+    const item = rlpItemAt(bytes, pos);
+    if (!item || item.end > end) {
+      return false;
+    }
+    fields.push(item);
+    pos = item.end;
+  }
+  if (pos !== end) {
+    return false;
+  }
+  for (const index of rlpIntegerFieldIndexes(bytes)) {
+    const field = fields[index];
+    if (!field) {
+      continue;
+    }
+    if (field.isList) {
+      return false;
+    }
+    if (field.payloadLength > 0 && bytes[field.payloadStart] === 0) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function rlpIntegerFieldIndexes(bytes: Uint8Array): number[] {
+  if (bytes.length > 1 && bytes[0]! <= 0x04 && bytes[1]! >= 0xc0) {
+    if (bytes[0] === 0x01) {
+      return [0, 1, 2, 3, 5];
+    }
+    return [0, 1, 2, 3, 4, 6];
+  }
+  return [0, 1, 2, 4, 6];
+}
+
+type RlpItemView = {
+  payloadStart: number;
+  payloadLength: number;
+  isList: boolean;
+  end: number;
+};
+
+function rlpItemAt(bytes: Uint8Array, offset: number): RlpItemView | null {
+  if (offset >= bytes.length) {
+    return null;
+  }
+  const prefix = bytes[offset]!;
+  if (prefix <= 0x7f) {
+    return { payloadStart: offset, payloadLength: 1, isList: false, end: offset + 1 };
+  }
+  if (prefix <= 0xb7) {
+    const len = prefix - 0x80;
+    const start = offset + 1;
+    if (bytes.length < start + len) {
+      return null;
+    }
+    return { payloadStart: start, payloadLength: len, isList: false, end: start + len };
+  }
+  if (prefix <= 0xbf) {
+    const lenOfLen = prefix - 0xb7;
+    if (bytes.length < offset + 1 + lenOfLen) {
+      return null;
+    }
+    const len = readInt(bytes, offset + 1, lenOfLen);
+    const start = offset + 1 + lenOfLen;
+    if (bytes.length < start + len) {
+      return null;
+    }
+    return { payloadStart: start, payloadLength: len, isList: false, end: start + len };
+  }
+  if (prefix <= 0xf7) {
+    const len = prefix - 0xc0;
+    const start = offset + 1;
+    if (bytes.length < start + len) {
+      return null;
+    }
+    return { payloadStart: start, payloadLength: len, isList: true, end: start + len };
+  }
+  const lenOfLen = prefix - 0xf7;
+  if (bytes.length < offset + 1 + lenOfLen) {
+    return null;
+  }
+  const len = readInt(bytes, offset + 1, lenOfLen);
+  const start = offset + 1 + lenOfLen;
+  if (bytes.length < start + len) {
+    return null;
+  }
+  return { payloadStart: start, payloadLength: len, isList: true, end: start + len };
 }
 
 function rlpLengthAt(bytes: Uint8Array, offset: number): number | null {

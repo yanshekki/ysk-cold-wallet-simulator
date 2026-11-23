@@ -28,7 +28,7 @@ CWS is a simulator. It is not a secure element. Ledger, Trezor, and OneKey do no
 
 ## Downloads
 
-Version 1.1.9 (build 15). It keeps the 1.1.8 Trezor 2.13.1 baseline and matches Ledger Ethereum app 1.24.0 SIGN_TX RLP rejects, personal-sign u32 lengths, and EIP-712 V2 isolation / Ether Mail hash-and-sign. Seeds are not absolutely safe.
+Version 1.1.9 (build 15). It keeps the 1.1.8 Trezor 2.13.1 baseline and matches Ledger Ethereum app 1.24.0 SIGN_TX RLP rejects (including integer leading zeros), personal-sign u32 lengths, and EIP-712 V2 isolation / Ether Mail hash-and-sign. Seeds are not absolutely safe.
 
 [GitHub Release v1.1.0](https://github.com/yanshekki/ysk-cold-wallet-simulator/releases/tag/v1.1.0) is the only tag. It is notes only: no APK, IPA, or desktop package is attached. Later notes do not attach binaries either. See [docs/releases/README.md](docs/releases/README.md).
 

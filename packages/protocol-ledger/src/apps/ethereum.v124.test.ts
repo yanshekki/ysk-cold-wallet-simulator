@@ -207,14 +207,73 @@ async function sendV2(ins: number, payload: Uint8Array, ctx: ReturnType<typeof e
   return reply!;
 }
 
-function legacyTx(): Uint8Array {
-  const to = new Uint8Array(20).fill(0x11);
-  const inner = concatBytes(
-    Uint8Array.of(0x80, 0x01, 0x82, 0x52, 0x08, 0x94),
-    to,
-    Uint8Array.of(0x80, 0x80, 0x01, 0x80, 0x80),
-  );
+const TO = new Uint8Array(20).fill(0x11);
+const TO_ITEM = concatBytes(Uint8Array.of(0x94), TO);
+
+function rlpListShort(items: Uint8Array[]): Uint8Array {
+  const inner = concatBytes(...items);
+  if (inner.length > 55) {
+    throw new Error('test helper: inner RLP list longer than 55 bytes');
+  }
   return concatBytes(Uint8Array.of(0xc0 + inner.length), inner);
+}
+
+function overlayFields(items: Uint8Array[], fields: Array<Uint8Array | undefined>): Uint8Array[] {
+  const next = items.slice();
+  for (const [index, value] of fields.entries()) {
+    if (value) {
+      next[index] = value;
+    }
+  }
+  return next;
+}
+
+function legacyTx(fields: Array<Uint8Array | undefined> = []): Uint8Array {
+  return rlpListShort(
+    overlayFields(
+      [
+        Uint8Array.of(0x80),
+        Uint8Array.of(0x01),
+        Uint8Array.of(0x82, 0x52, 0x08),
+        TO_ITEM,
+        Uint8Array.of(0x80),
+        Uint8Array.of(0x80),
+        Uint8Array.of(0x01),
+        Uint8Array.of(0x80),
+        Uint8Array.of(0x80),
+      ],
+      fields,
+    ),
+  );
+}
+
+function eip1559Tx(fields: Array<Uint8Array | undefined> = []): Uint8Array {
+  return concatBytes(
+    Uint8Array.of(0x02),
+    rlpListShort(
+      overlayFields(
+        [
+          Uint8Array.of(0x01),
+          Uint8Array.of(0x80),
+          Uint8Array.of(0x01),
+          Uint8Array.of(0x01),
+          Uint8Array.of(0x82, 0x52, 0x08),
+          TO_ITEM,
+          Uint8Array.of(0x80),
+          Uint8Array.of(0x80),
+          Uint8Array.of(0xc0),
+        ],
+        fields,
+      ),
+    ),
+  );
+}
+
+async function signTx(raw: Uint8Array): Promise<Uint8Array> {
+  const data = concatBytes(encodePath(ETH_PATH), raw);
+  const reply = await handleEthereumApdu(parseApdu(encodeApdu(0xe0, 0x04, 0x00, 0x00, data)), ethCtx());
+  expect(reply).not.toBeNull();
+  return reply!;
 }
 
 function expectedTypedSig(digest: Uint8Array): Uint8Array {
@@ -246,20 +305,63 @@ describe('Ledger Ethereum 1.24.0 SIGN_TX RLP', () => {
     setLedgerVersionPicks({ ethereum: '1.24.0' });
     const inner = legacyTx().subarray(1);
     const nonCanonical = concatBytes(Uint8Array.of(0xf8, inner.length), inner);
-    const data = concatBytes(encodePath(ETH_PATH), nonCanonical);
-    const reply = await handleEthereumApdu(parseApdu(encodeApdu(0xe0, 0x04, 0x00, 0x00, data)), ethCtx());
-    expect(statusWord(reply!)).toBe(SW_INCORRECT_DATA);
-    expect(reply!.length).toBe(2);
+    const reply = await signTx(nonCanonical);
+    expect(statusWord(reply)).toBe(SW_INCORRECT_DATA);
+    expect(reply.length).toBe(2);
+  });
+
+  it('rejects non-canonical single-byte RLP (0x81 + byte ≤ 0x7f) with 6A80 when ≥ 1.24.0', async () => {
+    setLedgerVersionPicks({ ethereum: '1.24.0' });
+    const reply = await signTx(legacyTx([undefined, Uint8Array.of(0x81, 0x01)]));
+    expect(statusWord(reply)).toBe(SW_INCORRECT_DATA);
+    expect(reply.length).toBe(2);
+  });
+
+  it.each([
+    ['nonce', [Uint8Array.of(0x82, 0x00, 0x01)]],
+    ['nonce self-encoded zero', [Uint8Array.of(0x00)]],
+    ['gasPrice', [undefined, Uint8Array.of(0x82, 0x00, 0x01)]],
+    ['gasLimit', [undefined, undefined, Uint8Array.of(0x83, 0x00, 0x52, 0x08)]],
+    ['value', [undefined, undefined, undefined, undefined, Uint8Array.of(0x82, 0x00, 0x01)]],
+    ['v', [undefined, undefined, undefined, undefined, undefined, undefined, Uint8Array.of(0x82, 0x00, 0x01)]],
+  ] as Array<[string, Array<Uint8Array | undefined>]>)(
+    'rejects integer leading zeros on %s with 6A80 when ≥ 1.24.0',
+    async (_name, fields) => {
+    setLedgerVersionPicks({ ethereum: '1.24.0' });
+    const reply = await signTx(legacyTx([...fields]));
+    expect(statusWord(reply)).toBe(SW_INCORRECT_DATA);
+    expect(reply.length).toBe(2);
+  });
+
+  it('rejects integer leading zeros on EIP-1559 chainId with 6A80 when ≥ 1.24.0', async () => {
+    setLedgerVersionPicks({ ethereum: '1.24.0' });
+    const reply = await signTx(eip1559Tx([Uint8Array.of(0x82, 0x00, 0x01)]));
+    expect(statusWord(reply)).toBe(SW_INCORRECT_DATA);
+    expect(reply.length).toBe(2);
   });
 
   it('signs a canonical legacy transaction when ≥ 1.24.0', async () => {
     setLedgerVersionPicks({ ethereum: '1.24.0' });
-    const raw = legacyTx();
-    const data = concatBytes(encodePath(ETH_PATH), raw);
-    const reply = await handleEthereumApdu(parseApdu(encodeApdu(0xe0, 0x04, 0x00, 0x00, data)), ethCtx());
-    expect(statusWord(reply!)).toBe(SW_OK);
-    expect(reply!.length).toBe(67);
-    expect(reply![0] === 27 || reply![0] === 28).toBe(true);
+    const reply = await signTx(legacyTx());
+    expect(statusWord(reply)).toBe(SW_OK);
+    expect(reply.length).toBe(67);
+    expect(reply[0] === 27 || reply[0] === 28).toBe(true);
+  });
+
+  it('signs a canonical EIP-1559 transaction when ≥ 1.24.0', async () => {
+    setLedgerVersionPicks({ ethereum: '1.24.0' });
+    const reply = await signTx(eip1559Tx());
+    expect(statusWord(reply)).toBe(SW_OK);
+    expect(reply.length).toBe(67);
+  });
+
+  it('still signs calldata whose first byte is 0x00 when ≥ 1.24.0', async () => {
+    setLedgerVersionPicks({ ethereum: '1.24.0' });
+    const reply = await signTx(
+      legacyTx([undefined, undefined, undefined, undefined, undefined, Uint8Array.of(0x82, 0x00, 0x01)]),
+    );
+    expect(statusWord(reply)).toBe(SW_OK);
+    expect(reply.length).toBe(67);
   });
 
   it('still signs the RLP prefix when trailing bytes arrive on the catalog default', async () => {
@@ -267,6 +369,12 @@ describe('Ledger Ethereum 1.24.0 SIGN_TX RLP', () => {
     const reply = await handleEthereumApdu(parseApdu(encodeApdu(0xe0, 0x04, 0x00, 0x00, data)), ethCtx());
     expect(statusWord(reply!)).toBe(SW_OK);
     expect(reply!.length).toBe(67);
+  });
+
+  it('still signs integer leading zeros on the catalog default', async () => {
+    const reply = await signTx(legacyTx([Uint8Array.of(0x82, 0x00, 0x01)]));
+    expect(statusWord(reply)).toBe(SW_OK);
+    expect(reply.length).toBe(67);
   });
 });
 
@@ -318,6 +426,26 @@ describe('Ledger Ethereum 1.24.0 EIP-712 V2', () => {
   it('refuses V2 sign without schema and values with 6980', async () => {
     const reply = await handleEthereumApdu(parseApdu(encodeApdu(0xe0, 0x0c, 0x00, 0x02, new Uint8Array())), ethCtx());
     expect(statusWord(reply!)).toBe(SW_COMMAND_NOT_ALLOWED);
+  });
+
+  it('refuses V2 sign with Lc ≠ 0 as 6A80', async () => {
+    const reply = await handleEthereumApdu(parseApdu(encodeApdu(0xe0, 0x0c, 0x00, 0x02, Uint8Array.of(0x00))), ethCtx());
+    expect(statusWord(reply!)).toBe(SW_INCORRECT_DATA);
+    expect(reply!.length).toBe(2);
+  });
+
+  it('refuses a malformed EIP-712 V2 schema TLV with 6A80', async () => {
+    const reply = await handleEthereumApdu(parseApdu(v2First(0x1a, Uint8Array.of(0x00))), ethCtx());
+    expect(statusWord(reply!)).toBe(SW_INCORRECT_DATA);
+    expect(reply!.length).toBe(2);
+  });
+
+  it('refuses a malformed EIP-712 V2 values TLV with 6A80', async () => {
+    const ctx = ethCtx();
+    expect(statusWord(await sendV2(0x1a, mailSchema(), ctx))).toBe(SW_OK);
+    const reply = await sendV2(0x1c, Uint8Array.of(0x00), ctx);
+    expect(statusWord(reply)).toBe(SW_INCORRECT_DATA);
+    expect(reply.length).toBe(2);
   });
 
   it('refuses unknown SIGN EIP 712 P2 with 6B00', async () => {

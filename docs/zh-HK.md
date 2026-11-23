@@ -26,7 +26,7 @@ CWS 是模擬器。它不是安全元件。Ledger、Trezor 及 OneKey 均未認�
 
 ## 下載
 
-版本 1.1.9（組建編號 15），保留 1.1.8 的 Trezor 2.13.1 基線，並對齊 Ledger Ethereum 應用程式 1.24.0 的 SIGN_TX RLP 拒絕、personal-sign 完整 u32 長度，以及 EIP-712 V2 隔離／Ether Mail 雜湊簽署。種子並非絕對安全。
+版本 1.1.9（組建編號 15），保留 1.1.8 的 Trezor 2.13.1 基線，並對齊 Ledger Ethereum 應用程式 1.24.0 的 SIGN_TX RLP 拒絕（包括整數前導零）、personal-sign 完整 u32 長度，以及 EIP-712 V2 隔離／Ether Mail 雜湊簽署。種子並非絕對安全。
 
 [GitHub Release v1.1.0](https://github.com/yanshekki/ysk-cold-wallet-simulator/releases/tag/v1.1.0) 是唯一的標籤。該頁只有說明，沒有附上 APK、IPA 或桌面安裝包。其後的說明同樣沒有附上二進位檔。見 [releases/README.md](releases/README.md)。
 
