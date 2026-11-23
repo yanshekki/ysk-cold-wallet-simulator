@@ -2,11 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Linking, Pressable, Text } from 'react-native';
 import { Button, Screen, colors } from '@cws/ui';
-import { useT } from '../../../src/i18n';
+import { useLanguage, useT, yskCwsProxyUrl, yskHomeUrl } from '../../../src/i18n';
 import { settingsStyles as styles } from '../../../src/settings/styles';
-
-const YSK_SITE = 'https://ysk.hk';
-const CWS_PROXY_PAGE = 'https://ysk.hk/products/cws-cold-wallet-simulator#cws-proxy';
 
 const LINKS = [
   { href: '/(app)/settings/language', label: 'settings.language', testID: 'settings-link-language' },
@@ -18,6 +15,7 @@ const LINKS = [
 
 export default function SettingsIndexScreen() {
   const t = useT();
+  const language = useLanguage();
   const router = useRouter();
 
   return (
@@ -51,13 +49,13 @@ export default function SettingsIndexScreen() {
         testID="settings-link-proxy"
         label={t('settings.proxy')}
         variant="ghost"
-        onPress={() => void Linking.openURL(CWS_PROXY_PAGE)}
+        onPress={() => void Linking.openURL(yskCwsProxyUrl(language))}
       />
       <Button
         testID="settings-link-ysk"
         label={t('settings.poweredBy')}
         variant="ghost"
-        onPress={() => void Linking.openURL(YSK_SITE)}
+        onPress={() => void Linking.openURL(yskHomeUrl(language))}
       />
     </Screen>
   );
