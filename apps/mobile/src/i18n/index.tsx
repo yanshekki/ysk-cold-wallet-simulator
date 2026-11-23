@@ -4,6 +4,7 @@ import { translate as translateMessage, type AppLanguage } from './translate';
 
 export type { MessageTree } from './translate';
 export { APP_LANGUAGES, isAppLanguage, isRtl, type AppLanguage } from './translate';
+export { isChineseUiLanguage, yskCwsProxyUrl, yskHomeUrl, yskUrl } from './yskUrl';
 
 export function translate(
   language: AppLanguage,
