@@ -6,6 +6,7 @@ import { useT } from '../../../src/i18n';
 import { settingsStyles as styles } from '../../../src/settings/styles';
 
 const YSK_SITE = 'https://ysk.hk';
+const CWS_PROXY_PAGE = 'https://ysk.hk/products/cws-cold-wallet-simulator#cws-proxy';
 
 const LINKS = [
   { href: '/(app)/settings/language', label: 'settings.language', testID: 'settings-link-language' },
@@ -45,6 +46,12 @@ export default function SettingsIndexScreen() {
         label={t('settings.disclaimer')}
         variant="ghost"
         onPress={() => router.push('/(app)/settings/disclaimer')}
+      />
+      <Button
+        testID="settings-link-proxy"
+        label={t('settings.proxy')}
+        variant="ghost"
+        onPress={() => void Linking.openURL(CWS_PROXY_PAGE)}
       />
       <Button
         testID="settings-link-ysk"

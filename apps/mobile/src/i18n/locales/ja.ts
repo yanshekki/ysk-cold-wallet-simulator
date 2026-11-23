@@ -233,6 +233,7 @@ export const ja: MessageTree = {
     version: 'バージョン',
     privacy: 'プライバシーポリシー',
     disclaimer: '免責',
+    proxy: 'CWS Proxy',
     poweredBy: 'Powered by YSK Limited',
     danger: '危険',
     reset: '設定をリセット',

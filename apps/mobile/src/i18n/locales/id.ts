@@ -233,6 +233,7 @@ export const id: MessageTree = {
     version: 'Versi',
     privacy: 'Kebijakan privasi',
     disclaimer: 'Penafian',
+    proxy: 'CWS Proxy',
     poweredBy: 'Powered by YSK Limited',
     danger: 'Bahaya',
     reset: 'Reset pengaturan',

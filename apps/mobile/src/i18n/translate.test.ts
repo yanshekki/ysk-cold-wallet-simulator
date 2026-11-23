@@ -37,6 +37,14 @@ describe('platform-aware authenticator copy', () => {
     }
   });
 
+  it('labels the Settings CWS Proxy product link in English and zh-HK', () => {
+    expect(translate('en', 'settings.proxy')).toBe('CWS Proxy');
+    expect(translate('zh-HK', 'settings.proxy')).toBe('CWS 代理程式');
+    for (const language of LANGUAGES) {
+      expect(translate(language, 'settings.proxy')).not.toBe('settings.proxy');
+    }
+  });
+
   it('labels hold-to-confirm in English and zh-HK', () => {
     expect(translate('en', 'signing.holdSign')).toBe('Hold to sign');
     expect(translate('en', 'settings.holdDuration')).toContain('seconds');

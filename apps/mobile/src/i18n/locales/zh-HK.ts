@@ -233,6 +233,7 @@ export const zhHK: MessageTree = {
     version: '版本',
     privacy: '私隱政策',
     disclaimer: '免責聲明',
+    proxy: 'CWS 代理程式',
     poweredBy: 'Powered by YSK Limited',
     danger: '危險操作',
     reset: '重設設定',
