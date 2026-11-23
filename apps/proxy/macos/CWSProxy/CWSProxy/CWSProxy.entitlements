@@ -9,5 +9,17 @@
   <string>K897VVZW77</string>
   <key>com.apple.developer.hid.virtual.device</key>
   <true/>
+  <key>com.apple.security.app-sandbox</key>
+  <true/>
+  <key>com.apple.security.cs.allow-jit</key>
+  <true/>
+  <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+  <true/>
+  <key>com.apple.security.network.client</key>
+  <true/>
+  <key>com.apple.security.network.server</key>
+  <true/>
+  <key>com.apple.security.device.bluetooth</key>
+  <true/>
 </dict>
 </plist>
