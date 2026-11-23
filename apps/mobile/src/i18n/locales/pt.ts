@@ -233,6 +233,7 @@ export const pt: MessageTree = {
     version: 'Versão',
     privacy: 'Política de privacidade',
     disclaimer: 'Isenção de responsabilidade',
+    proxy: 'CWS Proxy',
     poweredBy: 'Powered by YSK Limited',
     danger: 'Perigo',
     reset: 'Repor definições',

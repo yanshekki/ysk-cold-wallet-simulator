@@ -85,4 +85,6 @@ tags:
 - assertVisible:
     id: "settings-link-disclaimer"
 - assertVisible:
+    id: "settings-link-proxy"
+- assertVisible:
     id: "settings-link-ysk"

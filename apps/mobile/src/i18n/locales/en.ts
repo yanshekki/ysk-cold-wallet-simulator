@@ -231,6 +231,7 @@ export const en = {
     version: 'Version',
     privacy: 'Privacy policy',
     disclaimer: 'Disclaimer',
+    proxy: 'CWS Proxy',
     poweredBy: 'Powered by YSK Limited',
     danger: 'Danger',
     reset: 'Reset settings',
