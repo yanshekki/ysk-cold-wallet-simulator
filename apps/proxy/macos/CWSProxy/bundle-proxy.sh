@@ -73,11 +73,15 @@ cp "$ROOT/apps/proxy/ui/"* "$RESOURCES/ui/"
 IDENTITY="${EXPANDED_CODE_SIGN_IDENTITY:-}"
 if [ -n "$IDENTITY" ] && [ "$IDENTITY" != "-" ]; then
   ENTITLEMENTS="$SRCROOT/CWSProxy/node.entitlements"
-  codesign --force --sign "$IDENTITY" \
+  SIGN_FLAGS=(--force --sign "$IDENTITY" --options runtime)
+  if [ "${CONFIGURATION:-}" != "Debug" ]; then
+    SIGN_FLAGS+=(--timestamp)
+  fi
+  codesign "${SIGN_FLAGS[@]}" \
     --identifier hk.ysk.cws.proxy.node \
     --entitlements "$ENTITLEMENTS" \
     "$RESOURCES/node"
   for lib in "$RESOURCES/proxy/node_modules/@cws/native-proxy"/*.node; do
-    codesign --force --sign "$IDENTITY" --identifier hk.ysk.cws.proxy.native "$lib"
+    codesign "${SIGN_FLAGS[@]}" --identifier hk.ysk.cws.proxy.native "$lib"
   done
 fi

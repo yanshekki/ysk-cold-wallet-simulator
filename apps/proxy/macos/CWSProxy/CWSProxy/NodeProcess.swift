@@ -28,6 +28,8 @@ final class NodeProcess {
     child.executableURL = node
     child.arguments = [main.path, "--ui-port", "\(uiURL.port ?? 8788)"]
     var env = ProcessInfo.processInfo.environment
+    env["HOME"] = FileManager.default.homeDirectoryForCurrentUser.path
+    env["TMPDIR"] = FileManager.default.temporaryDirectory.path
     env["CWS_HID_SOCKET"] = hidSocket
     env["CWS_BLE_SOCKET"] = bleSocket
     env["CWS_NO_OPEN"] = "1"
