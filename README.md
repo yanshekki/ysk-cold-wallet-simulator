@@ -43,7 +43,7 @@ Version 1.1.9 (build 15). It keeps the 1.1.8 Trezor 2.13.1 baseline and matches 
 
 Virtual HID exists for Linux (`/dev/uhid`, including the Ubuntu package) and for the macOS CWS Proxy app. It is not implemented for Windows.
 
-Product version **1.1.9** and build **15** come from `apps/mobile/app.json` (`version`, `versionCode`, `buildNumber`). Expo prebuild writes the Android `versionName` / `versionCode` and the iOS `CFBundleShortVersionString` / `CFBundleVersion`. Workspace packages that ship with the app are version `1.1.9`. The macOS proxy marketing version and build remain **1.1.6 (build 12)**; this change is mobile-only.
+Product version **1.1.9** and build **15** come from `apps/mobile/app.json` (`version`, `versionCode`, `buildNumber`). Expo prebuild writes the Android `versionName` / `versionCode` and the iOS `CFBundleShortVersionString` / `CFBundleVersion`. Workspace packages that ship with the app are version `1.1.9`. The macOS proxy marketing version and build are **1.1.9 (build 15)** (`MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` in the Xcode project).
 
 ## Quick start
 

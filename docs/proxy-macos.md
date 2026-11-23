@@ -2,7 +2,7 @@
 
 **YSK Limited** · [ysk.hk/products/ysk-cold-wallet-simulator](https://ysk.hk/products/ysk-cold-wallet-simulator)
 
-CWS Proxy bundle `hk.ysk.cws.proxy` · version **1.1.6 (build 12)**
+CWS Proxy bundle `hk.ysk.cws.proxy` · version **1.1.9 (build 15)**
 
 Seeds are not absolutely safe. The proxy forwards bytes. Signing stays on the phone. Read [security.md](security.md) before you use a secret.
 
@@ -71,7 +71,7 @@ apps/proxy/macos/CWSProxy/DerivedData/Build/Products/Debug/CWS Proxy.app
 
 `apps/proxy/macos/CWSProxy/DerivedData/` is gitignored. Cleaning Derived Data deletes this build.
 
-Bundle id `hk.ysk.cws.proxy`. Display name CWS Proxy. `Info.plist` is `apps/proxy/macos/CWSProxy/CWSProxy/Info.plist`. Marketing version 1.1.6 and build 12 come from the Xcode project. The phone app is 1.1.9 (build 15); Proxy was not bumped for that mobile-only change.
+Bundle id `hk.ysk.cws.proxy`. Display name CWS Proxy. `Info.plist` is `apps/proxy/macos/CWSProxy/CWSProxy/Info.plist`. Marketing version 1.1.9 and build 15 come from the Xcode project. The phone app is 1.1.9 (build 15).
 
 ## Applications
 
@@ -124,7 +124,7 @@ The proxy only forwards bytes. Signing stays on the phone. Seeds are not absolut
 
 **YSK Limited** · [ysk.hk/products/ysk-cold-wallet-simulator](https://ysk.hk/products/ysk-cold-wallet-simulator)
 
-CWS Proxy 套件識別碼 `hk.ysk.cws.proxy` · 版本 **1.1.6（組建編號 12）**
+CWS Proxy 套件識別碼 `hk.ysk.cws.proxy` · 版本 **1.1.9（組建編號 15）**
 
 種子並非絕對安全。代理程式只轉送位元組。簽署留在手機上。使用秘密資料之前，請先閱讀 [security.md](security.md)。
 
@@ -193,7 +193,7 @@ apps/proxy/macos/CWSProxy/DerivedData/Build/Products/Debug/CWS Proxy.app
 
 `apps/proxy/macos/CWSProxy/DerivedData/` 已列入 gitignore。清除 Derived Data 會刪除這個組建。
 
-套件識別碼 `hk.ysk.cws.proxy`。顯示名稱 CWS Proxy。`Info.plist` 是 `apps/proxy/macos/CWSProxy/CWSProxy/Info.plist`。行銷版本 1.1.6 與組建編號 12 來自 Xcode 專案。手機應用程式是 1.1.9（組建編號 15）；代理程式沒有因該次只限手機的改動而升版。
+套件識別碼 `hk.ysk.cws.proxy`。顯示名稱 CWS Proxy。`Info.plist` 是 `apps/proxy/macos/CWSProxy/CWSProxy/Info.plist`。行銷版本 1.1.9 與組建編號 15 來自 Xcode 專案。手機應用程式是 1.1.9（組建編號 15）。
 
 ### 「應用程式」資料夾
 
