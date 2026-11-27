@@ -1,15 +1,11 @@
 import { Platform } from 'react-native';
 import type { GATTCharacteristicPermission } from 'munim-bluetooth';
+import { CWS_PERIPHERAL_ID, bleGapLocalName, type DeviceModel } from '@cws/contracts';
 import {
-  CWS_PERIPHERAL_ID,
-  bleGapLocalName,
-  foldBlePeripheralIdWrite,
-  type DeviceModel,
-  type ProtocolHandler,
-} from '@cws/contracts';
-import { DEFAULT_MTU, splitNotify } from '@cws/sdk';
-import { bleSignHostGate } from './bleSignGate';
-import { bytesToHex, hexToBytes } from './hex';
+  createPeripheralLink,
+  type AdvertiseOptions,
+  type PeripheralOs,
+} from './peripheralLink';
 import type { HandlerSource, PeripheralCallbacks, PeripheralHandle } from './types';
 
 export type { PeripheralCallbacks, PeripheralHandle };
@@ -26,30 +22,10 @@ function delay(ms: number): Promise<void> {
   });
 }
 
-function notifyMtu(model: DeviceModel, incomingLength: number): number {
-  if (model.protocol === 'thp') {
-    return Math.max(DEFAULT_MTU, incomingLength);
-  }
-  // iOS notify default is 20 bytes. Using the incoming write size as MTU
-  // makes GET_VERSION / DeviceInfo replies larger than the central can
-  // accept, so CoreBluetooth drops the update and the host times out.
-  return DEFAULT_MTU;
-}
-
 function unsubscribe(sub: Subscription): void {
   if (typeof sub === 'function') {
     sub();
   }
-}
-
-function sameBleUuid(left?: string, right?: string): boolean {
-  if (!left || !right) {
-    return false;
-  }
-  const normalize = (value: string) => value.replace(/-/g, '').toLowerCase();
-  const a = normalize(left);
-  const b = normalize(right);
-  return a === b || a.endsWith(b) || b.endsWith(a);
 }
 
 function mapBleError(error: unknown): Error {
@@ -150,8 +126,8 @@ function waitForAdvertisingStarted(ble: BleModule): {
   };
 }
 
-function resolveHandler(handler: HandlerSource): ProtocolHandler {
-  return typeof handler === 'function' ? handler() : handler;
+function peripheralOs(): PeripheralOs {
+  return Platform.OS === 'android' ? 'android' : 'ios';
 }
 
 export async function startAdvertising(
@@ -174,6 +150,10 @@ export async function startAdvertising(
     token: options?.identityToken,
     suffix: options?.nameSuffix,
   });
+  const advertiseOptions: AdvertiseOptions = {
+    serviceUUIDs: [model.serviceUUID],
+    localName,
+  };
 
   try {
     ble.stopAdvertising();
@@ -188,6 +168,7 @@ export async function startAdvertising(
   }
 
   const subscriptions: Subscription[] = [];
+  let advertisingReady = false;
 
   subscriptions.push(ble.addEventListener('adapterStateChanged', () => undefined));
 
@@ -195,117 +176,61 @@ export async function startAdvertising(
     ble.addEventListener('advertisingStartFailed', (event) => {
       const message = advertiseFailureMessage(event);
       callbacks.onLog('out', '', message);
-      callbacks.onError?.(message);
+      // After the first successful start, a later Android readvertise must not
+      // tear the session down. The GATT server stays up for a host reconnect.
+      if (!advertisingReady) {
+        callbacks.onError?.(message);
+      }
     }),
   );
 
-  let writeEpoch = 0;
-  let idWritePending: Uint8Array | null = null;
+  const link = createPeripheralLink({
+    platform: peripheralOs(),
+    model,
+    handler,
+    callbacks,
+    advertiseOptions,
+    notifyGapMs: NOTIFY_GAP_MS,
+    delay,
+    ble: {
+      startAdvertising: (next) => {
+        ble.startAdvertising(next);
+      },
+      updateCharacteristicValue: (serviceUUID, characteristicUUID, value, notify) =>
+        ble.updateCharacteristicValue(serviceUUID, characteristicUUID, value, notify),
+      respondToPeripheralWriteRequest: (requestId, accept) =>
+        ble.respondToPeripheralWriteRequest(requestId, accept),
+    },
+  });
+
   subscriptions.push(
     ble.addEventListener('peripheralSubscribed', (event) => {
-      writeEpoch += 1;
-      if (!event.characteristicUUID || sameBleUuid(event.characteristicUUID, model.notifyCharUUID)) {
-        callbacks.onConnected(event.centralId ?? 'host');
-      }
-      resolveHandler(handler).resetLink?.();
+      link.onSubscribed(event);
     }),
   );
-
   subscriptions.push(
-    ble.addEventListener('peripheralUnsubscribed', () => {
-      writeEpoch += 1;
-      bleSignHostGate.setCentral(null);
-      resolveHandler(handler).resetLink?.();
-      callbacks.onDisconnected();
+    ble.addEventListener('peripheralUnsubscribed', (event) => {
+      link.onUnsubscribed(event);
     }),
   );
-
-  let writeTail = Promise.resolve();
   subscriptions.push(
     ble.addEventListener('peripheralWriteRequest', (event) => {
-      if (event.responseRequired && event.requestId) {
-        void ble.respondToPeripheralWriteRequest(event.requestId, true).catch(() => undefined);
-      }
-      if (sameBleUuid(event.characteristicUUID, CWS_PERIPHERAL_ID.writeCharUUID)) {
-        try {
-          const chunk = event.value ? hexToBytes(event.value) : new Uint8Array();
-          const folded = foldBlePeripheralIdWrite(idWritePending, event.offset ?? 0, chunk);
-          idWritePending = folded.pending;
-          if (folded.id) {
-            callbacks.onPeripheralId?.(folded.id);
-          }
-        } catch {
-          idWritePending = null;
-        }
-        return;
-      }
-      const epoch = writeEpoch;
-      writeTail = writeTail
-        .then(async () => {
-          if (epoch !== writeEpoch) {
-            return;
-          }
-          if (!event.value) {
-            return;
-          }
-          const centralId = event.centralId ?? 'host';
-          bleSignHostGate.setCentral(centralId);
-          callbacks.onConnected(centralId);
-          const incoming = hexToBytes(event.value);
-          const hex = bytesToHex(incoming);
-          callbacks.onLog('in', hex, `GATT write ${event.characteristicUUID ?? ''}`.trim());
-          bleSignHostGate.beginWrite();
-          let outgoing: Uint8Array | null;
-          try {
-            outgoing = await resolveHandler(handler).handleWrite(incoming);
-          } finally {
-            bleSignHostGate.endWrite();
-          }
-          if (epoch !== writeEpoch || !outgoing || outgoing.length === 0) {
-            return;
-          }
-          const packets = splitNotify(model, outgoing, notifyMtu(model, incoming.length));
-          for (let index = 0; index < packets.length; index += 1) {
-            if (epoch !== writeEpoch) {
-              return;
-            }
-            const packet = packets[index];
-            const packetHex = bytesToHex(packet);
-            callbacks.onLog('out', packetHex, 'GATT notify');
-            await ble.updateCharacteristicValue(
-              model.serviceUUID,
-              model.notifyCharUUID,
-              packetHex,
-              true,
-            );
-            if (index < packets.length - 1) {
-              await delay(NOTIFY_GAP_MS);
-            }
-          }
-        })
-        .catch((error) => {
-          callbacks.onLog(
-            'out',
-            '',
-            error instanceof Error ? error.message : 'write handling failed',
-          );
-        });
+      void link.onWriteRequest(event);
     }),
   );
 
   const started = waitForAdvertisingStarted(ble);
   try {
-    ble.startAdvertising({
-      serviceUUIDs: [model.serviceUUID],
-      localName,
-    });
+    ble.startAdvertising(advertiseOptions);
   } catch (error) {
     started.cancel(mapBleError(error));
   }
   try {
     await started.promise;
+    advertisingReady = true;
     callbacks.onLog('out', '', `Advertising as ${localName}`);
   } catch (error) {
+    link.stop();
     for (const sub of subscriptions) {
       unsubscribe(sub);
     }
@@ -319,6 +244,7 @@ export async function startAdvertising(
 
   return {
     stop: async () => {
+      link.stop();
       for (const sub of subscriptions) {
         unsubscribe(sub);
       }
