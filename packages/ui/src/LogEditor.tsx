@@ -30,6 +30,7 @@ import {
 } from './logQuery';
 import { KeyboardAvoidingView } from './keyboard';
 import { colors, fonts, hairline, radius, space } from './theme';
+import { userActivityViewProps } from './userActivity';
 
 export type LogEditorLabels = {
   search?: string;
@@ -171,7 +172,12 @@ export function LogEditor({
   );
 
   return (
-    <KeyboardAvoidingView behavior="padding" automaticOffset style={styles.root}>
+    <KeyboardAvoidingView
+      behavior="padding"
+      automaticOffset
+      style={styles.root}
+      {...userActivityViewProps()}
+    >
       <View style={styles.instrument}>
       <View style={styles.chips}>
         <Chip testID="log-filter-all" label={L.all} active={filter === 'all'} onPress={() => setFilter('all')} />

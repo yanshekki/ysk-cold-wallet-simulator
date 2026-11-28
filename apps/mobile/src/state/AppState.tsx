@@ -8,7 +8,9 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { Keyboard, View } from 'react-native';
 import * as Crypto from 'expo-crypto';
+import { setUserActivityReporter, userActivityViewProps } from '@cws/ui';
 import type {
   ConfirmationPort,
   DeviceModel,
@@ -55,6 +57,7 @@ import { reauthBeforeReveal } from '../passkeys/secretReauth';
 import { needsSignReauth } from '../passkeys/signGate';
 import { setFaceIdEnabled, unlock as requestUnlock } from '../passkeys';
 import { SecretSession } from '../seeds/secretSession';
+import { createIdleLockSession, minutesToIdleMs } from './idleLock';
 import { WalletPrepTimeoutError, runWalletPrep, yieldOverlayPaint } from './walletPrep';
 import { listSlots, loadEntropy, lockVaultMemory, setVaultAuthPrompt, updateSlotMeta, wipeAllSlots } from '../seeds/vault';
 import {
@@ -171,6 +174,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const logSeq = useRef(0);
   const settingsRef = useRef(settings);
   const seedRef = useRef(seed);
+  const lockRef = useRef<() => void>(() => {});
+  const idleRef = useRef<ReturnType<typeof createIdleLockSession> | null>(null);
+  idleRef.current ??= createIdleLockSession(() => {
+    lockRef.current();
+  });
   settingsRef.current = settings;
   seedRef.current = seed;
 
@@ -233,6 +241,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setSettings(next);
     setFaceIdEnabled(next.faceIdEnabled);
     setVaultAuthPrompt(translate(next.language, 'vault.authPrompt'));
+    if (patch.autoLockMinutes != null && idleRef.current?.isArmed()) {
+      const deadline = idleRef.current.setIdleMs(minutesToIdleMs(next.autoLockMinutes));
+      setUnlockedUntil(deadline);
+    }
     await saveSettings(next);
   }, []);
 
@@ -344,7 +356,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     try {
       const ok = await requestUnlock(translate(settingsRef.current.language, 'unlock.prompt'));
       if (ok) {
-        setUnlockedUntil(Date.now() + settingsRef.current.autoLockMinutes * 60 * 1000);
+        const deadline = idleRef.current?.start(minutesToIdleMs(settingsRef.current.autoLockMinutes)) ?? null;
+        setUnlockedUntil(deadline);
         setError(null);
       }
       return ok;
@@ -384,27 +397,29 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   }, [appendAppLog]);
 
   const lock = useCallback(() => {
+    idleRef.current?.stop();
     void stopSimulation();
     lockVaultMemory();
     publicReadBatchRef.current.reset();
     setError(null);
     setUnlockedUntil(null);
   }, [stopSimulation]);
+  lockRef.current = lock;
 
   useEffect(() => {
-    if (unlockedUntil == null) {
-      return;
-    }
-    const remaining = unlockedUntil - Date.now();
-    if (remaining <= 0) {
-      lock();
-      return;
-    }
-    const timer = setTimeout(() => {
-      lock();
-    }, remaining);
-    return () => clearTimeout(timer);
-  }, [lock, unlockedUntil]);
+    const onActivity = () => {
+      const deadline = idleRef.current?.noteActivity() ?? null;
+      if (deadline != null) {
+        setUnlockedUntil(deadline);
+      }
+    };
+    setUserActivityReporter(onActivity);
+    const keyboard = Keyboard.addListener('keyboardDidShow', onActivity);
+    return () => {
+      setUserActivityReporter(null);
+      keyboard.remove();
+    };
+  }, []);
 
   const refreshNear = useCallback(
     async (slot: SeedSlot) => {
@@ -460,6 +475,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     clearLogEntries();
     setDisclaimerAccepted(false);
     setError(null);
+    idleRef.current?.stop();
     setUnlockedUntil(null);
     currentAppRef.current = 'dashboard';
     setCurrentApp('dashboard');
@@ -853,24 +869,26 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   return (
     <AppStateContext.Provider value={value}>
       <I18nProvider language={settings.language}>
-        {children}
-        {bleHostCentral != null ? (
-          <BleHostSheet
-            centralId={bleHostCentral}
-            onAllow={() => {
-              const allowResolve = bleHostResolveRef.current;
-              bleHostResolveRef.current = null;
-              setBleHostCentral(null);
-              allowResolve?.(true);
-            }}
-            onReject={() => {
-              const allowResolve = bleHostResolveRef.current;
-              bleHostResolveRef.current = null;
-              setBleHostCentral(null);
-              allowResolve?.(false);
-            }}
-          />
-        ) : null}
+        <View style={{ flex: 1 }} collapsable={false} {...userActivityViewProps()}>
+          {children}
+          {bleHostCentral != null ? (
+            <BleHostSheet
+              centralId={bleHostCentral}
+              onAllow={() => {
+                const allowResolve = bleHostResolveRef.current;
+                bleHostResolveRef.current = null;
+                setBleHostCentral(null);
+                allowResolve?.(true);
+              }}
+              onReject={() => {
+                const allowResolve = bleHostResolveRef.current;
+                bleHostResolveRef.current = null;
+                setBleHostCentral(null);
+                allowResolve?.(false);
+              }}
+            />
+          ) : null}
+        </View>
       </I18nProvider>
     </AppStateContext.Provider>
   );
@@ -886,5 +904,5 @@ export function useAppState(): AppStateValue {
 
 export function useSessionMs(): number {
   const { settings } = useAppState();
-  return settings.autoLockMinutes * 60 * 1000;
+  return minutesToIdleMs(settings.autoLockMinutes);
 }

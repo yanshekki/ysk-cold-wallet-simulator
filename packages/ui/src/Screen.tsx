@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets, type Edge } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollView, KeyboardStickyView } from './keyboard';
 import { colors, fonts, hairline, space, typography } from './theme';
+import { userActivityViewProps } from './userActivity';
 
 type Props = {
   title: string;
@@ -62,7 +63,10 @@ export function Screen({
   );
 
   return (
-    <View style={[styles.safe, { paddingTop: padTop, paddingBottom: padBottom }]}>
+    <View
+      style={[styles.safe, { paddingTop: padTop, paddingBottom: padBottom }]}
+      {...userActivityViewProps()}
+    >
       {scroll ? (
         <KeyboardAwareScrollView
           style={styles.fill}

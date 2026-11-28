@@ -11,6 +11,7 @@ import { Button } from './Button';
 import { HoldToConfirm } from './HoldToConfirm';
 import { SigningDetailView, type SigningCopy, type SigningHexCopy } from './SigningDetail';
 import { BRAND_LABEL, brandColor, colors, fonts, hairline, radius, space } from './theme';
+import { userActivityViewProps } from './userActivity';
 
 type Props = {
   visible: boolean;
@@ -131,7 +132,7 @@ export function SigningModal({
 
   if (embedded) {
     return (
-      <View style={styles.embeddedHost} testID="signing-embedded">
+      <View style={styles.embeddedHost} testID="signing-embedded" {...userActivityViewProps()}>
         {sheet}
       </View>
     );
@@ -139,7 +140,9 @@ export function SigningModal({
 
   return (
     <Modal visible={visible} transparent animationType="fade" statusBarTranslucent>
-      <GestureHandlerRootView style={styles.flex}>{sheet}</GestureHandlerRootView>
+      <GestureHandlerRootView style={styles.flex} {...userActivityViewProps()}>
+        {sheet}
+      </GestureHandlerRootView>
     </Modal>
   );
 }

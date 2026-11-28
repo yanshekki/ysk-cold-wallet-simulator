@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { KeyboardAvoidingView } from './keyboard';
 import { colors, fonts, hairline, radius, space } from './theme';
+import { userActivityViewProps } from './userActivity';
 
 type Props = {
   visible: boolean;
@@ -29,7 +30,12 @@ export function Sheet({
 }: Props) {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
-      <KeyboardAvoidingView behavior="padding" automaticOffset style={styles.frame}>
+      <KeyboardAvoidingView
+        behavior="padding"
+        automaticOffset
+        style={styles.frame}
+        {...userActivityViewProps()}
+      >
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={closeLabel}
