@@ -1,5 +1,5 @@
 import { Alert, StyleSheet, Text, View } from 'react-native';
-import { LogEditor, colors, space } from '@cws/ui';
+import { LogEditor, colors, space, userActivityViewProps } from '@cws/ui';
 import { copyText, exportText } from '../../src/lab/copy';
 import { useT } from '../../src/i18n';
 import { useAppState } from '../../src/state/AppState';
@@ -22,7 +22,7 @@ export default function ConsoleScreen() {
   };
 
   return (
-    <View style={styles.body}>
+    <View style={styles.body} collapsable={false} {...userActivityViewProps()}>
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <LogEditor
         entries={logs}

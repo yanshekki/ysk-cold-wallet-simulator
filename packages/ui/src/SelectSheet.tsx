@@ -3,6 +3,7 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 
 import { Button } from './Button';
 import { KeyboardAvoidingView } from './keyboard';
 import { colors, fonts, hairline, radius, space } from './theme';
+import { userActivityViewProps } from './userActivity';
 
 export type SelectSheetOption = {
   id: string;
@@ -53,7 +54,12 @@ export function SelectSheet({
   }, [options, query]);
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
-      <KeyboardAvoidingView behavior="padding" automaticOffset style={styles.frame}>
+      <KeyboardAvoidingView
+        behavior="padding"
+        automaticOffset
+        style={styles.frame}
+        {...userActivityViewProps()}
+      >
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={cancelLabel}

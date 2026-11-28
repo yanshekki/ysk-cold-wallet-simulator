@@ -3,6 +3,7 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 
 import { Button } from './Button';
 import { KeyboardAvoidingView } from './keyboard';
 import { colors, fonts, hairline, radius, space } from './theme';
+import { userActivityViewProps } from './userActivity';
 
 export type GroupedSelectOption = {
   id: string;
@@ -86,7 +87,12 @@ export function GroupedSelectSheet({
   }
 
   const body = (
-    <KeyboardAvoidingView behavior="padding" automaticOffset style={styles.frame}>
+    <KeyboardAvoidingView
+      behavior="padding"
+      automaticOffset
+      style={styles.frame}
+      {...userActivityViewProps()}
+    >
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={cancelLabel}
@@ -203,7 +209,11 @@ export function GroupedSelectSheet({
   );
 
   if (embedded) {
-    return <View style={styles.embeddedHost}>{body}</View>;
+    return (
+      <View style={styles.embeddedHost} {...userActivityViewProps()}>
+        {body}
+      </View>
+    );
   }
 
   return (

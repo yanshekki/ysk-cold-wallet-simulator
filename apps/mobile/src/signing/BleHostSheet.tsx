@@ -1,5 +1,5 @@
 import { Modal, StyleSheet, Text, View } from 'react-native';
-import { Button, colors, fonts, hairline, radius, space } from '@cws/ui';
+import { Button, colors, fonts, hairline, radius, space, userActivityViewProps } from '@cws/ui';
 import { bleHostLabel } from '../ble/bleSignGate';
 import { useT } from '../i18n';
 
@@ -14,7 +14,7 @@ export function BleHostSheet({ centralId, onAllow, onReject }: Props) {
   const label = centralId ? bleHostLabel(centralId) : '';
   return (
     <Modal visible transparent animationType="fade" statusBarTranslucent>
-      <View style={styles.backdrop}>
+      <View style={styles.backdrop} {...userActivityViewProps()}>
         <View style={styles.sheet} testID="ble-host-sheet">
           <Text style={styles.kicker}>{t('signing.bleHostTitle')}</Text>
           {label ? <Text style={styles.id}>{t('signing.bleHostId', { id: label })}</Text> : null}

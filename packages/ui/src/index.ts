@@ -29,6 +29,12 @@ export {
 export { CatalogTable, type CatalogTableLabels } from './CatalogTable';
 export { BootSplash } from './BootSplash';
 export { Hud, formatSessionRemaining, radioMode, type RadioMode } from './Hud';
+export {
+  reportUserActivity,
+  reportUserActivityMove,
+  setUserActivityReporter,
+  userActivityViewProps,
+} from './userActivity';
 export { DeviceCard } from './DeviceCard';
 export { PairingTakeover } from './PairingTakeover';
 export { Toast } from './Toast';

@@ -2,7 +2,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Button, colors, fonts, space } from '@cws/ui';
+import { Button, colors, fonts, space, userActivityViewProps } from '@cws/ui';
 import {
   cameraPreviewKey,
   cameraSettleMs,
@@ -134,7 +134,7 @@ export function QrScanner({
       onDismiss={() => setPresented(false)}
       onRequestClose={onClose}
     >
-      <View style={styles.root} testID="device-qr-scanner" collapsable={false}>
+      <View style={styles.root} testID="device-qr-scanner" collapsable={false} {...userActivityViewProps()}>
         {mountPreview ? (
           <View testID="device-qr-scanner-preview" style={styles.preview} collapsable={false}>
             <CameraView

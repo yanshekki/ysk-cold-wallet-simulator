@@ -13,6 +13,7 @@ import {
   formatSessionRemaining,
   hairline,
   radioMode,
+  userActivityViewProps,
 } from '@cws/ui';
 import { useT } from '../../src/i18n';
 import { HostedSigningModal } from '../../src/signing/HostedSigningModal';
@@ -45,7 +46,7 @@ export default function AppShell() {
   }
 
   return (
-    <View style={styles.root}>
+    <View style={styles.root} collapsable={false} {...userActivityViewProps()}>
       <View style={{ paddingTop: insets.top, backgroundColor: colors.bgElevated }}>
         <Hud
           sessionLabel={formatSessionRemaining(unlockedUntil, now)}
